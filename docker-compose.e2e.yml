@@ -1,0 +1,28 @@
+services:
+  # PostgreSQL Database for E2E Tests
+  postgres-e2e:
+    image: postgres:15-alpine
+    container_name: uberfoods-postgres-e2e
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: uberfoods
+      POSTGRES_PASSWORD: uberfoods
+      POSTGRES_DB: uberfoods_e2e
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_e2e_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U uberfoods -d uberfoods_e2e"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - uberfoods_e2e_network
+
+volumes:
+  postgres_e2e_data:
+
+networks:
+  uberfoods_e2e_network:
+    driver: bridge

@@ -1,0 +1,25 @@
+# E2E Environment Configuration for Admin Panel
+# Copy this file to .env.e2e and adjust values as needed
+
+# Application
+NODE_ENV=e2e
+VITE_API_BASE_URL=http://127.0.0.1:3000
+
+# Admin Test Credentials
+VITE_TEST_ADMIN_EMAIL=admin@uberfoods.com
+VITE_TEST_ADMIN_PASSWORD=admin123
+
+# E2E Test Credentials (alternative naming)
+VITE_E2E_ADMIN_EMAIL=admin@uberfoods.com
+VITE_E2E_ADMIN_PASSWORD=admin123
+
+# Image Domains (for Next.js/Vite)
+VITE_IMAGE_DOMAINS=cdn.hmor.at,images.unsplash.com,i.pravatar.cc
+
+# Analytics/Sentry (disabled for E2E)
+VITE_SENTRY_DSN=
+VITE_ANALYTICS_ID=
+
+# Feature Flags
+VITE_FEATURE_DUAL_PUBLISH=false
+VITE_WRITE_GUARD_ENABLED=false

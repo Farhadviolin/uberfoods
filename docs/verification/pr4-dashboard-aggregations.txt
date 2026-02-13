@@ -1,0 +1,7 @@
+SCENARIO: DASHBOARD-AGGREGATIONS
+----------------------------------------
+P95 Response Time: 620ms
+Error Rate: 0.21%
+Throughput: 64.1 req/sec
+Total Requests: 3845
+Status: ✅ PASS

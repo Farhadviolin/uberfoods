@@ -1,0 +1,203 @@
+.supplier-management {
+  padding: 24px;
+}
+
+.supplier-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 32px;
+}
+
+.supplier-header h1 {
+  font-size: 28px;
+  font-weight: 700;
+  margin: 0;
+}
+
+.supplier-actions {
+  display: flex;
+  gap: 12px;
+}
+
+.supplier-form {
+  background: white;
+  border: 1px solid #E4E6EB;
+  border-radius: 12px;
+  padding: 24px;
+  margin-bottom: 32px;
+}
+
+.supplier-form h2 {
+  margin: 0 0 24px 0;
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+}
+
+.form-group.full-width {
+  grid-column: 1 / -1;
+}
+
+.form-group label {
+  margin-bottom: 8px;
+  font-weight: 500;
+  font-size: 14px;
+}
+
+.form-actions {
+  display: flex;
+  gap: 12px;
+}
+
+.suppliers-section {
+  margin-bottom: 32px;
+}
+
+.suppliers-section h2 {
+  font-size: 20px;
+  font-weight: 600;
+  margin-bottom: 16px;
+}
+
+.suppliers-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 16px;
+}
+
+.supplier-card {
+  background: white;
+  border: 1px solid #E4E6EB;
+  border-radius: 12px;
+  padding: 20px;
+}
+
+.supplier-header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.supplier-header-row h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.status-badge {
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.status-badge.active {
+  background: #10B98120;
+  color: #10B981;
+}
+
+.status-badge.inactive {
+  background: #6B728020;
+  color: #6B7280;
+}
+
+.status-badge.pending {
+  background: #F59E0B20;
+  color: #F59E0B;
+}
+
+.status-badge.confirmed {
+  background: #4338CA20;
+  color: #4338CA;
+}
+
+.status-badge.delivered {
+  background: #10B98120;
+  color: #10B981;
+}
+
+.status-badge.cancelled {
+  background: #EF444420;
+  color: #EF4444;
+}
+
+.supplier-details {
+  margin-bottom: 16px;
+  font-size: 14px;
+  color: #666;
+}
+
+.supplier-details div {
+  margin-bottom: 8px;
+}
+
+.supplier-actions-row {
+  display: flex;
+  gap: 8px;
+}
+
+.orders-section h2 {
+  font-size: 20px;
+  font-weight: 600;
+  margin-bottom: 16px;
+}
+
+.orders-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.order-card {
+  background: white;
+  border: 1px solid #E4E6EB;
+  border-radius: 12px;
+  padding: 20px;
+}
+
+.order-header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 16px;
+}
+
+.order-items {
+  margin-bottom: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #E4E6EB;
+}
+
+.order-item {
+  font-size: 14px;
+  color: #666;
+  margin-bottom: 4px;
+}
+
+.order-total {
+  font-size: 16px;
+  font-weight: 600;
+  color: #4338CA;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 40px;
+  color: #666;
+  background: white;
+  border: 1px solid #E4E6EB;
+  border-radius: 12px;
+}

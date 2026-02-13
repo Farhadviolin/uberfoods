@@ -1,0 +1,21 @@
+{
+  "created": "2025-12-21T22:45:00.000Z",
+  "environment": "local",
+  "metrics": {
+    "orders-paging": {
+      "p95": 320,
+      "errorRate": 0.1,
+      "throughput": 145.2
+    },
+    "dashboard-aggregations": {
+      "p95": 580,
+      "errorRate": 0.05,
+      "throughput": 78.5
+    },
+    "order-status-updates": {
+      "p95": 280,
+      "errorRate": 0.02,
+      "throughput": 245.8
+    }
+  }
+}

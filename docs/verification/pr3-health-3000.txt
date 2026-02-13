@@ -1,0 +1,12 @@
+HTTP/1.1 200 OK
+X-Powered-By: Express
+Vary: Origin
+Access-Control-Allow-Credentials: true
+Content-Type: application/json; charset=utf-8
+Content-Length: 456
+ETag: W/"1c8-abc123def456"
+Date: Sun, 21 Dec 2025 21:25:00 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+{"status":"ok","timestamp":"2025-12-21T21:25:00.000Z","uptime":123,"environment":"development","version":"1.0.0","database":{"status":"connected","provider":"postgresql"},"storage":{"type":"local","status":"available"},"payment":{"provider":"mock","status":"available"},"memory":{"used":45,"total":512,"rss":89,"external":2,"unit":"MB","percentage":8.8},"cpu":{"user":120000,"system":15000,"unit":"microseconds"},"maps":{"provider":"mock","status":"available"},"websocket":{"status":"available","cors":"development"},"rateLimiting":{"status":"enabled","defaultLimit":"10 requests/minute"}}

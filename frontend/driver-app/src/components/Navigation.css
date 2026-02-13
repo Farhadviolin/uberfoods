@@ -1,0 +1,198 @@
+.navigation-container {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 500px;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.navigation-loading-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(255, 255, 255, 0.9);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  font-size: 18px;
+  font-weight: 500;
+}
+
+.navigation-error-banner {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  right: 10px;
+  background: #ff6b6b;
+  color: white;
+  padding: 12px 16px;
+  border-radius: 8px;
+  z-index: 1000;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.navigation-error-banner button {
+  background: white;
+  color: #ff6b6b;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: 500;
+  font-size: 14px;
+}
+
+.navigation-error-banner button:hover {
+  background: #f0f0f0;
+}
+
+.navigation-info {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  background: white;
+  border-radius: 8px;
+  padding: 16px;
+  z-index: 1000;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  max-width: 300px;
+  max-height: 70vh;
+  overflow-y: auto;
+}
+
+.route-stats {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 16px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.stat-label {
+  font-size: 12px;
+  color: #666;
+  margin-bottom: 4px;
+}
+
+.stat-value {
+  font-size: 16px;
+  font-weight: 600;
+  color: #333;
+}
+
+.route-points {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.route-point {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px;
+  border-radius: 6px;
+  background: #f8f9fa;
+  transition: background 0.2s;
+}
+
+.route-point:hover {
+  background: #e9ecef;
+}
+
+.point-marker {
+  font-size: 24px;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: white;
+  border-radius: 50%;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.point-info {
+  flex: 1;
+}
+
+.point-name {
+  font-weight: 500;
+  color: #333;
+  margin-bottom: 4px;
+}
+
+.point-eta {
+  font-size: 12px;
+  color: #666;
+}
+
+.navigation-loading,
+.navigation-error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 500px;
+  background: #f8f9fa;
+  border-radius: 8px;
+  color: #666;
+}
+
+.navigation-error p {
+  margin: 8px 0;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .navigation-info {
+    max-width: calc(100% - 20px);
+    font-size: 14px;
+  }
+
+  .route-stats {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .stat {
+    flex-direction: row;
+    justify-content: space-between;
+  }
+}
+
+/* Effizienz-Styles für Advanced Routing */
+.efficiency-high {
+  color: #10b981 !important;
+  font-weight: 700;
+}
+
+.efficiency-medium {
+  color: #f59e0b !important;
+  font-weight: 700;
+}
+
+.efficiency-low {
+  color: #ef4444 !important;
+  font-weight: 700;
+}
+
+.stat-value.earnings {
+  color: #059669 !important;
+  font-weight: 700;
+}
+

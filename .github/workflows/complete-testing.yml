@@ -1,0 +1,398 @@
+name: Complete Testing Suite
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  workflow_dispatch:
+
+jobs:
+  unit-tests:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [18.x, 20.x]
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Setup Node.js ${{ matrix.node-version }}
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ matrix.node-version }}
+        cache: 'npm'
+
+    - name: Install Backend Dependencies
+      run: cd backend && npm ci
+
+    - name: Install Frontend Dependencies
+      run: |
+        cd frontend/customer-web && npm ci
+        cd ../driver-app && npm ci
+        cd ../restaurant-web && npm ci
+        cd ../admin-panel && npm ci
+
+    - name: Run Backend Unit Tests
+      run: cd backend && npm run test:cov
+
+    - name: Run Customer Web Unit Tests
+      run: cd frontend/customer-web && npm run test:coverage
+
+    - name: Run Driver App Unit Tests
+      run: cd frontend/driver-app && npm run test:coverage
+
+    - name: Run Restaurant Web Unit Tests
+      run: cd frontend/restaurant-web && npm run test:coverage
+
+    - name: Run Admin Panel Unit Tests
+      run: cd frontend/admin-panel && npm run test:coverage
+
+    - name: Upload Coverage Reports
+      uses: codecov/codecov-action@v3
+      with:
+        files: ./backend/coverage/lcov.info,./frontend/*/coverage/lcov.info
+        flags: unit-tests
+        fail_ci_if_error: false
+
+  e2e-tests:
+    name: E2E Tests
+    runs-on: ubuntu-latest
+    needs: unit-tests
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: 20.x
+        cache: 'npm'
+
+    - name: Install Playwright Browsers
+      run: npx playwright install --with-deps
+
+    - name: Install Dependencies
+      run: |
+        cd backend && npm ci
+        cd ../frontend/customer-web && npm ci && npx playwright install
+        cd ../driver-app && npm ci && npx playwright install
+        cd ../restaurant-web && npm ci && npx playwright install
+        cd ../admin-panel && npm ci && npx playwright install
+
+    - name: Run Customer Web E2E Tests
+      run: cd frontend/customer-web && npm run test:e2e
+      env:
+        BASE_URL: http://localhost:3002
+
+    - name: Run Driver App E2E Tests
+      run: cd frontend/driver-app && npm run test:e2e
+      env:
+        BASE_URL: http://localhost:3003
+
+    - name: Run Restaurant Web E2E Tests
+      run: cd frontend/restaurant-web && npm run test:e2e
+      env:
+        BASE_URL: http://localhost:3004
+
+    - name: Run Admin Panel E2E Tests
+      run: cd frontend/admin-panel && npm run test:e2e
+      env:
+        BASE_URL: http://localhost:3001
+
+    - name: Upload E2E Test Results
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: e2e-results
+        path: |
+          frontend/*/test-results/
+          frontend/*/playwright-report/
+
+  integration-tests:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    needs: e2e-tests
+
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: testpassword
+          POSTGRES_DB: uberfoods_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: 20.x
+        cache: 'npm'
+
+    - name: Install Dependencies
+      run: |
+        cd backend && npm ci
+        cd ../test && npm ci
+
+    - name: Setup Database
+      run: |
+        cd backend
+        npm run db:migrate:test
+        npm run db:seed:test
+
+    - name: Run Integration Tests
+      run: cd test && npm run test:integration
+      env:
+        DATABASE_URL: postgresql://postgres:testpassword@localhost:5432/uberfoods_test
+        REDIS_URL: redis://localhost:6379
+        JWT_SECRET: test-jwt-secret-for-ci
+        NODE_ENV: test
+
+  performance-tests:
+    name: Performance Tests
+    runs-on: ubuntu-latest
+    needs: integration-tests
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: 20.x
+        cache: 'npm'
+
+    - name: Install Artillery
+      run: npm install -g artillery
+
+    - name: Install Dependencies
+      run: |
+        cd backend && npm ci
+        cd ../frontend/customer-web && npm ci
+        cd ../test && npm ci
+
+    - name: Run Performance Tests
+      run: |
+        cd test
+        artillery run performance.yml --output performance-results.json
+        artillery report performance-results.json
+
+    - name: Upload Performance Results
+      uses: actions/upload-artifact@v3
+      with:
+        name: performance-results
+        path: test/performance-results.json
+
+  cross-app-integration:
+    name: Cross-App Integration Tests
+    runs-on: ubuntu-latest
+    needs: performance-tests
+
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: testpassword
+          POSTGRES_DB: uberfoods_integration
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: 20.x
+        cache: 'npm'
+
+    - name: Install Playwright Browsers
+      run: npx playwright install --with-deps
+
+    - name: Install All Dependencies
+      run: |
+        cd backend && npm ci
+        cd ../frontend/customer-web && npm ci && npx playwright install
+        cd ../driver-app && npm ci && npx playwright install
+        cd ../restaurant-web && npm ci && npx playwright install
+        cd ../admin-panel && npm ci && npx playwright install
+        cd ../test && npm ci
+
+    - name: Setup Integration Database
+      run: |
+        cd backend
+        npm run db:migrate:test
+        npm run db:seed:integration
+
+    - name: Run Cross-App Integration Tests
+      run: cd test && npm run test:cross-app
+      env:
+        DATABASE_URL: postgresql://postgres:testpassword@localhost:5432/uberfoods_integration
+        REDIS_URL: redis://localhost:6379
+        JWT_SECRET: integration-test-secret
+        NODE_ENV: test
+        CUSTOMER_WEB_URL: http://localhost:3002
+        DRIVER_APP_URL: http://localhost:3003
+        RESTAURANT_WEB_URL: http://localhost:3004
+        ADMIN_PANEL_URL: http://localhost:3001
+
+    - name: Upload Integration Test Results
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: integration-results
+        path: test/test-results/
+
+  security-tests:
+    name: Security Tests
+    runs-on: ubuntu-latest
+    needs: cross-app-integration
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: 20.x
+        cache: 'npm'
+
+    - name: Install Security Tools
+      run: |
+        npm install -g audit-ci
+        npm install -g njsscan
+        npm install -g semgrep
+
+    - name: Run Security Audit
+      run: |
+        cd backend && npm audit --audit-level moderate
+        cd ../frontend/customer-web && npm audit --audit-level moderate
+        cd ../driver-app && npm audit --audit-level moderate
+        cd ../restaurant-web && npm audit --audit-level moderate
+        cd ../admin-panel && npm audit --audit-level moderate
+
+    - name: Run Code Security Scan
+      run: |
+        # Scan for common security issues
+        semgrep --config auto --include="*.ts,*.tsx,*.js,*.jsx" --exclude="node_modules/**" .
+
+    - name: Check for Secrets
+      run: |
+        # Check for accidentally committed secrets
+        if grep -r "password\|secret\|key\|token" --include="*.ts" --include="*.tsx" --include="*.js" --include="*.json" --exclude-dir=node_modules --exclude-dir=.git . | grep -v "test\|mock\|example\|config"; then
+          echo "Potential secrets found in code!"
+          exit 1
+        fi
+
+  deployment-readiness:
+    name: Deployment Readiness Check
+    runs-on: ubuntu-latest
+    needs: [security-tests, cross-app-integration]
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Check Test Coverage
+      run: |
+        # Ensure minimum test coverage
+        if [ ! -f "backend/coverage/coverage-summary.json" ]; then
+          echo "Backend test coverage not found!"
+          exit 1
+        fi
+
+        BACKEND_COVERAGE=$(jq '.total.lines.pct' backend/coverage/coverage-summary.json)
+        if (( $(echo "$BACKEND_COVERAGE < 80" | bc -l) )); then
+          echo "Backend test coverage too low: $BACKEND_COVERAGE%"
+          exit 1
+        fi
+
+        echo "✅ Test coverage requirements met: ${BACKEND_COVERAGE}%"
+
+    - name: Check Build Success
+      run: |
+        cd backend && npm run build
+        cd ../frontend/customer-web && npm run build
+        cd ../driver-app && npm run build
+        cd ../restaurant-web && npm run build
+        cd ../admin-panel && npm run build
+
+    - name: Check Environment Configuration
+      run: |
+        # Check for required environment variables
+        if [ ! -f "backend/.env.production.example" ]; then
+          echo "Production environment template missing!"
+          exit 1
+        fi
+
+        if [ ! -f "docker-compose.production.yml" ]; then
+          echo "Production Docker Compose missing!"
+          exit 1
+        fi
+
+    - name: Validate Deployment Scripts
+      run: |
+        if [ ! -f "scripts/deploy-production.sh" ]; then
+          echo "Deployment script missing!"
+          exit 1
+        fi
+
+        if [ ! -f "nginx/nginx.production.conf" ]; then
+          echo "Nginx production config missing!"
+          exit 1
+        fi
+
+    - name: Tag Release
+      if: success()
+      run: |
+        # Auto-tag successful builds
+        git tag "v$(date +%Y%m%d_%H%M%S)"
+        git push origin --tags
+
+  notify:
+    name: Notification
+    runs-on: ubuntu-latest
+    needs: [deployment-readiness]
+    if: always()
+
+    steps:
+    - name: Notify Success
+      if: needs.deployment-readiness.result == 'success'
+      run: |
+        echo "🎉 All tests passed! System is production-ready."
+        echo "✅ Unit Tests: PASSED"
+        echo "✅ E2E Tests: PASSED"
+        echo "✅ Integration Tests: PASSED"
+        echo "✅ Performance Tests: PASSED"
+        echo "✅ Security Tests: PASSED"
+        echo "✅ Deployment Ready: PASSED"
+
+    - name: Notify Failure
+      if: needs.deployment-readiness.result == 'failure'
+      run: |
+        echo "❌ Some tests failed. Please review and fix issues before deployment."
+        echo "Check the test results and logs for details."

@@ -1,0 +1,840 @@
+openapi: 3.0.3
+info:
+  title: UberFoods API
+  version: 1.0.0
+  description: Complete API documentation for UberFoods food delivery platform
+  contact:
+    name: UberFoods API Support
+    email: api@uberfoods.com
+    url: https://uberfoods.com/api-support
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: https://api.uberfoods.com/v1
+    description: Production server
+  - url: https://staging-api.uberfoods.com/v1
+    description: Staging server
+  - url: http://localhost:3000
+    description: Development server
+
+security:
+  - bearerAuth: []
+  - apiKeyAuth: []
+
+paths:
+
+  # Authentication
+  /auth/register:
+    post:
+      tags: ["Authentication"]
+      summary: Register a new user
+      description: Create a new user account with email and password
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - password
+                - firstName
+                - lastName
+                - role
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: "user@example.com"
+                password:
+                  type: string
+                  minLength: 8
+                  example: "securepassword123"
+                firstName:
+                  type: string
+                  example: "John"
+                lastName:
+                  type: string
+                  example: "Doe"
+                role:
+                  type: string
+                  enum: ["customer", "driver", "restaurant_owner"]
+                  example: "customer"
+                phone:
+                  type: string
+                  example: "+1234567890"
+      responses:
+        201:
+          description: User created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user:
+                    $ref: '#/components/schemas/User'
+                  token:
+                    type: string
+                    example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                  refreshToken:
+                    type: string
+                    example: "refresh_token_here"
+        400:
+          $ref: '#/components/responses/BadRequest'
+        409:
+          $ref: '#/components/responses/Conflict'
+
+  /auth/login:
+    post:
+      tags: ["Authentication"]
+      summary: User login
+      description: Authenticate user with email and password
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - password
+              properties:
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+      responses:
+        200:
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user:
+                    $ref: '#/components/schemas/User'
+                  token:
+                    type: string
+                  refreshToken:
+                    type: string
+        401:
+          $ref: '#/components/responses/Unauthorized'
+
+  # Restaurants
+  /restaurants:
+    get:
+      tags: ["Restaurants"]
+      summary: Get restaurants list
+      description: Retrieve paginated list of restaurants with filtering options
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+          description: Page number
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+            maximum: 100
+          description: Number of items per page
+        - name: cuisine
+          in: query
+          schema:
+            type: string
+          description: Filter by cuisine type
+        - name: rating
+          in: query
+          schema:
+            type: number
+            minimum: 1
+            maximum: 5
+          description: Minimum rating filter
+        - name: deliveryTime
+          in: query
+          schema:
+            type: integer
+          description: Maximum delivery time in minutes
+        - name: latitude
+          in: query
+          schema:
+            type: number
+          description: User latitude for location-based search
+        - name: longitude
+          in: query
+          schema:
+            type: number
+          description: User longitude for location-based search
+      responses:
+        200:
+          description: Restaurants retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  restaurants:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Restaurant'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+        400:
+          $ref: '#/components/responses/BadRequest'
+
+  /restaurants/{id}:
+    get:
+      tags: ["Restaurants"]
+      summary: Get restaurant details
+      description: Retrieve detailed information about a specific restaurant
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Restaurant ID
+      responses:
+        200:
+          description: Restaurant details retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RestaurantDetail'
+        404:
+          $ref: '#/components/responses/NotFound'
+
+  # Orders
+  /orders:
+    post:
+      tags: ["Orders"]
+      summary: Create new order
+      description: Place a new food order
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - restaurantId
+                - items
+                - deliveryAddress
+              properties:
+                restaurantId:
+                  type: string
+                  example: "rest_123"
+                items:
+                  type: array
+                  items:
+                    type: object
+                    required:
+                      - dishId
+                      - quantity
+                    properties:
+                      dishId:
+                        type: string
+                        example: "dish_456"
+                      quantity:
+                        type: integer
+                        minimum: 1
+                        example: 2
+                      specialInstructions:
+                        type: string
+                        example: "No onions please"
+                deliveryAddress:
+                  $ref: '#/components/schemas/Address'
+                paymentMethod:
+                  type: object
+                  properties:
+                    type:
+                      type: string
+                      enum: ["card", "paypal", "apple_pay"]
+                      example: "card"
+                    cardId:
+                      type: string
+                      example: "card_789"
+                tip:
+                  type: number
+                  minimum: 0
+                  example: 5.00
+      responses:
+        201:
+          description: Order created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+        400:
+          $ref: '#/components/responses/BadRequest'
+        401:
+          $ref: '#/components/responses/Unauthorized'
+
+    get:
+      tags: ["Orders"]
+      summary: Get user orders
+      description: Retrieve user's order history
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+            maximum: 100
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: ["pending", "confirmed", "preparing", "ready", "picked_up", "delivered", "cancelled"]
+      responses:
+        200:
+          description: Orders retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  orders:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Order'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+
+  /orders/{id}:
+    get:
+      tags: ["Orders"]
+      summary: Get order details
+      description: Retrieve detailed information about a specific order
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Order ID
+      responses:
+        200:
+          description: Order details retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderDetail'
+        404:
+          $ref: '#/components/responses/NotFound'
+
+  # Driver endpoints
+  /drivers/me/orders/available:
+    get:
+      tags: ["Driver"]
+      summary: Get available orders
+      description: Retrieve orders available for pickup
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: latitude
+          in: query
+          schema:
+            type: number
+          description: Driver's current latitude
+        - name: longitude
+          in: query
+          schema:
+            type: number
+          description: Driver's current longitude
+        - name: radius
+          in: query
+          schema:
+            type: number
+            default: 5
+          description: Search radius in kilometers
+      responses:
+        200:
+          description: Available orders retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  orders:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Order'
+
+  /drivers/me/orders/{orderId}/accept:
+    post:
+      tags: ["Driver"]
+      summary: Accept order
+      description: Accept an available order for delivery
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: orderId
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Order ID
+      responses:
+        200:
+          description: Order accepted successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+        409:
+          $ref: '#/components/responses/Conflict'
+
+  # WebSocket endpoints (for real-time updates)
+  /socket.io/:
+    get:
+      tags: ["WebSocket"]
+      summary: WebSocket connection
+      description: Establish WebSocket connection for real-time updates
+      parameters:
+        - name: token
+          in: query
+          schema:
+            type: string
+          description: JWT token for authentication
+      responses:
+        101:
+          description: WebSocket connection established
+
+components:
+  schemas:
+
+    # User schemas
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          example: "user_123"
+        email:
+          type: string
+          format: email
+          example: "user@example.com"
+        firstName:
+          type: string
+          example: "John"
+        lastName:
+          type: string
+          example: "Doe"
+        role:
+          type: string
+          enum: ["customer", "driver", "restaurant_owner"]
+          example: "customer"
+        phone:
+          type: string
+          example: "+1234567890"
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    # Restaurant schemas
+    Restaurant:
+      type: object
+      properties:
+        id:
+          type: string
+          example: "rest_123"
+        name:
+          type: string
+          example: "Mario's Pizza"
+        description:
+          type: string
+          example: "Authentic Italian pizza since 1995"
+        cuisine:
+          type: string
+          example: "Italian"
+        rating:
+          type: number
+          minimum: 0
+          maximum: 5
+          example: 4.5
+        reviewCount:
+          type: integer
+          example: 1250
+        deliveryTime:
+          type: integer
+          example: 25
+        deliveryFee:
+          type: number
+          example: 2.99
+        minimumOrder:
+          type: number
+          example: 15.00
+        isOpen:
+          type: boolean
+          example: true
+        image:
+          type: string
+          format: uri
+          example: "https://cdn.uberfoods.com/restaurants/rest_123.jpg"
+        address:
+          $ref: '#/components/schemas/Address'
+
+    RestaurantDetail:
+      allOf:
+        - $ref: '#/components/schemas/Restaurant'
+        - type: object
+          properties:
+            menu:
+              type: array
+              items:
+                $ref: '#/components/schemas/MenuCategory'
+            reviews:
+              type: array
+              items:
+                $ref: '#/components/schemas/Review'
+            operatingHours:
+              type: object
+              properties:
+                monday:
+                  $ref: '#/components/schemas/Hours'
+                tuesday:
+                  $ref: '#/components/schemas/Hours'
+                wednesday:
+                  $ref: '#/components/schemas/Hours'
+                thursday:
+                  $ref: '#/components/schemas/Hours'
+                friday:
+                  $ref: '#/components/schemas/Hours'
+                saturday:
+                  $ref: '#/components/schemas/Hours'
+                sunday:
+                  $ref: '#/components/schemas/Hours'
+
+    MenuCategory:
+      type: object
+      properties:
+        id:
+          type: string
+          example: "cat_123"
+        name:
+          type: string
+          example: "Pizza"
+        dishes:
+          type: array
+          items:
+            $ref: '#/components/schemas/Dish'
+
+    Dish:
+      type: object
+      properties:
+        id:
+          type: string
+          example: "dish_123"
+        name:
+          type: string
+          example: "Margherita Pizza"
+        description:
+          type: string
+          example: "Fresh tomato sauce, mozzarella, basil"
+        price:
+          type: number
+          example: 12.99
+        image:
+          type: string
+          format: uri
+          example: "https://cdn.uberfoods.com/dishes/dish_123.jpg"
+        isVegetarian:
+          type: boolean
+          example: true
+        isVegan:
+          type: boolean
+          example: false
+        allergens:
+          type: array
+          items:
+            type: string
+          example: ["dairy", "gluten"]
+
+    # Order schemas
+    Order:
+      type: object
+      properties:
+        id:
+          type: string
+          example: "order_123"
+        customerId:
+          type: string
+          example: "user_123"
+        restaurantId:
+          type: string
+          example: "rest_123"
+        driverId:
+          type: string
+          example: "user_456"
+        status:
+          type: string
+          enum: ["pending", "confirmed", "preparing", "ready", "picked_up", "delivered", "cancelled"]
+          example: "confirmed"
+        items:
+          type: array
+          items:
+            type: object
+            properties:
+              dishId:
+                type: string
+                example: "dish_123"
+              dishName:
+                type: string
+                example: "Margherita Pizza"
+              quantity:
+                type: integer
+                example: 2
+              price:
+                type: number
+                example: 12.99
+              specialInstructions:
+                type: string
+                example: "Extra cheese"
+        subtotal:
+          type: number
+          example: 25.98
+        deliveryFee:
+          type: number
+          example: 2.99
+        tip:
+          type: number
+          example: 5.00
+        tax:
+          type: number
+          example: 2.60
+        total:
+          type: number
+          example: 36.57
+        deliveryAddress:
+          $ref: '#/components/schemas/Address'
+        createdAt:
+          type: string
+          format: date-time
+        estimatedDeliveryTime:
+          type: string
+          format: date-time
+
+    OrderDetail:
+      allOf:
+        - $ref: '#/components/schemas/Order'
+        - type: object
+          properties:
+            restaurant:
+              $ref: '#/components/schemas/Restaurant'
+            driver:
+              $ref: '#/components/schemas/User'
+            timeline:
+              type: array
+              items:
+                type: object
+                properties:
+                  status:
+                    type: string
+                  timestamp:
+                    type: string
+                    format: date-time
+                  description:
+                    type: string
+
+    # Common schemas
+    Address:
+      type: object
+      properties:
+        street:
+          type: string
+          example: "123 Main St"
+        city:
+          type: string
+          example: "New York"
+        state:
+          type: string
+          example: "NY"
+        zipCode:
+          type: string
+          example: "10001"
+        country:
+          type: string
+          example: "US"
+        latitude:
+          type: number
+          example: 40.7128
+        longitude:
+          type: number
+          example: -74.0060
+
+    Hours:
+      type: object
+      properties:
+        open:
+          type: string
+          format: time
+          example: "11:00"
+        close:
+          type: string
+          format: time
+          example: "23:00"
+        isOpen:
+          type: boolean
+          example: true
+
+    Review:
+      type: object
+      properties:
+        id:
+          type: string
+          example: "review_123"
+        userId:
+          type: string
+          example: "user_123"
+        userName:
+          type: string
+          example: "John Doe"
+        rating:
+          type: integer
+          minimum: 1
+          maximum: 5
+          example: 5
+        comment:
+          type: string
+          example: "Amazing pizza! Will order again."
+        createdAt:
+          type: string
+          format: date-time
+
+    Pagination:
+      type: object
+      properties:
+        page:
+          type: integer
+          example: 1
+        limit:
+          type: integer
+          example: 20
+        total:
+          type: integer
+          example: 150
+        pages:
+          type: integer
+          example: 8
+
+  # Error responses
+  responses:
+    BadRequest:
+      description: Bad request
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+                example: "VALIDATION_ERROR"
+              message:
+                type: string
+                example: "Invalid input data"
+              details:
+                type: object
+
+    Unauthorized:
+      description: Unauthorized
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+                example: "UNAUTHORIZED"
+              message:
+                type: string
+                example: "Invalid or missing authentication token"
+
+    Forbidden:
+      description: Forbidden
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+                example: "FORBIDDEN"
+              message:
+                type: string
+                example: "Insufficient permissions"
+
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+                example: "NOT_FOUND"
+              message:
+                type: string
+                example: "Resource not found"
+
+    Conflict:
+      description: Conflict
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+                example: "CONFLICT"
+              message:
+                type: string
+                example: "Resource already exists or conflict detected"
+
+    InternalServerError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+                example: "INTERNAL_ERROR"
+              message:
+                type: string
+                example: "An unexpected error occurred"
+
+  # Security schemes
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT token obtained from /auth/login
+
+    apiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      description: API key for server-to-server communication

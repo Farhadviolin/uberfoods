@@ -1,0 +1,288 @@
+.multi-order-view {
+  padding: 20px;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.multi-order-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+  padding-bottom: 16px;
+  border-bottom: 2px solid #E4E6EB;
+}
+
+.multi-order-header h2 {
+  color: #050505;
+  font-size: 24px;
+  font-weight: 700;
+  margin: 0;
+}
+
+.route-info {
+  display: flex;
+  gap: 24px;
+}
+
+.route-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.stat-label {
+  font-size: 12px;
+  color: #65676B;
+  margin-bottom: 4px;
+}
+
+.stat-value {
+  font-size: 18px;
+  font-weight: 600;
+  color: #1877F2;
+}
+
+.multi-order-error {
+  background: #ff6b6b;
+  color: white;
+  padding: 12px 16px;
+  border-radius: 8px;
+  margin-bottom: 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.multi-order-error button {
+  background: white;
+  color: #ff6b6b;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: 500;
+}
+
+.multi-order-content {
+  display: grid;
+  grid-template-columns: 400px 1fr;
+  gap: 24px;
+}
+
+.orders-selection {
+  background: white;
+  border-radius: 8px;
+  padding: 20px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+  border: 1px solid #E4E6EB;
+  max-height: 80vh;
+  overflow-y: auto;
+}
+
+.orders-selection h3 {
+  color: #050505;
+  font-size: 18px;
+  font-weight: 600;
+  margin: 0 0 16px 0;
+}
+
+.orders-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.order-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px;
+  border: 2px solid #E4E6EB;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+  background: white;
+}
+
+.order-item:hover {
+  border-color: #1877F2;
+  background: #F0F2F5;
+}
+
+.order-item.selected {
+  border-color: #1877F2;
+  background: #E7F3FF;
+}
+
+.order-item input[type="checkbox"] {
+  width: 20px;
+  height: 20px;
+  cursor: pointer;
+  margin-top: 2px;
+}
+
+.order-info {
+  flex: 1;
+}
+
+.order-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.order-header strong {
+  color: #050505;
+  font-size: 16px;
+}
+
+.order-status {
+  font-size: 12px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  background: #E4E6EB;
+  color: #65676B;
+}
+
+.order-details {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 14px;
+  color: #65676B;
+}
+
+.route-visualization {
+  background: white;
+  border-radius: 8px;
+  padding: 20px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+  border: 1px solid #E4E6EB;
+}
+
+.route-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 200px;
+  font-size: 18px;
+  color: #65676B;
+}
+
+.route-details {
+  margin-bottom: 24px;
+}
+
+.route-details h3 {
+  color: #050505;
+  font-size: 18px;
+  font-weight: 600;
+  margin: 0 0 16px 0;
+}
+
+.route-points {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.route-point {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  background: #F8F9FA;
+  border-radius: 8px;
+}
+
+.point-number {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #1877F2;
+  color: white;
+  border-radius: 50%;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.point-marker {
+  font-size: 24px;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: white;
+  border-radius: 50%;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.point-info {
+  flex: 1;
+}
+
+.point-name {
+  font-weight: 500;
+  color: #050505;
+  margin-bottom: 4px;
+}
+
+.point-order {
+  font-size: 12px;
+  color: #65676B;
+}
+
+.navigation-container {
+  height: 500px;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.multi-order-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 400px;
+  color: #65676B;
+}
+
+.multi-order-empty div {
+  font-size: 48px;
+  margin-bottom: 16px;
+}
+
+/* KI-Routing Effizienz Styles */
+.efficiency-high {
+  color: #10b981 !important;
+}
+
+.efficiency-medium {
+  color: #f59e0b !important;
+}
+
+.efficiency-low {
+  color: #ef4444 !important;
+}
+
+.stat-value.earnings {
+  color: #059669 !important;
+  font-weight: 700;
+}
+
+/* Responsive */
+@media (max-width: 1024px) {
+  .multi-order-content {
+    grid-template-columns: 1fr;
+  }
+
+  .orders-selection {
+    max-height: 400px;
+  }
+}
+

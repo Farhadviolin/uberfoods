@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-label="UberFoods Driver Icon Large">
+  <defs>
+    <linearGradient id="grad512" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0b5cff"/>
+      <stop offset="100%" stop-color="#0fe3b0"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="72" fill="url(#grad512)"/>
+  <circle cx="256" cy="214" r="100" fill="#0f172a" opacity="0.16"/>
+  <path d="M136 336c0-52 48-80 120-80s120 28 120 80-48 76-120 76-120-24-120-76z" fill="#0f172a" opacity="0.2"/>
+  <text x="50%" y="55%" text-anchor="middle" font-family="Inter, Arial, sans-serif" font-size="140" font-weight="700" fill="#fff">UF</text>
+</svg>

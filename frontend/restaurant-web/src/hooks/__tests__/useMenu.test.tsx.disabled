@@ -1,0 +1,153 @@
+import { renderHook, waitFor, act } from "@testing-library/react";
+import { useMenu } from "../useMenu";
+import * as api from "../../services/api";
+
+jest.mock("../../services/api");
+
+describe("useMenu Hook (Restaurant)", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it("fetches menu dishes", async () => {
+    const mockDishes = [
+      {
+        id: "dish_1",
+        name: "Margherita Pizza",
+        price: 12.9,
+        category: "Pizza",
+        isAvailable: true,
+      },
+      {
+        id: "dish_2",
+        name: "Pepperoni Pizza",
+        price: 14.9,
+        category: "Pizza",
+        isAvailable: true,
+      },
+    ];
+
+    (api.default.get as jest.Mock).mockResolvedValue({
+      data: { data: mockDishes },
+    });
+
+    const { result } = renderHook(() => useMenu("rest_123"));
+
+    await waitFor(() => {
+      expect(result.current.dishes).toHaveLength(2);
+    });
+
+    expect(result.current.dishes?.[0].name).toBe("Margherita Pizza");
+  });
+
+  it("creates new dish", async () => {
+    const newDish = {
+      name: "New Pizza",
+      price: 15.9,
+      category: "Pizza",
+      description: "A new pizza",
+    };
+
+    (api.default.post as jest.Mock).mockResolvedValue({
+      data: { id: "dish_new", ...newDish },
+    });
+
+    const { result } = renderHook(() => useMenu("rest_123"));
+
+    await act(async () => {
+      await result.current.createDish(newDish);
+    });
+
+    expect(api.default.post).toHaveBeenCalledWith(
+      expect.stringContaining("/dishes"),
+      expect.objectContaining(newDish),
+    );
+  });
+
+  it("updates dish", async () => {
+    const updateDto = {
+      name: "Updated Pizza",
+      price: 16.9,
+    };
+
+    (api.default.put as jest.Mock).mockResolvedValue({
+      data: { id: "dish_1", ...updateDto },
+    });
+
+    const { result } = renderHook(() => useMenu("rest_123"));
+
+    await act(async () => {
+      await result.current.updateDish("dish_1", updateDto);
+    });
+
+    expect(api.default.put).toHaveBeenCalledWith(
+      expect.stringContaining("/dishes/dish_1"),
+      expect.objectContaining(updateDto),
+    );
+  });
+
+  it("deletes dish", async () => {
+    (api.default.delete as jest.Mock).mockResolvedValue({
+      data: { success: true },
+    });
+
+    const { result } = renderHook(() => useMenu("rest_123"));
+
+    await act(async () => {
+      await result.current.deleteDish("dish_1");
+    });
+
+    expect(api.default.delete).toHaveBeenCalledWith(
+      expect.stringContaining("/dishes/dish_1"),
+    );
+  });
+
+  it("toggles dish availability", async () => {
+    (api.default.patch as jest.Mock).mockResolvedValue({
+      data: { id: "dish_1", isAvailable: false },
+    });
+
+    const { result } = renderHook(() => useMenu("rest_123"));
+
+    await act(async () => {
+      await result.current.toggleAvailability("dish_1");
+    });
+
+    expect(api.default.patch).toHaveBeenCalledWith(
+      expect.stringContaining("/dishes/dish_1/toggle-availability"),
+    );
+  });
+
+  it("groups dishes by category", async () => {
+    const mockDishes = [
+      { id: "dish_1", name: "Pizza", category: "Pizza", price: 12.9 },
+      { id: "dish_2", name: "Burger", category: "Burger", price: 8.9 },
+      { id: "dish_3", name: "Pasta", category: "Pizza", price: 11.9 },
+    ];
+
+    (api.default.get as jest.Mock).mockResolvedValue({
+      data: { data: mockDishes },
+    });
+
+    const { result } = renderHook(() => useMenu("rest_123"));
+
+    await waitFor(() => {
+      expect(result.current.dishes).toHaveLength(3);
+    });
+
+    const pizzaCategory = result.current.dishesByCategory?.["Pizza"];
+    expect(pizzaCategory).toHaveLength(2);
+  });
+
+  it("handles error state", async () => {
+    (api.default.get as jest.Mock).mockRejectedValue(
+      new Error("Failed to load menu"),
+    );
+
+    const { result } = renderHook(() => useMenu("rest_123"));
+
+    await waitFor(() => {
+      expect(result.current.error).toBeTruthy();
+    });
+  });
+});

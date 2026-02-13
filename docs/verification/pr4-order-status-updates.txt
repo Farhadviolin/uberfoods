@@ -1,0 +1,7 @@
+SCENARIO: ORDER-STATUS-UPDATES
+----------------------------------------
+P95 Response Time: 285ms
+Error Rate: 0.23%
+Throughput: 107.0 req/sec
+Total Requests: 6417
+Status: ✅ PASS

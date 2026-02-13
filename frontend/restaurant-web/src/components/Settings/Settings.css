@@ -1,0 +1,19 @@
+.settings {
+  padding: var(--fb-space-5);
+}
+
+.settings-section {
+  background: var(--fb-bg-primary);
+  border-radius: var(--fb-radius-md);
+  padding: var(--fb-space-5);
+  border: 1px solid var(--fb-border-primary);
+  box-shadow: var(--fb-shadow-base);
+  margin-bottom: var(--fb-space-5);
+}
+
+.settings-section h2 {
+  font-size: var(--fb-font-size-lg);
+  font-weight: 600;
+  margin: 0;
+}
+

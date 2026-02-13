@@ -1,0 +1,5 @@
+CONTRACT_OK
+hasData=true
+hasMore=true
+hasNextCursor=true
+dataLen=2

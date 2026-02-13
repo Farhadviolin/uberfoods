@@ -1,0 +1,78 @@
+.card {
+  background: var(--color-surface, #ffffff);
+  border-radius: var(--radius-md, 8px);
+  transition: all 0.2s ease-in-out;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Variants */
+.card-default {
+  background: var(--color-surface, #ffffff);
+  border: 1px solid var(--color-border, #e0e0e0);
+}
+
+.card-outlined {
+  background: transparent;
+  border: 1px solid var(--color-border, #e0e0e0);
+}
+
+.card-elevated {
+  background: var(--color-surface, #ffffff);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  border: none;
+}
+
+.card-flat {
+  background: var(--color-surface, #ffffff);
+  border: none;
+  box-shadow: none;
+}
+
+/* Padding */
+.card-padding-none {
+  padding: 0;
+}
+
+.card-padding-sm {
+  padding: 12px;
+}
+
+.card-padding-md {
+  padding: 16px;
+}
+
+.card-padding-lg {
+  padding: 24px;
+}
+
+/* Hoverable */
+.card-hoverable:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+/* Clickable */
+.card-clickable {
+  cursor: pointer;
+}
+
+.card-clickable:active {
+  transform: scale(0.98);
+}
+
+/* Dark Mode */
+[data-theme='dark'] .card-default,
+[data-theme='dark'] .card-elevated,
+[data-theme='dark'] .card-flat {
+  background: var(--color-surface-dark, #1e1e1e);
+  border-color: var(--color-border-dark, #333333);
+}
+
+[data-theme='dark'] .card-outlined {
+  border-color: var(--color-border-dark, #333333);
+}
+
+[data-theme='dark'] .card-hoverable:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}

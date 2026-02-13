@@ -1,0 +1,38 @@
+.app {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background-color: var(--fb-bg-secondary);
+}
+
+.app-content {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+  margin-top: 0;
+  transition: margin-top 0.3s ease;
+}
+
+.app:has(.offline-banner) .app-content {
+  margin-top: 48px;
+}
+
+.app-main {
+  flex: 1;
+  overflow-y: auto;
+  background-color: var(--fb-bg-secondary);
+}
+
+.loading-container {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+@media (max-width: 768px) {
+  .app-content {
+    flex-direction: column;
+  }
+}
+

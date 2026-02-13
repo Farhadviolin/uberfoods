@@ -1,0 +1,9 @@
+.theme-toggle {
+  min-width: 2.5rem;
+  padding: 0.5rem;
+}
+
+.theme-toggle svg {
+  color: currentColor;
+}
+

@@ -1,0 +1,52 @@
+.optimized-image-wrapper {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+.optimized-image-skeleton {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 1;
+}
+
+.optimized-image-blur {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  filter: blur(10px);
+  transform: scale(1.1);
+}
+
+.optimized-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0;
+  transition: opacity 0.3s ease-in-out;
+}
+
+.optimized-image--loaded {
+  opacity: 1;
+  z-index: 2;
+}
+
+.optimized-image--error {
+  opacity: 1;
+  background: #F0F2F5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #8A8D91;
+  font-size: 0.875rem;
+}
+
+[data-theme='dark'] .optimized-image--error {
+  background: #2E3032;
+  color: #8A8D91;
+}
+

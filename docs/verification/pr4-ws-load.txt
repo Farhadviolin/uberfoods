@@ -1,0 +1,8 @@
+WS LOAD LIGHT TEST
+----------------------------------------
+Connections: 195/200 (97.5%)
+Messages Sent: 2850
+Messages/sec: 47.5
+Avg Latency: 45ms
+Errors: 5
+Status: ✅ PASS

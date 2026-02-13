@@ -1,0 +1,19 @@
+# UberFoods Robots.txt
+# Allow all crawlers
+
+User-agent: *
+Allow: /
+
+# Disallow admin/private areas
+Disallow: /dashboard
+Disallow: /profile
+Disallow: /orders
+Disallow: /settings
+Disallow: /admin
+
+# Allow restaurant and menu pages
+Allow: /restaurant/
+Allow: /legal/
+
+# Sitemap location
+Sitemap: https://uberfoods.com/sitemap.xml

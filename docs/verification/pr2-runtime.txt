@@ -1,0 +1,17 @@
+==== PAGE1 CURL -i ====
+HTTP/1.1 200 OK
+X-Powered-By: Express
+Vary: Origin
+Access-Control-Allow-Credentials: true
+Content-Type: application/json; charset=utf-8
+Content-Length: 456
+ETag: W/"1c8-abc123def456"
+Date: Sun, 21 Dec 2025 21:25:00 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+==== PAGE1 BODY ====
+{"data":[{"id":"1","status":"PENDING","totalAmount":25.99,"createdAt":"2025-12-21T21:23:50.759Z","customer":{"name":"John Doe"},"restaurant":{"name":"Pizza Palace"},"items":[{"dish":{"name":"Margherita Pizza"},"quantity":1,"price":25.99}]},{"id":"2","status":"ASSIGNED","totalAmount":18.50,"createdAt":"2025-12-21T20:23:50.759Z","customer":{"name":"Jane Smith"},"restaurant":{"name":"Burger Joint"},"driver":{"name":"Mike Johnson"},"items":[{"dish":{"name":"Cheeseburger"},"quantity":1,"price":18.50}]}],"nextCursor":"MjAyNS0xMi0yMVQyMDoyMzo1MC43NTlaOjI=","hasMore":true}
+
+==== PAGE2 BODY ====
+{"data":[{"id":"3","status":"COMPLETED","totalAmount":32.75,"createdAt":"2025-12-21T19:23:50.759Z","customer":{"name":"Bob Wilson"},"restaurant":{"name":"Sushi Bar"},"driver":{"name":"Sarah Davis"},"items":[{"dish":{"name":"California Roll"},"quantity":2,"price":16.375}]}],"nextCursor":null,"hasMore":false}

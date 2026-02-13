@@ -1,0 +1,198 @@
+/* ========== Progress Component ========== */
+
+.progress-linear-wrapper {
+  width: 100%;
+}
+
+.progress-label-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+  font-size: 0.875rem;
+  color: var(--text-secondary, #757575);
+}
+
+.progress-linear {
+  width: 100%;
+  background: var(--bg-tertiary, #E4E6EB);
+  border-radius: var(--radius-full, 9999px);
+  overflow: hidden;
+  position: relative;
+}
+
+.progress-linear--sm {
+  height: 4px;
+}
+
+.progress-linear--md {
+  height: 8px;
+}
+
+.progress-linear--lg {
+  height: 12px;
+}
+
+.progress-linear-fill {
+  height: 100%;
+  border-radius: var(--radius-full, 9999px);
+  transition: width 0.3s ease-out;
+}
+
+.progress-linear-fill--indeterminate {
+  width: 30%;
+  animation: progress-indeterminate 1.5s ease-in-out infinite;
+}
+
+@keyframes progress-indeterminate {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(400%);
+  }
+}
+
+/* Colors */
+.progress-linear--primary .progress-linear-fill {
+  background: var(--primary-500, #1877F2);
+}
+
+.progress-linear--success .progress-linear-fill {
+  background: var(--success-500, #28a745);
+}
+
+.progress-linear--warning .progress-linear-fill {
+  background: var(--warning-500, #ffc107);
+}
+
+.progress-linear--error .progress-linear-fill {
+  background: var(--error-500, #dc3545);
+}
+
+.progress-linear--info .progress-linear-fill {
+  background: var(--info-500, #17a2b8);
+}
+
+/* Circular Progress */
+.progress-circular-wrapper {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.progress-circular {
+  transform: rotate(-90deg);
+}
+
+.progress-circular-track {
+  stroke: var(--bg-tertiary, #E4E6EB);
+}
+
+.progress-circular-fill {
+  stroke-linecap: round;
+  transition: stroke-dashoffset 0.3s ease-out;
+}
+
+.progress-circular-fill--indeterminate {
+  stroke-dasharray: 1, 200;
+  stroke-dashoffset: 0;
+  animation: progress-circular-indeterminate 1.5s ease-in-out infinite;
+}
+
+@keyframes progress-circular-indeterminate {
+  0% {
+    stroke-dasharray: 1, 200;
+    stroke-dashoffset: 0;
+  }
+  50% {
+    stroke-dasharray: 100, 200;
+    stroke-dashoffset: -15px;
+  }
+  100% {
+    stroke-dasharray: 100, 200;
+    stroke-dashoffset: -125px;
+  }
+}
+
+.progress-circular--sm {
+  width: 40px;
+  height: 40px;
+}
+
+.progress-circular--md {
+  width: 56px;
+  height: 56px;
+}
+
+.progress-circular--lg {
+  width: 72px;
+  height: 72px;
+}
+
+.progress-circular--primary .progress-circular-fill {
+  stroke: var(--primary-500, #1877F2);
+}
+
+.progress-circular--success .progress-circular-fill {
+  stroke: var(--success-500, #28a745);
+}
+
+.progress-circular--warning .progress-circular-fill {
+  stroke: var(--warning-500, #ffc107);
+}
+
+.progress-circular--error .progress-circular-fill {
+  stroke: var(--error-500, #dc3545);
+}
+
+.progress-circular--info .progress-circular-fill {
+  stroke: var(--info-500, #17a2b8);
+}
+
+.progress-label {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-primary, #212121);
+}
+
+.progress-label--sm {
+  font-size: 0.625rem;
+}
+
+.progress-label--lg {
+  font-size: 0.875rem;
+}
+
+/* Dark Mode */
+@media (prefers-color-scheme: dark) {
+  .progress-linear {
+    background: var(--bg-tertiary, #3A3B3C);
+  }
+
+  .progress-circular-track {
+    stroke: var(--bg-tertiary, #3A3B3C);
+  }
+
+  .progress-label {
+    color: var(--text-primary, #E4E6EB);
+  }
+}
+
+[data-theme='dark'] .progress-linear {
+  background: var(--bg-tertiary, #3A3B3C);
+}
+
+[data-theme='dark'] .progress-circular-track {
+  stroke: var(--bg-tertiary, #3A3B3C);
+}
+
+[data-theme='dark'] .progress-label {
+  color: var(--text-primary, #E4E6EB);
+}
+

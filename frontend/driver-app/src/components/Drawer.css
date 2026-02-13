@@ -1,0 +1,98 @@
+.drawer-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 999;
+}
+
+.drawer {
+  position: fixed;
+  background: white;
+  box-shadow: -2px 0 8px rgba(0, 0, 0, 0.1);
+  z-index: 1000;
+  overflow-y: auto;
+}
+
+.drawer-left {
+  top: 0;
+  left: 0;
+  bottom: 0;
+  animation: slideInLeft 0.3s ease-out;
+}
+
+.drawer-right {
+  top: 0;
+  right: 0;
+  bottom: 0;
+  animation: slideInRight 0.3s ease-out;
+}
+
+.drawer-top {
+  top: 0;
+  left: 0;
+  right: 0;
+  animation: slideInTop 0.3s ease-out;
+}
+
+.drawer-bottom {
+  bottom: 0;
+  left: 0;
+  right: 0;
+  animation: slideInBottom 0.3s ease-out;
+}
+
+.drawer-small {
+  width: 300px;
+}
+
+.drawer-medium {
+  width: 400px;
+}
+
+.drawer-large {
+  width: 600px;
+}
+
+.drawer-content {
+  padding: 20px;
+}
+
+@keyframes slideInLeft {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+@keyframes slideInRight {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+@keyframes slideInTop {
+  from {
+    transform: translateY(-100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideInBottom {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+

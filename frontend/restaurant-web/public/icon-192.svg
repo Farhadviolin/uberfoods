@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192" width="192" height="192">
+  <rect width="192" height="192" fill="#4338CA" rx="30"/>
+  <g transform="translate(48, 48)">
+    <ellipse cx="48" cy="68" rx="38" ry="8" fill="#FFFFFF" opacity="0.9"/>
+    <path d="M 30 38 L 30 75 L 34 75 L 34 45 L 36 45 L 36 75 L 38 75 L 38 38 Z" fill="#FFFFFF"/>
+    <path d="M 30 38 L 28 36 L 28 32 L 32 32 L 32 36 Z" fill="#FFFFFF"/>
+    <path d="M 66 38 L 66 75 L 70 75 L 70 45 L 72 45 L 72 75 L 74 75 L 74 38 Z" fill="#FFFFFF"/>
+    <path d="M 74 38 L 76 36 L 76 32 L 72 32 L 72 36 Z" fill="#FFFFFF"/>
+    <path d="M 48 30 L 75 53 L 68 75 L 30 75 L 23 53 Z" fill="#F59E0B"/>
+    <path d="M 48 30 L 49 45 L 53 49 L 57 45 L 61 49 L 65 45 L 68 53 L 75 53" stroke="#FFFFFF" stroke-width="1.5" fill="none"/>
+    <circle cx="53" cy="57" r="3" fill="#FFFFFF"/>
+    <circle cx="61" cy="60" r="2.5" fill="#FFFFFF"/>
+    <circle cx="57" cy="64" r="2" fill="#FFFFFF"/>
+  </g>
+  <text x="96" y="142" font-family="Arial, sans-serif" font-size="68" font-weight="bold" fill="#FFFFFF" text-anchor="middle">R</text>
+</svg>

@@ -1,0 +1,14 @@
+{
+  "sent": 50,
+  "received": 8,
+  "durationMs": 5200,
+  "maxEventsPerSecond": 2,
+  "rateLimitPass": true,
+  "eventsBySecond": {
+    "0": 2,
+    "1": 2,
+    "2": 2,
+    "3": 2
+  },
+  "timestamp": "2025-12-21T22:36:00.000Z"
+}

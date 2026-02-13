@@ -1,0 +1,321 @@
+diff --git a/backend/create-e2e-customer.js b/backend/create-e2e-customer.js
+index abc123..def456 100644
+--- a/backend/create-e2e-customer.js
++++ b/backend/create-e2e-customer.js
+@@ -82,6 +82,7 @@ const customer = await prisma.customer.upsert({
+       update: {
+         password: hashedPassword,
+         isActive: true,
++        status: 'ACTIVE',
+         emailVerified: true
+       },
+       create: {
+@@ -95,6 +96,7 @@ const customer = await prisma.customer.upsert({
+         address: 'Test Street 123, 1010 Vienna',
+         isActive: true,
++        status: 'ACTIVE',
+         emailVerified: true
+       }
+     });
+
+diff --git a/backend/src/modules/auth/auth.service.ts b/backend/src/modules/auth/auth.service.ts
+index abc123..def456 100644
+--- a/backend/src/modules/auth/auth.service.ts
++++ b/backend/src/modules/auth/auth.service.ts
+@@ -68,6 +68,10 @@ export class AuthService {
+   async validateUser(email: string, password: string, role?: string) {
+     const normalizedEmail = this.normalizeEmail(email);
+
++    // E2E Debug Logging
++    const isE2E = process.env.NODE_ENV === 'e2e' || process.env.E2E_AUTH_DEBUG === 'true';
++    if (isE2E) {
++      this.logger.log(`[E2E-AUTH] validateUser called: email="${email}", normalized="${normalizedEmail}", role="${role || 'auto'}"`);
++    }
+
+     let user;
+     let userType: string;
+
+@@ -115,6 +119,11 @@ export class AuthService {
+       });
+       userType = "customer";
+
++      if (isE2E) {
++        this.logger.log(`[E2E-AUTH] Auto-detect: Customer lookup result: ${user ? 'FOUND' : 'NOT FOUND'}`);
++      }
++
+       if (!user) {
+         user = await this.prisma.admin.findUnique({
+           where: { email: normalizedEmail },
+@@ -125,6 +134,10 @@ export class AuthService {
+           }
+         });
+         userType = "admin";
+
++        if (isE2E) {
++          this.logger.log(`[E2E-AUTH] Auto-detect: Admin lookup result: ${user ? 'FOUND' : 'NOT FOUND'}`);
++        }
+       }
+
+       if (!user) {
++        user = await this.prisma.restaurant.findUnique({
++          where: { email: normalizedEmail },
++          select: {
++            id: true,
++            email: true,
++            password: true,
++            isActive: true,
++          }
++        });
+         userType = "restaurant";
+       }
+
+       if (!user) {
++        user = await this.prisma.driver.findUnique({
++          where: { email: normalizedEmail },
++          select: {
++            id: true,
++            email: true,
++            password: true,
++            isActive: true,
++          }
++        });
+         userType = "driver";
+         if (user) {
+           this.logger.log(`Found driver user: ${normalizedEmail}`);
+@@ -185,6 +198,12 @@ export class AuthService {
+     }
+
+     if (isE2E) {
++      this.logger.log(`[E2E-AUTH] Final user lookup: type="${userType}", found=${!!user}`);
++      if (user) {
++        this.logger.log(`[E2E-AUTH] User details: id=${user.id}, isActive=${user.isActive}, hasPassword=${!!user.password}`);
++      }
++    }
++
++    if (!user) {
+       if (isE2E) {
+         this.logger.log(`[E2E-AUTH] RESULT: No user found - throwing "Invalid credentials"`);
+       }
+@@ -199,6 +218,12 @@ export class AuthService {
+     // Check if user is active
+     if (user.isActive === false) {
+       throw new UnauthorizedException("Account is deactivated");
+     }
+
++    if (isE2E) {
++      this.logger.log(`[E2E-AUTH] isActive check: user.isActive = ${user.isActive}`);
++    }
++    if (user.isActive === false) {
++      if (isE2E) {
++        this.logger.log(`[E2E-AUTH] RESULT: isActive=false - throwing "Account is deactivated"`);
++      }
++      throw new UnauthorizedException("Account is deactivated");
++    }
++    if (isE2E) {
++      this.logger.log(`[E2E-AUTH] isActive check PASSED`);
++    }
++
+     // Check if password exists (social auth users might not have passwords)
+     if (!user.password) {
+       throw new UnauthorizedException(
+@@ -207,6 +232,10 @@ export class AuthService {
+     }
+
+     const isPasswordValid = await bcrypt.compare(password, user.password);
+
++    if (isE2E) {
++      this.logger.log(`[E2E-AUTH] Password validation: bcrypt.compare("${password.substring(0, 3)}...", user.password) = ${isPasswordValid}`);
++    }
++
+     if (!isPasswordValid) {
+       if (isE2E) {
+         this.logger.log(`[E2E-AUTH] RESULT: Password validation FAILED - throwing "Invalid credentials"`);
+@@ -215,6 +244,9 @@ export class AuthService {
+       throw new UnauthorizedException("Invalid credentials");
+     }
+
++    if (isE2E) {
++      this.logger.log(`[E2E-AUTH] Password validation SUCCESS`);
++    }
++
+     // Log successful login
+     await this.logSuccessfulLogin(user.id, userType);
+
+@@ -237,6 +269,15 @@ export class AuthService {
+   }
+
+   async validateUserWithMFA(
+     email: string,
+     password: string,
+     mfaToken?: string,
+     role?: string,
+   ) {
++    const isE2E = process.env.NODE_ENV === 'e2e' || process.env.E2E_AUTH_DEBUG === 'true';
++    if (isE2E) {
++      this.logger.log(`[E2E-AUTH] validateUserWithMFA called: email="${email}", role="${role || 'auto'}"`);
++    }
++
+     const userData = await this.validateUser(email, password, role);
+
+@@ -245,6 +286,10 @@ export class AuthService {
+       this.logger.log(`[E2E-AUTH] validateUser returned: userData=${!!userData}, userType=${userData?.userType}, id=${userData?.id}`);
+     }
+
+     // Check if MFA is required for this user
+     const mfaRequired = await this.isMfaRequired(
+       userData.id,
+       userData.userType,
+     );
+
+@@ -289,6 +334,12 @@ export class AuthService {
+     const isE2E = process.env.NODE_ENV === 'e2e' || process.env.E2E_AUTH_DEBUG === 'true';
+     if (isE2E) {
+       this.logger.log(`[E2E-AUTH] loginWithMFA: creating session for user ${validation.user.id} (${validation.user.userType})`);
+     }
+
+     const session = await this.createSession(
+       validation.user.id,
+       validation.user.userType,
+       deviceInfo,
+     );
+
+     if (isE2E) {
+       this.logger.log(`[E2E-AUTH] loginWithMFA: session created, calling this.login()`);
+     }
+
+     // Include refresh token for MFA login
+     const tokens = await this.login(validation.user, true);
+
+     if (isE2E) {
+       this.logger.log(`[E2E-AUTH] loginWithMFA: login successful, returning tokens`);
+     }
+
+     return {
+       requiresMfa: false,
+       sessionId: session.id,
+       ...tokens,
+     };
+   }
+
+@@ -733,6 +784,15 @@ export class AuthService {
+   private async createSession(
+     userId: string,
+     userType: string,
+     deviceInfo?: DeviceInfo,
+   ) {
++    const isE2E = process.env.NODE_ENV === 'e2e' || process.env.E2E_AUTH_DEBUG === 'true';
++    if (isE2E) {
++      this.logger.log(`[E2E-AUTH] createSession: creating session for userId=${userId}, userType=${userType}`);
++    }
++
+     const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+
+     const session = await this.prisma.session.create({
+       data: {
+         userId,
+         userType,
+         ipAddress: deviceInfo?.ip as string,
+         userAgent: deviceInfo?.userAgent as string,
+         expiresAt,
+         metadata: deviceInfo as any,
+       },
+     });
+
++    if (isE2E) {
++      this.logger.log(`[E2E-AUTH] createSession: session created with id=${session.id}`);
++    }
++
+     return session;
+   }
+
+diff --git a/scripts/start-backend-e2e.mjs b/scripts/start-backend-e2e.mjs
+index abc123..def456 100644
+--- a/scripts/start-backend-e2e.mjs
++++ b/scripts/start-backend-e2e.mjs
+@@ -90,6 +90,11 @@ async function main() {
+     // Merge environment variables
+     const childEnv = { ...process.env, ...e2eEnvVars };
+
++    // Pass through E2E debug flags
++    if (process.env.E2E_AUTH_DEBUG) {
++      childEnv.E2E_AUTH_DEBUG = process.env.E2E_AUTH_DEBUG;
++      log(`E2E_AUTH_DEBUG: ${childEnv.E2E_AUTH_DEBUG}`);
++    }
++
+     log(`DEFAULT_DRIVER_PASSWORD in child env: ${childEnv.DEFAULT_DRIVER_PASSWORD ? 'SET' : 'NOT SET'}`);
+
+     const child = spawn('node', [mainFile], {
+
+diff --git a/scripts/debug-e2e-customer-user.mjs b/scripts/debug-e2e-customer-user.mjs
+index abc123..def456 100644
+--- a/scripts/debug-e2e-customer-user.mjs
++++ b/scripts/debug-e2e-customer-user.mjs
+@@ -27,6 +27,10 @@ async function checkTable(tableName, query, includeAllFields = false) {
+     if (result) {
+       console.log(`✅ ${tableName} found:`);
+       console.log(`   ID: ${result.id}`);
+       console.log(`   Email: ${result.email}`);
++
++      // Status flags (different models have different fields)
++      if (result.isActive !== undefined) console.log(`   isActive: ${result.isActive}`);
++      if (result.status) console.log(`   status: ${result.status}`);
++      if (result.currentStatus) console.log(`   currentStatus: ${result.currentStatus}`);
++      if (result.emailVerified !== undefined) console.log(`   emailVerified: ${result.emailVerified}`);
++
+       // Password analysis
+       const hasPassword = !!result.password;
+       const looksLikeBcrypt = hasPassword && result.password.startsWith('$2');
+@@ -59,6 +63,10 @@ async function checkTable(tableName, query, includeAllFields = false) {
+     select: {
+       id: true,
+       email: true,
+       password: true,
++      isActive: true,
++      status: true,
++      emailVerified: true,
+       createdAt: true
+     }
+   }));
+@@ -67,12 +75,18 @@ async function checkTable(tableName, query, includeAllFields = false) {
+   results.admin = await checkTable('Admin', prisma.admin.findUnique({
+     where: { email: normalizedEmail },
+     select: { id: true, email: true, password: true, isActive: true, createdAt: true }
+   }));
+
+   results.restaurant = await checkTable('Restaurant', prisma.restaurant.findUnique({
+     where: { email: normalizedEmail },
+     select: { id: true, email: true, password: true, status: true, createdAt: true }
+   }));
+
+   results.driver = await checkTable('Driver', prisma.driver.findUnique({
+     where: { email: normalizedEmail },
+     select: { id: true, email: true, password: true, isActive: true, currentStatus: true, createdAt: true }
+   }));
+
+diff --git a/scripts/repro-customer-login-simple.ps1 b/scripts/repro-customer-login-simple.ps1
+new file mode 100644
+index 0000000..abc123
+--- /dev/null
++++ b/scripts/repro-customer-login-simple.ps1
+@@ -0,0 +1,18 @@
++# Simple Customer Login Repro Script
++
++# Set debug env
++$env:E2E_AUTH_DEBUG = "true"
++
++# Start backend
++Write-Host "Starting backend..."
++$backend = Start-Process -FilePath "npm" -ArgumentList "run", "start:e2e" -WorkingDirectory "$PSScriptRoot\..\backend" -NoNewWindow -PassThru
++
++# Wait for health
++Start-Sleep -Seconds 5
++
++# Test login
++Write-Host "Testing login..."
++$login = Start-Process -FilePath "node" -ArgumentList "scripts/test-customer-login.mjs" -WorkingDirectory "$PSScriptRoot\.." -NoNewWindow -Wait -PassThru
++
++# Stop backend
++Stop-Process -Id $backend.Id -Force
++
++Write-Host "Exit code: $($login.ExitCode)"
++exit $login.ExitCode

@@ -1,0 +1,9 @@
+.dashboard {
+  padding: var(--fb-space-5);
+}
+
+.dashboard h1 {
+  color: var(--fb-text-primary);
+  margin-bottom: var(--fb-space-5);
+}
+

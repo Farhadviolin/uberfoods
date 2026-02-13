@@ -1,0 +1,180 @@
+.dishes-management {
+  padding: 20px;
+}
+
+.dishes-management .error-message {
+  background-color: #fee;
+  color: #c33;
+  padding: 12px;
+  border-radius: 8px;
+  margin-bottom: 20px;
+  border: 1px solid #fcc;
+}
+
+.dishes-management .form-container {
+  background: #fff;
+  padding: 24px;
+  border-radius: 12px;
+  margin-bottom: 24px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.dishes-management .form-group {
+  margin-bottom: 20px;
+}
+
+.dishes-management .form-group label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: 600;
+  color: #1c1e21;
+}
+
+.dishes-management .form-group input,
+.dishes-management .form-group textarea,
+.dishes-management .form-group select {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  font-size: 14px;
+  font-family: inherit;
+}
+
+.dishes-management .form-group textarea {
+  min-height: 100px;
+  resize: vertical;
+}
+
+.dishes-management .table-container {
+  background: #fff;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.dishes-management table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.dishes-management table thead {
+  background: #f0f2f5;
+}
+
+.dishes-management table th {
+  padding: 16px;
+  text-align: left;
+  font-weight: 600;
+  color: #1c1e21;
+  border-bottom: 2px solid #e4e6eb;
+}
+
+.dishes-management table td {
+  padding: 16px;
+  border-bottom: 1px solid #e4e6eb;
+}
+
+.dishes-management table tbody tr:hover {
+  background: #f8f9fa;
+}
+
+.dishes-management table img {
+  width: 80px;
+  height: 80px;
+  object-fit: cover;
+  border-radius: 8px;
+}
+
+.dishes-management .actions {
+  display: flex;
+  gap: 8px;
+}
+
+.dishes-management .empty-state {
+  text-align: center;
+  padding: 60px 20px;
+  color: #65676b;
+}
+
+.dishes-management button {
+  padding: 10px 20px;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.dishes-management button:not(.small) {
+  background: #1877f2;
+  color: white;
+}
+
+.dishes-management button:not(.small):hover {
+  background: #166fe5;
+}
+
+.dishes-management button.secondary {
+  background: #e4e6eb;
+  color: #1c1e21;
+}
+
+.dishes-management button.secondary:hover {
+  background: #d8dadf;
+}
+
+.dishes-management button.small {
+  padding: 6px 12px;
+  font-size: 13px;
+}
+
+.dishes-management button.success {
+  background: #28a745;
+  color: white;
+}
+
+.dishes-management button.danger {
+  background: #dc3545;
+  color: white;
+}
+
+.dishes-management button.danger:hover {
+  background: #c82333;
+}
+
+[data-theme="dark"] .dishes-management .form-container,
+[data-theme="dark"] .dishes-management .table-container {
+  background: #242526;
+  color: #e4e6eb;
+}
+
+[data-theme="dark"] .dishes-management .form-group label {
+  color: #e4e6eb;
+}
+
+[data-theme="dark"] .dishes-management .form-group input,
+[data-theme="dark"] .dishes-management .form-group textarea,
+[data-theme="dark"] .dishes-management .form-group select {
+  background: #3a3b3c;
+  border-color: #4e4f50;
+  color: #e4e6eb;
+}
+
+[data-theme="dark"] .dishes-management table thead {
+  background: #3a3b3c;
+}
+
+[data-theme="dark"] .dishes-management table th {
+  color: #e4e6eb;
+  border-bottom-color: #4e4f50;
+}
+
+[data-theme="dark"] .dishes-management table td {
+  border-bottom-color: #4e4f50;
+}
+
+[data-theme="dark"] .dishes-management table tbody tr:hover {
+  background: #3a3b3c;
+}
+

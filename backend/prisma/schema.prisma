@@ -1,0 +1,3919 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Customer {
+  id                            String                       @id @default(cuid())
+  name                          String?
+  email                         String                       @unique
+  password                      String
+  firstName                     String?
+  lastName                      String?
+  phone                         String?
+  address                       String?
+  isActive                      Boolean                      @default(true)
+  status                        String                       @default("ACTIVE")
+  marketingConsent              Boolean                      @default(false)
+  resetToken                    String?
+  resetTokenExpiresAt           DateTime?
+  socialAuthProvider            String? // 'google', 'facebook', 'apple'
+  socialAuthId                  String? // Provider-spezifische ID
+  socialAuthEmail               String? // Email vom Provider
+  emailVerified                 Boolean                      @default(false)
+  metadata                      Json? // UI preferences, settings, etc.
+  createdAt                     DateTime                     @default(now())
+  updatedAt                     DateTime                     @updatedAt
+  addresses                     Address[]
+  achievements                  CustomerAchievement[]
+  chefProfile                   CustomerChefProfile?
+  favorites                     CustomerFavorite[]
+  gamification                  CustomerGamification?
+  loyalty                       CustomerLoyalty?
+  giftCards                     GiftCard[]                   @relation("CustomerGiftCards")
+  groupOrderItems               GroupOrderItem[]             @relation("GroupOrderItemCustomer")
+  groupOrderMemberships         GroupOrderMember[]           @relation("GroupOrderMemberCustomer")
+  groupOrdersHosted             GroupOrder[]                 @relation("GroupOrderHost")
+  loyaltyPoints                 LoyaltyPointsHistory[]
+  mealPlans                     MealPlan[]
+  mealPlanTemplates             MealPlanTemplate[]
+  orders                        Order[]
+  paymentMethods                PaymentMethod[]
+  receivedReferrals             Referral[]                   @relation("ReferralReferred")
+  sentReferrals                 Referral[]                   @relation("ReferralReferrer")
+  reviewLikes                   ReviewLike[]
+  reviewReports                 ReviewReport[]
+  reviewComments                ReviewComment[]
+  reviewHelpfuls                ReviewHelpful[]
+  reviews                       Review[]
+  scheduledOrders               ScheduledOrder[]
+  socialChallengeParticipations SocialChallengeParticipant[] @relation("CustomerSocialChallengeParticipants")
+  socialComments                SocialComment[]
+  socialFollows                 SocialFollow[]               @relation("SocialFollowFollower")
+  followers                     SocialFollow[]               @relation("SocialFollowFollowing")
+  socialLikes                   SocialLike[]
+  socialPosts                   SocialPost[]
+  socialShares                  SocialShare[]
+  socialBookmarks               SocialBookmark[]
+  socialHiddenPosts             SocialHiddenPost[]
+  socialReports                 SocialReport[]
+  resolvedReports               SocialReport[]               @relation("ReportResolvedBy")
+  savedCarts                    SavedCart[]
+  favoriteDishes                FavoriteDish[]
+  restaurantAlerts              RestaurantAlert[]
+
+  @@index([email])
+  @@index([socialAuthId])
+  @@index([socialAuthProvider])
+  @@index([isActive])
+  @@index([status])
+  @@index([createdAt])
+  @@index([isActive, createdAt])
+  @@index([status, createdAt])
+  @@index([name, email])
+  @@map("customers")
+}
+
+model Restaurant {
+  id                    String                @id @default(cuid())
+  name                  String
+  description           String?
+  address               String
+  phone                 String?
+  email                 String                @unique
+  imageUrl              String?
+  password              String?
+  mustChangePassword    Boolean               @default(true)
+  welcomeEmailSent      Boolean               @default(false)
+  welcomeEmailSentAt    DateTime?
+  status                String                @default("OPEN")
+  rating                Float                 @default(0)
+  totalOrders           Int                   @default(0)
+  avgPrepTime           Int                   @default(15)
+  minOrderAmount        Float                 @default(0)
+  deliveryFee           Float                 @default(2.5)
+  freeDeliveryThreshold Float?
+  location              Json?
+  deliveryZones         Json?
+  operatingHours        Json?
+  estimatedDeliveryTime Int                   @default(30)
+  cuisines              String[]              @default([])
+  tags                  String[]              @default([])
+  settings              Json?
+  // Flexible Zusatzdaten
+  metadata              Json?
+  resetToken            String?
+  resetTokenExpiresAt   DateTime?
+  isActive              Boolean               @default(true)
+  createdAt             DateTime              @default(now())
+  updatedAt             DateTime              @updatedAt
+  favorites             CustomerFavorite[]
+  restaurantAlerts      RestaurantAlert[]
+  dishes                Dish[]
+  giftCards             GiftCard[]            @relation("RestaurantGiftCards")
+  groupOrders           GroupOrder[]
+  legalPages            LegalPage[]
+  loyaltyPrograms       LoyaltyProgram[]
+  mealPlans             MealPlan[]
+  orders                Order[]
+  promotions            Promotion[]
+  taxProfile            RestaurantTaxProfile?
+  reviewReplies         ReviewReply[]
+  reviews               Review[]
+  scheduledOrders       ScheduledOrder[]
+  socialChallenges      SocialChallenge[]
+  socialPosts           SocialPost[]
+  restaurantSocialPosts RestaurantSocialPost[]
+  staff                 Staff[]
+  inventoryItems        StockItem[]
+  locations             RestaurantLocation[]
+  supplierOrders        SupplierOrder[]
+  tables                RestaurantTable[]
+  reservations          Reservation[]
+
+  @@index([isActive])
+  @@index([status])
+  @@index([createdAt])
+  @@index([isActive, status])
+  @@index([isActive, createdAt])
+  @@map("restaurants")
+}
+
+model Driver {
+  id                      String                    @id @default(cuid())
+  name                    String
+  email                   String                    @unique
+  phone                   String?
+  password                String?
+  mustChangePassword      Boolean                   @default(true)
+  welcomeEmailSent        Boolean                   @default(false)
+  welcomeEmailSentAt      DateTime?
+  isActive                Boolean                   @default(true)
+  location                Json?
+  avatarUrl               String?
+  vehicleInfo             Json?
+  rating                  Float                     @default(0)
+  totalDeliveries         Int                       @default(0)
+  currentStatus           String                    @default("OFFLINE")
+  createdAt               DateTime                  @default(now())
+  updatedAt               DateTime                  @updatedAt
+  // Flexible Zusatzdaten
+  metadata                Json?
+  resetToken              String?
+  resetTokenExpiresAt     DateTime?
+  // Payouts / Banking
+  stripeConnectAccountId  String?
+  bankAccountVerified     Boolean                   @default(false)
+  // Stripe integration for subscriptions
+  stripeCustomerId        String?                   @unique
+  commissionTransactions  CommissionTransaction[]
+  shifts                  Shift[]
+  schedules               DriverSchedule[]
+  subscription            DriverSubscription?
+  taxProfile              DriverTaxProfile?
+  orders                  Order[]
+  reviews                 Review[]
+  // Additional relations for Driver App features
+  orderNotes              OrderNote[]
+  orderDelays             OrderDelay[]
+  bulkOrderActions        BulkOrderAction[]
+  routeOptimizations      RouteOptimization[]
+  routeHistories          RouteHistory[]
+  routeAlternatives       RouteAlternative[]
+  performances            DriverPerformance[]
+  performanceGoals        PerformanceGoal[]
+  gamificationStats       GamificationStats?
+  gamificationChallenges  GamificationAchievement[]
+  gamificationQuests      GamificationQuest[]
+  emergencyAlerts         EmergencyAlert[]
+  safetyIncidents         SafetyIncident[]
+  safetyScore             SafetyScore?
+  emergencyContacts       EmergencyContact[]
+  expenses                DriverExpense[]
+  financialProjections    FinancialProjection[]
+  taxDeductions           TaxDeduction[]
+  // Relations for advanced subscription features
+  gdprRequests            GDPRRequest[]
+  winbackCampaignLogs     WinbackCampaignLog[]
+  lifetimeValue           CustomerLifetimeValue?
+  churnPrediction         ChurnPrediction?
+  subscriptionContracts   SubscriptionContract[]
+  financialBonuses        FinancialBonus[]
+  financialBudgets        FinancialBudget[]
+  subscriptionFeatures    SubscriptionFeature[]
+  subscriptionUsage       SubscriptionUsage[]
+  subscriptionAnalytics   SubscriptionAnalytics[]
+  metaGlassesSessions     MetaGlassesSession[]
+  voiceCommands           VoiceCommand[]
+  qrScans                 QRScan[]
+  driverReferralsSent     DriverReferral[]          @relation("DriverReferrer")
+  driverReferralsReceived DriverReferral[]          @relation("DriverReferred")
+  emergencyLogs           EmergencyLog[]
+  favoriteOrders          FavoriteOrder[]
+  // Fleet Management Relations
+  fleetZoneId             String?
+  fleetZone               FleetZone?                @relation(fields: [fleetZoneId], references: [id])
+  fleetShifts             FleetShift[]
+  fleetRoutes             FleetRoute[]
+  vehicle                 Vehicle?
+  fleetIncidents          FleetIncident[]
+
+  // Performance Tracking Relations
+  performanceAlerts  PerformanceAlert[]
+  performanceRewards PerformanceReward[]
+
+  // Audit Events
+  auditEvents       DriverAuditEvent[]
+
+  // ML Assignment Relations
+  assignmentLogs AssignmentLog[]
+
+  @@index([isActive])
+  @@index([currentStatus])
+  @@index([email])
+  @@index([rating])
+  @@index([isActive, currentStatus, createdAt])
+  @@index([currentStatus, rating])
+  @@index([name, email])
+  @@map("drivers")
+}
+
+model PartnerApplication {
+  id               String   @id @default(cuid())
+  role             String
+  contactName      String
+  contactEmail     String
+  contactPhone     String
+  contactCity      String?
+  contactCountry   String?
+  notes            String?
+  consentTerms     Boolean  @default(false)
+  consentMarketing Boolean  @default(false)
+  driverInfo       Json?
+  restaurantInfo   Json?
+  status           String   @default("pending")
+  createdAt        DateTime @default(now())
+
+  @@index([role])
+  @@index([status])
+  @@index([createdAt])
+  @@map("partner_applications")
+}
+
+model DriverAuditEvent {
+  id             String   @id @default(cuid())
+  driverId       String
+  action         String
+  orderId        String?
+  location       Json?
+  deviceId       String?
+  appVersion     String?
+  networkType    String?
+  battery        Float?
+  region         String?
+  isOfflineSync  Boolean  @default(false)
+  metadata       Json?
+  createdAt      DateTime @default(now())
+
+  driver         Driver   @relation(fields: [driverId], references: [id], onDelete: Cascade)
+
+  @@index([driverId, createdAt])
+  @@index([driverId, action, createdAt])
+  @@index([orderId, createdAt])
+  @@index([region, createdAt])
+  @@map("driver_audit_events")
+}
+
+model Category {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  dishes    Dish[]
+
+  @@map("categories")
+}
+
+model Dish {
+  id               String           @id @default(cuid())
+  name             String
+  description      String?
+  price            Float
+  imageUrl         String?
+  category         String
+  isAvailable      Boolean          @default(true)
+  tags             String[]         @default([])
+  calories         Int?
+  nutrition        Json?
+  prepTime         Int?
+  restaurantId     String
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+  // Neue Felder für Category-Relation
+  isActive         Boolean          @default(true)
+  categoryId       String?
+  categoryRelation Category?        @relation(fields: [categoryId], references: [id])
+  nutritionFacts   DishNutrition?
+  restaurant       Restaurant       @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  // Metadata field for ingredients and steps
+  metadata         Json?
+  groupOrderItems  GroupOrderItem[] @relation("GroupOrderItemDish")
+  items            OrderItem[]
+  socialPosts      SocialPost[]
+  favorites        FavoriteDish[]
+
+  @@index([restaurantId, isAvailable])
+  @@index([category])
+  @@index([isAvailable])
+  @@index([categoryId])
+  @@map("dishes")
+}
+
+model Order {
+  id                    String                 @id @default(cuid())
+  customerId            String
+  restaurantId          String
+  driverId              String?
+  status                String                 @default("PENDING")
+  totalAmount           Float
+  deliveryFee           Float                  @default(0)
+  taxAmount             Float                  @default(0)
+  notes                 String?
+  cancelReason          String?
+  discountAmount        Float                  @default(0)
+  paymentStatus         PaymentStatus          @default(PENDING)
+  version               Int                    @default(1)
+  address               String?
+  phone                 String?
+  customerLocation      Json?
+  scheduledFor          DateTime?
+  estimatedDeliveryTime Int?
+  deliveredAt           DateTime?
+  canCancelUntil        DateTime?
+  promotionId           String?
+  priority              String?
+  route                 Json?
+  metadata              Json?
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
+  actualDeliveryTime    DateTime?
+  subtotal              Float                  @default(0)
+  // Neue Felder für Finanzen und Lieferung
+  tax                   Float                  @default(0)
+  tip                   Float                  @default(0)
+  deliveryAddress       String?
+  deliveryInstructions  String?
+  paymentMethod         String?
+  transactionId         String?
+  chatMessages          ChatMessage[]
+  commissionTransaction CommissionTransaction?
+  loyaltyHistory        LoyaltyPointsHistory[]
+  items                 OrderItem[]
+  customer              Customer               @relation(fields: [customerId], references: [id])
+  driver                Driver?                @relation(fields: [driverId], references: [id])
+  promotion             Promotion?             @relation(fields: [promotionId], references: [id])
+  restaurant            Restaurant             @relation(fields: [restaurantId], references: [id])
+  payments              Payment[]
+  reviews               Review[]
+  socialPosts           SocialPost[]
+  // Additional relations for Driver App features
+  orderNotes            OrderNote[]
+  orderDelays           OrderDelay[]
+  favoriteOrders        FavoriteOrder[]
+  fleetRoutes           FleetRoute[] // Many-to-many relation with FleetRoute
+  assignmentLogs        AssignmentLog[]
+
+  @@index([customerId])
+  @@index([restaurantId])
+  @@index([driverId])
+  @@index([promotionId])
+  @@index([status])
+  @@index([paymentStatus])
+  @@index([createdAt])
+  @@index([status, createdAt])
+  @@index([restaurantId, status])
+  @@index([customerId, createdAt])
+  @@index([status, createdAt, restaurantId])
+  @@index([driverId, status])
+  @@index([status, deliveredAt])
+  // Keyset Pagination Indexes für skalierbare Cursor-basierte Pagination
+  @@index([status, createdAt, id])
+  @@index([restaurantId, status, createdAt, id])
+  @@index([customerId, createdAt, id])
+  @@map("orders")
+}
+
+model OrderItem {
+  id                  String  @id @default(cuid())
+  orderId             String
+  dishId              String
+  quantity            Int
+  price               Float
+  modifications       Json?
+  specialInstructions String?
+  dish                Dish    @relation(fields: [dishId], references: [id])
+  order               Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@map("order_items")
+}
+
+model Address {
+  id         String   @id @default(cuid())
+  customerId String
+  label      String?
+  street     String
+  city       String
+  postalCode String
+  country    String   @default("Austria")
+  latitude   Float?
+  longitude  Float?
+  notes      String?
+  isDefault  Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([customerId])
+  @@index([customerId, isDefault])
+  @@map("addresses")
+}
+
+model CustomerFavorite {
+  id           String     @id @default(cuid())
+  customerId   String
+  restaurantId String
+  customer     Customer   @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  @@unique([customerId, restaurantId])
+  @@map("customer_favorites")
+}
+
+model RestaurantAlert {
+  id           String     @id @default(cuid())
+  customerId   String
+  restaurantId String
+  alertType    String     @default("OPENED") // OPENED, PROMOTION, NEW_DISH
+  isActive     Boolean    @default(true)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  customer     Customer   @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  @@unique([customerId, restaurantId, alertType])
+  @@index([customerId])
+  @@index([restaurantId])
+  @@index([isActive])
+  @@map("restaurant_alerts")
+}
+
+model PaymentMethod {
+  id              String            @id @default(cuid())
+  customerId      String
+  type            PaymentMethodType
+  last4           String?
+  brand           String?
+  iban            String?
+  bic             String?
+  mandateId       String?
+  isDefault       Boolean           @default(false)
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  expiryMonth     Int?
+  expiryYear      Int?
+  paymentMethodId String?
+  customer        Customer          @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  payments        Payment[]
+
+  @@index([customerId])
+  @@index([customerId, paymentMethodId])
+  @@map("payment_methods")
+}
+
+model Payment {
+  id                String         @id @default(cuid())
+  orderId           String
+  customerId        String
+  paymentMethodId   String?
+  amount            Float
+  currency          String         @default("EUR")
+  status            PaymentStatus  @default(PENDING)
+  paymentIntentId   String?
+  transactionId     String?
+  errorMessage      String?
+  paymentMethodType String?
+  metadata          Json?
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+  order             Order          @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  paymentMethod     PaymentMethod? @relation(fields: [paymentMethodId], references: [id])
+
+  @@index([orderId])
+  @@index([customerId])
+  @@index([status])
+  @@index([createdAt])
+  @@index([customerId, status])
+  @@map("payments")
+}
+
+model DriverTaxProfile {
+  id                 String             @id @default(cuid())
+  driverId           String             @unique
+  taxId              String?
+  finanzamtId        String?
+  finanzamtStatus    FinanzamtStatus    @default(PENDING)
+  autoReportEnabled  Boolean            @default(true)
+  autoPayoutEnabled  Boolean            @default(true)
+  reportingFrequency ReportingFrequency @default(MONTHLY)
+  iban               String?
+  bic                String?
+  lastReportDate     DateTime?
+  lastPayoutDate     DateTime?
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+  driver             Driver             @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  payouts            Payout[]
+  taxReports         TaxReport[]
+
+  @@index([driverId])
+  @@index([finanzamtStatus])
+  @@map("driver_tax_profiles")
+}
+
+model RestaurantTaxProfile {
+  id                 String             @id @default(cuid())
+  restaurantId       String             @unique
+  taxId              String?
+  ustId              String?
+  finanzamtId        String?
+  finanzamtStatus    FinanzamtStatus    @default(PENDING)
+  autoReportEnabled  Boolean            @default(true)
+  autoPayoutEnabled  Boolean            @default(true)
+  reportingFrequency ReportingFrequency @default(MONTHLY)
+  tseEnabled         Boolean            @default(false)
+  tseSerialNumber    String?
+  iban               String?
+  bic                String?
+  lastReportDate     DateTime?
+  lastPayoutDate     DateTime?
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+  payouts            Payout[]
+  restaurant         Restaurant         @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  taxReports         TaxReport[]
+
+  @@index([restaurantId])
+  @@index([finanzamtStatus])
+  @@map("restaurant_tax_profiles")
+}
+
+model TaxReport {
+  id                     String                @id @default(cuid())
+  driverTaxProfileId     String?
+  restaurantTaxProfileId String?
+  entityType             String
+  type                   TaxReportType
+  period                 String
+  status                 TaxReportStatus       @default(PENDING)
+  amount                 Float?
+  taxAmount              Float?
+  submittedAt            DateTime?
+  confirmationNumber     String?
+  pdfUrl                 String?
+  xmlUrl                 String?
+  errorMessage           String?
+  createdAt              DateTime              @default(now())
+  updatedAt              DateTime              @updatedAt
+  driverTaxProfile       DriverTaxProfile?     @relation(fields: [driverTaxProfileId], references: [id])
+  restaurantTaxProfile   RestaurantTaxProfile? @relation(fields: [restaurantTaxProfileId], references: [id])
+
+  @@index([driverTaxProfileId])
+  @@index([restaurantTaxProfileId])
+  @@index([status])
+  @@index([period])
+  @@map("tax_reports")
+}
+
+model Payout {
+  id                     String                @id @default(cuid())
+  driverTaxProfileId     String?
+  restaurantTaxProfileId String?
+  entityType             String
+  amount                 Float
+  netAmount              Float
+  taxAmount              Float
+  status                 PayoutStatus          @default(PENDING)
+  period                 String
+  taxReportId            String?
+  transactionId          String?
+  iban                   String?
+  bic                    String?
+  processedAt            DateTime?
+  errorMessage           String?
+  createdAt              DateTime              @default(now())
+  updatedAt              DateTime              @updatedAt
+  driverTaxProfile       DriverTaxProfile?     @relation(fields: [driverTaxProfileId], references: [id])
+  restaurantTaxProfile   RestaurantTaxProfile? @relation(fields: [restaurantTaxProfileId], references: [id])
+
+  @@index([driverTaxProfileId])
+  @@index([restaurantTaxProfileId])
+  @@index([status])
+  @@index([period])
+  @@map("payouts")
+}
+
+model FinancialEvent {
+  id        String   @id @default(cuid())
+  type      String   // 'payment_completed' | 'payout_processed' | 'invoice_generated' | 'refund_processed' | 'revenue_update'
+  data      Json
+  timestamp DateTime @default(now())
+  createdAt DateTime @default(now())
+
+  @@index([type])
+  @@index([timestamp])
+  @@map("financial_events")
+}
+
+model DriverSubscription {
+  id                     String                  @id @default(cuid())
+  driverId               String                  @unique
+  tier                   SubscriptionTier        @default(BASIC)
+  status                 SubscriptionStatus      @default(TRIALING)
+  stripeSubscriptionId   String?                 @unique
+  stripeCustomerId       String?
+  stripePriceId          String?
+  currentPeriodStart     DateTime
+  currentPeriodEnd       DateTime
+  cancelAtPeriodEnd      Boolean                 @default(false)
+  trialEndsAt            DateTime?
+  customCommissionRate   Float?
+  createdAt              DateTime                @default(now())
+  updatedAt              DateTime                @updatedAt
+  commissionTransactions CommissionTransaction[]
+  driver                 Driver                  @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  contracts              SubscriptionContract[]
+
+  @@index([driverId])
+  @@index([status])
+  @@index([tier])
+  @@map("driver_subscriptions")
+}
+
+model CommissionTransaction {
+  id                   String              @id @default(cuid())
+  orderId              String              @unique
+  driverId             String
+  subscriptionId       String?
+  orderAmount          Float
+  restaurantCommission Float
+  driverCommission     Float
+  platformFee          Float
+  tier                 SubscriptionTier
+  status               CommissionStatus    @default(PENDING)
+  paidAt               DateTime?
+  createdAt            DateTime            @default(now())
+  updatedAt            DateTime            @updatedAt
+  driver               Driver              @relation(fields: [driverId], references: [id])
+  order                Order               @relation(fields: [orderId], references: [id])
+  subscription         DriverSubscription? @relation(fields: [subscriptionId], references: [id])
+
+  @@index([driverId])
+  @@index([orderId])
+  @@index([status])
+  @@index([tier])
+  @@map("commission_transactions")
+}
+
+model SubscriptionTierConfig {
+  id                String           @id @default(cuid())
+  tier              SubscriptionTier @unique
+  name              String
+  price             Float
+  commissionRate    Float
+  displayCommission String
+  features          String[]
+  isPopular         Boolean          @default(false)
+  deliveryLimit     Int?
+  payoutThreshold   Float?
+  payoutDelay       Int?
+  bonusThreshold    Int?
+  bonusRate         Float?
+  isActive          Boolean          @default(true)
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+
+  @@map("subscription_tier_configs")
+}
+
+model Admin {
+  id                        String    @id @default(cuid())
+  email                     String    @unique
+  password                  String
+  name                      String
+  role                      AdminRole @default(ADMIN)
+  isActive                  Boolean   @default(true)
+  passwordResetToken        String?
+  passwordResetTokenExpires DateTime?
+  createdAt                 DateTime  @default(now())
+  updatedAt                 DateTime  @updatedAt
+
+  // Relations
+  acknowledgedAlerts     SystemAlert[]    @relation("AlertAcknowledgedBy")
+  createdIncidents       SystemIncident[] @relation("IncidentCreatedBy")
+  resolvedIncidents      SystemIncident[] @relation("IncidentResolvedBy")
+  fleetIncidentsResolved FleetIncident[]  @relation("FleetIncidentResolver")
+
+  @@map("admins")
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String
+  action    String
+  entity    String
+  entityId  String
+  changes   Json?
+  ipAddress String?
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([entity, entityId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+model Setting {
+  key         String   @id
+  value       String
+  category    String?
+  description String?
+  updatedBy   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("settings")
+}
+
+model Session {
+  id        String    @id @default(cuid())
+  userId    String
+  userType  String    @default("ADMIN")
+  ipAddress String?
+  userAgent String?
+  expiresAt DateTime?
+  metadata  Json?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@map("sessions")
+}
+
+model TwoFactorAuth {
+  id          String   @id @default(cuid())
+  userId      String   @unique
+  secret      String
+  enabled     Boolean  @default(false)
+  backupCodes String[] @default([])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("two_factor_auth")
+}
+
+model APIKey {
+  id          String    @id @default(cuid())
+  name        String
+  key         String    @unique
+  permissions String[]  @default([])
+  expiresAt   DateTime?
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@map("api_keys")
+}
+
+model Integration {
+  id          String   @id
+  name        String
+  type        String
+  config      Json?
+  isConnected Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("integrations")
+}
+
+model Webhook {
+  id        String   @id @default(cuid())
+  url       String
+  events    String[] @default([])
+  secret    String
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("webhooks")
+}
+
+model Campaign {
+  id             String   @id @default(cuid())
+  name           String
+  type           String
+  targetAudience String?
+  description    String?
+  status         String   @default("DRAFT")
+  startDate      DateTime
+  endDate        DateTime
+  budget         Float    @default(0)
+  metrics        Json?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@map("campaigns")
+}
+
+model Promotion {
+  id             String      @id @default(cuid())
+  restaurantId   String?
+  name           String
+  description    String?
+  code           String      @unique
+  discountType   String      @default("PERCENTAGE")
+  discount       Float       @default(0)
+  startDate      DateTime
+  endDate        DateTime
+  minOrderAmount Float?
+  maxUses        Int?
+  currentUses    Int         @default(0)
+  isFeatured     Boolean     @default(false)
+  isActive       Boolean     @default(true)
+  metadata       Json?
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+  orders         Order[]
+  restaurant     Restaurant? @relation(fields: [restaurantId], references: [id])
+
+  @@index([restaurantId])
+  @@map("promotions")
+}
+
+model GiftCard {
+  id           String      @id @default(cuid())
+  code         String      @unique
+  amount       Float
+  balance      Float
+  currency     String      @default("EUR")
+  purchasedBy  String?
+  redeemedBy   String?
+  redeemedAt   DateTime?
+  isRedeemed   Boolean     @default(false)
+  status       String      @default("ACTIVE")
+  customerId   String?
+  restaurantId String?
+  expiresAt    DateTime?
+  metadata     Json?
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+  customer     Customer?   @relation("CustomerGiftCards", fields: [customerId], references: [id])
+  restaurant   Restaurant? @relation("RestaurantGiftCards", fields: [restaurantId], references: [id])
+
+  @@index([customerId])
+  @@index([restaurantId])
+  @@index([purchasedBy])
+  @@index([redeemedBy])
+  @@map("gift_cards")
+}
+
+model Referral {
+  id           String    @id @default(cuid())
+  referrerId   String
+  referredId   String?
+  code         String    @unique
+  status       String    @default("PENDING")
+  rewardAmount Float?    @default(0)
+  pointsEarned Int       @default(0)
+  metadata     Json?
+  completedAt  DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  referred     Customer? @relation("ReferralReferred", fields: [referredId], references: [id])
+  referrer     Customer  @relation("ReferralReferrer", fields: [referrerId], references: [id], onDelete: Cascade)
+
+  @@index([referrerId])
+  @@index([referredId])
+  @@map("referrals")
+}
+
+model LoyaltyProgram {
+  id             String            @id @default(cuid())
+  restaurantId   String?
+  name           String
+  description    String?
+  pointsPerEuro  Float             @default(1)
+  pointsPerOrder Int               @default(0)
+  tierThresholds Json?
+  isActive       Boolean           @default(true)
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+  customers      CustomerLoyalty[]
+  restaurant     Restaurant?       @relation(fields: [restaurantId], references: [id])
+  rewards        Reward[]
+
+  @@index([restaurantId])
+  @@map("loyalty_programs")
+}
+
+model CustomerLoyalty {
+  id            String          @id @default(cuid())
+  customerId    String          @unique
+  programId     String?
+  points        Int             @default(0)
+  tier          String          @default("BRONZE")
+  totalSpent    Float           @default(0)
+  totalOrders   Int             @default(0)
+  streakDays    Int             @default(0)
+  lastOrderDate DateTime?
+  totalRewards  Int             @default(0)
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+  customer      Customer        @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  program       LoyaltyProgram? @relation(fields: [programId], references: [id])
+
+  @@index([programId])
+  @@map("customer_loyalty")
+}
+
+model LoyaltyPointsHistory {
+  id          String   @id @default(cuid())
+  customerId  String
+  points      Int
+  type        String
+  description String?
+  orderId     String?
+  rewardId    String?
+  metadata    Json?
+  createdAt   DateTime @default(now())
+  customer    Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  order       Order?   @relation(fields: [orderId], references: [id])
+  reward      Reward?  @relation(fields: [rewardId], references: [id])
+
+  @@index([customerId])
+  @@index([rewardId])
+  @@index([orderId])
+  @@map("loyalty_points_history")
+}
+
+model Reward {
+  id           String                 @id @default(cuid())
+  programId    String?
+  name         String
+  description  String?
+  type         String                 @default("DISCOUNT")
+  pointsCost   Int                    @default(0)
+  discount     Float?
+  discountType String?
+  metadata     Json?
+  maxUses      Int?
+  expiresAt    DateTime?
+  isActive     Boolean                @default(true)
+  createdAt    DateTime               @default(now())
+  updatedAt    DateTime               @updatedAt
+  redemptions  LoyaltyPointsHistory[]
+  program      LoyaltyProgram?        @relation(fields: [programId], references: [id])
+
+  @@index([programId])
+  @@map("rewards")
+}
+
+model CustomerGamification {
+  customerId     String    @id
+  level          Int       @default(1)
+  xp             Int       @default(0)
+  xpToNextLevel  Int       @default(100)
+  totalXP        Int       @default(0)
+  totalOrders    Int       @default(0)
+  totalSpent     Float     @default(0)
+  reviewsWritten Int       @default(0)
+  socialPosts    Int       @default(0)
+  socialLikes    Int       @default(0)
+  socialShares   Int       @default(0)
+  streakDays     Int       @default(0)
+  bestStreak     Int       @default(0)
+  lastActivity   DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  customer       Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@map("customer_gamification")
+}
+
+model Achievement {
+  id               String                @id @default(cuid())
+  type             String
+  title            String
+  description      String
+  icon             String?
+  points           Int                   @default(10)
+  requirements     Json?
+  rewardTitle      String?
+  isActive         Boolean               @default(true)
+  createdAt        DateTime              @default(now())
+  updatedAt        DateTime              @updatedAt
+  userAchievements CustomerAchievement[]
+
+  @@map("achievements")
+}
+
+model CustomerAchievement {
+  id            String      @id @default(cuid())
+  customerId    String
+  achievementId String
+  unlockedAt    DateTime    @default(now())
+  achievement   Achievement @relation(fields: [achievementId], references: [id], onDelete: Cascade)
+  customer      Customer    @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@unique([customerId, achievementId])
+  @@map("customer_achievements")
+}
+
+model CustomerChefProfile {
+  customerId           String    @id
+  favoriteCuisines     String[]  @default([])
+  allergies            String[]  @default([])
+  dietaryType          Json?
+  preferredPriceRange  String?
+  tasteProfile         Json?
+  dietaryRestrictions  Json?
+  preferredIngredients String[]  @default([])
+  dislikedIngredients  String[]  @default([])
+  lastMealPlan         Json?
+  lastOrderDate        DateTime?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+  customer             Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@map("customer_chef_profiles")
+}
+
+model LegalPage {
+  id           String      @id @default(cuid())
+  restaurantId String?
+  slug         String      @unique
+  title        String
+  content      String
+  version      String?
+  isPublished  Boolean     @default(false)
+  publishedAt  DateTime?
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+  language     String      @default("de")
+  updatedBy    String?
+  restaurant   Restaurant? @relation(fields: [restaurantId], references: [id])
+
+  @@index([restaurantId])
+  @@map("legal_pages")
+}
+
+model DishNutrition {
+  id        String   @id @default(cuid())
+  dishId    String   @unique
+  calories  Int?
+  protein   Float?
+  carbs     Float?
+  fat       Float?
+  fiber     Float?
+  sugar     Float?
+  allergens String[] @default([])
+  vitamins  Json?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  dish      Dish     @relation(fields: [dishId], references: [id], onDelete: Cascade)
+
+  @@map("dish_nutrition")
+}
+
+model MealPlan {
+  id            String      @id @default(cuid())
+  customerId    String
+  restaurantId  String?
+  name          String
+  description   String?
+  totalCalories Int?
+  macroTargets  Json?
+  schedule      Json?
+  tags          String[]    @default([])
+  isActive      Boolean     @default(true)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  date          DateTime?
+  dishIds       String[]    @default([])
+  executedAt    DateTime?
+  isExecuted    Boolean     @default(false)
+  notes         String?
+  customer      Customer    @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  restaurant    Restaurant? @relation(fields: [restaurantId], references: [id])
+
+  @@index([customerId])
+  @@index([restaurantId])
+  @@map("meal_plans")
+}
+
+model ScheduledOrder {
+  id           String     @id @default(cuid())
+  customerId   String
+  restaurantId String
+  status       String     @default("SCHEDULED")
+  scheduledAt  DateTime
+  timezone     String?
+  notes        String?
+  address      String?
+  phone        String?
+  items        Json?
+  payload      Json?
+  frequency    String     @default("ONCE")
+  nextOrder    DateTime?
+  lastOrdered  DateTime?
+  isActive     Boolean    @default(true)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  customer     Customer   @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  @@index([customerId])
+  @@index([restaurantId])
+  @@map("scheduled_orders")
+}
+
+model GroupOrder {
+  id           String             @id @default(cuid())
+  restaurantId String
+  hostId       String
+  status       String             @default("OPEN")
+  expiresAt    DateTime?
+  totalAmount  Float              @default(0)
+  notes        String?
+  metadata     Json?
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+  items        GroupOrderItem[]
+  members      GroupOrderMember[]
+  host         Customer           @relation("GroupOrderHost", fields: [hostId], references: [id], onDelete: Cascade)
+  restaurant   Restaurant         @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  @@index([restaurantId])
+  @@index([hostId])
+  @@map("group_orders")
+}
+
+model GroupOrderMember {
+  id           String     @id @default(cuid())
+  groupOrderId String
+  customerId   String
+  status       String     @default("INVITED")
+  totalAmount  Float      @default(0)
+  metadata     Json?
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  customer     Customer   @relation("GroupOrderMemberCustomer", fields: [customerId], references: [id], onDelete: Cascade)
+  groupOrder   GroupOrder @relation(fields: [groupOrderId], references: [id], onDelete: Cascade)
+
+  @@unique([groupOrderId, customerId])
+  @@map("group_order_members")
+}
+
+model GroupOrderItem {
+  id           String     @id @default(cuid())
+  groupOrderId String
+  customerId   String
+  dishId       String
+  quantity     Int        @default(1)
+  price        Float
+  notes        String?
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  customer     Customer   @relation("GroupOrderItemCustomer", fields: [customerId], references: [id], onDelete: Cascade)
+  dish         Dish       @relation("GroupOrderItemDish", fields: [dishId], references: [id])
+  groupOrder   GroupOrder @relation(fields: [groupOrderId], references: [id], onDelete: Cascade)
+
+  @@map("group_order_items")
+}
+
+model Review {
+  id             String          @id @default(cuid())
+  customerId     String
+  restaurantId   String
+  orderId        String?
+  rating         Int
+  comment        String?
+  status         String          @default("PUBLISHED")
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  driverId       String?
+  // Neue Rating-Felder
+  foodRating     Float?
+  deliveryRating Float?
+  overallRating  Float?
+  images         ReviewImage[]
+  likes          ReviewLike[]
+  comments       ReviewComment[]
+  helpfuls       ReviewHelpful[]
+  reply          ReviewReply?
+  reports        ReviewReport[]
+  customer       Customer        @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  driver         Driver?         @relation(fields: [driverId], references: [id])
+  order          Order?          @relation(fields: [orderId], references: [id])
+  restaurant     Restaurant      @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  @@index([customerId])
+  @@index([restaurantId])
+  @@index([orderId])
+  @@index([driverId])
+  @@index([rating])
+  @@index([status])
+  @@index([createdAt])
+  @@index([restaurantId, rating])
+  @@map("reviews")
+}
+
+model ReviewImage {
+  id        String   @id @default(cuid())
+  reviewId  String
+  imageUrl  String
+  createdAt DateTime @default(now())
+  review    Review   @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+
+  @@map("review_images")
+}
+
+model ReviewReply {
+  id           String     @id @default(cuid())
+  reviewId     String     @unique
+  restaurantId String
+  response     String
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  review       Review     @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+
+  @@index([reviewId])
+  @@index([restaurantId])
+  @@map("review_replies")
+}
+
+model ReviewLike {
+  id         String   @id @default(cuid())
+  reviewId   String
+  customerId String
+  createdAt  DateTime @default(now())
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  review     Review   @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+
+  @@unique([reviewId, customerId])
+  @@index([reviewId])
+  @@index([customerId])
+  @@map("review_likes")
+}
+
+model ReviewReport {
+  id         String   @id @default(cuid())
+  reviewId   String
+  customerId String
+  reason     String
+  status     String   @default("PENDING")
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  review     Review   @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+
+  @@unique([reviewId, customerId])
+  @@index([reviewId])
+  @@index([customerId])
+  @@map("review_reports")
+}
+
+model ChatMessage {
+  id         String   @id @default(cuid())
+  orderId    String
+  senderId   String
+  senderType String
+  senderName String?
+  message    String
+  metadata   Json?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @default(now())
+  order      Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+  @@map("chat_messages")
+}
+
+model SocialPost {
+  id            String             @id @default(cuid())
+  customerId    String
+  restaurantId  String?
+  dishId        String?
+  orderId       String?
+  content       String?
+  mediaUrls     String[]           @default([])
+  tags          String[]           @default([])
+  isPublic      Boolean            @default(true)
+  isDeleted     Boolean            @default(false)
+  likesCount    Int                @default(0)
+  commentsCount Int                @default(0)
+  sharesCount   Int                @default(0)
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+  comments      SocialComment[]
+  likes         SocialLike[]
+  shares        SocialShare[]
+  bookmarks     SocialBookmark[]
+  hiddenBy      SocialHiddenPost[]
+  reports       SocialReport[]
+  customer      Customer           @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  dish          Dish?              @relation(fields: [dishId], references: [id])
+  order         Order?             @relation(fields: [orderId], references: [id])
+  restaurant    Restaurant?        @relation(fields: [restaurantId], references: [id])
+
+  @@index([customerId])
+  @@index([restaurantId])
+  @@index([dishId])
+  @@index([isPublic])
+  @@index([isDeleted])
+  @@index([createdAt])
+  @@index([customerId, createdAt])
+  @@map("social_posts")
+}
+
+model SocialComment {
+  id         String     @id @default(cuid())
+  postId     String
+  customerId String
+  content    String
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+  customer   Customer   @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  post       SocialPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@index([postId])
+  @@map("social_comments")
+}
+
+model SocialLike {
+  id         String     @id @default(cuid())
+  postId     String
+  customerId String
+  createdAt  DateTime   @default(now())
+  customer   Customer   @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  post       SocialPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@unique([postId, customerId], name: "postId_customerId")
+  @@map("social_likes")
+}
+
+model SocialFollow {
+  id          String   @id @default(cuid())
+  followerId  String
+  followingId String
+  createdAt   DateTime @default(now())
+  follower    Customer @relation("SocialFollowFollower", fields: [followerId], references: [id], onDelete: Cascade)
+  following   Customer @relation("SocialFollowFollowing", fields: [followingId], references: [id], onDelete: Cascade)
+
+  @@unique([followerId, followingId])
+  @@map("social_follows")
+}
+
+model SocialChallenge {
+  id           String                       @id @default(cuid())
+  restaurantId String?
+  title        String
+  description  String?
+  reward       String?
+  goal         Int?
+  status       String                       @default("ACTIVE")
+  isActive     Boolean                      @default(true)
+  startDate    DateTime?
+  endDate      DateTime?
+  metadata     Json?
+  createdAt    DateTime                     @default(now())
+  updatedAt    DateTime                     @updatedAt
+  participants SocialChallengeParticipant[]
+  restaurant   Restaurant?                  @relation(fields: [restaurantId], references: [id])
+
+  @@map("social_challenges")
+}
+
+model SocialChallengeParticipant {
+  id          String          @id @default(cuid())
+  challengeId String
+  customerId  String
+  progress    Int             @default(0)
+  status      String          @default("ACTIVE")
+  completedAt DateTime?
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  challenge   SocialChallenge @relation(fields: [challengeId], references: [id], onDelete: Cascade)
+  customer    Customer        @relation("CustomerSocialChallengeParticipants", fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@unique([challengeId, customerId])
+  @@map("social_challenge_participants")
+}
+
+model SocialShare {
+  id         String     @id @default(cuid())
+  postId     String
+  customerId String
+  message    String?
+  shareType  String     @default("public") // 'public', 'friends', 'private'
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+  customer   Customer   @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  post       SocialPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@index([postId])
+  @@index([customerId])
+  @@map("social_shares")
+}
+
+model SocialBookmark {
+  id         String     @id @default(cuid())
+  postId     String
+  customerId String
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+  customer   Customer   @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  post       SocialPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@unique([customerId, postId], name: "customerId_postId")
+  @@index([customerId])
+  @@index([postId])
+  @@map("social_bookmarks")
+}
+
+model SocialHiddenPost {
+  id         String     @id @default(cuid())
+  postId     String
+  customerId String
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+  customer   Customer   @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  post       SocialPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@unique([customerId, postId], name: "customerId_postId")
+  @@index([customerId])
+  @@index([postId])
+  @@map("social_hidden_posts")
+}
+
+model SocialReport {
+  id               String     @id @default(cuid())
+  postId           String
+  customerId       String
+  reason           String
+  description      String?
+  category         String // 'spam', 'harassment', 'inappropriate', 'fake', 'other'
+  status           String     @default("pending") // 'pending', 'resolved', 'dismissed'
+  resolutionAction String?
+  resolutionReason String?
+  resolvedById     String?
+  resolvedAt       DateTime?
+  createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @updatedAt
+  customer         Customer   @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  post             SocialPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  resolvedBy       Customer?  @relation("ReportResolvedBy", fields: [resolvedById], references: [id])
+
+  @@unique([customerId, postId], name: "customerId_postId")
+  @@index([postId])
+  @@index([customerId])
+  @@index([status])
+  @@map("social_reports")
+}
+
+model RestaurantSocialPost {
+  id             String      @id @default(cuid())
+  restaurantId   String
+  platform       String      // 'facebook', 'instagram', 'twitter', 'linkedin'
+  content        String
+  mediaUrls      String[]    @default([])
+  scheduledAt    DateTime?
+  postedAt       DateTime?
+  status         String      @default("draft") // 'draft', 'scheduled', 'posted', 'failed'
+  engagement     Int         @default(0) // likes + comments + shares
+  postId         String?     // external platform post ID
+  errorMessage   String?
+  metadata       Json?       // platform-specific data
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+  restaurant     Restaurant  @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  @@index([restaurantId])
+  @@index([platform])
+  @@index([status])
+  @@index([scheduledAt])
+  @@map("restaurant_social_posts")
+}
+
+model Staff {
+  id           String       @id @default(cuid())
+  restaurantId String
+  name         String
+  email        String
+  phone        String?
+  role         String?
+  permissions  String[]     @default([])
+  salary       Float?
+  hourlyRate   Float?
+  startDate    DateTime     @default(now())
+  endDate      DateTime?
+  isActive     Boolean      @default(true)
+  notes        String?
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+  restaurant   Restaurant   @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  shifts       StaffShift[]
+
+  @@index([restaurantId])
+  @@map("staff")
+}
+
+model StaffShift {
+  id            String    @id @default(cuid())
+  staffId       String
+  startTime     DateTime
+  endTime       DateTime?
+  breakDuration Int       @default(0)
+  notes         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  staff         Staff     @relation(fields: [staffId], references: [id], onDelete: Cascade)
+
+  @@index([staffId])
+  @@map("staff_shifts")
+}
+
+model Shift {
+  id            String    @id @default(cuid())
+  driverId      String
+  status        String    @default("ACTIVE")
+  startTime     DateTime
+  endTime       DateTime?
+  lastBreakTime DateTime?
+  metadata      Json?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  driver        Driver    @relation(fields: [driverId], references: [id], onDelete: Cascade)
+
+  @@index([driverId])
+  @@map("driver_shifts")
+}
+
+model Supplier {
+  id             String          @id @default(cuid())
+  name           String
+  email          String?
+  phone          String?
+  address        String?
+  contact        String?
+  notes          String?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  purchaseOrders PurchaseOrder[]
+  stockItems     StockItem[]
+  supplierOrders SupplierOrder[]
+
+  @@map("suppliers")
+}
+
+model StockItem {
+  id            String              @id @default(cuid())
+  restaurantId  String
+  supplierId    String?
+  name          String
+  sku           String?
+  category      String?
+  unit          String?
+  unitPrice     Float               @default(0)
+  currentStock  Float               @default(0)
+  minStock      Float               @default(0)
+  maxStock      Float?
+  location      String?
+  reorderPoint  Float?
+  notes         String?
+  receivedAt    DateTime?
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+  purchaseItems PurchaseOrderItem[]
+  restaurant    Restaurant          @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  supplier      Supplier?           @relation(fields: [supplierId], references: [id])
+  wasteRecords  WasteRecord[]
+  movements     StockMovement[]
+
+  @@index([restaurantId])
+  @@index([supplierId])
+  @@map("stock_items")
+}
+
+model PurchaseOrder {
+  id               String              @id @default(cuid())
+  supplierId       String
+  expectedDelivery DateTime?
+  status           String              @default("PENDING")
+  totalAmount      Float               @default(0)
+  notes            String?
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+  items            PurchaseOrderItem[]
+  supplier         Supplier            @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+
+  @@index([supplierId])
+  @@map("purchase_orders")
+}
+
+model PurchaseOrderItem {
+  id              String        @id @default(cuid())
+  purchaseOrderId String
+  stockItemId     String
+  quantity        Float
+  unitPrice       Float
+  purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  stockItem       StockItem     @relation(fields: [stockItemId], references: [id], onDelete: Cascade)
+
+  @@map("purchase_order_items")
+}
+
+model WasteRecord {
+  id          String    @id @default(cuid())
+  stockItemId String
+  quantity    Float
+  cost        Float
+  reason      String?
+  recordedAt  DateTime  @default(now())
+  stockItem   StockItem @relation(fields: [stockItemId], references: [id], onDelete: Cascade)
+
+  @@index([stockItemId])
+  @@map("waste_records")
+}
+
+model StockMovement {
+  id          String    @id @default(cuid())
+  stockItemId String
+  oldQuantity Float
+  newQuantity Float
+  difference  Float
+  reason      String    @default("manual_adjustment")
+  userId      String?
+  createdAt   DateTime  @default(now())
+  stockItem   StockItem @relation(fields: [stockItemId], references: [id], onDelete: Cascade)
+
+  @@index([stockItemId])
+  @@index([createdAt])
+  @@index([reason])
+  @@map("stock_movements")
+}
+
+model Dashboard {
+  id        String   @id @default(cuid())
+  name      String
+  widgets   Json
+  layout    Json?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("dashboards")
+}
+
+model Report {
+  id               String            @id @default(cuid())
+  name             String
+  type             String
+  format           String            @default("PDF")
+  parameters       Json?
+  config           Json?
+  status           String            @default("pending")
+  userId           String
+  lastRun          DateTime?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  scheduledReports ScheduledReport[]
+
+  @@map("reports")
+}
+
+model ScheduledReport {
+  id         String    @id @default(cuid())
+  reportId   String
+  cron       String
+  recipients String[]  @default([])
+  lastRun    DateTime?
+  nextRun    DateTime?
+  status     String    @default("ACTIVE")
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  report     Report    @relation(fields: [reportId], references: [id], onDelete: Cascade)
+
+  @@index([reportId])
+  @@map("scheduled_reports")
+}
+
+model Workflow {
+  id            String         @id @default(cuid())
+  name          String
+  description   String?
+  trigger       Json?
+  actions       Json?
+  enabled       Boolean        @default(true)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  executionLogs ExecutionLog[]
+
+  @@map("workflows")
+}
+
+model Rule {
+  id            String         @id @default(cuid())
+  name          String
+  condition     String
+  action        String
+  enabled       Boolean        @default(true)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  executionLogs ExecutionLog[]
+
+  @@map("rules")
+}
+
+model ExecutionLog {
+  id         String    @id @default(cuid())
+  workflowId String?
+  ruleId     String?
+  status     String    @default("SUCCESS")
+  details    Json?
+  executedAt DateTime  @default(now())
+  rule       Rule?     @relation(fields: [ruleId], references: [id])
+  workflow   Workflow? @relation(fields: [workflowId], references: [id])
+
+  @@index([workflowId])
+  @@index([ruleId])
+  @@map("execution_logs")
+}
+
+model Tenant {
+  id         String            @id @default(cuid())
+  name       String
+  subdomain  String            @unique
+  domain     String?
+  plan       String            @default("BASIC")
+  status     String            @default("ACTIVE")
+  metadata   Json?
+  createdAt  DateTime          @default(now())
+  updatedAt  DateTime          @updatedAt
+  billing    TenantBilling?
+  whitelabel WhitelabelConfig?
+
+  @@map("tenants")
+}
+
+model WhitelabelConfig {
+  id             String   @id @default(cuid())
+  tenantId       String   @unique
+  companyName    String?
+  logoUrl        String?
+  primaryColor   String?
+  secondaryColor String?
+  supportEmail   String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  tenant         Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("whitelabel_configs")
+}
+
+model TenantBilling {
+  id             String   @id @default(cuid())
+  tenantId       String   @unique
+  totalRevenue   Float    @default(0)
+  monthlyRevenue Float    @default(0)
+  mrr            Float    @default(0)
+  invoices       Json?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  tenant         Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("tenant_billing")
+}
+
+model Permission {
+  id          String   @id @default(cuid())
+  resource    String
+  action      String
+  description String?
+  createdAt   DateTime @default(now())
+
+  @@unique([resource, action])
+  @@map("permissions")
+}
+
+model Role {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String?
+  permissions String[] @default([])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("roles")
+}
+
+model PushSubscription {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  userRole  String
+  endpoint  String
+  p256dh    String
+  auth      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@map("push_subscriptions")
+}
+
+model NotificationSettings {
+  id           String   @id @default(cuid())
+  userId       String   @unique
+  email        Boolean  @default(true)
+  push         Boolean  @default(true)
+  sms          Boolean  @default(false)
+  orderUpdates Boolean  @default(true)
+  promotions   Boolean  @default(true)
+  reviews      Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([userId])
+  @@map("notification_settings")
+}
+
+model Notification {
+  id        String    @id @default(cuid())
+  userId    String
+  type      String
+  title     String
+  message   String
+  data      Json?
+  read      Boolean   @default(false)
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+  @@index([read])
+  @@index([createdAt])
+  @@map("notifications")
+}
+
+model ScheduledNotification {
+  id           String    @id @default(cuid())
+  userId       String
+  type         String
+  title        String
+  message      String
+  data         Json?
+  scheduledFor DateTime
+  sentAt       DateTime?
+  status       String    @default("PENDING") // PENDING | SENT | FAILED | CANCELLED
+  errorMessage String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@index([userId])
+  @@index([scheduledFor])
+  @@index([status])
+  @@map("scheduled_notifications")
+}
+
+model UnifiedNotification {
+  id        String    @id @default(cuid())
+  type      String    // 'order' | 'payment' | 'system' | 'marketing' | 'security' | 'analytics' | 'financial'
+  priority  String    // 'low' | 'medium' | 'high' | 'critical'
+  title     String
+  message   String
+  data      Json?
+  recipients Json     // Array of recipient configs
+  channels  String[]  // ['websocket', 'push', 'email', 'sms']
+  status    String    @default("sent") // 'sent' | 'delivered' | 'failed'
+  expiresAt DateTime?
+  metadata  Json?
+  sentAt    DateTime  @default(now())
+  createdAt DateTime  @default(now())
+
+  @@index([type])
+  @@index([priority])
+  @@index([status])
+  @@index([sentAt])
+  @@map("unified_notifications")
+}
+
+model SupportTicket {
+  id          String                 @id @default(cuid())
+  userId      String
+  userType    String                 @default("DRIVER")
+  subject     String
+  message     String
+  status      SupportTicketStatus    @default(OPEN)
+  priority    SupportTicketPriority  @default(MEDIUM)
+  attachments String[]               @default([])
+  metadata    Json?
+  createdAt   DateTime               @default(now())
+  updatedAt   DateTime               @updatedAt
+  messages    SupportTicketMessage[]
+  chatSessions ChatSession[]
+
+  @@index([userId])
+  @@index([status])
+  @@index([priority])
+  @@index([createdAt])
+  @@map("support_tickets")
+}
+
+model SupportTicketMessage {
+  id          String        @id @default(cuid())
+  ticketId    String
+  senderId    String
+  senderType  String
+  message     String
+  attachments String[]      @default([])
+  metadata    Json?
+  createdAt   DateTime      @default(now())
+  ticket      SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  @@index([ticketId])
+  @@index([createdAt])
+  @@map("support_ticket_messages")
+}
+
+model ChatSession {
+  id         String   @id @default(cuid())
+  ticketId   String
+  customerId String?
+  driverId   String?
+  status     String   @default("ACTIVE") // ACTIVE | CLOSED
+  createdAt  DateTime @default(now())
+  closedAt   DateTime?
+
+  ticket     SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  @@index([ticketId])
+  @@index([status])
+  @@map("chat_sessions")
+}
+
+model FAQ {
+  id        String   @id @default(cuid())
+  question  String
+  answer    String
+  category  String
+  order     Int      @default(0)
+  views     Int      @default(0)
+  helpful   Int      @default(0)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([category])
+  @@index([isActive])
+  @@map("faqs")
+}
+
+model KnowledgeBaseArticle {
+  id          String   @id @default(cuid())
+  title       String
+  content     String
+  category    String
+  tags        String[] @default([])
+  views       Int      @default(0)
+  helpful     Int      @default(0)
+  isPublished Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([category])
+  @@index([isPublished])
+  @@map("knowledge_base_articles")
+}
+
+model MLModel {
+  id           String         @id @default(cuid())
+  name         String
+  type         String
+  status       MLModelStatus  @default(TRAINING)
+  accuracy     Float?
+  version      String
+  lastTrained  DateTime?
+  trainingData Json?
+  config       Json?
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  MLPrediction MLPrediction[]
+
+  @@index([type])
+  @@index([status])
+  @@map("ml_models")
+}
+
+model MLPrediction {
+  id         String   @id @default(cuid())
+  modelId    String
+  input      Json
+  output     Json
+  confidence Float?
+  createdAt  DateTime @default(now())
+  model      MLModel  @relation(fields: [modelId], references: [id], onDelete: Cascade)
+
+  @@index([modelId])
+  @@index([createdAt])
+  @@map("ml_predictions")
+}
+
+model DriverSchedule {
+  id         String   @id @default(cuid())
+  driverId   String
+  date       DateTime
+  startTime  String
+  endTime    String
+  type       String   @default("REGULAR")
+  status     String   @default("SCHEDULED")
+  orderCount Int      @default(0)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  driver     Driver   @relation(fields: [driverId], references: [id], onDelete: Cascade)
+
+  @@index([driverId])
+  @@index([date])
+  @@map("driver_schedules")
+}
+
+model AutomationTrigger {
+  id          String   @id @default(cuid())
+  name        String
+  type        String
+  description String?
+  config      Json?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([type])
+  @@index([isActive])
+  @@map("automation_triggers")
+}
+
+model ScheduledTask {
+  id        String    @id @default(cuid())
+  name      String
+  schedule  String
+  status    String    @default("ACTIVE")
+  lastRun   DateTime?
+  nextRun   DateTime?
+  config    Json?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@index([status])
+  @@index([nextRun])
+  @@map("scheduled_tasks")
+}
+
+model MarketingTemplate {
+  id        String   @id @default(cuid())
+  name      String
+  type      String
+  subject   String?
+  content   String
+  variables String[] @default([])
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([type])
+  @@index([isActive])
+  @@map("marketing_templates")
+}
+
+model MarketingSegment {
+  id            String   @id @default(cuid())
+  name          String
+  description   String?
+  criteria      Json
+  customerCount Int      @default(0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([name])
+  @@map("marketing_segments")
+}
+
+model ReportTemplate {
+  id          String   @id @default(cuid())
+  name        String
+  type        String
+  description String?
+  parameters  Json
+  format      String   @default("PDF")
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([type])
+  @@index([isActive])
+  @@map("report_templates")
+}
+
+model AvailableIntegration {
+  id           String   @id
+  name         String
+  type         String
+  description  String?
+  icon         String?
+  configSchema Json?
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([type])
+  @@index([isActive])
+  @@map("available_integrations")
+}
+
+enum PaymentStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+  REFUNDED
+}
+
+enum PaymentMethodType {
+  CARD
+  PAYPAL
+  APPLE_PAY
+  GOOGLE_PAY
+  SEPA_DIRECT_DEBIT
+  BANK_TRANSFER
+  SOFORT
+}
+
+enum ReportingFrequency {
+  MONTHLY
+  QUARTERLY
+  YEARLY
+}
+
+enum FinanzamtStatus {
+  PENDING
+  REGISTERED
+  ACTIVE
+  SUSPENDED
+  ERROR
+}
+
+enum TaxReportType {
+  ELDA
+  VAT_RETURN
+  ANNUAL
+}
+
+enum TaxReportStatus {
+  PENDING
+  GENERATED
+  SUBMITTED
+  CONFIRMED
+  ERROR
+}
+
+enum PayoutStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+enum SubscriptionTier {
+  BASIC
+  PRO
+  FULLTIME
+  ENTERPRISE
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  TRIALING
+  PAST_DUE
+  CANCELED
+  UNPAID
+  INCOMPLETE
+}
+
+enum CommissionStatus {
+  PENDING
+  CALCULATED
+  PAID
+  FAILED
+}
+
+enum AdminRole {
+  ADMIN
+  SUPER_ADMIN
+  MODERATOR
+  SUPPORT
+}
+
+enum SupportTicketStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+}
+
+enum SupportTicketPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum MLModelStatus {
+  TRAINING
+  DEPLOYED
+  ARCHIVED
+  FAILED
+}
+
+model SavedCart {
+  id           String   @id @default(cuid())
+  customerId   String
+  name         String?
+  items        Json
+  restaurantId String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  customer     Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([customerId])
+  @@index([restaurantId])
+  @@map("saved_carts")
+}
+
+model FavoriteDish {
+  id         String   @id @default(cuid())
+  customerId String
+  dishId     String
+  createdAt  DateTime @default(now())
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  dish       Dish     @relation(fields: [dishId], references: [id], onDelete: Cascade)
+
+  @@unique([customerId, dishId])
+  @@index([customerId])
+  @@index([dishId])
+  @@map("favorite_dishes")
+}
+
+model ReviewComment {
+  id         String   @id @default(cuid())
+  reviewId   String
+  customerId String
+  content    String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  review     Review   @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+
+  @@index([reviewId])
+  @@index([customerId])
+  @@map("review_comments")
+}
+
+model ReviewHelpful {
+  id         String   @id @default(cuid())
+  reviewId   String
+  customerId String
+  isHelpful  Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  review     Review   @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+
+  @@unique([reviewId, customerId])
+  @@index([reviewId])
+  @@index([customerId])
+  @@map("review_helpfuls")
+}
+
+model MealPlanTemplate {
+  id          String    @id @default(cuid())
+  customerId  String?
+  name        String
+  description String?
+  schedule    Json
+  dishIds     String[]  @default([])
+  tags        String[]  @default([])
+  isPublic    Boolean   @default(false)
+  usageCount  Int       @default(0)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  customer    Customer? @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([customerId])
+  @@index([isPublic])
+  @@map("meal_plan_templates")
+}
+
+// ===== DRIVER APP EXTENSIONS =====
+
+// Advanced Order Management
+model OrderNote {
+  id        String   @id @default(cuid())
+  orderId   String
+  driverId  String
+  note      String
+  type      String   @default("GENERAL") // GENERAL, PRIVATE, PUBLIC
+  isVisible Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  driver    Driver   @relation(fields: [driverId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+  @@index([driverId])
+  @@map("order_notes")
+}
+
+model OrderDelay {
+  id          String    @id @default(cuid())
+  orderId     String
+  driverId    String
+  delayReason String
+  delayTime   Int // minutes
+  status      String    @default("REPORTED")
+  approvedAt  DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  order       Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  driver      Driver    @relation(fields: [driverId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+  @@index([driverId])
+  @@map("order_delays")
+}
+
+model BulkOrderAction {
+  id         String   @id @default(cuid())
+  driverId   String
+  actionType String // ACCEPT, REJECT, PRIORITY_UPDATE
+  orderIds   String[]
+  reason     String?
+  executedAt DateTime @default(now())
+  result     Json // execution results
+  driver     Driver   @relation(fields: [driverId], references: [id], onDelete: Cascade)
+
+  @@index([driverId])
+  @@map("bulk_order_actions")
+}
+
+// Route & Navigation
+model RouteOptimization {
+  id                String   @id @default(cuid())
+  driverId          String
+  orderIds          String[]
+  optimizedRoute    Json
+  estimatedTime     Int // minutes
+  estimatedDistance Float // km
+  trafficFactor     Float    @default(1.0)
+  weatherFactor     Float    @default(1.0)
+  createdAt         DateTime @default(now())
+  driver            Driver   @relation(fields: [driverId], references: [id], onDelete: Cascade)
+
+  @@index([driverId])
+  @@map("route_optimizations")
+}
+
+model RouteHistory {
+  id             String    @id @default(cuid())
+  driverId       String
+  routeId        String?
+  waypoints      Json
+  actualTime     Int? // actual delivery time in minutes
+  actualDistance Float? // actual distance in km
+  performance    Json // route performance metrics
+  completedAt    DateTime?
+  createdAt      DateTime  @default(now())
+  driver         Driver    @relation(fields: [driverId], references: [id], onDelete: Cascade)
+
+  @@index([driverId])
+  @@index([completedAt])
+  @@map("route_histories")
+}
+
+model TrafficIncident {
+  id          String    @id @default(cuid())
+  location    Json // lat/lng coordinates
+  type        String // ACCIDENT, CONSTRUCTION, ROAD_CLOSURE
+  severity    String // LOW, MEDIUM, HIGH, CRITICAL
+  description String?
+  startTime   DateTime
+  endTime     DateTime?
+  impact      Json // affected routes, delay estimates
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([startTime])
+  @@index([endTime])
+  @@map("traffic_incidents")
+}
+
+model RouteAlternative {
+  id               String   @id @default(cuid())
+  originalRouteId  String
+  alternativeRoute Json
+  reason           String // TRAFFIC, WEATHER, ROAD_WORK
+  timeSavings      Int? // minutes saved
+  distanceSavings  Float? // km saved
+  createdAt        DateTime @default(now())
+  driverId         String
+  driver           Driver   @relation(fields: [driverId], references: [id], onDelete: Cascade)
+
+  @@index([driverId])
+  @@map("route_alternatives")
+}
+
+// Performance Analytics
+model DriverPerformance {
+  id                   String   @id @default(cuid())
+  driverId             String   @unique
+  period               String // DAILY, WEEKLY, MONTHLY
+  periodStart          DateTime
+  periodEnd            DateTime
+  totalOrders          Int      @default(0)
+  completedOrders      Int      @default(0)
+  cancelledOrders      Int      @default(0)
+  averageRating        Float    @default(0)
+  totalEarnings        Float    @default(0)
+  totalDistance        Float    @default(0)
+  totalTime            Int      @default(0) // minutes
+  onTimeDeliveryRate   Float    @default(0)
+  customerSatisfaction Float    @default(0)
+  efficiencyScore      Float    @default(0)
+  goals                Json // performance goals
+  achievements         Json // unlocked achievements
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+  driver               Driver   @relation(fields: [driverId], references: [id], onDelete: Cascade)
+
+  @@index([driverId])
+  @@index([period])
+  @@index([periodStart])
+  @@map("driver_performances")
+}
+
+model PerformanceGoal {
+  id           String    @id @default(cuid())
+  driverId     String
+  goalType     String // ORDERS_PER_DAY, EARNINGS, RATING, DISTANCE
+  targetValue  Float
+  currentValue Float     @default(0)
+  period       String // DAILY, WEEKLY, MONTHLY
+  status       String    @default("ACTIVE")
+  deadline     DateTime?
+  reward       Json // reward details
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  driver       Driver    @relation(fields: [driverId], references: [id], onDelete: Cascade)
+
+  @@index([driverId])
+  @@index([goalType])
+  @@map("performance_goals")
+}
+
+model PerformanceBenchmark {
+  id         String   @id @default(cuid())
+  region     String
+  metric     String // AVG_DELIVERY_TIME, CUSTOMER_SATISFACTION, etc.
+  value      Float
+  percentile Float // 50th, 75th, 90th percentile
+  period     String // DAILY, WEEKLY, MONTHLY
+  updatedAt  DateTime @updatedAt
+  createdAt  DateTime @default(now())
+
+  @@unique([region, metric, percentile, period])
+  @@index([region])
+  @@index([metric])
+  @@map("performance_benchmarks")
+}
+
+// Gamification
+model GamificationStats {
+  id           String    @id @default(cuid())
+  driverId     String    @unique
+  level        Int       @default(1)
+  xp           Int       @default(0)
+  totalXP      Int       @default(0)
+  points       Int       @default(0)
+  streakDays   Int       @default(0)
+  bestStreak   Int       @default(0)
+  badges       Json      @default("[]")
+  achievements Json      @default("[]")
+  lastActivity DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  driver       Driver    @relation(fields: [driverId], references: [id], onDelete: Cascade)
+
+  @@index([driverId])
+  @@map("gamification_stats")
+}
+
+model GamificationChallenge {
+  id           String   @id @default(cuid())
+  title        String
+  description  String
+  type         String // DAILY, WEEKLY, MONTHLY, SPECIAL
+  requirements Json // completion requirements
+  rewards      Json // XP, points, badges
+  startDate    DateTime
+  endDate      DateTime
+  isActive     Boolean  @default(true)
+  participants Json     @default("[]") // participating driver IDs
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([type])
+  @@index([isActive])
+  @@map("gamification_challenges")
+}
+
+model GamificationAchievement {
+  id            String   @id @default(cuid())
+  driverId      String
+  achievementId String
+  unlockedAt    DateTime @default(now())
+  progress      Float    @default(0) // 0-100
+  metadata      Json?
+  driver        Driver   @relation(fields: [driverId], references: [id], onDelete: Cascade)
+
+  @@unique([driverId, achievementId])
+  @@index([driverId])
+  @@map("gamification_achievements")
+}
+
+model GamificationQuest {
+  id        String    @id @default(cuid())
+  driverId  String
+  questType String // DELIVERY_STREAK, DISTANCE_GOAL, RATING_TARGET
+  target    Float
+  progress  Float     @default(0)
+  status    String    @default("ACTIVE")
+  reward    Json
+  deadline  DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  driver    Driver    @relation(fields: [driverId], references: [id], onDelete: Cascade)
+
+  @@index([driverId])
+  @@index([status])
+  @@map("gamification_quests")
+}
+
+// Emergency & Safety
+model EmergencyAlert {
+  id                  String              @id @default(cuid())
+  driverId            String
+  type                String // PANIC_BUTTON, ACCIDENT, MEDICAL_EMERGENCY, VEHICLE_ISSUE, OTHER
+  message             String
+  severity            String              @default("high") // low, medium, high, critical
+  status              String              @default("ACTIVE") // ACTIVE, RESOLVED, FALSE_ALARM
+  location            Json? // current location {lat, lng, address?}
+  alertType           String? // Legacy field for compatibility
+  description         String? // Legacy field for compatibility
+  assignedResponderId String?
+  lastResponseAt      DateTime?
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+  driver              Driver              @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  responses           EmergencyResponse[]
+  dispatches          EmergencyDispatch[]
+
+  // Legacy fields for backward compatibility
+  respondedAt DateTime?
+  resolvedAt  DateTime?
+  response    Json?
+
+  @@index([driverId])
+  @@index([type])
+  @@index([severity])
+  @@index([status])
+  @@map("emergency_alerts")
+}
+
+model SafetyIncident {
+  id            String   @id @default(cuid())
+  driverId      String
+  incidentType  String // TRAFFIC_VIOLATION, CUSTOMER_COMPLAINT, ACCIDENT
+  severity      String   @default("LOW")
+  description   String
+  location      Json?
+  date          DateTime
+  status        String   @default("REPORTED")
+  investigation Json?
+  penalty       Json?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  driver        Driver   @relation(fields: [driverId], references: [id], onDelete: Cascade)
+
+  @@index([driverId])
+  @@index([incidentType])
+  @@map("safety_incidents")
+}
+
+model SafetyScore {
+  id           String   @id @default(cuid())
+  driverId     String   @unique
+  overallScore Float    @default(100)
+  components   Json // breakdown by category
+  lastUpdated  DateTime @updatedAt
+  createdAt    DateTime @default(now())
+  driver       Driver   @relation(fields: [driverId], references: [id], onDelete: Cascade)
+
+  @@index([driverId])
+  @@map("safety_scores")
+}
+
+model EmergencyLog {
+  id          String   @id @default(cuid())
+  driverId    String
+  type        String   // e.g. PANIC_BUTTON, INCIDENT, ALERT
+  severity    String   @default("medium")
+  description String
+  location    Json?
+  resolvedAt  DateTime?
+  createdAt   DateTime @default(now())
+
+  driver      Driver   @relation(fields: [driverId], references: [id], onDelete: Cascade)
+
+  @@index([driverId])
+  @@index([severity])
+  @@index([createdAt])
+  @@map("emergency_logs")
+}
+
+model EmergencyContact {
+  id        String   @id @default(cuid())
+  driverId  String
+  name      String
+  phone     String
+  relation  String // FAMILY, FRIEND, EMERGENCY_SERVICE
+  isPrimary Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  driver    Driver   @relation(fields: [driverId], references: [id], onDelete: Cascade)
+
+  @@index([driverId])
+  @@map("emergency_contacts")
+}
+
+model EmergencyBroadcast {
+  id            String   @id @default(cuid())
+  adminId       String
+  message       String
+  priority      String   @default("medium")
+  targetDrivers String[] // Array of driver IDs
+  targetArea    Json? // Geo area for broadcast
+  emergencyType String?
+  sentAt        DateTime @default(now())
+  status        String   @default("SENT")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([adminId])
+  @@index([priority])
+  @@map("emergency_broadcasts")
+}
+
+model EmergencyDispatch {
+  id           String         @id @default(cuid())
+  emergencyId  String
+  services     String[] // Array of emergency services (police, ambulance, fire)
+  priority     String         @default("medium")
+  status       String         @default("DISPATCHED")
+  notes        String?
+  dispatchedAt DateTime       @default(now())
+  respondedAt  DateTime?
+  resolvedAt   DateTime?
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  emergency    EmergencyAlert @relation(fields: [emergencyId], references: [id], onDelete: Cascade)
+
+  @@index([emergencyId])
+  @@index([status])
+  @@map("emergency_dispatches")
+}
+
+model EmergencyResponse {
+  id          String         @id @default(cuid())
+  emergencyId String
+  responderId String
+  action      String // EMERGENCY_RESPONSE, SUPPORT, COORDINATION
+  priority    String         @default("normal")
+  notes       String?
+  timestamp   DateTime       @default(now())
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  emergency   EmergencyAlert @relation(fields: [emergencyId], references: [id], onDelete: Cascade)
+
+  @@index([emergencyId])
+  @@index([responderId])
+  @@map("emergency_responses")
+}
+
+// Monitoring & Analytics
+model SystemAlert {
+  id               String    @id @default(cuid())
+  type             String // info, warning, error, critical
+  title            String
+  message          String
+  source           String // component that generated the alert
+  acknowledged     Boolean   @default(false)
+  acknowledgedAt   DateTime?
+  acknowledgedById String?
+  acknowledgedBy   Admin?    @relation("AlertAcknowledgedBy", fields: [acknowledgedById], references: [id])
+  timestamp        DateTime  @default(now())
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  @@index([type])
+  @@index([source])
+  @@index([acknowledged])
+  @@index([timestamp])
+  @@map("system_alerts")
+}
+
+model ApplicationLog {
+  id        String   @id @default(cuid())
+  level     String // DEBUG, INFO, WARN, ERROR
+  component String // API, WebSocket, Database, etc.
+  message   String
+  data      Json? // Additional structured data
+  userId    String? // Associated user if applicable
+  sessionId String? // Session ID for tracking
+  timestamp DateTime @default(now())
+  createdAt DateTime @default(now())
+
+  @@index([level])
+  @@index([component])
+  @@index([userId])
+  @@index([timestamp])
+  @@map("application_logs")
+}
+
+model SystemIncident {
+  id                 String                    @id @default(cuid())
+  title              String
+  description        String
+  severity           String // low, medium, high, critical
+  component          String // Affected system component
+  status             String                    @default("OPEN") // OPEN, INVESTIGATING, RESOLVED, CLOSED
+  tags               String[] // Tags for categorization
+  resolution         String?
+  notes              String?
+  createdAt          DateTime                  @default(now())
+  updatedAt          DateTime                  @updatedAt
+  resolvedAt         DateTime?
+  createdById        String?
+  resolvedById       String?
+  createdBy          Admin?                    @relation("IncidentCreatedBy", fields: [createdById], references: [id])
+  resolvedBy         Admin?                    @relation("IncidentResolvedBy", fields: [resolvedById], references: [id])
+  affectedComponents SystemIncidentComponent[]
+
+  @@index([severity])
+  @@index([component])
+  @@index([status])
+  @@index([createdAt])
+  @@map("system_incidents")
+}
+
+model SystemIncidentComponent {
+  id         String         @id @default(cuid())
+  incidentId String
+  component  String // Specific component affected
+  impact     String // HIGH, MEDIUM, LOW
+  status     String         @default("AFFECTED") // AFFECTED, RECOVERED
+  notes      String?
+  incident   SystemIncident @relation(fields: [incidentId], references: [id], onDelete: Cascade)
+
+  @@index([incidentId])
+  @@index([component])
+  @@map("system_incident_components")
+}
+
+// Advanced Fleet Management
+model FleetZone {
+  id          String          @id @default(cuid())
+  name        String
+  boundaries  Json // GeoJSON polygon
+  capacity    Int             @default(50) // Max concurrent drivers
+  priority    Int             @default(1) // 1 = highest priority
+  isActive    Boolean         @default(true)
+  region      String?
+  drivers     Driver[]
+  schedules   FleetSchedule[]
+  fleetShifts FleetShift[]
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  @@index([region])
+  @@index([priority])
+  @@index([isActive])
+  @@map("fleet_zones")
+}
+
+model FleetSchedule {
+  id          String       @id @default(cuid())
+  date        DateTime
+  region      String?
+  zoneId      String?
+  algorithm   String       @default("manual") // manual, greedy, genetic, ml
+  constraints Json? // Scheduling constraints
+  isActive    Boolean      @default(true)
+  zone        FleetZone?   @relation(fields: [zoneId], references: [id])
+  shifts      FleetShift[]
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  @@index([date])
+  @@index([region])
+  @@index([isActive])
+  @@map("fleet_schedules")
+}
+
+model FleetShift {
+  id         String        @id @default(cuid())
+  scheduleId String
+  driverId   String
+  startTime  DateTime
+  endTime    DateTime
+  zoneId     String?
+  priority   Int           @default(1)
+  status     String        @default("SCHEDULED") // SCHEDULED, ACTIVE, COMPLETED, CANCELLED
+  schedule   FleetSchedule @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
+  driver     Driver        @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  zone       FleetZone?    @relation(fields: [zoneId], references: [id])
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+
+  @@index([scheduleId])
+  @@index([driverId])
+  @@index([startTime])
+  @@index([status])
+  @@map("fleet_shifts")
+}
+
+model Vehicle {
+  id                 String               @id @default(cuid())
+  type               String // CAR, BIKE, SCOOTER, VAN
+  licensePlate       String               @unique
+  make               String
+  model              String
+  year               Int
+  status             String               @default("ACTIVE") // ACTIVE, MAINTENANCE, OUT_OF_SERVICE
+  location           Json? // Current location
+  region             String?
+  driverId           String?              @unique
+  fuelType           String               @default("GASOLINE")
+  fuelEfficiency     Float? // km/l or kWh/km
+  lastMaintenance    DateTime?
+  nextMaintenance    DateTime?
+  mileage            Float                @default(0) // Total km
+  insuranceExpiry    DateTime?
+  registrationExpiry DateTime?
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+  driver             Driver?              @relation(fields: [driverId], references: [id])
+  maintenanceRecords VehicleMaintenance[]
+  incidents          FleetIncident[]
+
+  @@index([status])
+  @@index([region])
+  @@index([driverId])
+  @@map("vehicles")
+}
+
+model VehicleMaintenance {
+  id            String    @id @default(cuid())
+  vehicleId     String
+  type          String // ROUTINE, REPAIR, INSPECTION, EMERGENCY
+  description   String
+  scheduledDate DateTime
+  completedDate DateTime?
+  cost          Float?
+  status        String    @default("SCHEDULED") // SCHEDULED, IN_PROGRESS, COMPLETED, CANCELLED
+  notes         String?
+  performedBy   String?
+  vehicle       Vehicle   @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([vehicleId])
+  @@index([scheduledDate])
+  @@index([status])
+  @@map("vehicle_maintenance")
+}
+
+model FleetRoute {
+  id                String          @id @default(cuid())
+  driverId          String
+  status            String          @default("PLANNED") // PLANNED, ASSIGNED, IN_PROGRESS, COMPLETED, CANCELLED
+  totalDistance     Float?
+  estimatedDuration Int? // minutes
+  actualDuration    Int?
+  fuelConsumption   Float?
+  region            String?
+  optimizationId    String?
+  orders            Order[]
+  waypoints         RouteWaypoint[]
+  driver            Driver          @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+
+  @@index([driverId])
+  @@index([status])
+  @@index([region])
+  @@map("fleet_routes")
+}
+
+model RouteWaypoint {
+  id               String     @id @default(cuid())
+  routeId          String
+  sequence         Int
+  type             String // PICKUP, DELIVERY, BREAK, REFUEL
+  location         Json // lat, lng, address
+  orderId          String?
+  estimatedArrival DateTime?
+  actualArrival    DateTime?
+  notes            String?
+  route            FleetRoute @relation(fields: [routeId], references: [id], onDelete: Cascade)
+  createdAt        DateTime   @default(now())
+
+  @@index([routeId])
+  @@index([sequence])
+  @@map("route_waypoints")
+}
+
+model FleetOptimization {
+  id          String    @id @default(cuid())
+  type        String // capacity, cost, speed, balanced
+  region      String?
+  constraints Json?
+  timeWindow  Json?
+  results     Json // Optimization results
+  applied     Boolean   @default(false)
+  appliedAt   DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@index([type])
+  @@index([region])
+  @@index([applied])
+  @@map("fleet_optimizations")
+}
+
+model FleetRouteOptimization {
+  id               String    @id @default(cuid())
+  routeIds         String[]
+  optimizationGoal String // time, cost, distance, balanced
+  constraints      Json?
+  results          Json // Optimization results
+  applied          Boolean   @default(false)
+  appliedAt        DateTime?
+  createdAt        DateTime  @default(now())
+
+  @@index([optimizationGoal])
+  @@index([applied])
+  @@map("fleet_route_optimizations")
+}
+
+model FleetBudget {
+  id        String   @id @default(cuid())
+  period    String // YYYY-MM, YYYY-Q1, etc.
+  category  String // drivers, vehicles, operational, overhead
+  region    String   @default("global")
+  amount    Float
+  spent     Float    @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([period, category, region])
+  @@index([period])
+  @@index([category])
+  @@index([region])
+  @@map("fleet_budgets")
+}
+
+model FleetIncident {
+  id           String    @id @default(cuid())
+  type         String // ACCIDENT, BREAKDOWN, TRAFFIC_VIOLATION, CUSTOMER_COMPLAINT, OTHER
+  severity     String    @default("medium") // low, medium, high, critical
+  description  String
+  location     Json?
+  driverId     String?
+  vehicleId    String?
+  region       String?
+  status       String    @default("REPORTED") // REPORTED, INVESTIGATING, RESOLVED, CLOSED
+  resolvedAt   DateTime?
+  resolution   String?
+  cost         Float?
+  notes        String?
+  driver       Driver?   @relation(fields: [driverId], references: [id])
+  vehicle      Vehicle?  @relation(fields: [vehicleId], references: [id])
+  resolvedById String?
+  resolvedBy   Admin?    @relation("FleetIncidentResolver", fields: [resolvedById], references: [id])
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@index([type])
+  @@index([severity])
+  @@index([status])
+  @@index([driverId])
+  @@index([vehicleId])
+  @@index([region])
+  @@map("fleet_incidents")
+}
+
+// Performance Tracking
+model PerformanceAlert {
+  id             String    @id @default(cuid())
+  driverId       String
+  type           String // warning, critical, info
+  title          String
+  message        String
+  metric         String // rating, deliveryTime, efficiency, etc.
+  threshold      Float
+  currentValue   Float
+  acknowledged   Boolean   @default(false)
+  acknowledgedAt DateTime?
+  timestamp      DateTime  @default(now())
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  driver         Driver    @relation(fields: [driverId], references: [id], onDelete: Cascade)
+
+  @@index([driverId])
+  @@index([type])
+  @@index([acknowledged])
+  @@index([timestamp])
+  @@map("performance_alerts")
+}
+
+model PerformanceReward {
+  id            String    @id @default(cuid())
+  driverId      String
+  type          String // bonus, badge, promotion, recognition
+  amount        Float?
+  reason        String
+  metadata      Json?
+  status        String    @default("distributed") // distributed, claimed, expired
+  distributedAt DateTime  @default(now())
+  claimedAt     DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  driver        Driver    @relation(fields: [driverId], references: [id], onDelete: Cascade)
+
+  @@index([driverId])
+  @@index([type])
+  @@index([status])
+  @@map("performance_rewards")
+}
+
+// ML Assignment System
+model AssignmentLog {
+  id                    String   @id @default(cuid())
+  orderId               String
+  driverId              String
+  algorithm             String // ml, genetic, greedy, hungarian
+  score                 Float
+  estimatedDeliveryTime Int
+  estimatedDistance     Float
+  confidence            Float?
+  reasoning             String[]
+  alternatives          Json? // Alternative assignments
+  actualDeliveryTime    Int?
+  actualDistance        Float?
+  success               Boolean? // Whether assignment was successful
+  feedback              Json? // Performance feedback
+  createdAt             DateTime @default(now())
+  driver                Driver   @relation(fields: [driverId], references: [id])
+  order                 Order?   @relation(fields: [orderId], references: [id])
+
+  @@index([orderId])
+  @@index([driverId])
+  @@index([algorithm])
+  @@index([createdAt])
+  @@map("assignment_logs")
+}
+
+model ABTest {
+  id          String    @id @default(cuid())
+  name        String
+  algorithms  String[] // Algorithms being tested
+  duration    Int // Hours
+  sampleSize  Int
+  region      String?
+  status      String    @default("planned") // planned, running, completed, cancelled
+  results     Json? // Test results
+  winner      String?
+  confidence  Float?
+  startedAt   DateTime?
+  completedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([status])
+  @@index([region])
+  @@map("ab_tests")
+}
+
+// Financial Management
+model DriverExpense {
+  id          String    @id @default(cuid())
+  driverId    String
+  category    String // FUEL, MAINTENANCE, TOLLS, PARKING, OTHER
+  amount      Float
+  description String?
+  date        DateTime
+  receipt     String? // file URL
+  status      String    @default("PENDING") // PENDING, APPROVED, REJECTED
+  approvedAt  DateTime?
+  approvedBy  String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  driver      Driver    @relation(fields: [driverId], references: [id], onDelete: Cascade)
+
+  @@index([driverId])
+  @@index([category])
+  @@index([status])
+  @@map("driver_expenses")
+}
+
+model FinancialProjection {
+  id                String   @id @default(cuid())
+  driverId          String
+  period            String // MONTHLY, QUARTERLY, YEARLY
+  periodStart       DateTime
+  periodEnd         DateTime
+  projectedEarnings Float    @default(0)
+  projectedExpenses Float    @default(0)
+  projectedNet      Float    @default(0)
+  confidence        Float    @default(0) // 0-100
+  factors           Json // factors affecting projection
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  driver            Driver   @relation(fields: [driverId], references: [id], onDelete: Cascade)
+
+  @@index([driverId])
+  @@index([period])
+  @@map("financial_projections")
+}
+
+model TaxDeduction {
+  id          String    @id @default(cuid())
+  driverId    String
+  type        String // VEHICLE, FUEL, MAINTENANCE, INSURANCE, OTHER
+  amount      Float
+  description String
+  date        DateTime
+  receipt     String?
+  status      String    @default("PENDING")
+  approvedAt  DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  driver      Driver    @relation(fields: [driverId], references: [id], onDelete: Cascade)
+
+  @@index([driverId])
+  @@index([type])
+  @@map("tax_deductions")
+}
+
+model FinancialBonus {
+  id        String    @id @default(cuid())
+  driverId  String
+  bonusType String // PERFORMANCE, LOYALTY, REFERRAL, SEASONAL
+  amount    Float
+  reason    String
+  status    String    @default("PENDING")
+  paidAt    DateTime?
+  expiresAt DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  driver    Driver    @relation(fields: [driverId], references: [id], onDelete: Cascade)
+
+  @@index([driverId])
+  @@index([bonusType])
+  @@map("financial_bonuses")
+}
+
+model FinancialBudget {
+  id          String   @id @default(cuid())
+  driverId    String
+  period      String // MONTHLY, YEARLY
+  periodStart DateTime
+  periodEnd   DateTime
+  categories  Json // budgeted amounts by category
+  actual      Json // actual spending
+  alerts      Json // budget alerts
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  driver      Driver   @relation(fields: [driverId], references: [id], onDelete: Cascade)
+
+  @@index([driverId])
+  @@map("financial_budgets")
+}
+
+// Subscription Management
+model SubscriptionFeature {
+  id         String    @id @default(cuid())
+  driverId   String
+  featureId  String
+  isEnabled  Boolean   @default(true)
+  usageCount Int       @default(0)
+  usageLimit Int?
+  resetDate  DateTime?
+  lastUsedAt DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  driver     Driver    @relation(fields: [driverId], references: [id], onDelete: Cascade)
+
+  @@unique([driverId, featureId])
+  @@index([driverId])
+  @@map("subscription_features")
+}
+
+model SubscriptionUsage {
+  id        String    @id @default(cuid())
+  driverId  String
+  feature   String
+  usage     Int       @default(0)
+  limit     Int?
+  period    String // DAILY, MONTHLY, YEARLY
+  resetAt   DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  driver    Driver    @relation(fields: [driverId], references: [id], onDelete: Cascade)
+
+  @@index([driverId])
+  @@index([feature])
+  @@map("subscription_usage")
+}
+
+model SubscriptionAnalytics {
+  id              String   @id @default(cuid())
+  driverId        String
+  period          String // DAILY, WEEKLY, MONTHLY
+  periodStart     DateTime
+  periodEnd       DateTime
+  featureUsage    Json // usage by feature
+  costSavings     Float    @default(0)
+  roi             Float? // return on investment
+  recommendations Json // upgrade/downgrade suggestions
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  driver          Driver   @relation(fields: [driverId], references: [id], onDelete: Cascade)
+
+  @@index([driverId])
+  @@index([period])
+  @@map("subscription_analytics")
+}
+
+// Advanced Features
+model MetaGlassesSession {
+  id             String    @id @default(cuid())
+  driverId       String
+  deviceId       String
+  status         String    @default("DISCONNECTED")
+  connectedAt    DateTime?
+  disconnectedAt DateTime?
+  batteryLevel   Int?
+  settings       Json?
+  navigation     Json? // current navigation state
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  driver         Driver    @relation(fields: [driverId], references: [id], onDelete: Cascade)
+
+  @@index([driverId])
+  @@index([deviceId])
+  @@map("meta_glasses_sessions")
+}
+
+model VoiceCommand {
+  id         String   @id @default(cuid())
+  driverId   String
+  command    String
+  parameters Json?
+  response   String?
+  confidence Float?
+  executedAt DateTime @default(now())
+  success    Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  driver     Driver   @relation(fields: [driverId], references: [id], onDelete: Cascade)
+
+  @@index([driverId])
+  @@index([executedAt])
+  @@map("voice_commands")
+}
+
+model QRScan {
+  id        String   @id @default(cuid())
+  driverId  String
+  qrCode    String
+  type      String // ORDER_PICKUP, ORDER_DELIVERY, VEHICLE_CHECK
+  data      Json?
+  scannedAt DateTime @default(now())
+  location  Json?
+  success   Boolean  @default(true)
+  createdAt DateTime @default(now())
+  driver    Driver   @relation(fields: [driverId], references: [id], onDelete: Cascade)
+
+  @@index([driverId])
+  @@index([type])
+  @@map("qr_scans")
+}
+
+model DriverReferral {
+  id           String    @id @default(cuid())
+  referrerId   String
+  referredId   String?
+  code         String    @unique
+  status       String    @default("PENDING")
+  rewardAmount Float     @default(0)
+  earnedAt     DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  referrer     Driver    @relation("DriverReferrer", fields: [referrerId], references: [id], onDelete: Cascade)
+  referred     Driver?   @relation("DriverReferred", fields: [referredId], references: [id])
+
+  @@index([referrerId])
+  @@index([referredId])
+  @@map("driver_referrals")
+}
+
+model FavoriteOrder {
+  id        String   @id @default(cuid())
+  driverId  String
+  orderId   String   @unique
+  createdAt DateTime @default(now())
+  driver    Driver   @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@unique([driverId, orderId])
+  @@index([driverId])
+  @@map("favorite_orders")
+}
+
+model CrossAppEvent {
+  id         String   @id @default(cuid())
+  type       String // 'order_status_changed', 'driver_assigned', 'emergency_alert', etc.
+  sourceApp  String // 'customer-web', 'restaurant-web', 'driver-app', 'admin-panel'
+  targetApps String[] // Array of target apps
+  data       Json // Event payload data
+  priority   String   @default("medium") // 'low', 'medium', 'high', 'critical'
+  timestamp  DateTime @default(now())
+  processed  Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  @@index([type])
+  @@index([sourceApp])
+  @@index([timestamp])
+  @@index([processed])
+  @@map("cross_app_events")
+}
+
+model WorkflowEvent {
+  id            String   @id @default(cuid())
+  type          String // Event type
+  source        String // Event source
+  data          Json // Event data
+  correlationId String? // Correlation ID for tracking related events
+  causationId   String? // Causation ID for event chains
+  metadata      Json? // Additional metadata
+  timestamp     DateTime @default(now())
+  processed     Boolean  @default(false)
+
+  @@index([type])
+  @@index([correlationId])
+  @@index([timestamp])
+  @@index([processed])
+  @@map("workflow_events")
+}
+
+model WorkflowInstance {
+  id          String    @id @default(cuid())
+  workflowId  String // Reference to workflow definition
+  status      String    @default("running") // 'running', 'completed', 'failed', 'paused'
+  currentStep String // Current step ID
+  context     Json // Workflow context data
+  startedAt   DateTime  @default(now())
+  completedAt DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@index([workflowId])
+  @@index([status])
+  @@index([startedAt])
+  @@map("workflow_instances")
+}
+
+model WorkflowDefinition {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String?
+  steps       Json // Workflow steps definition
+  version     String   @default("1.0")
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([name])
+  @@index([isActive])
+  @@map("workflow_definitions")
+}
+
+model OrchestrationExecution {
+  id         String   @id @default(cuid())
+  ruleId     String // Reference to orchestration rule
+  eventId    String // Reference to triggering event
+  executedAt DateTime @default(now())
+  success    Boolean  @default(true)
+  error      String?
+  rule       Json? // Store rule snapshot for audit
+  event      Json? // Store event snapshot for audit
+
+  @@index([ruleId])
+  @@index([eventId])
+  @@index([executedAt])
+  @@index([success])
+  @@map("orchestration_executions")
+}
+
+model EmergencyIncident {
+  id            String    @id @default(cuid())
+  type          String // 'medical', 'vehicle', 'security', 'technical', 'other'
+  severity      String // 'low', 'medium', 'high', 'critical'
+  description   String
+  location      Json? // Location data with lat/lng
+  reportedBy    String
+  reportedFrom  String // Source app
+  affectedUsers String[] // Array of affected user IDs
+  workflowId    String?
+  status        String    @default("active") // 'active', 'resolved', 'closed'
+  resolution    String?
+  resolvedAt    DateTime?
+  resolvedBy    String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([type])
+  @@index([severity])
+  @@index([status])
+  @@index([createdAt])
+  @@map("emergency_incidents")
+}
+
+model CrossAppSupportTicket {
+  id                String    @id @default(cuid())
+  category          String // 'order_issue', 'payment_problem', 'account_issue', 'technical_problem', 'general_inquiry'
+  priority          String // 'LOW', 'MEDIUM', 'HIGH', 'URGENT'
+  subject           String
+  description       String
+  customerId        String
+  orderId           String?
+  contactMethod     String // 'chat', 'email', 'phone', 'app'
+  preferredLanguage String    @default("de")
+  assignedTeam      String?
+  assignedAgent     String?
+  workflowId        String?
+  status            String    @default("open") // 'open', 'assigned', 'in_progress', 'resolved', 'closed'
+  resolution        String?
+  resolvedAt        DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@index([category])
+  @@index([priority])
+  @@index([status])
+  @@index([customerId])
+  @@index([assignedAgent])
+  @@map("cross_app_support_tickets")
+}
+
+model AnalyticsReport {
+  id          String    @id @default(cuid())
+  type        String // 'performance', 'revenue', 'user_behavior', 'operational', 'predictive'
+  timeRange   Json // { start: Date, end: Date }
+  metrics     String[] // Array of metric names
+  filters     Json? // Filter criteria
+  data        Json // Report data
+  recipients  String[] // Array of recipient IDs
+  format      String    @default("dashboard") // 'dashboard', 'pdf', 'csv', 'email'
+  status      String    @default("generating") // 'generating', 'completed', 'failed'
+  generatedAt DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@index([type])
+  @@index([status])
+  @@index([generatedAt])
+  @@map("analytics_reports")
+}
+
+model CrossAppCustomerFeedback {
+  id             String    @id @default(cuid())
+  orderId        String
+  customerId     String
+  restaurantId   String
+  driverId       String?
+  rating         Json // { food: number, delivery: number, overall: number }
+  comment        String?
+  sentiment      String // 'positive', 'neutral', 'negative'
+  analysis       Json? // AI analysis results
+  requiresAction Boolean   @default(false)
+  actionItems    String[] // Array of action item IDs
+  status         String    @default("received") // 'received', 'reviewed', 'actioned', 'closed'
+  reviewedAt     DateTime?
+  reviewedBy     String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@index([orderId])
+  @@index([customerId])
+  @@index([restaurantId])
+  @@index([driverId])
+  @@index([sentiment])
+  @@index([status])
+  @@map("cross_app_customer_feedback")
+}
+
+model QualityInvestigation {
+  id                  String    @id @default(cuid())
+  type                String // Type of quality issue
+  severity            String // 'low', 'medium', 'high', 'critical'
+  description         String
+  relatedOrderId      String?
+  relatedRestaurantId String?
+  relatedDriverId     String?
+  status              String    @default("investigating") // 'investigating', 'action_required', 'resolved', 'closed'
+  assignedTo          String?
+  findings            Json? // Investigation findings
+  correctiveActions   String[] // Array of corrective action IDs
+  resolution          String?
+  resolvedAt          DateTime?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  @@index([type])
+  @@index([severity])
+  @@index([status])
+  @@index([assignedTo])
+  @@map("quality_investigations")
+}
+
+// Offline Sync Models
+model SyncState {
+  id               String    @id @default(cuid())
+  userId           String
+  deviceId         String
+  lastSyncTimestamp DateTime @default(now())
+  syncVersion      Int       @default(1)
+  metadata         Json?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  @@unique([userId, deviceId])
+  @@index([userId])
+  @@index([deviceId])
+  @@index([lastSyncTimestamp])
+  @@map("sync_states")
+}
+
+model SyncQueue {
+  id          String   @id @default(cuid())
+  userId      String
+  deviceId    String
+  table       String
+  operation   String   // 'INSERT' | 'UPDATE' | 'DELETE'
+  data        Json
+  version     Int      @default(1)
+  status      String   @default("pending") // 'pending' | 'processing' | 'completed' | 'failed'
+  error       String?
+  retryCount  Int      @default(0)
+  maxRetries  Int      @default(3)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  processedAt DateTime?
+
+  @@index([userId, deviceId])
+  @@index([status])
+  @@index([createdAt])
+  @@index([status, createdAt])
+  @@map("sync_queue")
+}
+
+model SyncConflict {
+  id           String    @id @default(cuid())
+  userId       String
+  deviceId     String
+  table        String
+  localData    Json
+  serverData   Json
+  conflictType String    // 'version' | 'data' | 'deletion'
+  resolution   String?   // 'local' | 'server' | 'merge'
+  resolvedAt   DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@index([userId, deviceId])
+  @@index([conflictType])
+  @@index([resolution])
+  @@index([resolvedAt])
+  @@index([userId, deviceId, resolvedAt])
+  @@map("sync_conflicts")
+}
+
+// ============================================
+// Restaurant Locations (Multi-Location Support)
+// ============================================
+
+model RestaurantLocation {
+  id              String    @id @default(cuid())
+  restaurantId    String
+  name            String
+  address         String
+  city            String
+  postalCode      String
+  country         String    @default("Österreich")
+  phone           String
+  email           String
+  isActive        Boolean   @default(true)
+  operatingHours  Json?
+  managerId       String?
+  managerName     String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  @@index([restaurantId])
+  @@index([isActive])
+  @@map("restaurant_locations")
+}
+
+// ============================================
+// Supplier Management
+// ============================================
+
+enum PaymentTerms {
+  NET_30
+  NET_60
+  IMMEDIATE
+}
+
+enum SupplierOrderStatus {
+  PENDING
+  CONFIRMED
+  DELIVERED
+  CANCELLED
+}
+
+model SupplierOrder {
+  id           String               @id @default(cuid())
+  supplierId   String
+  restaurantId String
+  orderDate    DateTime             @default(now())
+  deliveryDate DateTime?
+  status       SupplierOrderStatus  @default(PENDING)
+  totalAmount  Float
+  items        Json
+  createdAt    DateTime             @default(now())
+  updatedAt    DateTime             @updatedAt
+
+  supplier   Supplier   @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  @@index([supplierId])
+  @@index([restaurantId])
+  @@index([status])
+  @@map("supplier_orders")
+}
+
+// ============================================
+// Table & Reservation Management
+// ============================================
+
+enum TableStatus {
+  AVAILABLE
+  OCCUPIED
+  RESERVED
+  CLEANING
+}
+
+enum TableShape {
+  SQUARE
+  ROUND
+  RECTANGLE
+}
+
+enum ReservationStatus {
+  CONFIRMED
+  SEATED
+  COMPLETED
+  CANCELLED
+}
+
+model RestaurantTable {
+  id           String      @id @default(cuid())
+  restaurantId String
+  number       Int
+  capacity     Int
+  status       TableStatus @default(AVAILABLE)
+  shape        TableShape  @default(SQUARE)
+  location     Json?
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  restaurant   Restaurant  @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  reservations Reservation[]
+
+  @@unique([restaurantId, number])
+  @@index([restaurantId])
+  @@index([status])
+  @@map("restaurant_tables")
+}
+
+model Reservation {
+  id              String             @id @default(cuid())
+  restaurantId    String
+  tableId         String?
+  customerName    String
+  customerPhone   String
+  partySize       Int
+  reservationTime DateTime
+  status          ReservationStatus  @default(CONFIRMED)
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+
+  restaurant Restaurant      @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  table       RestaurantTable? @relation(fields: [tableId], references: [id])
+
+  @@index([restaurantId])
+  @@index([tableId])
+  @@index([reservationTime])
+  @@index([status])
+  @@map("reservations")
+}
+
+// Advanced Subscription Management Tables
+model GDPRRequest {
+  id          String   @id @default(cuid())
+  driverId    String
+  type        GDPRRequestType
+  reason      String?
+  status      GDPRRequestStatus @default(PENDING)
+  dataPackage Json? // For data portability
+  requestedAt DateTime @default(now())
+  completedAt DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  driver Driver @relation(fields: [driverId], references: [id], onDelete: Cascade)
+
+  @@index([driverId])
+  @@index([type])
+  @@index([status])
+  @@map("gdpr_requests")
+}
+
+
+model WinbackCampaignLog {
+  id             String   @id @default(cuid())
+  driverId       String
+  campaignId     String
+  discountCode   String?
+  discountPercentage Float
+  emailType      String // winback_offer, winback_reminder, etc.
+  sentAt         DateTime @default(now())
+  openedAt       DateTime?
+  clickedAt      DateTime?
+  convertedAt    DateTime?
+  createdAt      DateTime @default(now())
+
+  driver Driver @relation(fields: [driverId], references: [id], onDelete: Cascade)
+
+  @@index([driverId])
+  @@index([campaignId])
+  @@index([sentAt])
+  @@map("winback_campaign_logs")
+}
+
+model DiscountCode {
+  id            String        @id @default(cuid())
+  code          String        @unique
+  type          String        @default("PERCENTAGE") // PERCENTAGE, FIXED
+  value         Float
+  validUntil    DateTime
+  usageLimit    Int?
+  usedCount     Int           @default(0)
+  isActive      Boolean       @default(true)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  @@index([code])
+  @@index([validUntil])
+  @@index([isActive])
+  @@map("discount_codes")
+}
+
+model CustomerLifetimeValue {
+  id              String   @id @default(cuid())
+  driverId        String   @unique
+  historicalValue Float    @default(0)
+  predictedValue  Float    @default(0)
+  totalValue      Float    @default(0)
+  confidence      Float    @default(0) // 0-1 confidence score
+  segments        Json? // RFM segmentation data
+  lastCalculated  DateTime @default(now())
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  driver Driver @relation(fields: [driverId], references: [id], onDelete: Cascade)
+
+  @@index([driverId])
+  @@index([totalValue])
+  @@index([lastCalculated])
+  @@map("customer_lifetime_value")
+}
+
+model ChurnPrediction {
+  id              String   @id @default(cuid())
+  driverId        String   @unique
+  churnProbability Float   @default(0) // 0-1 probability
+  riskLevel       String   @default("LOW") // LOW, MEDIUM, HIGH
+  predictedAt     DateTime
+  factors         Json? // Contributing factors
+  confidence      Float    @default(0) // 0-1 confidence score
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  driver Driver @relation(fields: [driverId], references: [id], onDelete: Cascade)
+
+  @@index([driverId])
+  @@index([churnProbability])
+  @@index([riskLevel])
+  @@index([predictedAt])
+  @@map("churn_predictions")
+}
+
+model SubscriptionContract {
+  id            String   @id @default(cuid())
+  driverId      String
+  subscriptionId String
+  contractNumber String  @unique
+  contractData  Json // Full contract data
+  pdfUrl        String?
+  signedAt      DateTime?
+  expiresAt     DateTime?
+  status        String   @default("DRAFT") // DRAFT, SIGNED, EXPIRED
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  driver Driver @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  subscription DriverSubscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+
+  @@index([driverId])
+  @@index([subscriptionId])
+  @@index([contractNumber])
+  @@index([status])
+  @@map("subscription_contracts")
+}
+
+
+// New Enums
+enum GDPRRequestType {
+  DATA_DELETION
+  DATA_PORTABILITY
+  DATA_RECTIFICATION
+  ACCESS_REQUEST
+}
+
+enum GDPRRequestStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  REJECTED
+}

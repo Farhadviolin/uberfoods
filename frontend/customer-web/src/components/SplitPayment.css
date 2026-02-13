@@ -1,0 +1,171 @@
+.split-payment-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.split-payment-content {
+  background: white;
+  border-radius: 16px;
+  padding: 24px;
+  max-width: 600px;
+  width: 90%;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.split-payment-content h2 {
+  margin: 0 0 8px 0;
+  font-size: 24px;
+  font-weight: 700;
+}
+
+.split-payment-subtitle {
+  color: #666;
+  margin-bottom: 24px;
+  font-size: 14px;
+}
+
+.split-method-selector {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 24px;
+  padding: 16px;
+  background: #F0F2F5;
+  border-radius: 12px;
+}
+
+.split-method-selector label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-weight: 500;
+}
+
+.participants-list {
+  margin-bottom: 24px;
+}
+
+.participant-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px;
+  border: 1px solid #E4E6EB;
+  border-radius: 12px;
+  margin-bottom: 12px;
+  background: white;
+}
+
+.participant-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex: 1;
+  gap: 16px;
+}
+
+.participant-email {
+  font-weight: 500;
+}
+
+.participant-amount {
+  font-weight: 600;
+  color: #1877F2;
+  font-size: 16px;
+}
+
+.participant-amount-input {
+  width: 120px;
+  padding: 8px 12px;
+  border: 1px solid #E4E6EB;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: 600;
+  text-align: right;
+}
+
+.remove-participant-btn {
+  background: #EF4444;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  width: 32px;
+  height: 32px;
+  cursor: pointer;
+  font-size: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.remove-participant-btn:hover {
+  background: #DC2626;
+}
+
+.add-participant {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.participant-email-input {
+  flex: 1;
+  padding: 12px 16px;
+  border: 2px solid #E4E6EB;
+  border-radius: 12px;
+  font-size: 14px;
+}
+
+.participant-email-input:focus {
+  outline: none;
+  border-color: #1877F2;
+}
+
+.add-participant-btn {
+  padding: 12px 24px;
+  background: #1877F2;
+  color: white;
+  border: none;
+  border-radius: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.add-participant-btn:hover {
+  background: #166FE5;
+}
+
+.split-actions {
+  display: flex;
+  gap: 12px;
+}
+
+.split-submit-btn {
+  flex: 1;
+  padding: 16px;
+  background: #1877F2;
+  color: white;
+  border: none;
+  border-radius: 12px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.split-submit-btn:hover:not(:disabled) {
+  background: #166FE5;
+}
+
+.split-submit-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

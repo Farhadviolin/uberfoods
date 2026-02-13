@@ -1,0 +1,104 @@
+openapi: 3.0.3
+info:
+  title: UberFoods Partner Apply API
+  version: 1.0.0
+paths:
+  /partners/apply:
+    post:
+      summary: Bewerbung als Partner (Fahrer, Restaurant, Sonstiges)
+      tags: [Partners]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [role, contact, consent]
+              properties:
+                role:
+                  type: string
+                  enum: [driver, restaurant, other]
+                contact:
+                  type: object
+                  required: [name, email, phone]
+                  properties:
+                    name:
+                      type: string
+                      example: Max Mustermann
+                    email:
+                      type: string
+                      format: email
+                      example: max@example.com
+                    phone:
+                      type: string
+                      example: "+43 123 456789"
+                    city:
+                      type: string
+                      example: Wien
+                    country:
+                      type: string
+                      example: Österreich
+                notes:
+                  type: string
+                  example: "Ich kann abends und am Wochenende."
+                consent:
+                  type: object
+                  required: [termsAccepted]
+                  properties:
+                    termsAccepted:
+                      type: boolean
+                      example: true
+                    marketingOptIn:
+                      type: boolean
+                      example: false
+                driverInfo:
+                  type: object
+                  properties:
+                    licenseClass:
+                      type: string
+                      example: B
+                    vehicleType:
+                      type: string
+                      example: Auto
+                    availabilityNote:
+                      type: string
+                      example: "Abends und Wochenende"
+                restaurantInfo:
+                  type: object
+                  properties:
+                    companyName:
+                      type: string
+                      example: "Pizza Roma GmbH"
+                    address:
+                      type: string
+                      example: "Hauptstrasse 1, 1010 Wien"
+                    cuisine:
+                      type: string
+                      example: "Italienisch"
+                    openingHours:
+                      type: string
+                      example: "Mo-So 11:00 - 22:00"
+      responses:
+        "201":
+          description: Bewerbung erfolgreich entgegengenommen
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    example: "app_123"
+                  status:
+                    type: string
+                    example: "pending"
+                  message:
+                    type: string
+                    example: "Application received. We will contact you soon."
+        "400":
+          description: Ungültige Anfrage (Validation)
+        "429":
+          description: Rate limit exceeded
+        "500":
+          description: Server error
+

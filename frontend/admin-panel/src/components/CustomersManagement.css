@@ -1,0 +1,300 @@
+.customers-management {
+  padding: 20px;
+}
+
+.customers-management .error-message {
+  background-color: #fee;
+  color: #c33;
+  padding: 12px;
+  border-radius: 8px;
+  margin-bottom: 20px;
+  border: 1px solid #fcc;
+}
+
+.customers-management .form-container {
+  background: #fff;
+  padding: 24px;
+  border-radius: 12px;
+  margin-bottom: 24px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.customers-management .form-group {
+  margin-bottom: 20px;
+}
+
+.customers-management .form-group label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: 600;
+  color: #1c1e21;
+}
+
+.customers-management .form-group input {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  font-size: 14px;
+  font-family: inherit;
+}
+
+.customers-management .customer-details-card {
+  background: #fff;
+  padding: 24px;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.customers-management .customer-details-card h2 {
+  margin: 0 0 16px 0;
+  color: #1c1e21;
+}
+
+.customers-management .customer-details-card p {
+  margin: 12px 0;
+  color: #65676b;
+}
+
+.customers-management .customer-details-card strong {
+  color: #1c1e21;
+  font-weight: 600;
+}
+
+.customers-management .orders-container {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+  gap: 16px;
+}
+
+.customers-management .order-card {
+  background: #f8f9fa;
+  border-radius: 8px;
+  padding: 16px;
+  border: 1px solid #e4e6eb;
+}
+
+.customers-management .order-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #e4e6eb;
+}
+
+.customers-management .order-header h3 {
+  margin: 0;
+  font-size: 16px;
+  color: #1c1e21;
+}
+
+.customers-management .status-badge {
+  padding: 4px 10px;
+  border-radius: 16px;
+  color: white;
+  font-weight: 600;
+  font-size: 11px;
+  text-transform: uppercase;
+}
+
+.customers-management .order-info p {
+  margin: 6px 0;
+  font-size: 13px;
+  color: #65676b;
+}
+
+.customers-management .order-items {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #e4e6eb;
+}
+
+.customers-management .order-item {
+  display: flex;
+  justify-content: space-between;
+  padding: 6px 0;
+  font-size: 13px;
+  color: #65676b;
+}
+
+.customers-management .order-total {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid #e4e6eb;
+  font-size: 14px;
+  color: #1c1e21;
+}
+
+.customers-management .table-container {
+  background: #fff;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.customers-management table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.customers-management table thead {
+  background: #f0f2f5;
+}
+
+.customers-management table th {
+  padding: 16px;
+  text-align: left;
+  font-weight: 600;
+  color: #1c1e21;
+  border-bottom: 2px solid #e4e6eb;
+}
+
+.customers-management table td {
+  padding: 16px;
+  border-bottom: 1px solid #e4e6eb;
+}
+
+.customers-management table tbody tr:hover {
+  background: #f8f9fa;
+}
+
+.customers-management .actions {
+  display: flex;
+  gap: 8px;
+}
+
+.customers-management .bulk-actions-bar {
+  background: #f0f2f5;
+  padding: 12px 16px;
+  border-radius: 8px;
+  margin-bottom: 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.customers-management .bulk-actions-buttons {
+  display: flex;
+  gap: 8px;
+}
+
+.customers-management .empty-state {
+  text-align: center;
+  padding: 60px 20px;
+  color: #65676b;
+}
+
+.customers-management button {
+  padding: 10px 20px;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.customers-management button:not(.small) {
+  background: #1877f2;
+  color: white;
+}
+
+.customers-management button:not(.small):hover {
+  background: #166fe5;
+}
+
+.customers-management button.secondary {
+  background: #e4e6eb;
+  color: #1c1e21;
+}
+
+.customers-management button.secondary:hover {
+  background: #d8dadf;
+}
+
+.customers-management button.small {
+  padding: 6px 12px;
+  font-size: 13px;
+}
+
+.customers-management button.danger {
+  background: #dc3545;
+  color: white;
+}
+
+.customers-management button.danger:hover {
+  background: #c82333;
+}
+
+[data-theme="dark"] .customers-management .form-container,
+[data-theme="dark"] .customers-management .customer-details-card,
+[data-theme="dark"] .customers-management .table-container {
+  background: #242526;
+  color: #e4e6eb;
+}
+
+[data-theme="dark"] .customers-management .form-group label {
+  color: #e4e6eb;
+}
+
+[data-theme="dark"] .customers-management .form-group input {
+  background: #3a3b3c;
+  border-color: #4e4f50;
+  color: #e4e6eb;
+}
+
+[data-theme="dark"] .customers-management .customer-details-card h2 {
+  color: #e4e6eb;
+}
+
+[data-theme="dark"] .customers-management .customer-details-card p {
+  color: #b0b3b8;
+}
+
+[data-theme="dark"] .customers-management .customer-details-card strong {
+  color: #e4e6eb;
+}
+
+[data-theme="dark"] .customers-management .order-card {
+  background: #3a3b3c;
+  border-color: #4e4f50;
+}
+
+[data-theme="dark"] .customers-management .order-header {
+  border-bottom-color: #4e4f50;
+}
+
+[data-theme="dark"] .customers-management .order-header h3 {
+  color: #e4e6eb;
+}
+
+[data-theme="dark"] .customers-management .order-items {
+  border-top-color: #4e4f50;
+}
+
+[data-theme="dark"] .customers-management .order-total {
+  border-top-color: #4e4f50;
+  color: #e4e6eb;
+}
+
+[data-theme="dark"] .customers-management table thead {
+  background: #3a3b3c;
+}
+
+[data-theme="dark"] .customers-management table th {
+  color: #e4e6eb;
+  border-bottom-color: #4e4f50;
+}
+
+[data-theme="dark"] .customers-management table td {
+  border-bottom-color: #4e4f50;
+}
+
+[data-theme="dark"] .customers-management table tbody tr:hover {
+  background: #3a3b3c;
+}
+
+[data-theme="dark"] .customers-management .bulk-actions-bar {
+  background: #3a3b3c;
+}
+

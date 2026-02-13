@@ -1,0 +1,22 @@
+# Snyk Code / DeepCode ignore file
+
+# Node and build artifacts
+node_modules/
+**/node_modules/
+dist/
+build/
+.next/
+
+# Test artifacts / coverage
+coverage/
+**/coverage/
+playwright-report/
+test-results/
+**/trace/
+
+# Local tools / IDE
+.vscode/
+.idea/
+.DS_Store
+.env
+

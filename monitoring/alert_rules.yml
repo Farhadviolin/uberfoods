@@ -1,0 +1,158 @@
+groups:
+  - name: uberfoods_alerts
+    rules:
+    # Backend API Alerts
+    - alert: BackendHighCPUUsage
+      expr: rate(container_cpu_usage_seconds_total{pod=~"uberfoods-backend-.*"}[5m]) > 0.8
+      for: 5m
+      labels:
+        severity: warning
+        service: backend
+      annotations:
+        summary: "Backend CPU usage is high"
+        description: "Backend pod {{ $labels.pod }} CPU usage is {{ $value }}%"
+
+    - alert: BackendHighMemoryUsage
+      expr: container_memory_usage_bytes{pod=~"uberfoods-backend-.*"} / container_spec_memory_limit_bytes > 0.9
+      for: 5m
+      labels:
+        severity: warning
+        service: backend
+      annotations:
+        summary: "Backend memory usage is high"
+        description: "Backend pod {{ $labels.pod }} memory usage is {{ $value }}%"
+
+    - alert: BackendDown
+      expr: up{job="uberfoods-backend"} == 0
+      for: 1m
+      labels:
+        severity: critical
+        service: backend
+      annotations:
+        summary: "Backend service is down"
+        description: "Backend service has been down for more than 1 minute"
+
+    # Database Alerts
+    - alert: DatabaseHighConnections
+      expr: pg_stat_activity_count{datname="uberfoods_prod"} > 80
+      for: 5m
+      labels:
+        severity: warning
+        service: database
+      annotations:
+        summary: "Database connection count is high"
+        description: "PostgreSQL has {{ $value }} active connections"
+
+    - alert: DatabaseDown
+      expr: up{job="uberfoods-postgres"} == 0
+      for: 1m
+      labels:
+        severity: critical
+        service: database
+      annotations:
+        summary: "Database is down"
+        description: "PostgreSQL database has been down for more than 1 minute"
+
+    # Redis Alerts
+    - alert: RedisHighMemoryUsage
+      expr: redis_memory_used_bytes / redis_memory_max_bytes > 0.9
+      for: 5m
+      labels:
+        severity: warning
+        service: cache
+      annotations:
+        summary: "Redis memory usage is high"
+        description: "Redis memory usage is {{ $value }}%"
+
+    - alert: RedisDown
+      expr: up{job="uberfoods-redis"} == 0
+      for: 1m
+      labels:
+        severity: critical
+        service: cache
+      annotations:
+        summary: "Redis cache is down"
+        description: "Redis cache has been down for more than 1 minute"
+
+    # Frontend Alerts
+    - alert: CustomerWebDown
+      expr: up{job="uberfoods-customer-web"} == 0
+      for: 2m
+      labels:
+        severity: critical
+        service: customer-web
+      annotations:
+        summary: "Customer web app is down"
+        description: "Customer web application is not responding"
+
+    - alert: DriverAppDown
+      expr: up{job="uberfoods-driver-app"} == 0
+      for: 2m
+      labels:
+        severity: critical
+        service: driver-app
+      annotations:
+        summary: "Driver app is down"
+        description: "Driver application is not responding"
+
+    - alert: RestaurantWebDown
+      expr: up{job="uberfoods-restaurant-web"} == 0
+      for: 2m
+      labels:
+        severity: critical
+        service: restaurant-web
+      annotations:
+        summary: "Restaurant web is down"
+        description: "Restaurant web application is not responding"
+
+    - alert: AdminPanelDown
+      expr: up{job="uberfoods-admin-panel"} == 0
+      for: 2m
+      labels:
+        severity: critical
+        service: admin-panel
+      annotations:
+        summary: "Admin panel is down"
+        description: "Admin panel is not responding"
+
+    # Business Logic Alerts
+    - alert: HighOrderFailureRate
+      expr: rate(order_failures_total[5m]) / rate(order_requests_total[5m]) > 0.05
+      for: 5m
+      labels:
+        severity: warning
+        service: business
+      annotations:
+        summary: "High order failure rate"
+        description: "Order failure rate is {{ $value }}% in the last 5 minutes"
+
+    - alert: PaymentProcessingDelayed
+      expr: histogram_quantile(0.95, rate(payment_processing_duration_seconds_bucket[5m])) > 30
+      for: 5m
+      labels:
+        severity: warning
+        service: payments
+      annotations:
+        summary: "Payment processing is slow"
+        description: "95th percentile payment processing time is {{ $value }}s"
+
+    # Infrastructure Alerts
+    - alert: HighDiskUsage
+      expr: (1 - node_filesystem_avail_bytes / node_filesystem_size_bytes) > 0.85
+      for: 10m
+      labels:
+        severity: warning
+        service: infrastructure
+      annotations:
+        summary: "High disk usage"
+        description: "Disk usage is {{ $value }}% on {{ $labels.instance }}"
+
+    - alert: HighNetworkErrors
+      expr: rate(node_network_receive_errs_total[5m]) > 10
+      for: 5m
+      labels:
+        severity: warning
+        service: infrastructure
+      annotations:
+        summary: "High network error rate"
+        description: "Network receive errors on {{ $labels.device }}"

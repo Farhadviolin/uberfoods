@@ -1,0 +1,121 @@
+.inventory {
+  padding: var(--fb-space-6);
+}
+
+.inventory-overview {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--fb-space-4);
+  margin-bottom: var(--fb-space-8);
+}
+
+.inventory-card {
+  background: var(--fb-bg-secondary);
+  padding: var(--fb-space-6);
+  border-radius: var(--fb-radius-md);
+  display: flex;
+  align-items: center;
+  gap: var(--fb-space-4);
+}
+
+.inventory-card-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: var(--fb-radius-base);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+}
+
+.inventory-card-content {
+  flex: 1;
+}
+
+.inventory-card-label {
+  font-size: var(--fb-font-size-sm);
+  color: var(--fb-text-secondary);
+  margin-bottom: var(--fb-space-1);
+}
+
+.inventory-card-value {
+  font-size: var(--fb-font-size-xl);
+  font-weight: 700;
+  color: var(--fb-text-primary);
+}
+
+.alerts-section {
+  margin-bottom: var(--fb-space-8);
+}
+
+.alerts-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fb-space-2);
+}
+
+.alert-item {
+  background: var(--fb-bg-secondary);
+  padding: var(--fb-space-4);
+  border-radius: var(--fb-radius-base);
+  display: flex;
+  align-items: center;
+  gap: var(--fb-space-3);
+  border-left: 4px solid;
+}
+
+.alert-item.critical {
+  border-left-color: var(--fb-error);
+}
+
+.alert-item.warning {
+  border-left-color: var(--fb-warning);
+}
+
+.alert-icon {
+  font-size: 24px;
+}
+
+.alert-content {
+  flex: 1;
+}
+
+.stock-items-section {
+  margin-top: var(--fb-space-8);
+}
+
+.stock-items-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: var(--fb-space-4);
+}
+
+.stock-item-card {
+  background: var(--fb-bg-secondary);
+  padding: var(--fb-space-6);
+  border-radius: var(--fb-radius-md);
+  border-left: 4px solid var(--fb-primary);
+}
+
+.stock-item-card.low-stock {
+  border-left-color: var(--fb-error);
+}
+
+.stock-item-info {
+  margin-bottom: var(--fb-space-4);
+}
+
+.stock-item-details {
+  margin-top: var(--fb-space-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--fb-space-2);
+  font-size: var(--fb-font-size-sm);
+}
+
+.stock-item-actions {
+  display: flex;
+  gap: var(--fb-space-2);
+  align-items: center;
+}
+

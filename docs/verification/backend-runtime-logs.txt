@@ -1,0 +1,18 @@
+Backend Runtime Logs - CONTAINER STARTUP BLOCKER
+===============================================
+
+Container Status: NOT RUNNING
+Root Cause: Docker build completion issues prevent container startup
+Evidence: Build processes aborting before final image creation
+
+Expected Logs (if running):
+[NestFactory] Starting Nest application...
+[InstanceLoader] AppModule dependencies initialized
+[InstanceLoader] HealthModule dependencies initialized
+[RoutesResolver] HealthController{/health} (4 handlers)
+[RoutesResolver] HealthAliasController{/} (2 handlers)
+[NestApplication] Nest application successfully started
+Listening on port 3000
+
+Actual Status: Container startup blocked by incomplete Docker build
+Evidence: Build logs show npm install success but process termination before CMD configuration

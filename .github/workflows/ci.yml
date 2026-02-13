@@ -1,0 +1,314 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # Backend API Verification
+  api-verification:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: postgres123
+          POSTGRES_DB: uberfoods
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5434:5432
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        cache: 'npm'
+        cache-dependency-path: 'backend/package-lock.json'
+
+    - name: Install backend dependencies
+      working-directory: ./backend
+      run: npm ci
+
+    - name: Generate Prisma client
+      working-directory: ./backend
+      run: npx prisma generate --schema=./prisma/schema.prisma
+
+    - name: Run database migrations
+      working-directory: ./backend
+      run: npx prisma db push --schema=./prisma/schema.prisma
+      env:
+        DATABASE_URL: postgresql://postgres:postgres123@localhost:5434/uberfoods
+
+    - name: Create test driver
+      working-directory: ./backend
+      run: node scripts/create-test-driver.js
+      env:
+        DATABASE_URL: postgresql://postgres:postgres123@localhost:5434/uberfoods
+
+    - name: Start E2E backend
+      working-directory: ./backend
+      run: |
+        npm run start:e2e &
+        # Wait for backend to be ready (scripts handle their own health checks)
+        sleep 20
+
+    - name: Run API verification scripts
+      working-directory: ./backend
+      shell: pwsh
+      run: |
+        # Run final verification
+        & pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File ./scripts/final-verification.ps1
+        if ($LASTEXITCODE -ne 0) {
+          Write-Error "Final verification failed"
+          exit 1
+        }
+
+        # Run smoke driver test
+        & pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File ./scripts/smoke-driver.ps1
+        if ($LASTEXITCODE -ne 0) {
+          Write-Error "Smoke driver test failed"
+          exit 1
+        }
+
+        # Run SocialMedia service unit tests
+        npm test -- --testPathPattern=social-media.service.spec.ts --runInBand
+        if ($LASTEXITCODE -ne 0) {
+          Write-Error "SocialMedia service tests failed"
+          exit 1
+        }
+
+  # UI-E2E Full Order Lifecycle Test
+  ui-e2e-lifecycle:
+    runs-on: ubuntu-latest
+    needs: api-verification
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: postgres123
+          POSTGRES_DB: uberfoods
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5434:5432
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+
+    - name: Install Playwright
+      run: npx playwright install --with-deps
+
+    - name: Setup backend for E2E
+      working-directory: ./backend
+      run: |
+        npm ci
+        npx prisma generate --schema=./prisma/schema.prisma
+        npx prisma db push --schema=./prisma/schema.prisma
+        node scripts/create-test-driver.js
+        npm run start:e2e &
+        sleep 20
+        curl -f http://localhost:3000/api/health || (echo "Backend failed to start" && exit 1)
+      env:
+        DATABASE_URL: postgresql://postgres:postgres123@localhost:5434/uberfoods
+
+    - name: Install frontend dependencies
+      run: |
+        cd frontend
+        npm ci
+        cd customer-web && npm ci
+        cd ../admin-panel && npm ci
+        cd ../restaurant-web && npm ci
+        cd ../driver-app && npm ci
+
+    - name: Start all frontend apps
+      working-directory: ./frontend
+      run: |
+        # Start all frontend apps
+        cd customer-web && npm run dev > ../logs/customer-web.log 2>&1 &
+        cd ../admin-panel && npm run dev:localhost > ../logs/admin-panel.log 2>&1 &
+        cd ../restaurant-web && npm run dev > ../logs/restaurant-web.log 2>&1 &
+        cd ../driver-app && npm run dev > ../logs/driver-app.log 2>&1 &
+        sleep 15
+
+        # Verify all apps are running
+        curl -f http://localhost:3001 || (echo "Customer web failed" && exit 1)
+        curl -f http://localhost:3002 || (echo "Admin panel failed" && exit 1)
+        curl -f http://localhost:3003 || (echo "Restaurant web failed" && exit 1)
+        curl -f http://localhost:3004 || (echo "Driver app failed" && exit 1)
+
+    - name: Setup Authentication States
+      working-directory: ./frontend/customer-web
+      run: npm run test:setup-auth
+
+    - name: Run Full Order Lifecycle UI-E2E Test
+      working-directory: ./frontend/customer-web
+      run: RUN_ID=${{ github.run_id }}_${{ github.run_attempt }} npx playwright test full-order-lifecycle.spec.ts --reporter=line,html,junit
+      env:
+        RUN_ID: ${{ github.run_id }}_${{ github.run_attempt }}
+
+    - name: Upload UI-E2E test results
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: ui-e2e-lifecycle-results
+        path: |
+          frontend/customer-web/playwright-report/
+          frontend/customer-web/test-results/
+          frontend/logs/
+        retention-days: 30
+
+  # Individual Frontend E2E Tests
+  frontend-e2e:
+    runs-on: ubuntu-latest
+    needs: api-verification
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: postgres123
+          POSTGRES_DB: uberfoods
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5434:5432
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+
+    - name: Install Playwright
+      run: npx playwright install --with-deps
+
+    - name: Setup backend for E2E
+      working-directory: ./backend
+      run: |
+        npm ci
+        npx prisma generate --schema=./prisma/schema.prisma
+        npx prisma db push --schema=./prisma/schema.prisma
+        npm run start:e2e &
+        sleep 15
+        curl -f http://localhost:3000/api/health || (echo "Backend failed to start" && exit 1)
+      env:
+        DATABASE_URL: postgresql://postgres:3000/api/health:5434/uberfoods
+
+    - name: Run customer web E2E tests
+      working-directory: ./frontend/customer-web
+      run: |
+        npm ci
+        npm run build
+        npm run preview &
+        sleep 10
+        npx playwright test --grep-invert "full-order-lifecycle"
+
+    - name: Run admin panel unit tests
+      working-directory: ./frontend/admin-panel
+      run: |
+        npm ci
+        npm test -- --testPathPattern=SocialManagement.test.tsx --watchAll=false
+        if ($LASTEXITCODE -ne 0) {
+          Write-Error "Admin panel SocialManagement tests failed"
+          exit 1
+        }
+
+    - name: Run admin panel E2E tests
+      working-directory: ./frontend/admin-panel
+      run: |
+        npm ci
+        npm run build
+        npm run preview &
+        sleep 10
+        npx playwright test
+
+    - name: Run driver app E2E tests
+      working-directory: ./frontend/driver-app
+      run: |
+        npm ci
+        npm run build
+        npm run preview &
+        sleep 10
+        npx playwright test
+
+    - name: Upload individual E2E test results
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: e2e-test-results
+        path: |
+          frontend/*/playwright-report/
+          frontend/*/test-results/
+        retention-days: 30
+
+  # Build and deploy checks
+  build:
+    runs-on: ubuntu-latest
+    needs: [api-verification, ui-e2e-lifecycle, frontend-e2e]
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+
+    - name: Build backend
+      working-directory: ./backend
+      run: |
+        npm ci
+        npm run build
+
+    - name: Build customer web
+      working-directory: ./frontend/customer-web
+      run: |
+        npm ci
+        npm run build
+
+    - name: Build admin panel
+      working-directory: ./frontend/admin-panel
+      run: |
+        npm ci
+        npm run build
+
+    - name: Build driver app
+      working-directory: ./frontend/driver-app
+      run: |
+        npm ci
+        npm run build
+
+    - name: Build restaurant web
+      working-directory: ./frontend/restaurant-web
+      run: |
+        npm ci
+        npm run build

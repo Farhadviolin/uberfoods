@@ -1,0 +1,138 @@
+name: Local Development Verification
+
+on:
+  workflow_dispatch:
+    inputs:
+      test_type:
+        description: 'Type of test to run'
+        required: true
+        default: 'all'
+        type: choice
+        options:
+        - all
+        - api-only
+        - frontend-only
+
+jobs:
+  api-verification:
+    if: inputs.test_type == 'all' || inputs.test_type == 'api-only'
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: postgres123
+          POSTGRES_DB: uberfoods
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5434:5432
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        cache: 'npm'
+        cache-dependency-path: 'backend/package-lock.json'
+
+    - name: Install backend dependencies
+      working-directory: ./backend
+      run: npm ci
+
+    - name: Generate Prisma client
+      working-directory: ./backend
+      run: npx prisma generate --schema=./prisma/schema.prisma
+
+    - name: Run database migrations
+      working-directory: ./backend
+      run: npx prisma db push --schema=./prisma/schema.prisma
+      env:
+        DATABASE_URL: postgresql://postgres:postgres123@localhost:5434/uberfoods
+
+    - name: Create test driver
+      working-directory: ./backend
+      run: node scripts/create-test-driver.js
+      env:
+        DATABASE_URL: postgresql://postgres:postgres123@localhost:5434/uberfoods
+
+    - name: Start E2E backend
+      working-directory: ./backend
+      run: |
+        npm run start:e2e &
+        # Wait for backend to be ready (scripts handle their own health checks)
+        sleep 20
+
+    - name: Run API verification scripts
+      working-directory: ./backend
+      shell: pwsh
+      run: |
+        Write-Host "🧪 Running API Verification Scripts..." -ForegroundColor Cyan
+
+        # Run final verification
+        Write-Host "`n📊 Running final-verification.ps1..." -ForegroundColor Yellow
+        & pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File ./scripts/final-verification.ps1
+        if ($LASTEXITCODE -ne 0) {
+          Write-Error "❌ Final verification failed"
+          exit 1
+        }
+
+        # Run smoke driver test
+        Write-Host "`n🚗 Running smoke-driver.ps1..." -ForegroundColor Yellow
+        & pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File ./scripts/smoke-driver.ps1
+        if ($LASTEXITCODE -ne 0) {
+          Write-Error "❌ Smoke driver test failed"
+          exit 1
+        }
+
+        Write-Host "`n🎉 All API verification tests passed!" -ForegroundColor Green
+
+  frontend-e2e:
+    if: inputs.test_type == 'all' || inputs.test_type == 'frontend-only'
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+
+    - name: Install Playwright
+      run: npx playwright install --with-deps
+
+    - name: Run customer web E2E tests
+      working-directory: ./frontend/customer-web
+      run: |
+        npm ci
+        npm run build
+        npm run preview &
+        sleep 10
+        npx playwright test --headed=false
+
+    - name: Run admin panel E2E tests
+      working-directory: ./frontend/admin-panel
+      run: |
+        npm ci
+        npm run build
+        npm run preview &
+        sleep 10
+        npx playwright test --headed=false
+
+    - name: Run driver app E2E tests
+      working-directory: ./frontend/driver-app
+      run: |
+        npm ci
+        npm run build
+        npm run preview &
+        sleep 10
+        npx playwright test --headed=false

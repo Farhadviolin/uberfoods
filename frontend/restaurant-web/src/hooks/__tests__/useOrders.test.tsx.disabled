@@ -1,0 +1,144 @@
+import { renderHook, waitFor, act } from "@testing-library/react";
+import { useOrders } from "../useOrders";
+import * as api from "../../services/api";
+
+jest.mock("../../services/api");
+
+describe("useOrders Hook (Restaurant)", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it("fetches restaurant orders", async () => {
+    const mockOrders = [
+      {
+        id: "order_1",
+        status: "PENDING",
+        customer: { name: "John Doe", phone: "+43 664 1234567" },
+        items: [{ dish: { name: "Margherita Pizza" }, quantity: 2 }],
+        totalAmount: 25.5,
+        createdAt: new Date().toISOString(),
+      },
+    ];
+
+    (api.default.get as jest.Mock).mockResolvedValue({
+      data: { data: mockOrders },
+    });
+
+    const { result } = renderHook(() => useOrders());
+
+    await waitFor(() => {
+      expect(result.current.orders).toHaveLength(1);
+    });
+
+    expect(result.current.orders?.[0].customer.name).toBe("John Doe");
+  });
+
+  it("confirms order", async () => {
+    (api.default.patch as jest.Mock).mockResolvedValue({
+      data: { success: true },
+    });
+
+    const { result } = renderHook(() => useOrders());
+
+    await act(async () => {
+      await result.current.confirmOrder("order_1");
+    });
+
+    expect(api.default.patch).toHaveBeenCalledWith(
+      expect.stringContaining("/orders/order_1/status"),
+      expect.objectContaining({ status: "CONFIRMED" }),
+    );
+  });
+
+  it("marks order as ready", async () => {
+    (api.default.patch as jest.Mock).mockResolvedValue({
+      data: { success: true },
+    });
+
+    const { result } = renderHook(() => useOrders());
+
+    await act(async () => {
+      await result.current.markAsReady("order_1");
+    });
+
+    expect(api.default.patch).toHaveBeenCalledWith(
+      expect.stringContaining("/orders/order_1/status"),
+      expect.objectContaining({ status: "READY" }),
+    );
+  });
+
+  it("cancels order with reason", async () => {
+    (api.default.patch as jest.Mock).mockResolvedValue({
+      data: { success: true },
+    });
+
+    const { result } = renderHook(() => useOrders());
+
+    await act(async () => {
+      await result.current.cancelOrder("order_1", "Out of stock");
+    });
+
+    expect(api.default.patch).toHaveBeenCalledWith(
+      expect.stringContaining("/orders/order_1"),
+      expect.objectContaining({
+        status: "CANCELLED",
+        cancellationReason: "Out of stock",
+      }),
+    );
+  });
+
+  it("filters orders by status", async () => {
+    const mockOrders = [{ id: "order_1", status: "PENDING" }];
+
+    (api.default.get as jest.Mock).mockResolvedValue({
+      data: { data: mockOrders },
+    });
+
+    const { result } = renderHook(() => useOrders({ status: "PENDING" }));
+
+    await waitFor(() => {
+      expect(result.current.orders).toHaveLength(1);
+    });
+
+    expect(api.default.get).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({
+        params: expect.objectContaining({ status: "PENDING" }),
+      }),
+    );
+  });
+
+  it("groups orders by status", async () => {
+    const mockOrders = [
+      { id: "order_1", status: "PENDING", totalAmount: 25.5 },
+      { id: "order_2", status: "PREPARING", totalAmount: 30.0 },
+      { id: "order_3", status: "PENDING", totalAmount: 15.0 },
+    ];
+
+    (api.default.get as jest.Mock).mockResolvedValue({
+      data: { data: mockOrders },
+    });
+
+    const { result } = renderHook(() => useOrders());
+
+    await waitFor(() => {
+      expect(result.current.orders).toHaveLength(3);
+    });
+
+    expect(result.current.ordersByStatus?.PENDING).toHaveLength(2);
+    expect(result.current.ordersByStatus?.PREPARING).toHaveLength(1);
+  });
+
+  it("handles error state", async () => {
+    (api.default.get as jest.Mock).mockRejectedValue(
+      new Error("Network error"),
+    );
+
+    const { result } = renderHook(() => useOrders());
+
+    await waitFor(() => {
+      expect(result.current.error).toBeDefined();
+    });
+  });
+});

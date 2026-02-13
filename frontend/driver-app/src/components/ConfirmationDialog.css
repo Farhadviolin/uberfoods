@@ -1,0 +1,77 @@
+.confirmation-dialog {
+  padding: 0;
+}
+
+.confirmation-dialog-title {
+  margin: 0 0 16px 0;
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #111827;
+}
+
+.confirmation-dialog-message {
+  margin-bottom: 24px;
+  color: #6b7280;
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+.confirmation-dialog-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+}
+
+.confirmation-dialog-button {
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: 1px solid transparent;
+}
+
+.confirmation-dialog-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.confirmation-dialog-button-cancel {
+  background: white;
+  color: #6b7280;
+  border-color: #d1d5db;
+}
+
+.confirmation-dialog-button-cancel:hover:not(:disabled) {
+  background: #f9fafb;
+}
+
+.confirmation-dialog-button-confirm {
+  color: white;
+}
+
+.confirmation-dialog-button-info {
+  background: #3b82f6;
+}
+
+.confirmation-dialog-button-info:hover:not(:disabled) {
+  background: #2563eb;
+}
+
+.confirmation-dialog-button-warning {
+  background: #f59e0b;
+}
+
+.confirmation-dialog-button-warning:hover:not(:disabled) {
+  background: #d97706;
+}
+
+.confirmation-dialog-button-danger {
+  background: #ef4444;
+}
+
+.confirmation-dialog-button-danger:hover:not(:disabled) {
+  background: #dc2626;
+}
+

@@ -1,0 +1,8 @@
+{
+  "scenario": "orders-paging",
+  "p95": 345,
+  "errorRate": "0.23",
+  "throughput": "85.4",
+  "totalRequests": 5123,
+  "timestamp": "2025-12-21T22:50:00.000Z"
+}

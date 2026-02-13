@@ -1,0 +1,8 @@
+{
+  "scenario": "dashboard-aggregations",
+  "p95": 620,
+  "errorRate": "0.21",
+  "throughput": "64.1",
+  "totalRequests": 3845,
+  "timestamp": "2025-12-21T22:50:00.000Z"
+}

@@ -1,0 +1,8 @@
+{
+  "scenario": "order-status-updates",
+  "p95": 285,
+  "errorRate": "0.23",
+  "throughput": "107.0",
+  "totalRequests": 6417,
+  "timestamp": "2025-12-21T22:50:00.000Z"
+}

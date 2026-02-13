@@ -1,0 +1,29 @@
+.trend-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1, 4px);
+  padding: var(--space-1, 4px) var(--space-2, 8px);
+  border-radius: var(--radius-sm, 6px);
+  font-size: var(--text-xs, 12px);
+  font-weight: var(--font-semibold, 600);
+}
+
+.trend-indicator.positive {
+  background: rgba(16, 185, 129, 0.1);
+  color: var(--success-600, #059669);
+}
+
+.trend-indicator.negative {
+  background: rgba(239, 68, 68, 0.1);
+  color: var(--error-600, #dc2626);
+}
+
+.trend-icon {
+  font-size: 10px;
+  line-height: 1;
+}
+
+.trend-value {
+  line-height: 1;
+}
+

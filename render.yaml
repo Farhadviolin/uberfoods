@@ -1,0 +1,142 @@
+services:
+  # Backend API Service
+  - type: web
+    name: backend-web
+    runtime: node
+    rootDir: backend
+    buildCommand: npm ci && npm run build && npx prisma migrate deploy
+    startCommand: npm run start:prod
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        sync: false # Set in Render dashboard
+      - key: JWT_SECRET
+        sync: false # Set in Render dashboard
+      - key: JWT_REFRESH_SECRET
+        sync: false # Set in Render dashboard
+      - key: REDIS_URL
+        sync: false # Set in Render dashboard (or use Render Redis addon)
+      - key: ALLOWED_ORIGINS
+        sync: false # Set in Render dashboard with frontend URLs
+      - key: SENTRY_DSN
+        sync: false # Optional: Set in Render dashboard
+      - key: STRIPE_SECRET_KEY
+        sync: false # Set in Render dashboard
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: false # Set in Render dashboard
+      - key: PAYPAL_CLIENT_ID
+        sync: false # Set in Render dashboard
+      - key: PAYPAL_CLIENT_SECRET
+        sync: false # Set in Render dashboard
+      - key: PAYPAL_ENVIRONMENT
+        value: live
+      - key: SMTP_HOST
+        sync: false # Set in Render dashboard
+      - key: SMTP_PORT
+        value: 587
+      - key: SMTP_USER
+        sync: false # Set in Render dashboard
+      - key: SMTP_PASS
+        sync: false # Set in Render dashboard
+      - key: FROM_EMAIL
+        sync: false # Set in Render dashboard
+      - key: SUPPORT_EMAIL
+        sync: false # Set in Render dashboard
+      - key: VAPID_PUBLIC_KEY
+        sync: false # Set in Render dashboard
+      - key: VAPID_PRIVATE_KEY
+        sync: false # Set in Render dashboard
+      - key: SUPPORT_PHONE
+        sync: false # Set in Render dashboard
+
+  # Admin Panel Static Site
+  - type: web
+    name: admin-panel
+    runtime: static
+    rootDir: frontend/admin-panel
+    buildCommand: npm ci && npm run build
+    staticPublishPath: ./dist
+    envVars:
+      - key: VITE_API_BASE_URL
+        fromService:
+          type: web
+          name: backend-web
+          property: host
+      - key: VITE_APP_TITLE
+        value: UberFoods Admin Panel
+
+  # Customer Web Static Site
+  - type: web
+    name: customer-web
+    runtime: static
+    rootDir: frontend/customer-web
+    buildCommand: npm ci && npm run build
+    staticPublishPath: ./dist
+    envVars:
+      - key: VITE_API_BASE_URL
+        fromService:
+          type: web
+          name: backend-web
+          property: host
+      - key: VITE_STRIPE_PUBLISHABLE_KEY
+        sync: false # Set in Render dashboard
+      - key: VITE_GOOGLE_MAPS_API_KEY
+        sync: false # Set in Render dashboard
+      - key: VITE_ENABLE_SOCIAL_FEATURES
+        value: true
+      - key: VITE_ENABLE_VOICE_ASSISTANT
+        value: true
+      - key: VITE_ENABLE_GAMIFICATION
+        value: true
+      - key: VITE_ENABLE_ANALYTICS
+        value: true
+      - key: VITE_ENABLE_NOTIFICATIONS
+        value: true
+      - key: VITE_ENABLE_GEOCODING
+        value: true
+
+  # Restaurant Web Static Site
+  - type: web
+    name: restaurant-web
+    runtime: static
+    rootDir: frontend/restaurant-web
+    buildCommand: npm ci && npm run build
+    staticPublishPath: ./dist
+    envVars:
+      - key: VITE_API_BASE_URL
+        fromService:
+          type: web
+          name: backend-web
+          property: host
+      - key: VITE_APP_NAME
+        value: UberFoods Restaurant
+
+  # Driver App Static Site
+  - type: web
+    name: driver-app
+    runtime: static
+    rootDir: frontend/driver-app
+    buildCommand: npm ci && npm run build
+    staticPublishPath: ./dist
+    envVars:
+      - key: VITE_API_BASE_URL
+        fromService:
+          type: web
+          name: backend-web
+          property: host
+      - key: VITE_GOOGLE_MAPS_API_KEY
+        sync: false # Set in Render dashboard
+      - key: VITE_APP_VERSION
+        value: 1.0.0
+
+# Optional: Add databases (uncomment and configure as needed)
+# databases:
+#   - name: uberfoods-db
+#     databaseName: uberfoods_prod
+#     user: uberfoods
+#     plan: free # Upgrade to paid plan for production
+#
+#   - name: uberfoods-redis
+#     redisName: uberfoods_cache
+#     plan: free # Upgrade to paid plan for production

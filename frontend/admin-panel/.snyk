@@ -1,0 +1,28 @@
+# Snyk (https://snyk.io) policy file, patches or ignores known vulnerabilities.
+version: v1.28.0
+
+# Ignore False Positives - Diese Issues sind bereits durch Sanitization abgedeckt
+ignore:
+  # DOM XSS in App.tsx und DishesManagement.tsx - bereits durch escapeHtmlAttribute und escapeUrlForSrc geschützt
+  javascript/DOMXSS:
+    - id: a2311964.4773f344.607187b5.d7919eeb.3333445f.e930b2ad.df7e59ba.c33fa564.87bc1c5f.b6e32c83.390708e4.7b15a523.79a7d027.becd9ff1.ffd88d9b.070be06a
+      reason: False Positive - Image URLs werden durch validateImageUrl und escapeUrlForSrc sanitized
+      expires: '2026-12-31T23:59:59.000Z'
+      created: '2025-12-09T00:00:00.000Z'
+    - id: a2311964.4773f344.607187b5.d7919eeb.3333445f.e930b2ad.df7e59ba.c33fa564.87bc1c5f.7d4b7307.d2ba97e5.c8688b2b.3f452f8c.f8890b3c.ffd88d9b.e4491be4
+      reason: False Positive - Image URLs werden durch validateImageUrl und escapeUrlForSrc sanitized
+      expires: '2026-12-31T23:59:59.000Z'
+      created: '2025-12-09T00:00:00.000Z'
+    - id: 9838c534.4773f344.b6cad12c.4c6fcba1.ef9f7d82.a465d936.577c8569.7a4a8b2e.fb3bd11e.7d4b7307.c9330245.08906714.d4b786e1.8431f2ca.ffd88d9b.c191d455
+      reason: False Positive - Filenames werden durch sanitizeFilename sanitized
+      expires: '2026-12-31T23:59:59.000Z'
+      created: '2025-12-09T00:00:00.000Z'
+  
+  # URI Scheme Sanitization in imageUtils.ts - bereits durch escapeUrlForSrc geschützt
+  javascript/InsufficientUriSchemeSanitization:
+    - id: 8981fa39.4773f344.8b18f948.d7919eeb.b6be8b13.eaeadb8c.ea4b1c47.17c85c92.8981fa39.4773f344.8b18f948.01c4284e.b6be8b13.eaeadb8c.ea4b1c47.17c85c92
+      reason: False Positive - URLs werden durch escapeUrlForSrc mit Protokoll-Validierung geschützt
+      expires: '2026-12-31T23:59:59.000Z'
+      created: '2025-12-09T00:00:00.000Z'
+
+patch: {}

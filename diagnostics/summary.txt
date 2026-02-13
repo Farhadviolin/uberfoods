@@ -1,0 +1,42 @@
+Diagnose-Zusammenfassung (UTC 2025-12-07)
+
+Prereqs
+- Node umgestellt auf v20.19.6 (brew node@20, PATH gesetzt)
+- Docker-Compose gestartet: postgres (5434), redis (6379), backend (3000) healthy
+
+Backend
+- npm ci --legacy-peer-deps OK
+- prisma generate OK; migrate (dev/deploy) fehlgeschlagen (P3006/P1014), db push OK; seed fehlgeschlagen (PrismaClient __internal undefined)
+- Lint fehlgeschlagen (keine ESLint-Konfig gefunden)
+- tsc OK, build OK
+- Tests fehlgeschlagen (emergency/inventory/financial/reviews/statistics Specs)
+
+Admin-Panel
+- npm ci OK; Lint fehlgeschlagen (19 Errors: Hooks order, display-name, missing rule security/detect-possible-ssrf, no-unescaped-entities)
+- Build OK (Vite Warnungen)
+- Jest-Tests fehlgeschlagen (import.meta in tokenStorage/ErrorBoundary, API mocks); Playwright E2E: 64 Failures (Login/Dashboard visibility)
+
+Customer-Web
+- npm ci --legacy-peer-deps OK; Lint WARN-only (171 Warnungen)
+- Build OK; Jest-Tests fehlgeschlagen (useMealPlanner, useKeyboardShortcuts)
+- Fix: control-char Check in utils/security.ts ohne control-regex
+
+Restaurant-Web
+- npm ci OK, Lint OK, Build OK, Tests OK
+
+Driver-Web
+- npm ci OK; kein Lint-Script vorhanden
+- Build OK; Tests fehlgeschlagen (OrderCard expectation)
+
+Driver-Mobile (Expo)
+- .env/.env.example nicht vorhanden
+- npm ci scheiterte (lock mismatch), npm install OK
+- expo-doctor: Schema-Fehler (android.foregroundService/useNextNotificationsApi), doppelte/inkompatible Abhängigkeiten (SDK54 vs installierte Versionen)
+
+Snyk
+- snyk_code_scan (backend, severity>=high): keine Issues; gesamtes Repo-Scan wegen Timeout nicht abgeschlossen.
+
+Artefakte
+- Logs unter diagnostics/run-20251207T191131Z/
+- Tarball: diagnostics_20251207T191131Z.tar.gz
+- repair_report.json enthält Detailstatus

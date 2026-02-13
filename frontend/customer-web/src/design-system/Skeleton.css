@@ -1,0 +1,64 @@
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    #F0F2F5 0%,
+    #E4E6EB 50%,
+    #F0F2F5 100%
+  );
+  background-size: 200% 100%;
+  border-radius: 0.5rem;
+}
+
+/* Variants */
+.skeleton--text {
+  height: 1rem;
+  border-radius: 0.25rem;
+}
+
+.skeleton--circular {
+  border-radius: 50%;
+  aspect-ratio: 1;
+}
+
+.skeleton--rectangular {
+  border-radius: 0.5rem;
+}
+
+/* Animations */
+.skeleton--pulse {
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+.skeleton--wave {
+  animation: wave 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+@keyframes wave {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+/* Dark Mode */
+[data-theme='dark'] .skeleton {
+  background: linear-gradient(
+    90deg,
+    #2E3032 0%,
+    #3A3B3C 50%,
+    #2E3032 100%
+  );
+  background-size: 200% 100%;
+}
+

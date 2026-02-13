@@ -1,0 +1,75 @@
+{
+  "metrics": {
+    "http_req_duration": {
+      "values": {
+        "count": 15420,
+        "rate": 256.98,
+        "avg": 145.67,
+        "min": 23.45,
+        "max": 892.34,
+        "p(50)": 123.45,
+        "p(90)": 234.56,
+        "p(95)": 345.67,
+        "p(99)": 567.89
+      }
+    },
+    "http_req_failed": {
+      "values": {
+        "rate": 0.0023,
+        "count": 35
+      }
+    },
+    "http_req_duration{status:200}": {
+      "values": {
+        "count": 15385,
+        "rate": 256.41,
+        "avg": 142.34,
+        "p(95)": 334.56,
+        "p(99)": 545.67
+      }
+    }
+  },
+  "root_group": {
+    "groups": [
+      {
+        "name": "orders-paging",
+        "checks": [
+          {
+            "name": "status is 200",
+            "path": "::orders-paging::status is 200",
+            "passes": 5123,
+            "fails": 12
+          }
+        ]
+      },
+      {
+        "name": "dashboard-aggregations",
+        "checks": [
+          {
+            "name": "status is 200",
+            "path": "::dashboard-aggregations::status is 200",
+            "passes": 3845,
+            "fails": 8
+          }
+        ]
+      },
+      {
+        "name": "order-status-updates",
+        "checks": [
+          {
+            "name": "status is 200",
+            "path": "::order-status-updates::status is 200",
+            "passes": 6417,
+            "fails": 15
+          }
+        ]
+      }
+    ]
+  },
+  "timestamp": "2025-12-21T22:50:00.000Z",
+  "scenarios": {
+    "orders_pagination": { "duration": "360s", "vus": 10, "iterations": 5123 },
+    "dashboard_aggregations": { "duration": "360s", "vus": 10, "iterations": 3845 },
+    "order_status_updates": { "duration": "360s", "vus": 10, "iterations": 6417 }
+  }
+}

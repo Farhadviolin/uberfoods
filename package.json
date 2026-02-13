@@ -1,0 +1,21 @@
+{
+  "name": "uberfoods",
+  "version": "1.0.0",
+  "description": "UberFoods Delivery Platform",
+  "scripts": {
+    "e2e": "node scripts/run-e2e.mjs",
+    "e2e:setup": "node scripts/setup-e2e.mjs",
+    "e2e:seed": "node scripts/seed-e2e.mjs",
+    "e2e:gate:a": "npm --prefix frontend/admin-panel run e2e:gate:a",
+    "e2e:gate:b": "npm --prefix frontend/admin-panel run e2e:gate:b",
+    "e2e:all": "npm --prefix frontend/admin-panel run e2e:all",
+    "verify:local": "powershell -NoLogo -NoProfile -ExecutionPolicy Bypass -File scripts/verify-local.ps1",
+    "verify:local:no-docker": "powershell -NoLogo -NoProfile -ExecutionPolicy Bypass -File scripts/verify-local-no-docker.ps1"
+  },
+  "dependencies": {
+    "@prisma/client": "^7.1.0",
+    "cors": "^2.8.5",
+    "express": "^5.2.1",
+    "prisma": "^7.1.0"
+  }
+}

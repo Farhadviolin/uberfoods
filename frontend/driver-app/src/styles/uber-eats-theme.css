@@ -1,0 +1,1127 @@
+/* ============================================
+   UberEats Theme - Driver App
+   Professionelles Design im UberEats-Stil
+   ============================================ */
+
+:root {
+  /* UberEats Color Palette */
+  --ue-black: #000000;
+  --ue-dark-gray: #0A0A0A;
+  --ue-card-bg: #1A1A1A;
+  --ue-card-hover: #242424;
+  --ue-card-border: #2A2A2A;
+  --ue-green: #06C167;
+  --ue-green-dark: #05A855;
+  --ue-green-light: #0FE37A;
+  --ue-red: #FF3B30;
+  --ue-red-dark: #E6342A;
+  --ue-orange: #FF9500;
+  --ue-orange-dark: #E68500;
+  --ue-gray: #8E8E93;
+  --ue-gray-dark: #636366;
+  --ue-text-primary: #FFFFFF;
+  --ue-text-secondary: #B0B0B0;
+  --ue-text-tertiary: #8E8E93;
+  --ue-text-disabled: #636366;
+  
+  /* Shadows */
+  --ue-shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.4);
+  --ue-shadow-md: 0 2px 8px rgba(0, 0, 0, 0.3);
+  --ue-shadow-lg: 0 4px 16px rgba(0, 0, 0, 0.4);
+  --ue-shadow-green: 0 2px 8px rgba(6, 193, 103, 0.3);
+  --ue-shadow-green-hover: 0 4px 12px rgba(6, 193, 103, 0.4);
+  
+  /* Spacing */
+  --ue-spacing-xs: 4px;
+  --ue-spacing-sm: 8px;
+  --ue-spacing-md: 16px;
+  --ue-spacing-lg: 20px;
+  --ue-spacing-xl: 24px;
+  --ue-spacing-2xl: 32px;
+  
+  /* Border Radius */
+  --ue-radius-sm: 8px;
+  --ue-radius-md: 12px;
+  --ue-radius-lg: 16px;
+  --ue-radius-full: 24px;
+  --ue-radius-button: 24px;
+}
+
+/* ============================================
+   Global Styles - UberEats Dark Theme
+   ============================================ */
+
+body {
+  background-color: var(--ue-black) !important;
+  color: var(--ue-text-primary) !important;
+}
+
+/* ============================================
+   Dashboard Container
+   ============================================ */
+
+.dashboard-container {
+  background: var(--ue-black) !important;
+  min-height: 100vh;
+}
+
+.dashboard-container::before {
+  display: none !important;
+}
+
+/* ============================================
+   Header - UberEats Style
+   ============================================ */
+
+.dashboard-header {
+  background: var(--ue-black) !important;
+  border-bottom: 1px solid var(--ue-card-border) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.05) !important;
+  border-radius: 0 !important;
+  margin: 0 !important;
+  padding: var(--ue-spacing-md) var(--ue-spacing-lg) !important;
+}
+
+.header-content h1 {
+  color: var(--ue-text-primary) !important;
+  font-size: 24px !important;
+  font-weight: 700 !important;
+  -webkit-text-fill-color: var(--ue-text-primary) !important;
+  background: none !important;
+  background-clip: unset !important;
+  letter-spacing: -0.5px !important;
+  margin: 0 !important;
+}
+
+.header-content p {
+  color: var(--ue-text-secondary) !important;
+  font-size: 14px !important;
+  margin: 4px 0 0 0 !important;
+}
+
+/* ============================================
+   Status Toggle - UberEats Style
+   ============================================ */
+
+.status-toggle {
+  background: var(--ue-green) !important;
+  color: var(--ue-text-primary) !important;
+  border-radius: var(--ue-radius-button) !important;
+  padding: 12px 24px !important;
+  font-size: 15px !important;
+  font-weight: 600 !important;
+  min-height: 48px !important;
+  min-width: 130px !important;
+  box-shadow: var(--ue-shadow-green) !important;
+  border: none !important;
+  text-transform: none !important;
+  letter-spacing: 0 !important;
+}
+
+.status-toggle.online {
+  background: var(--ue-green) !important;
+  box-shadow: var(--ue-shadow-green) !important;
+}
+
+.status-toggle.online:hover:not(:disabled) {
+  background: var(--ue-green-dark) !important;
+  box-shadow: var(--ue-shadow-green-hover) !important;
+  transform: translateY(-1px) !important;
+}
+
+.status-toggle.offline {
+  background: var(--ue-gray) !important;
+  box-shadow: 0 2px 8px rgba(142, 142, 147, 0.3) !important;
+}
+
+.status-toggle.offline:hover:not(:disabled) {
+  background: var(--ue-gray-dark) !important;
+  transform: translateY(-1px) !important;
+}
+
+.status-toggle.on_break {
+  background: var(--ue-orange) !important;
+  box-shadow: 0 2px 8px rgba(255, 149, 0, 0.3) !important;
+}
+
+.status-toggle.on_break:hover:not(:disabled) {
+  background: var(--ue-orange-dark) !important;
+  transform: translateY(-1px) !important;
+}
+
+.status-toggle::before {
+  display: none !important;
+}
+
+/* ============================================
+   Action Buttons - UberEats Style
+   ============================================ */
+
+.map-toggle,
+.navigation-toggle,
+.stats-toggle,
+.multi-order-toggle,
+.push-toggle,
+.documents-toggle,
+.logout-button,
+.earnings-toggle,
+.ratings-toggle,
+.shift-toggle,
+.notifications-toggle,
+.settings-toggle,
+.expenses-toggle,
+.history-toggle,
+.achievements-toggle,
+.help-toggle,
+.emergency-toggle,
+.referral-toggle {
+  background: var(--ue-card-bg) !important;
+  color: var(--ue-text-primary) !important;
+  border: 1px solid var(--ue-card-border) !important;
+  border-radius: var(--ue-radius-md) !important;
+  padding: 10px 18px !important;
+  font-size: 14px !important;
+  font-weight: 600 !important;
+  box-shadow: var(--ue-shadow-sm) !important;
+  transition: all 0.2s ease !important;
+}
+
+.map-toggle:hover,
+.navigation-toggle:hover,
+.stats-toggle:hover,
+.multi-order-toggle:hover,
+.push-toggle:hover,
+.documents-toggle:hover,
+.logout-button:hover,
+.earnings-toggle:hover,
+.ratings-toggle:hover,
+.shift-toggle:hover,
+.notifications-toggle:hover,
+.settings-toggle:hover,
+.expenses-toggle:hover,
+.history-toggle:hover,
+.achievements-toggle:hover,
+.help-toggle:hover,
+.emergency-toggle:hover,
+.referral-toggle:hover {
+  background: var(--ue-card-hover) !important;
+  border-color: var(--ue-green) !important;
+  transform: translateY(-1px) !important;
+  box-shadow: var(--ue-shadow-md) !important;
+}
+
+.map-toggle::before,
+.navigation-toggle::before,
+.stats-toggle::before,
+.multi-order-toggle::before,
+.push-toggle::before,
+.documents-toggle::before,
+.logout-button::before {
+  display: none !important;
+}
+
+/* ============================================
+   Order Cards - UberEats Style
+   ============================================ */
+
+.order-card {
+  background: var(--ue-card-bg) !important;
+  border: 1px solid var(--ue-card-border) !important;
+  border-radius: var(--ue-radius-md) !important;
+  padding: var(--ue-spacing-lg) !important;
+  box-shadow: var(--ue-shadow-md) !important;
+  transition: all 0.2s ease !important;
+  position: relative !important;
+  overflow: visible !important;
+}
+
+.order-card::before {
+  display: none !important;
+}
+
+.order-card::after {
+  display: none !important;
+}
+
+.order-card:hover {
+  border-color: var(--ue-green) !important;
+  box-shadow: var(--ue-shadow-lg) !important;
+  transform: translateY(-2px) !important;
+  background: var(--ue-card-hover) !important;
+}
+
+.order-header {
+  border-bottom: 1px solid var(--ue-card-border) !important;
+  padding-bottom: var(--ue-spacing-md) !important;
+  margin-bottom: var(--ue-spacing-md) !important;
+}
+
+.order-header::after {
+  display: none !important;
+}
+
+.order-header h3 {
+  color: var(--ue-text-primary) !important;
+  font-size: 18px !important;
+  font-weight: 600 !important;
+  margin: 0 !important;
+}
+
+.order-date {
+  color: var(--ue-text-secondary) !important;
+  font-size: 13px !important;
+  margin: 4px 0 0 0 !important;
+}
+
+/* ============================================
+   Status Badge - UberEats Style
+   ============================================ */
+
+.status-badge {
+  border-radius: 20px !important;
+  padding: 6px 14px !important;
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.5px !important;
+  box-shadow: var(--ue-shadow-sm) !important;
+}
+
+.status-badge::before {
+  display: none !important;
+}
+
+/* Status-specific colors */
+.status-badge[style*="PENDING"],
+.status-badge[style*="#ffc107"] {
+  background: var(--ue-orange) !important;
+  color: var(--ue-text-primary) !important;
+}
+
+.status-badge[style*="CONFIRMED"],
+.status-badge[style*="#17a2b8"] {
+  background: #00A8E8 !important;
+  color: var(--ue-text-primary) !important;
+}
+
+.status-badge[style*="PREPARING"],
+.status-badge[style*="#ff6b35"] {
+  background: var(--ue-orange) !important;
+  color: var(--ue-text-primary) !important;
+}
+
+.status-badge[style*="READY"],
+.status-badge[style*="#28a745"] {
+  background: var(--ue-green) !important;
+  color: var(--ue-text-primary) !important;
+}
+
+.status-badge[style*="ACCEPTED"],
+.status-badge[style*="#007bff"] {
+  background: #007AFF !important;
+  color: var(--ue-text-primary) !important;
+}
+
+.status-badge[style*="PICKED_UP"],
+.status-badge[style*="#6610f2"] {
+  background: #8E44AD !important;
+  color: var(--ue-text-primary) !important;
+}
+
+.status-badge[style*="IN_TRANSIT"],
+.status-badge[style*="#007bff"] {
+  background: #007AFF !important;
+  color: var(--ue-text-primary) !important;
+}
+
+.status-badge[style*="DELIVERED"],
+.status-badge[style*="#28a745"] {
+  background: var(--ue-green) !important;
+  color: var(--ue-text-primary) !important;
+}
+
+.status-badge[style*="CANCELLED"],
+.status-badge[style*="#dc3545"] {
+  background: var(--ue-red) !important;
+  color: var(--ue-text-primary) !important;
+}
+
+/* ============================================
+   Order Sections - UberEats Style
+   ============================================ */
+
+.order-section {
+  background: rgba(255, 255, 255, 0.03) !important;
+  border: 1px solid var(--ue-card-border) !important;
+  border-radius: var(--ue-radius-sm) !important;
+  padding: var(--ue-spacing-md) !important;
+  margin-bottom: var(--ue-spacing-md) !important;
+  transition: all 0.2s ease !important;
+}
+
+.order-section:hover {
+  background: rgba(255, 255, 255, 0.05) !important;
+  border-color: var(--ue-green) !important;
+  transform: translateX(0) !important;
+}
+
+.order-section h4 {
+  color: var(--ue-text-secondary) !important;
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 1px !important;
+  margin-bottom: 8px !important;
+}
+
+.order-section p {
+  color: var(--ue-text-primary) !important;
+  font-size: 15px !important;
+  margin-bottom: 4px !important;
+}
+
+.order-address,
+.order-phone,
+.order-notes {
+  color: var(--ue-text-secondary) !important;
+  font-size: 14px !important;
+}
+
+/* ============================================
+   Order Items - UberEats Style
+   ============================================ */
+
+.order-items {
+  background: rgba(255, 255, 255, 0.03) !important;
+  border: 1px solid var(--ue-card-border) !important;
+  border-radius: var(--ue-radius-sm) !important;
+  padding: var(--ue-spacing-md) !important;
+  margin-bottom: var(--ue-spacing-md) !important;
+}
+
+.order-item {
+  border-bottom: 1px solid var(--ue-card-border) !important;
+  color: var(--ue-text-primary) !important;
+  font-size: 15px !important;
+}
+
+.order-item:last-child {
+  border-bottom: none !important;
+}
+
+.order-total {
+  border-top: 2px solid var(--ue-card-border) !important;
+  color: var(--ue-text-primary) !important;
+  font-size: 18px !important;
+  font-weight: 600 !important;
+}
+
+/* ============================================
+   Buttons - UberEats Style
+   ============================================ */
+
+.order-actions button,
+.accept-button {
+  background: var(--ue-green) !important;
+  color: var(--ue-text-primary) !important;
+  border-radius: var(--ue-radius-button) !important;
+  padding: 14px 24px !important;
+  font-size: 17px !important;
+  font-weight: 600 !important;
+  min-height: 48px !important;
+  box-shadow: var(--ue-shadow-green) !important;
+  border: none !important;
+  text-transform: none !important;
+  letter-spacing: 0 !important;
+  transition: all 0.2s ease !important;
+}
+
+.accept-button::after {
+  display: none !important;
+}
+
+.accept-button:hover:not(:disabled) {
+  background: var(--ue-green-dark) !important;
+  box-shadow: var(--ue-shadow-green-hover) !important;
+  transform: translateY(-1px) !important;
+}
+
+.reject-button {
+  background: var(--ue-red) !important;
+  color: var(--ue-text-primary) !important;
+  border-radius: var(--ue-radius-button) !important;
+  padding: 14px 24px !important;
+  font-size: 17px !important;
+  font-weight: 600 !important;
+  min-height: 48px !important;
+  box-shadow: 0 2px 8px rgba(255, 59, 48, 0.3) !important;
+  border: none !important;
+  transition: all 0.2s ease !important;
+}
+
+.reject-button:hover:not(:disabled) {
+  background: var(--ue-red-dark) !important;
+  box-shadow: 0 4px 12px rgba(255, 59, 48, 0.4) !important;
+  transform: translateY(-1px) !important;
+}
+
+.status-update-button {
+  background: #007AFF !important;
+  color: var(--ue-text-primary) !important;
+  border-radius: var(--ue-radius-button) !important;
+  padding: 14px 24px !important;
+  font-size: 17px !important;
+  font-weight: 600 !important;
+  min-height: 48px !important;
+  box-shadow: 0 2px 8px rgba(0, 122, 255, 0.3) !important;
+  border: none !important;
+}
+
+.status-update-button:hover {
+  background: #0056CC !important;
+  box-shadow: 0 4px 12px rgba(0, 122, 255, 0.4) !important;
+  transform: translateY(-1px) !important;
+}
+
+/* ============================================
+   Customer Contact Buttons
+   ============================================ */
+
+.call-customer-button {
+  background: var(--ue-green) !important;
+  color: var(--ue-text-primary) !important;
+  border-radius: var(--ue-radius-md) !important;
+  padding: 10px 16px !important;
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  box-shadow: var(--ue-shadow-sm) !important;
+  border: none !important;
+}
+
+.call-customer-button:hover {
+  background: var(--ue-green-dark) !important;
+  box-shadow: var(--ue-shadow-md) !important;
+  transform: translateY(-1px) !important;
+}
+
+.sms-customer-button {
+  background: #007AFF !important;
+  color: var(--ue-text-primary) !important;
+  border-radius: var(--ue-radius-md) !important;
+  padding: 10px 16px !important;
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  box-shadow: var(--ue-shadow-sm) !important;
+  border: none !important;
+}
+
+.sms-customer-button:hover {
+  background: #0056CC !important;
+  box-shadow: var(--ue-shadow-md) !important;
+  transform: translateY(-1px) !important;
+}
+
+/* ============================================
+   Stat Cards - UberEats Style
+   ============================================ */
+
+.stat-card {
+  background: var(--ue-card-bg) !important;
+  border: 1px solid var(--ue-card-border) !important;
+  border-radius: var(--ue-radius-md) !important;
+  padding: var(--ue-spacing-lg) !important;
+  box-shadow: var(--ue-shadow-md) !important;
+  transition: all 0.2s ease !important;
+}
+
+.stat-card::before {
+  background: var(--ue-green) !important;
+  height: 3px !important;
+}
+
+.stat-card:hover {
+  border-color: var(--ue-green) !important;
+  box-shadow: var(--ue-shadow-lg) !important;
+  transform: translateY(-2px) !important;
+  background: var(--ue-card-hover) !important;
+}
+
+.stat-card h2 {
+  color: var(--ue-green) !important;
+  font-size: 32px !important;
+  font-weight: 700 !important;
+  -webkit-text-fill-color: var(--ue-green) !important;
+  background: none !important;
+  background-clip: unset !important;
+  margin-bottom: var(--ue-spacing-sm) !important;
+  letter-spacing: -1px !important;
+}
+
+.stat-card p {
+  color: var(--ue-text-secondary) !important;
+  font-size: 14px !important;
+  margin: 0 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.5px !important;
+}
+
+/* ============================================
+   Bottom Navigation - UberEats Style
+   ============================================ */
+
+.bottom-navigation {
+  background: var(--ue-black) !important;
+  border-top: 1px solid var(--ue-card-border) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.3) !important;
+  padding: var(--ue-spacing-sm) 0 calc(var(--ue-spacing-sm) + env(safe-area-inset-bottom)) !important;
+}
+
+.bottom-nav-item {
+  color: var(--ue-text-tertiary) !important;
+  background: transparent !important;
+  border: none !important;
+}
+
+.bottom-nav-item.active {
+  color: var(--ue-green) !important;
+  background: transparent !important;
+}
+
+.bottom-nav-item.active::before {
+  background: var(--ue-green) !important;
+  width: 40px !important;
+  height: 3px !important;
+}
+
+.bottom-nav-icon {
+  font-size: 24px !important;
+}
+
+.bottom-nav-item.active .bottom-nav-icon {
+  transform: scale(1.1) !important;
+  rotate: 0deg !important;
+}
+
+.bottom-nav-label {
+  color: inherit !important;
+  font-size: 11px !important;
+  font-weight: 500 !important;
+}
+
+.bottom-nav-badge {
+  background: var(--ue-red) !important;
+  color: var(--ue-text-primary) !important;
+  box-shadow: var(--ue-shadow-sm) !important;
+}
+
+/* ============================================
+   Empty State & Loading
+   ============================================ */
+
+.empty-state {
+  background: var(--ue-card-bg) !important;
+  border: 1px solid var(--ue-card-border) !important;
+  border-radius: var(--ue-radius-md) !important;
+  box-shadow: var(--ue-shadow-md) !important;
+  color: var(--ue-text-secondary) !important;
+}
+
+.empty-state::before {
+  display: none !important;
+}
+
+.empty-state p {
+  color: var(--ue-text-secondary) !important;
+  font-size: 15px !important;
+}
+
+.loading {
+  color: var(--ue-text-secondary) !important;
+}
+
+/* ============================================
+   Error & Success Messages
+   ============================================ */
+
+.error {
+  background: rgba(255, 59, 48, 0.1) !important;
+  border-left: 4px solid var(--ue-red) !important;
+  color: var(--ue-red) !important;
+  border-radius: var(--ue-radius-sm) !important;
+  box-shadow: var(--ue-shadow-sm) !important;
+}
+
+.success {
+  background: rgba(6, 193, 103, 0.1) !important;
+  border-left: 4px solid var(--ue-green) !important;
+  color: var(--ue-green) !important;
+  border-radius: var(--ue-radius-sm) !important;
+  box-shadow: var(--ue-shadow-sm) !important;
+}
+
+/* ============================================
+   Scrollbar - Dark Theme
+   ============================================ */
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--ue-black);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--ue-card-border);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--ue-gray);
+}
+
+/* ============================================
+   Selection
+   ============================================ */
+
+::selection {
+  background: var(--ue-green);
+  color: var(--ue-text-primary);
+}
+
+/* ============================================
+   Delivery Actions
+   ============================================ */
+
+.delivery-actions button {
+  background: var(--ue-card-bg) !important;
+  border: 1px solid var(--ue-card-border) !important;
+  color: var(--ue-text-primary) !important;
+  border-radius: var(--ue-radius-md) !important;
+  box-shadow: var(--ue-shadow-sm) !important;
+}
+
+.delivery-actions button:hover {
+  background: var(--ue-card-hover) !important;
+  border-color: var(--ue-green) !important;
+  transform: translateY(-1px) !important;
+  box-shadow: var(--ue-shadow-md) !important;
+}
+
+.qr-scan-button {
+  background: #007AFF !important;
+  border-color: #007AFF !important;
+}
+
+.qr-scan-button:hover {
+  background: #0056CC !important;
+  border-color: #0056CC !important;
+}
+
+.photo-button {
+  background: var(--ue-orange) !important;
+  border-color: var(--ue-orange) !important;
+}
+
+.photo-button:hover {
+  background: var(--ue-orange-dark) !important;
+  border-color: var(--ue-orange-dark) !important;
+}
+
+/* ============================================
+   Chat Button
+   ============================================ */
+
+.chat-button {
+  background: var(--ue-green) !important;
+  color: var(--ue-text-primary) !important;
+}
+
+.chat-button:hover {
+  background: var(--ue-green-dark) !important;
+}
+
+/* ============================================
+   Reject Dialog
+   ============================================ */
+
+.reject-dialog-overlay {
+  background: rgba(0, 0, 0, 0.7) !important;
+}
+
+.reject-dialog {
+  background: var(--ue-card-bg) !important;
+  border: 1px solid var(--ue-card-border) !important;
+  color: var(--ue-text-primary) !important;
+  box-shadow: var(--ue-shadow-lg) !important;
+}
+
+.reject-dialog h4 {
+  color: var(--ue-text-primary) !important;
+}
+
+.reject-dialog p {
+  color: var(--ue-text-secondary) !important;
+}
+
+.reject-reason-input {
+  background: var(--ue-black) !important;
+  border: 1px solid var(--ue-card-border) !important;
+  color: var(--ue-text-primary) !important;
+  border-radius: var(--ue-radius-sm) !important;
+}
+
+.reject-reason-input:focus {
+  border-color: var(--ue-green) !important;
+  outline: none !important;
+}
+
+.confirm-reject-button {
+  background: var(--ue-red) !important;
+  color: var(--ue-text-primary) !important;
+  border-radius: var(--ue-radius-md) !important;
+}
+
+.confirm-reject-button:hover:not(:disabled) {
+  background: var(--ue-red-dark) !important;
+}
+
+.cancel-button {
+  background: var(--ue-card-bg) !important;
+  border: 1px solid var(--ue-card-border) !important;
+  color: var(--ue-text-primary) !important;
+  border-radius: var(--ue-radius-md) !important;
+}
+
+.cancel-button:hover:not(:disabled) {
+  background: var(--ue-card-hover) !important;
+}
+
+/* ============================================
+   Login Page - UberEats Style
+   ============================================ */
+
+.login-container {
+  background: var(--ue-black) !important;
+  color: var(--ue-text-primary) !important;
+  min-height: 100vh !important;
+}
+
+.login-container::before {
+  display: none !important;
+}
+
+.login-card {
+  background: var(--ue-card-bg) !important;
+  border: 1px solid var(--ue-card-border) !important;
+  box-shadow: var(--ue-shadow-lg) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+.login-header h1 {
+  color: var(--ue-text-primary) !important;
+  -webkit-text-fill-color: var(--ue-text-primary) !important;
+  background: none !important;
+  background-clip: unset !important;
+}
+
+.login-header p {
+  color: var(--ue-text-secondary) !important;
+}
+
+.login-form {
+  background: var(--ue-card-bg) !important;
+  border: 1px solid var(--ue-card-border) !important;
+  border-radius: var(--ue-radius-md) !important;
+  box-shadow: var(--ue-shadow-lg) !important;
+}
+
+.login-form input {
+  background: var(--ue-black) !important;
+  border: 1px solid var(--ue-card-border) !important;
+  color: var(--ue-text-primary) !important;
+  border-radius: var(--ue-radius-sm) !important;
+}
+
+.login-form input:focus {
+  border-color: var(--ue-green) !important;
+  outline: none !important;
+}
+
+.login-form button {
+  background: var(--ue-green) !important;
+  color: var(--ue-text-primary) !important;
+  border-radius: var(--ue-radius-button) !important;
+  min-height: 48px !important;
+  font-size: 17px !important;
+  font-weight: 600 !important;
+  box-shadow: var(--ue-shadow-green) !important;
+}
+
+.login-form button:hover {
+  background: var(--ue-green-dark) !important;
+  box-shadow: var(--ue-shadow-green-hover) !important;
+}
+
+/* ============================================
+   Headings - UberEats Style
+   ============================================ */
+
+h2 {
+  color: var(--ue-text-primary) !important;
+  font-size: 20px !important;
+  font-weight: 600 !important;
+}
+
+/* ============================================
+   Dashboard Content
+   ============================================ */
+
+.dashboard-content {
+  background: var(--ue-black) !important;
+  padding: var(--ue-spacing-lg) var(--ue-spacing-md) !important;
+}
+
+/* ============================================
+   Stats Grid
+   ============================================ */
+
+.stats {
+  gap: var(--ue-spacing-md) !important;
+  margin-bottom: var(--ue-spacing-lg) !important;
+}
+
+/* ============================================
+   Orders Container
+   ============================================ */
+
+.orders-container {
+  gap: var(--ue-spacing-md) !important;
+}
+
+.order-card.completed {
+  opacity: 0.6 !important;
+  background: var(--ue-dark-gray) !important;
+}
+
+/* ============================================
+   Waiting Message
+   ============================================ */
+
+.waiting-message {
+  background: var(--ue-card-bg) !important;
+  border: 1px solid var(--ue-card-border) !important;
+  color: var(--ue-text-secondary) !important;
+  border-radius: var(--ue-radius-sm) !important;
+}
+
+/* ============================================
+   Micro-Interactions & Animations
+   ============================================ */
+
+@keyframes button-press {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(0.95);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slide-in-right {
+  from {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.order-card {
+  animation: fade-in 0.3s ease-out;
+}
+
+.order-card:nth-child(1) {
+  animation-delay: 0.05s;
+}
+
+.order-card:nth-child(2) {
+  animation-delay: 0.1s;
+}
+
+.order-card:nth-child(3) {
+  animation-delay: 0.15s;
+}
+
+.order-card:nth-child(4) {
+  animation-delay: 0.2s;
+}
+
+/* Button Press Animation */
+.accept-button:active,
+.reject-button:active,
+.status-update-button:active,
+.call-customer-button:active,
+.sms-customer-button:active,
+.qr-scan-button:active,
+.photo-button:active,
+.chat-button:active {
+  animation: button-press 0.2s ease-out;
+}
+
+/* Icon Animations */
+.bottom-nav-icon svg {
+  transition: transform 0.2s ease;
+}
+
+.bottom-nav-item.active .bottom-nav-icon svg {
+  transform: scale(1.1);
+}
+
+/* Icon Styling */
+.order-section-icon {
+  display: inline-block;
+  vertical-align: middle;
+  margin-right: 8px;
+}
+
+.order-phone-icon {
+  display: inline-block;
+  vertical-align: middle;
+  margin-right: 6px;
+}
+
+.button-icon {
+  display: inline-block;
+  vertical-align: middle;
+  margin-right: 6px;
+}
+
+/* Hover Effects for Icons */
+.order-section h4 svg {
+  transition: transform 0.2s ease;
+}
+
+.order-section:hover h4 svg {
+  transform: scale(1.1);
+}
+
+/* Pulse Animation for Status Badge */
+@keyframes pulse-green {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(6, 193, 103, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 0 8px rgba(6, 193, 103, 0);
+  }
+}
+
+.status-badge[style*="READY"],
+.status-badge[style*="DELIVERED"] {
+  animation: pulse-green 2s ease-in-out infinite;
+}
+
+/* Ripple Effect for Buttons */
+.accept-button,
+.reject-button,
+.status-update-button {
+  position: relative;
+  overflow: hidden;
+}
+
+.accept-button::after,
+.reject-button::after,
+.status-update-button::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.3);
+  transform: translate(-50%, -50%);
+  transition: width 0.6s, height 0.6s;
+}
+
+.accept-button:active::after,
+.reject-button:active::after,
+.status-update-button:active::after {
+  width: 300px;
+  height: 300px;
+}
+
+/* ============================================
+   Responsive Design
+   ============================================ */
+
+@media (max-width: 768px) {
+  .dashboard-header {
+    padding: var(--ue-spacing-md) !important;
+  }
+
+  .header-content h1 {
+    font-size: 20px !important;
+  }
+
+  .order-card {
+    padding: var(--ue-spacing-md) !important;
+  }
+
+  .stat-card {
+    padding: var(--ue-spacing-md) !important;
+  }
+
+  .stat-card h2 {
+    font-size: 28px !important;
+  }
+
+  .bottom-navigation {
+    padding-bottom: calc(12px + env(safe-area-inset-bottom)) !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .header-content h1 {
+    font-size: 18px !important;
+  }
+
+  .status-toggle {
+    min-width: 100px !important;
+    padding: 10px 16px !important;
+    font-size: 13px !important;
+  }
+
+  .order-actions {
+    flex-direction: column !important;
+    gap: var(--ue-spacing-sm) !important;
+  }
+
+  .order-actions button {
+    width: 100% !important;
+  }
+}
+

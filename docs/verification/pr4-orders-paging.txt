@@ -1,0 +1,7 @@
+SCENARIO: ORDERS-PAGING
+----------------------------------------
+P95 Response Time: 345ms
+Error Rate: 0.23%
+Throughput: 85.4 req/sec
+Total Requests: 5123
+Status: ✅ PASS

@@ -1,0 +1,222 @@
+/* ============================================
+   APP LAYOUT - Sidebar + Main Content
+   ============================================ */
+
+.app-layout {
+  display: flex;
+  min-height: 100vh;
+  background: var(--bg-secondary, #f9fafb);
+}
+
+.app-main {
+  flex: 1;
+  margin-left: 280px;
+  display: flex;
+  flex-direction: column;
+  transition: margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  min-height: 100vh;
+}
+
+/* Sidebar collapsed state */
+.sidebar.collapsed ~ .app-main {
+  margin-left: 64px;
+}
+
+/* App Header */
+.app-header {
+  background: var(--bg-primary, #ffffff);
+  border-bottom: 1px solid var(--border-color, #e5e7eb);
+  padding: var(--space-4) var(--space-6);
+  position: sticky;
+  top: 0;
+  z-index: var(--z-sticky);
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+}
+
+.header-content h1 {
+  margin: 0;
+  font-size: var(--text-2xl);
+  font-weight: var(--font-bold);
+  color: var(--primary-500);
+  line-height: var(--leading-tight);
+}
+
+.header-content p {
+  margin: var(--space-1) 0 0 0;
+  font-size: var(--text-sm);
+  color: var(--text-secondary, #6b7280);
+  line-height: var(--leading-normal);
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.status-indicator {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-full);
+  font-size: var(--text-xs);
+  font-weight: var(--font-semibold);
+  color: white;
+  transition: all var(--transition-base);
+}
+
+.status-indicator.connected {
+  background: var(--success-500);
+}
+
+.status-indicator.disconnected {
+  background: var(--error-500);
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: white;
+  animation: statusPulse 2s ease-in-out infinite;
+}
+
+.status-indicator.disconnected .status-dot {
+  animation: none;
+}
+
+@keyframes statusPulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.7;
+    transform: scale(1.2);
+  }
+}
+
+.user-info {
+  font-size: var(--text-sm);
+  color: var(--text-secondary, #6b7280);
+  white-space: nowrap;
+}
+
+/* App Content */
+.app-content {
+  flex: 1;
+  padding: var(--space-6);
+  max-width: 1600px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+.message-container {
+  margin-bottom: var(--space-4);
+  min-height: 0;
+  transition: all var(--transition-base);
+}
+
+.tab-content-wrapper {
+  min-height: 600px;
+  position: relative;
+  animation: fadeIn 0.3s ease-out;
+}
+
+/* Mobile Menu Toggle Button */
+.mobile-menu-toggle {
+  display: none;
+  position: fixed;
+  top: var(--space-4, 16px);
+  left: var(--space-4, 16px);
+  z-index: var(--z-fixed, 1030);
+  width: 48px;
+  height: 48px;
+  border-radius: var(--radius-md, 8px);
+  background: var(--primary-500, #1877F2);
+  color: white;
+  border: none;
+  box-shadow: var(--shadow-lg, 0 10px 15px -3px rgba(0, 0, 0, 0.1));
+  cursor: pointer;
+  font-size: var(--text-xl, 20px);
+  transition: all var(--transition-base, 200ms);
+  align-items: center;
+  justify-content: center;
+}
+
+.mobile-menu-toggle:hover {
+  background: var(--primary-600, #166FE5);
+  transform: scale(1.05);
+}
+
+.mobile-menu-toggle:active {
+  transform: scale(0.95);
+}
+
+/* Responsive */
+@media (max-width: 1024px) {
+  .app-main {
+    margin-left: 0;
+  }
+
+  .sidebar {
+    transform: translateX(-100%);
+    box-shadow: 4px 0 12px rgba(0, 0, 0, 0.15);
+  }
+
+  .sidebar.open {
+    transform: translateX(0);
+  }
+
+  .mobile-menu-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .app-content {
+    padding: var(--space-4, 16px);
+  }
+
+  .app-header {
+    padding-left: 64px; /* Space for mobile menu button */
+  }
+}
+
+@media (max-width: 768px) {
+  .app-header {
+    padding: var(--space-3) var(--space-4);
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .header-content h1 {
+    font-size: var(--text-xl);
+  }
+
+  .header-actions {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .app-content {
+    padding: var(--space-3);
+  }
+}
+
+/* Dark Mode */
+[data-theme='dark'] .app-layout {
+  background: var(--bg-primary, #0a0a0a);
+}
+
+[data-theme='dark'] .app-header {
+  background: var(--bg-secondary, #1a1a1a);
+  border-bottom-color: var(--border-color, #3a3a3a);
+}

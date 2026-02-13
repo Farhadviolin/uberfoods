@@ -1,0 +1,183 @@
+config:
+  target: 'http://localhost:3000'
+  phases:
+    # Warm-up phase
+    - duration: 60
+      arrivalRate: 5
+      name: "Warm up"
+
+    # Normal load
+    - duration: 300
+      arrivalRate: 10
+      name: "Normal load"
+
+    # Peak load
+    - duration: 120
+      arrivalRate: 50
+      name: "Peak load"
+
+    # Stress test
+    - duration: 60
+      arrivalRate: 100
+      name: "Stress test"
+
+  defaults:
+    headers:
+      Content-Type: 'application/json'
+
+scenarios:
+  - name: "Restaurant search and order placement"
+    weight: 40
+    flow:
+      - get:
+          url: "/api/restaurants/public"
+          expect:
+            - statusCode: 200
+      - think: 2
+      - get:
+          url: "/api/restaurants/{{ $randomInt(1, 100) }}"
+          expect:
+            - statusCode: 200
+      - think: 3
+      - post:
+          url: "/api/auth/login"
+          json:
+            email: "test-user-{{ $randomInt(1, 1000) }}@example.com"
+            password: "password123"
+          expect:
+            - statusCode: 200
+          capture:
+            json: "$.token"
+            as: "auth_token"
+      - post:
+          url: "/api/orders"
+          headers:
+            Authorization: "Bearer {{ auth_token }}"
+          json:
+            restaurantId: "restaurant-{{ $randomInt(1, 50) }}"
+            items: [
+              {
+                dishId: "dish-{{ $randomInt(1, 200) }}",
+                quantity: "{{ $randomInt(1, 3) }}"
+              }
+            ]
+            deliveryAddress: "Test Address {{ $randomInt(1, 100) }}"
+          expect:
+            - statusCode: 201
+          capture:
+            json: "$.id"
+            as: "order_id"
+      - think: 5
+      - get:
+          url: "/api/orders/{{ order_id }}"
+          headers:
+            Authorization: "Bearer {{ auth_token }}"
+          expect:
+            - statusCode: 200
+
+  - name: "Driver operations"
+    weight: 30
+    flow:
+      - post:
+          url: "/api/auth/driver/login"
+          json:
+            email: "driver-{{ $randomInt(1, 500) }}@hmor.com"
+            password: "driver123"
+          expect:
+            - statusCode: 200
+          capture:
+            json: "$.token"
+            as: "driver_token"
+      - get:
+          url: "/api/driver/orders/available"
+          headers:
+            Authorization: "Bearer {{ driver_token }}"
+          expect:
+            - statusCode: 200
+      - think: 2
+      - post:
+          url: "/api/driver/location"
+          headers:
+            Authorization: "Bearer {{ driver_token }}"
+          json:
+            latitude: "{{ 48.2 + $random() * 0.1 }}"
+            longitude: "{{ 16.3 + $random() * 0.1 }}"
+          expect:
+            - statusCode: 200
+      - think: 1
+      - get:
+          url: "/api/driver/dashboard"
+          headers:
+            Authorization: "Bearer {{ driver_token }}"
+          expect:
+            - statusCode: 200
+
+  - name: "Admin operations"
+    weight: 15
+    flow:
+      - post:
+          url: "/api/auth/login"
+          json:
+            email: "admin@hmor.com"
+            password: "admin123"
+          expect:
+            - statusCode: 200
+          capture:
+            json: "$.token"
+            as: "admin_token"
+      - get:
+          url: "/api/admin/dashboard"
+          headers:
+            Authorization: "Bearer {{ admin_token }}"
+          expect:
+            - statusCode: 200
+      - think: 3
+      - get:
+          url: "/api/admin/orders?status=PENDING"
+          headers:
+            Authorization: "Bearer {{ admin_token }}"
+          expect:
+            - statusCode: 200
+      - think: 2
+      - get:
+          url: "/api/admin/drivers"
+          headers:
+            Authorization: "Bearer {{ admin_token }}"
+          expect:
+            - statusCode: 200
+
+  - name: "API health and monitoring"
+    weight: 10
+    flow:
+      - get:
+          url: "/api/health"
+          expect:
+            - statusCode: 200
+      - get:
+          url: "/metrics"
+          expect:
+            - statusCode: 200
+      - think: 10
+      - get:
+          url: "/api/analytics/overview"
+          expect:
+            - statusCode: 200
+      - think: 5
+
+  - name: "Search and recommendations"
+    weight: 5
+    flow:
+      - get:
+          url: "/api/search?q=pizza&location=48.2082,16.3738"
+          expect:
+            - statusCode: 200
+      - think: 2
+      - get:
+          url: "/api/recommendations?userId=user-{{ $randomInt(1, 1000) }}&location=48.2082,16.3738"
+          expect:
+            - statusCode: 200
+      - think: 3
+      - get:
+          url: "/api/restaurants/{{ $randomInt(1, 100) }}/reviews"
+          expect:
+            - statusCode: 200

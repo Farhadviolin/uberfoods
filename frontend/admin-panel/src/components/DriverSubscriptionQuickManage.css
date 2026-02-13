@@ -1,0 +1,160 @@
+.driver-subscription-quick-manage {
+  padding: 20px;
+  background: #fff;
+  border-radius: 8px;
+  max-width: 600px;
+}
+
+.subscription-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  padding-bottom: 15px;
+  border-bottom: 2px solid #e9ecef;
+}
+
+.subscription-header h2 {
+  margin: 0;
+  color: #1c1e21;
+  font-size: 20px;
+}
+
+.subscription-info {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 15px;
+  margin-bottom: 20px;
+}
+
+.info-card {
+  background: #f8f9fa;
+  padding: 15px;
+  border-radius: 8px;
+  text-align: center;
+}
+
+.info-card.warning {
+  background: #fff3cd;
+  border: 2px solid #ffc107;
+}
+
+.info-card h3 {
+  margin: 0 0 10px 0;
+  font-size: 12px;
+  color: #65676b;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.info-value {
+  font-size: 18px;
+  font-weight: 700;
+  color: #1c1e21;
+}
+
+.subscription-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.upgrade-button,
+.cancel-button,
+.reactivate-button {
+  flex: 1;
+  padding: 12px 20px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: all 0.2s;
+}
+
+.upgrade-button {
+  background: #1877f2;
+  color: white;
+}
+
+.upgrade-button:hover:not(:disabled) {
+  background: #166fe5;
+}
+
+.cancel-button {
+  background: #dc3545;
+  color: white;
+}
+
+.cancel-button:hover:not(:disabled) {
+  background: #c82333;
+}
+
+.reactivate-button {
+  background: #28a745;
+  color: white;
+}
+
+.reactivate-button:hover:not(:disabled) {
+  background: #218838;
+}
+
+.upgrade-button:disabled,
+.cancel-button:disabled,
+.reactivate-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.no-subscription {
+  text-align: center;
+  padding: 40px;
+  color: #65676b;
+}
+
+.create-subscription-button {
+  margin-top: 20px;
+  padding: 12px 24px;
+  background: #1877f2;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.create-subscription-button:hover {
+  background: #166fe5;
+}
+
+.upgrade-form {
+  padding: 10px 0;
+}
+
+.upgrade-form p {
+  margin: 0 0 10px 0;
+  color: #1c1e21;
+}
+
+.driver-subscription-no-permission {
+  padding: 40px;
+  text-align: center;
+  color: #dc3545;
+}
+
+[data-theme="dark"] .driver-subscription-quick-manage {
+  background: #242526;
+  color: #e4e6eb;
+}
+
+[data-theme="dark"] .subscription-header h2 {
+  color: #e4e6eb;
+}
+
+[data-theme="dark"] .info-card {
+  background: #3a3b3c;
+}
+
+[data-theme="dark"] .info-value {
+  color: #e4e6eb;
+}
+

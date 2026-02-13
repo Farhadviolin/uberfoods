@@ -1,0 +1,141 @@
+.select-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.select-wrapper.full-width {
+  width: 100%;
+}
+
+.select-label {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--color-text-primary);
+  margin-bottom: 4px;
+}
+
+.select-container {
+  position: relative;
+  display: inline-block;
+  width: 100%;
+}
+
+.select {
+  appearance: none;
+  background: var(--color-background);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  padding: 8px 36px 8px 12px;
+  font-size: 0.875rem;
+  color: var(--color-text-primary);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  width: 100%;
+  min-height: 36px;
+}
+
+.select:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
+}
+
+.select:hover:not(.select-error) {
+  border-color: var(--color-border-hover);
+}
+
+.select:disabled {
+  background: var(--color-background-disabled);
+  color: var(--color-text-disabled);
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+/* Variants */
+.select-outlined {
+  border: 2px solid var(--color-border);
+}
+
+.select-outlined:focus {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.select-filled {
+  background: var(--color-background-secondary);
+  border-color: transparent;
+}
+
+.select-filled:focus {
+  background: var(--color-background);
+  border-color: var(--color-primary);
+}
+
+/* Sizes */
+.select-sm {
+  padding: 6px 32px 6px 10px;
+  font-size: 0.75rem;
+  min-height: 32px;
+}
+
+.select-lg {
+  padding: 12px 40px 12px 16px;
+  font-size: 1rem;
+  min-height: 44px;
+}
+
+/* Error state */
+.select-error {
+  border-color: var(--color-error);
+  background: rgba(239, 68, 68, 0.05);
+}
+
+.select-error:focus {
+  border-color: var(--color-error);
+  box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.1);
+}
+
+.select-arrow {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--color-text-secondary);
+  pointer-events: none;
+  transition: color 0.2s ease;
+}
+
+.select:focus + .select-arrow {
+  color: var(--color-primary);
+}
+
+.select-sm + .select-arrow {
+  right: 10px;
+}
+
+.select-lg + .select-arrow {
+  right: 16px;
+}
+
+.select-helper {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  margin-top: 4px;
+}
+
+.select-error-text {
+  color: var(--color-error);
+}
+
+/* Option styling */
+.select option {
+  padding: 8px;
+  background: var(--color-background);
+  color: var(--color-text-primary);
+}
+
+.select option:disabled {
+  color: var(--color-text-disabled);
+  background: var(--color-background-disabled);
+}

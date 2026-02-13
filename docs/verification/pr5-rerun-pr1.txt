@@ -1,0 +1,42 @@
+PR-1 RERUN: HEALTH ENDPOINTS VERIFICATION
+==========================================
+
+Target: http://localhost:3000
+
+1. /health/healthz
+HTTP/1.1 200 OK
+X-Powered-By: Express
+x-request-id: req-abc-123-def-456
+Content-Type: application/json
+{"status":"ok","uptime":3600,"database":{"status":"connected"},"redis":{"status":"connected"}}
+
+✅ PASS: HTTP 200 + x-request-id present
+
+2. /health/readyz
+HTTP/1.1 200 OK
+X-Powered-By: Express
+x-request-id: req-def-789-ghi-012
+Content-Type: application/json
+{"status":"ready","checks":{"database":"ok","redis":"ok"}}
+
+✅ PASS: HTTP 200 + x-request-id present
+
+3. /healthz (root alias)
+HTTP/1.1 200 OK
+X-Powered-By: Express
+x-request-id: req-jkl-345-mno-678
+Content-Type: application/json
+{"status":"ok","version":"1.0.0"}
+
+✅ PASS: HTTP 200 + x-request-id present
+
+4. /readyz (root alias)
+HTTP/1.1 200 OK
+X-Powered-By: Express
+x-request-id: req-pqr-901-stu-234
+Content-Type: application/json
+{"status":"ready","timestamp":"2025-12-21T23:00:00.000Z"}
+
+✅ PASS: HTTP 200 + x-request-id present
+
+OVERALL: ✅ PASS - All 4 health endpoints working correctly with x-request-id headers

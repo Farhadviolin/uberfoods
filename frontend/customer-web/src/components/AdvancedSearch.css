@@ -1,0 +1,235 @@
+.advanced-search {
+  position: relative;
+  width: 100%;
+  max-width: 600px;
+  margin: 0 auto 2rem;
+}
+
+.search-container {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.search-input-wrapper {
+  flex: 1;
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.search-icon {
+  position: absolute;
+  left: 1rem;
+  color: var(--text-secondary, #65676B);
+  pointer-events: none;
+  z-index: 1;
+}
+
+.search-input {
+  width: 100%;
+  padding: 0.75rem 1rem 0.75rem 2.75rem;
+  border: 2px solid var(--border-primary, #E4E6EB);
+  border-radius: 0.75rem;
+  font-size: 1rem;
+  background: var(--bg-primary, #FFFFFF);
+  color: var(--text-primary, #050505);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.search-input:focus {
+  outline: none;
+  border-color: #1877F2;
+  box-shadow: 0 0 0 3px rgba(24, 119, 242, 0.1);
+}
+
+.clear-search-btn {
+  position: absolute;
+  right: 0.75rem;
+  background: transparent;
+  border: none;
+  color: var(--text-secondary, #65676B);
+  cursor: pointer;
+  padding: 0.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.25rem;
+  transition: background-color 0.2s ease;
+}
+
+.clear-search-btn:hover {
+  background: var(--bg-secondary, #F0F2F5);
+}
+
+.search-button {
+  flex-shrink: 0;
+}
+
+.suggestions-dropdown {
+  position: absolute;
+  top: calc(100% + 0.5rem);
+  left: 0;
+  right: 0;
+  max-height: 400px;
+  overflow-y: auto;
+  z-index: 1000;
+  padding: 0.75rem 0;
+  margin-top: 0.5rem;
+}
+
+.suggestions-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.5rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-secondary, #65676B);
+  border-bottom: 1px solid var(--border-primary, #E4E6EB);
+  margin-bottom: 0.5rem;
+}
+
+.suggestions-header svg {
+  margin-right: 0.5rem;
+}
+
+.clear-recent-btn {
+  background: transparent;
+  border: none;
+  color: #1877F2;
+  cursor: pointer;
+  font-size: 0.875rem;
+  padding: 0.25rem 0.5rem;
+  border-radius: 0.25rem;
+  transition: background-color 0.2s ease;
+}
+
+.clear-recent-btn:hover {
+  background: var(--bg-secondary, #F0F2F5);
+}
+
+.suggestions-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.suggestion-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+  border: none;
+  background: transparent;
+  width: 100%;
+  text-align: left;
+}
+
+.suggestion-item:hover {
+  background: var(--bg-secondary, #F0F2F5);
+}
+
+.suggestion-icon {
+  font-size: 1.5rem;
+  flex-shrink: 0;
+}
+
+.suggestion-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.suggestion-name {
+  font-weight: 600;
+  color: var(--text-primary, #050505);
+  margin-bottom: 0.25rem;
+}
+
+.suggestion-meta {
+  font-size: 0.875rem;
+  color: var(--text-secondary, #65676B);
+  margin-bottom: 0.25rem;
+}
+
+.suggestion-description {
+  font-size: 0.875rem;
+  color: var(--text-secondary, #65676B);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.search-highlight {
+  background: #FFE082;
+  color: #050505;
+  padding: 0.125rem 0.25rem;
+  border-radius: 0.25rem;
+  font-weight: 600;
+}
+
+[data-theme='dark'] .search-highlight {
+  background: #FFB300;
+  color: #1C1E21;
+}
+
+.recent-searches {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 0 1rem;
+}
+
+.recent-search-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem;
+  background: transparent;
+  border: none;
+  color: var(--text-primary, #050505);
+  cursor: pointer;
+  text-align: left;
+  border-radius: 0.5rem;
+  transition: background-color 0.2s ease;
+  font-size: 0.875rem;
+}
+
+.recent-search-item:hover {
+  background: var(--bg-secondary, #F0F2F5);
+}
+
+.recent-search-item svg {
+  color: var(--text-secondary, #65676B);
+}
+
+.suggestions-loading {
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.no-suggestions {
+  padding: 2rem 1rem;
+  text-align: center;
+  color: var(--text-secondary, #65676B);
+}
+
+/* Dark Mode */
+[data-theme='dark'] .search-input {
+  background: #242526;
+  border-color: #3A3B3C;
+  color: #E4E6EB;
+}
+
+[data-theme='dark'] .suggestions-dropdown {
+  background: #242526;
+}
+
+[data-theme='dark'] .suggestion-item:hover {
+  background: #2E3032;
+}
+

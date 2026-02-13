@@ -1,0 +1,254 @@
+.driver-earnings-management {
+  padding: 20px;
+  background: #fff;
+  border-radius: 8px;
+  max-width: 900px;
+  max-height: 90vh;
+  overflow: auto;
+}
+
+.earnings-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  padding-bottom: 15px;
+  border-bottom: 2px solid #e9ecef;
+}
+
+.earnings-header h2 {
+  margin: 0;
+  color: #1c1e21;
+  font-size: 20px;
+}
+
+.earnings-overview {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 15px;
+  margin-bottom: 30px;
+}
+
+.earnings-card {
+  background: #f8f9fa;
+  padding: 20px;
+  border-radius: 8px;
+  text-align: center;
+}
+
+.earnings-card.total {
+  background: #d4edda;
+  border: 2px solid #28a745;
+}
+
+.earnings-card.pending {
+  background: #fff3cd;
+  border: 2px solid #ffc107;
+}
+
+.earnings-card h3 {
+  margin: 0 0 10px 0;
+  font-size: 14px;
+  color: #65676b;
+  font-weight: 600;
+}
+
+.earnings-value {
+  font-size: 24px;
+  font-weight: 700;
+  color: #1c1e21;
+}
+
+.earnings-card.total .earnings-value {
+  color: #28a745;
+}
+
+.earnings-card.pending .earnings-value {
+  color: #856404;
+}
+
+.earnings-actions {
+  margin-bottom: 30px;
+}
+
+.adjust-button {
+  background: #1877f2;
+  color: white;
+  border: none;
+  padding: 12px 24px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: background 0.2s;
+}
+
+.adjust-button:hover {
+  background: #166fe5;
+}
+
+.payout-requests-section {
+  margin-top: 30px;
+}
+
+.payout-requests-section h3 {
+  margin: 0 0 15px 0;
+  color: #1c1e21;
+  font-size: 18px;
+}
+
+.payouts-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: white;
+}
+
+.payouts-table thead {
+  background: #f8f9fa;
+}
+
+.payouts-table th {
+  padding: 12px;
+  text-align: left;
+  font-weight: 600;
+  color: #1c1e21;
+  border-bottom: 2px solid #dee2e6;
+}
+
+.payouts-table td {
+  padding: 12px;
+  border-bottom: 1px solid #e9ecef;
+}
+
+.payouts-table tr:hover {
+  background: #f8f9fa;
+}
+
+.status-badge {
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.status-badge.status-pending {
+  background: #fff3cd;
+  color: #856404;
+}
+
+.status-badge.status-approved {
+  background: #d4edda;
+  color: #155724;
+}
+
+.status-badge.status-rejected {
+  background: #f8d7da;
+  color: #721c24;
+}
+
+.status-badge.status-processed {
+  background: #d1ecf1;
+  color: #0c5460;
+}
+
+.process-button {
+  background: #28a745;
+  color: white;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  transition: background 0.2s;
+}
+
+.process-button:hover {
+  background: #218838;
+}
+
+.no-payouts {
+  text-align: center;
+  padding: 40px;
+  color: #65676b;
+}
+
+.adjust-form {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.adjust-form .form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.adjust-form label {
+  font-weight: 600;
+  color: #1c1e21;
+  font-size: 14px;
+}
+
+.adjust-form input,
+.adjust-form select,
+.adjust-form textarea {
+  padding: 8px 12px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  font-size: 14px;
+  font-family: inherit;
+}
+
+.adjust-form textarea {
+  resize: vertical;
+}
+
+.driver-earnings-no-permission {
+  padding: 40px;
+  text-align: center;
+  color: #dc3545;
+}
+
+[data-theme="dark"] .driver-earnings-management {
+  background: #242526;
+  color: #e4e6eb;
+}
+
+[data-theme="dark"] .earnings-header h2 {
+  color: #e4e6eb;
+}
+
+[data-theme="dark"] .earnings-card {
+  background: #3a3b3c;
+}
+
+[data-theme="dark"] .earnings-value {
+  color: #e4e6eb;
+}
+
+[data-theme="dark"] .payouts-table {
+  background: #242526;
+}
+
+[data-theme="dark"] .payouts-table thead {
+  background: #3a3b3c;
+}
+
+[data-theme="dark"] .payouts-table th {
+  color: #e4e6eb;
+  border-bottom-color: #4e4f50;
+}
+
+[data-theme="dark"] .payouts-table td {
+  border-bottom-color: #4e4f50;
+}
+
+[data-theme="dark"] .adjust-form input,
+[data-theme="dark"] .adjust-form select,
+[data-theme="dark"] .adjust-form textarea {
+  background: #3a3b3c;
+  border-color: #4e4f50;
+  color: #e4e6eb;
+}
+

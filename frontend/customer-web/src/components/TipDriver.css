@@ -1,0 +1,135 @@
+.tip-driver-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.tip-driver-content {
+  background: white;
+  border-radius: 16px;
+  padding: 24px;
+  max-width: 500px;
+  width: 90%;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.tip-driver-content h2 {
+  margin: 0 0 8px 0;
+  font-size: 24px;
+  font-weight: 700;
+}
+
+.tip-driver-subtitle {
+  color: #666;
+  margin-bottom: 24px;
+  font-size: 14px;
+}
+
+.tip-preset-amounts {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.tip-preset-btn {
+  padding: 16px;
+  border: 2px solid #E4E6EB;
+  border-radius: 12px;
+  background: white;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.tip-preset-btn:hover:not(:disabled) {
+  border-color: #1877F2;
+  background: #F0F2F5;
+}
+
+.tip-preset-btn.active {
+  border-color: #1877F2;
+  background: #1877F2;
+  color: white;
+}
+
+.tip-preset-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.tip-custom-amount {
+  margin-bottom: 24px;
+}
+
+.tip-custom-amount label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: 500;
+  font-size: 14px;
+}
+
+.tip-input-wrapper {
+  display: flex;
+  align-items: center;
+  border: 2px solid #E4E6EB;
+  border-radius: 12px;
+  padding: 0 16px;
+  background: white;
+}
+
+.tip-currency {
+  font-size: 18px;
+  font-weight: 600;
+  color: #666;
+  margin-right: 8px;
+}
+
+.tip-custom-input {
+  flex: 1;
+  border: none;
+  outline: none;
+  padding: 16px 0;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.tip-input-wrapper:focus-within {
+  border-color: #1877F2;
+}
+
+.tip-actions {
+  display: flex;
+  gap: 12px;
+}
+
+.tip-submit-btn {
+  flex: 1;
+  padding: 16px;
+  background: #1877F2;
+  color: white;
+  border: none;
+  border-radius: 12px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.tip-submit-btn:hover:not(:disabled) {
+  background: #166FE5;
+}
+
+.tip-submit-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

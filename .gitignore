@@ -1,0 +1,70 @@
+# Dependencies
+node_modules/
+*/node_modules/
+
+# Build outputs
+dist/
+build/
+*.tsbuildinfo
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Uploads
+backend/uploads/
+uploads/
+
+# Database
+*.db
+*.sqlite
+
+# Prisma
+backend/prisma/migrations/
+
+# Coverage
+coverage/
+.nyc_output/
+*/coverage/
+
+# Build outputs (additional patterns)
+.next/
+out/
+.vite/
+deps_temp_*/
+
+# Backup files
+*.bak
+*.backup
+*.orig
+*.old
+
+# Temporary files
+*.tmp
+*.temp
+
+# E2E artifacts and summaries
+tmp/summary-*.json
+artifacts/
+
+# Snyk Security Extension - AI Rules (auto-generated)
+.cursor/rules/snyk_rules.mdc

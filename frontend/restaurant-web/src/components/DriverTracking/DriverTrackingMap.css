@@ -1,0 +1,51 @@
+.driver-tracking-map {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.map-container {
+  width: 100%;
+  height: 400px;
+  border-radius: var(--fb-radius-base);
+  border: 1px solid var(--fb-border-primary);
+  overflow: hidden;
+}
+
+.driver-status {
+  padding: 16px;
+  background: var(--fb-bg-primary);
+  border: 1px solid var(--fb-border-primary);
+  border-radius: var(--fb-radius-base);
+}
+
+.custom-marker {
+  background: transparent !important;
+  border: none !important;
+  font-size: 24px;
+  text-align: center;
+  line-height: 32px;
+}
+
+.restaurant-marker {
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
+}
+
+.customer-marker {
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
+}
+
+.driver-marker {
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.1);
+  }
+}
+

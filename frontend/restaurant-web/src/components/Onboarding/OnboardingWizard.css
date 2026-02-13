@@ -1,0 +1,128 @@
+ .onboarding-wrapper {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(circle at 10% 20%, #f9fafb 0, #eef1f5 35%, #e9ecf2 100%);
+  padding: 32px;
+}
+
+.onboarding-card {
+  width: min(1080px, 100%);
+  background: white;
+  border-radius: 16px;
+  box-shadow: 0 20px 60px rgba(16, 24, 40, 0.12);
+  padding: 32px;
+  display: grid;
+  gap: 24px;
+  border: 1px solid #e4e7ec;
+}
+
+.onboarding-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: flex-start;
+}
+
+.onboarding-eyebrow {
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 12px;
+  color: #667085;
+  margin: 0 0 6px 0;
+  font-weight: 600;
+}
+
+.onboarding-subtitle {
+  color: #475467;
+  margin: 6px 0 0 0;
+}
+
+.onboarding-steps {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.onboarding-steps span {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 2px solid #d0d5dd;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  color: #98a2b3;
+  background: white;
+}
+
+.onboarding-steps span.active {
+  border-color: #ff6b6b;
+  color: #ff6b6b;
+  background: #fff4f2;
+}
+
+.onboarding-line {
+  height: 2px;
+  width: 32px;
+  background: #e4e7ec;
+}
+
+.onboarding-helper {
+  color: #475467;
+  margin: 4px 0 16px 0;
+}
+
+.onboarding-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 20px;
+}
+
+.onboarding-info {
+  background: #f8f9fc;
+  border: 1px solid #e4e7ec;
+  padding: 12px 14px;
+  border-radius: 10px;
+  margin-bottom: 16px;
+  color: #344054;
+  font-size: 14px;
+}
+
+.onboarding-field {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.onboarding-field label {
+  font-weight: 600;
+  color: #344054;
+}
+
+.onboarding-hint {
+  margin: 6px 0 0 0;
+  color: #667085;
+  font-size: 13px;
+}
+
+.onboarding-summary ul {
+  margin: 12px 0;
+  padding-left: 20px;
+  color: #344054;
+  line-height: 1.6;
+}
+
+.fb-button.primary {
+  background: #ff6b6b;
+  color: white;
+  border: none;
+}
+
+.fb-button.ghost {
+  background: transparent;
+  border: 1px solid #d0d5dd;
+  color: #344054;
+}

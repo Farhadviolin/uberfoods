@@ -1,0 +1,5 @@
+[Nest] 1  - 12/21/2025, 10:35:00 PM   LOG [RedisSocketAdapter] Redis adapter enabled and connection verified
+[Nest] 1  - 12/21/2025, 10:35:00 PM   LOG [RedisSocketAdapter] Setting up Redis adapter for WebSocket scaling
+[Nest] 1  - 12/21/2025, 10:35:01 PM   LOG [PrismaService] ✅ Prisma Client erfolgreich verbunden
+[Nest] 1  - 12/21/2025, 10:35:01 PM   LOG [WebsocketGateway] Client connected: test-driver-123 (driver)
+[Nest] 1  - 12/21/2025, 10:35:01 PM   LOG [DriverRateLimiterService] Broadcasting driver location update: test-driver-123, seq: 1

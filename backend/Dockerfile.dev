@@ -1,0 +1,28 @@
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Copy package files
+COPY package*.json ./
+COPY prisma ./prisma/
+
+# Install dependencies with legacy peer deps to handle version conflicts
+RUN NODE_OPTIONS="--max-old-space-size=4096" npm install --legacy-peer-deps
+
+# Generate Prisma client
+RUN npx prisma generate
+
+# Copy source code
+COPY . .
+
+# Build the application
+RUN npm run build
+
+# Ensure server.minimal.js exists
+RUN ls -la server.minimal.js || echo "server.minimal.js not found"
+
+# Expose port
+EXPOSE 3000
+
+# Default command - run NestJS application
+CMD ["node", "dist/main.js"]

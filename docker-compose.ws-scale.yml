@@ -1,0 +1,29 @@
+version: '3.8'
+
+services:
+  backend2:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.dev
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres123@postgres:5432/uberfoods
+      - REDIS_URL=redis://redis:6379
+      - NODE_ENV=development
+      - JWT_SECRET=your-super-secret-jwt-key-for-dev
+      - GOOGLE_MAPS_API_KEY=dummy-key
+      - STRIPE_SECRET_KEY=STRIPE_SECRET_KEY_PLACEHOLDER
+      - AWS_ACCESS_KEY_ID=dummy
+      - AWS_SECRET_ACCESS_KEY=dummy
+      - AWS_S3_BUCKET=dummy
+    depends_on:
+      - postgres
+      - redis
+    ports:
+      - "3001:3000"
+    volumes:
+      - ./backend/src:/app/src
+      - ./backend/dist:/app/dist
+      - ./backend/prisma:/app/prisma
+      - ./backend/package.json:/app/package.json
+      - ./backend/tsconfig.json:/app/tsconfig.json
+      - /app/node_modules

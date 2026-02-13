@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="de">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    
+    <!-- Content Security Policy für Stripe - EINZEILIG formatiert -->
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://js.stripe.com https://m.stripe.network https://*.stripe.com blob:; style-src 'self' 'unsafe-inline' https://js.stripe.com https://fonts.googleapis.com https://fonts.gstatic.com blob:; font-src 'self' https://fonts.gstatic.com data:; frame-src 'self' https://js.stripe.com https://hooks.stripe.com https://*.stripe.com; worker-src 'self' blob: https://js.stripe.com; child-src 'self' blob: https://js.stripe.com; connect-src 'self' http://localhost:3000 ws://localhost:3000 wss://localhost:3000 https://api.stripe.com https://m.stripe.network https://*.stripe.com; img-src 'self' data: https: blob:; object-src 'none'; base-uri 'self';">
+    
+    <!-- Primary Meta Tags -->
+    <title>UberFoods - Premium Food Delivery Service</title>
+    <meta name="title" content="UberFoods - Premium Food Delivery Service" />
+    <meta name="description" content="Bestellen Sie leckeres Essen von den besten Restaurants in Ihrer Nähe. Schnelle Lieferung, frische Gerichte und exzellenter Service." />
+    <meta name="keywords" content="Essen bestellen, Food Delivery, Lieferservice, Restaurant, Essen liefern lassen, Online Bestellung" />
+    <meta name="author" content="UberFoods" />
+    <meta name="robots" content="index, follow" />
+    <meta name="language" content="German" />
+    <meta name="theme-color" content="#FF9800" />
+    
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://uberfoods.com/" />
+    <meta property="og:title" content="UberFoods - Premium Food Delivery Service" />
+    <meta property="og:description" content="Bestellen Sie leckeres Essen von den besten Restaurants in Ihrer Nähe. Schnelle Lieferung, frische Gerichte und exzellenter Service." />
+    <meta property="og:image" content="https://uberfoods.com/og-image.jpg" />
+    <meta property="og:locale" content="de_AT" />
+    <meta property="og:site_name" content="UberFoods" />
+    
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image" />
+    <meta property="twitter:url" content="https://uberfoods.com/" />
+    <meta property="twitter:title" content="UberFoods - Premium Food Delivery Service" />
+    <meta property="twitter:description" content="Bestellen Sie leckeres Essen von den besten Restaurants in Ihrer Nähe. Schnelle Lieferung, frische Gerichte und exzellenter Service." />
+    <meta property="twitter:image" content="https://uberfoods.com/twitter-image.jpg" />
+    
+    <!-- Structured Data (JSON-LD) -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "FoodEstablishment",
+      "name": "UberFoods",
+      "description": "Premium Food Delivery Service",
+      "url": "https://uberfoods.com",
+      "logo": "https://uberfoods.com/logo.png",
+      "image": "https://uberfoods.com/og-image.jpg",
+      "address": {
+        "@type": "PostalAddress",
+        "addressCountry": "AT"
+      },
+      "servesCuisine": ["International", "Italian", "Asian", "American"],
+      "priceRange": "€€",
+      "aggregateRating": {
+        "@type": "AggregateRating",
+        "ratingValue": "4.8",
+        "reviewCount": "1250"
+      },
+      "sameAs": [
+        "https://www.facebook.com/uberfoods",
+        "https://www.instagram.com/uberfoods",
+        "https://twitter.com/uberfoods"
+      ]
+    }
+    </script>
+    
+    <!-- Preconnect for Performance -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
+

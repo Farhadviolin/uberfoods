@@ -1,0 +1,111 @@
+/* ============================================
+   Skeleton Loader - UberEats Style
+   ============================================ */
+
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    #1A1A1A 0%,
+    #242424 50%,
+    #1A1A1A 100%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-loading 1.5s ease-in-out infinite;
+  border-radius: 8px;
+}
+
+@keyframes skeleton-loading {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+.skeleton-text {
+  height: 16px;
+  border-radius: 4px;
+}
+
+.skeleton-button {
+  height: 48px;
+  border-radius: 24px;
+}
+
+.skeleton-circle {
+  border-radius: 50%;
+}
+
+.skeleton-card {
+  height: 200px;
+  border-radius: 12px;
+}
+
+.skeleton-margin {
+  margin-bottom: 12px;
+}
+
+/* ============================================
+   Skeleton Order Card
+   ============================================ */
+
+.skeleton-order-card {
+  background: #1A1A1A;
+  border: 1px solid #2A2A2A;
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 16px;
+}
+
+.skeleton-order-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #2A2A2A;
+}
+
+.skeleton-order-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+/* ============================================
+   Skeleton Stats Grid
+   ============================================ */
+
+.skeleton-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.skeleton-stat-card {
+  background: #1A1A1A;
+  border: 1px solid #2A2A2A;
+  border-radius: 12px;
+  padding: 20px;
+  text-align: center;
+}
+
+/* ============================================
+   Responsive
+   ============================================ */
+
+@media (max-width: 768px) {
+  .skeleton-stats-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .skeleton-order-actions {
+    flex-direction: column;
+  }
+
+  .skeleton-order-actions .skeleton-button {
+    width: 100%;
+  }
+}

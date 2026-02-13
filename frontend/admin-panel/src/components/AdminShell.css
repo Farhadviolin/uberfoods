@@ -1,0 +1,175 @@
+/* ============================================
+   ADMIN SHELL LAYOUT - Modern SaaS Admin Panel
+   ============================================ */
+
+.admin-shell {
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  grid-template-rows: 1fr;
+  min-height: 100vh;
+  background: var(--bg-secondary, #f9fafb);
+  transition: grid-template-columns 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Sidebar collapsed state */
+.admin-shell.sidebar-collapsed {
+  grid-template-columns: 76px 1fr;
+}
+
+/* Main content area */
+.admin-main {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background: var(--bg-primary, #ffffff);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Topbar */
+.admin-main .topbar {
+  background: var(--bg-primary, #ffffff);
+  border-bottom: 1px solid var(--border-color, #e4e6eb);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+/* Main content */
+.admin-content {
+  flex: 1;
+  padding: 0;
+  overflow-y: auto;
+  background: var(--bg-primary, #ffffff);
+}
+
+.admin-content-wrapper {
+  max-width: 1400px;
+  width: 100%;
+  margin: 0 auto;
+  padding: var(--space-6);
+  min-height: calc(100vh - 80px); /* Account for topbar height */
+}
+
+/* Mobile Menu Toggle Button */
+.mobile-menu-toggle {
+  display: none;
+  position: fixed;
+  top: 16px;
+  left: 16px;
+  z-index: 1050;
+  width: 48px;
+  height: 48px;
+  border-radius: 8px;
+  background: var(--primary-500, #1877f2);
+  color: white;
+  border: none;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  cursor: pointer;
+  font-size: 20px;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  align-items: center;
+  justify-content: center;
+}
+
+.mobile-menu-toggle:hover {
+  background: var(--primary-600, #166fe5);
+  transform: scale(1.05);
+}
+
+.mobile-menu-toggle:active {
+  transform: scale(0.95);
+}
+
+/* Dark Mode Support */
+[data-theme='dark'] .admin-shell {
+  background: var(--bg-primary, #0a0a0a);
+}
+
+[data-theme='dark'] .admin-main {
+  background: var(--bg-primary, #0a0a0a);
+}
+
+[data-theme='dark'] .admin-content {
+  background: var(--bg-primary, #0a0a0a);
+}
+
+[data-theme='dark'] .topbar {
+  background: var(--bg-secondary, #1a1a1a);
+  border-bottom-color: var(--border-color, #2a2a2a);
+}
+
+/* Responsive Design */
+@media (max-width: 1024px) {
+  .admin-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-shell.sidebar-collapsed {
+    grid-template-columns: 1fr;
+  }
+
+  .mobile-menu-toggle {
+    display: flex;
+  }
+
+  .admin-content-wrapper {
+    padding: 16px;
+  }
+}
+
+@media (max-width: 768px) {
+  .admin-content-wrapper {
+    padding: 12px;
+    max-width: 100%;
+  }
+
+  .mobile-menu-toggle {
+    width: 44px;
+    height: 44px;
+    font-size: 18px;
+  }
+}
+
+@media (max-width: 480px) {
+  .admin-content-wrapper {
+    padding: 8px;
+  }
+}
+
+/* Print styles */
+@media print {
+  .admin-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .mobile-menu-toggle,
+  .sidebar {
+    display: none !important;
+  }
+
+  .admin-content-wrapper {
+    padding: 0;
+    max-width: none;
+  }
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  .admin-shell {
+    border: 1px solid;
+  }
+
+  .topbar {
+    border-bottom: 2px solid;
+  }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  .admin-shell,
+  .admin-main,
+  .mobile-menu-toggle {
+    transition: none;
+  }
+}

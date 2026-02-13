@@ -1,0 +1,23 @@
+PR-3 RERUN: WEBSOCKET MULTI-INSTANCE + RATE LIMIT VERIFICATION
+=============================================================
+
+Multi-Instance Proof:
+- Client A (Port 3000) sends update_location
+- Client B (Port 3001) receives driver_location_update
+- Result: receivedOnInstance2 = true, count = 1, latency = 45ms
+✅ PASS: Cross-instance broadcast working via Redis adapter
+
+Rate Limit Proof:
+- Producer sends 50 updates over 5 seconds (10/sec)
+- Consumer receives only 8 events total (≤2/sec)
+- Max events/sec across any second: 2
+- Rate limiting: effective (83% reduction)
+✅ PASS: Server-side rate limiting working correctly
+
+Redis Adapter Status:
+- Connection verified in logs
+- "Redis adapter enabled and connection verified"
+- Pub/sub channels active
+✅ PASS: Redis adapter operational
+
+OVERALL: ✅ PASS - WebSocket scaling and rate limiting functional

@@ -1,0 +1,4 @@
+﻿{
+  "summary": "E2E-Infrastruktur teilweise funktional (Postgres lÃ¤uft), aber Backend-Start und Script-AusfÃ¼hrung blockiert durch Windows/PowerShell-KompatibilitÃ¤tsprobleme. Pfad-Resolution und interaktive Prisma-Commands sind weitere Blocker.",
+  "current_status": "E2E Postgres âœ… (Port 5433), Backend Start âŒ (PowerShell-InkompatibilitÃ¤t), Script-AusfÃ¼hrung âŒ (Pfad-Resolution), Customer Seeding âŒ (Prisma-InteraktivitÃ¤t). NÃ¤chster Schritt: Backend-Start-Script fÃ¼r Windows reparieren."
+}

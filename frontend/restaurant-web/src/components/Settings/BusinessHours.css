@@ -1,0 +1,7 @@
+.business-hours-day {
+  padding: var(--fb-space-4);
+  border: 1px solid var(--fb-border-primary);
+  border-radius: var(--fb-radius-md);
+  background-color: var(--fb-bg-primary);
+}
+

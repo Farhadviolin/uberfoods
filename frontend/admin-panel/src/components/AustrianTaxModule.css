@@ -1,0 +1,455 @@
+.austrian-tax-module {
+  padding: 24px;
+  background: var(--bg-primary, #ffffff);
+  min-height: 100vh;
+}
+
+.tax-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.tax-header h2 {
+  margin: 0;
+  font-size: 28px;
+  font-weight: 600;
+  color: var(--text-primary, #1a1a1a);
+}
+
+.tax-controls {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.period-selector {
+  padding: 8px 12px;
+  border: 1px solid var(--border-color, #e0e0e0);
+  border-radius: 6px;
+  background: var(--bg-secondary, #ffffff);
+  color: var(--text-primary, #1a1a1a);
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.tax-sub-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 24px;
+  border-bottom: 2px solid var(--border-color, #e0e0e0);
+  flex-wrap: wrap;
+  overflow-x: auto;
+}
+
+.sub-tab {
+  padding: 12px 20px;
+  background: transparent;
+  border: none;
+  border-bottom: 3px solid transparent;
+  color: var(--text-secondary, #666666);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.sub-tab:hover {
+  color: var(--primary-color, #1877F2);
+  background: var(--bg-tertiary, #f5f5f5);
+}
+
+.sub-tab.active {
+  color: var(--primary-color, #1877F2);
+  border-bottom-color: var(--primary-color, #1877F2);
+  font-weight: 600;
+}
+
+.tax-metrics,
+.input-tax-metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.metric-card {
+  background: var(--bg-secondary, #ffffff);
+  border: 1px solid var(--border-color, #e0e0e0);
+  border-radius: 8px;
+  padding: 20px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.metric-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.metric-card h3 {
+  margin: 0 0 12px 0;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-secondary, #666666);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.metric-value {
+  font-size: 32px;
+  font-weight: 700;
+  color: var(--primary-color, #1877F2);
+  margin-bottom: 8px;
+}
+
+.metric-subtitle {
+  font-size: 12px;
+  color: var(--text-secondary, #666666);
+}
+
+.tax-summary-card {
+  background: var(--bg-secondary, #ffffff);
+  border: 1px solid var(--border-color, #e0e0e0);
+  border-radius: 8px;
+  padding: 20px;
+  margin-top: 24px;
+}
+
+.tax-summary-card h3 {
+  margin: 0 0 20px 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-primary, #1a1a1a);
+}
+
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 16px;
+}
+
+.summary-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px;
+  background: var(--bg-tertiary, #f5f5f5);
+  border-radius: 6px;
+}
+
+.summary-label {
+  font-size: 14px;
+  color: var(--text-secondary, #666666);
+}
+
+.summary-value {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary, #1a1a1a);
+}
+
+.summary-value.highlight {
+  color: var(--primary-color, #1877F2);
+  font-size: 18px;
+}
+
+.ust-va-header {
+  margin-bottom: 24px;
+}
+
+.ust-va-header h3 {
+  margin: 0 0 12px 0;
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--text-primary, #1a1a1a);
+}
+
+.ust-va-info {
+  padding: 12px;
+  background: var(--bg-tertiary, #f5f5f5);
+  border-radius: 6px;
+  font-size: 14px;
+  color: var(--text-secondary, #666666);
+}
+
+.ust-va-table-section,
+.input-tax-table-section {
+  background: var(--bg-secondary, #ffffff);
+  border: 1px solid var(--border-color, #e0e0e0);
+  border-radius: 8px;
+  padding: 20px;
+}
+
+.input-tax-table-section h3 {
+  margin: 0 0 16px 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-primary, #1a1a1a);
+}
+
+.tax-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.tax-table thead {
+  background: var(--bg-tertiary, #f5f5f5);
+}
+
+.tax-table th {
+  padding: 12px;
+  text-align: left;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary, #1a1a1a);
+  border-bottom: 2px solid var(--border-color, #e0e0e0);
+}
+
+.tax-table td {
+  padding: 12px;
+  font-size: 14px;
+  color: var(--text-primary, #1a1a1a);
+  border-bottom: 1px solid var(--border-color, #e0e0e0);
+}
+
+.tax-table tbody tr:hover {
+  background: var(--bg-tertiary, #f5f5f5);
+}
+
+.status-badge {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.status-draft {
+  background: #ffc107;
+  color: #000;
+}
+
+.status-submitted {
+  background: #17a2b8;
+  color: white;
+}
+
+.status-paid {
+  background: #28a745;
+  color: white;
+}
+
+.status-deductible {
+  background: #28a745;
+  color: white;
+}
+
+.status-non-deductible {
+  background: #dc3545;
+  color: white;
+}
+
+.ust-rates-info h3 {
+  margin: 0 0 24px 0;
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--text-primary, #1a1a1a);
+}
+
+.rate-info-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.rate-info-card {
+  background: var(--bg-secondary, #ffffff);
+  border: 1px solid var(--border-color, #e0e0e0);
+  border-radius: 8px;
+  padding: 20px;
+  text-align: center;
+}
+
+.rate-badge {
+  display: inline-block;
+  width: 80px;
+  height: 80px;
+  line-height: 80px;
+  border-radius: 50%;
+  font-size: 24px;
+  font-weight: 700;
+  color: white;
+  margin-bottom: 16px;
+}
+
+.rate-10 {
+  background: #28a745;
+}
+
+.rate-20 {
+  background: #1877F2;
+}
+
+.rate-0 {
+  background: #6c757d;
+}
+
+.rate-info-card h4 {
+  margin: 0 0 12px 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary, #1a1a1a);
+}
+
+.rate-info-card ul {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 16px 0;
+  text-align: left;
+}
+
+.rate-info-card ul li {
+  padding: 4px 0;
+  font-size: 14px;
+  color: var(--text-secondary, #666666);
+}
+
+.rate-info-card ul li:before {
+  content: "• ";
+  color: var(--primary-color, #1877F2);
+  font-weight: bold;
+  margin-right: 8px;
+}
+
+.rate-amount {
+  padding: 12px;
+  background: var(--bg-tertiary, #f5f5f5);
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary, #1a1a1a);
+}
+
+.tax-chart-card {
+  background: var(--bg-secondary, #ffffff);
+  border: 1px solid var(--border-color, #e0e0e0);
+  border-radius: 8px;
+  padding: 20px;
+  margin-top: 24px;
+}
+
+.tax-chart-card h3 {
+  margin: 0 0 16px 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-primary, #1a1a1a);
+}
+
+.reports-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 16px;
+}
+
+.report-card {
+  background: var(--bg-secondary, #ffffff);
+  border: 1px solid var(--border-color, #e0e0e0);
+  border-radius: 8px;
+  padding: 20px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.report-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.report-card h3 {
+  margin: 0 0 16px 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-primary, #1a1a1a);
+}
+
+.report-details {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.report-detail {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+}
+
+.detail-label {
+  color: var(--text-secondary, #666666);
+}
+
+.detail-value {
+  font-weight: 600;
+  color: var(--text-primary, #1a1a1a);
+}
+
+.report-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.actions {
+  display: flex;
+  gap: 8px;
+}
+
+/* Dark Mode */
+[data-theme="dark"] .austrian-tax-module {
+  background: var(--bg-primary, #1a1a1a);
+}
+
+[data-theme="dark"] .metric-card,
+[data-theme="dark"] .tax-summary-card,
+[data-theme="dark"] .ust-va-table-section,
+[data-theme="dark"] .input-tax-table-section,
+[data-theme="dark"] .rate-info-card,
+[data-theme="dark"] .tax-chart-card,
+[data-theme="dark"] .report-card {
+  background: var(--bg-secondary, #2a2a2a);
+  border-color: var(--border-color, #3a3a3a);
+}
+
+[data-theme="dark"] .tax-table thead {
+  background: var(--bg-tertiary, #333333);
+}
+
+[data-theme="dark"] .summary-item,
+[data-theme="dark"] .ust-va-info,
+[data-theme="dark"] .rate-amount {
+  background: var(--bg-tertiary, #333333);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .tax-metrics,
+  .input-tax-metrics {
+    grid-template-columns: 1fr;
+  }
+  
+  .rate-info-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .tax-sub-tabs {
+    overflow-x: auto;
+  }
+}
+

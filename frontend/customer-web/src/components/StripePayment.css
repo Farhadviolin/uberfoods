@@ -1,0 +1,123 @@
+.stripe-payment-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4, 1rem);
+}
+
+.payment-amount {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--space-4, 1rem);
+  background: var(--bg-secondary, #F0F2F5);
+  border-radius: var(--radius-md, 0.5rem);
+  font-size: 1rem;
+}
+
+.payment-amount strong {
+  font-size: 1.5rem;
+  color: var(--primary-500, #1877F2);
+}
+
+.card-element-container {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2, 0.5rem);
+}
+
+.card-element-container label {
+  font-weight: 600;
+  color: var(--text-primary, #050505);
+  font-size: 0.9375rem;
+}
+
+.card-element-wrapper {
+  padding: var(--space-3, 0.75rem);
+  border: 1px solid var(--border-color, #E4E6EB);
+  border-radius: var(--radius-md, 0.5rem);
+  background: var(--bg-primary, #FFFFFF);
+  transition: border-color 0.2s;
+}
+
+.card-element-wrapper:focus-within {
+  border-color: var(--primary-500, #1877F2);
+  box-shadow: 0 0 0 2px rgba(24, 119, 242, 0.1);
+}
+
+[data-theme='dark'] .card-element-wrapper {
+  background: var(--bg-primary, #242526);
+  border-color: var(--border-color, #3A3B3C);
+}
+
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2, 0.5rem);
+  cursor: pointer;
+  font-size: 0.9375rem;
+  color: var(--text-primary, #050505);
+}
+
+.payment-actions {
+  display: flex;
+  gap: var(--space-3, 0.75rem);
+  margin-top: var(--space-4, 1rem);
+}
+
+.cancel-btn,
+.pay-btn {
+  flex: 1;
+  padding: var(--space-3, 0.75rem) var(--space-5, 1.25rem);
+  border-radius: var(--radius-md, 0.5rem);
+  font-weight: 600;
+  font-size: 0.9375rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: none;
+}
+
+.cancel-btn {
+  background: var(--bg-tertiary, #E4E6EB);
+  color: var(--text-primary, #050505);
+}
+
+.cancel-btn:hover:not(:disabled) {
+  background: var(--hover-bg, #F0F2F5);
+}
+
+.pay-btn {
+  background: var(--primary-500, #1877F2);
+  color: white;
+}
+
+.pay-btn:hover:not(:disabled) {
+  background: var(--primary-600, #166FE5);
+}
+
+.pay-btn:disabled,
+.cancel-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.error-message {
+  padding: var(--space-3, 0.75rem);
+  background: rgba(228, 30, 63, 0.1);
+  border: 1px solid rgba(228, 30, 63, 0.3);
+  border-radius: var(--radius-md, 0.5rem);
+  color: #E41E3F;
+  font-size: 0.875rem;
+}
+
+.payment-error {
+  padding: var(--space-6, 1.5rem);
+  text-align: center;
+  color: var(--text-primary, #050505);
+}
+
+.error-detail {
+  font-size: 0.875rem;
+  color: var(--text-secondary, #65676B);
+  margin-top: var(--space-2, 0.5rem);
+}
+

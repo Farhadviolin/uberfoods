@@ -1,0 +1,68 @@
+.audit-log {
+  padding: 20px;
+}
+
+.audit-log-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.audit-log-header h2 {
+  margin: 0;
+  color: #1c1e21;
+}
+
+.audit-log-filters {
+  display: flex;
+  gap: 12px;
+}
+
+.audit-log-filters select {
+  padding: 8px 12px;
+  border: 1px solid #CCD0D5;
+  border-radius: 6px;
+  background: white;
+}
+
+.audit-log-table {
+  background: white;
+  border-radius: 8px;
+  padding: 20px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  overflow-x: auto;
+}
+
+.audit-log-table table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.audit-log-table th,
+.audit-log-table td {
+  padding: 12px;
+  text-align: left;
+  border-bottom: 1px solid #E4E6EB;
+}
+
+.audit-log-table th {
+  font-weight: 600;
+  color: #65676B;
+  font-size: 14px;
+}
+
+.action-badge {
+  color: white;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.entity-id {
+  font-family: monospace;
+  font-size: 12px;
+  color: #65676B;
+}
+

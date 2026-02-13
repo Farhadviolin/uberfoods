@@ -1,0 +1,406 @@
+.loyalty-program {
+  padding: 2rem;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.loyalty-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2rem;
+}
+
+.loyalty-header h2 {
+  margin: 0;
+  font-size: 2rem;
+  font-weight: 700;
+}
+
+.loyalty-tier-badge {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1.5rem;
+  border: 2px solid;
+  border-radius: 12px;
+  font-weight: 600;
+  font-size: 1.1rem;
+}
+
+.loyalty-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 1.5rem;
+  margin-bottom: 2rem;
+}
+
+.loyalty-stat-card {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1.5rem;
+}
+
+.stat-icon {
+  width: 56px;
+  height: 56px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.stat-content h3 {
+  margin: 0 0 0.5rem 0;
+  font-size: 0.875rem;
+  color: #65676B;
+  font-weight: 500;
+}
+
+.stat-value {
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: #050505;
+}
+
+.tier-progress-card {
+  padding: 1.5rem;
+  margin-bottom: 2rem;
+}
+
+.tier-progress-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.tier-progress-header h3 {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+.tier-progress-text {
+  font-size: 0.875rem;
+  color: #65676B;
+}
+
+.tier-progress-bar {
+  width: 100%;
+  height: 12px;
+  background-color: #E4E6EB;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.tier-progress-fill {
+  height: 100%;
+  border-radius: 6px;
+  transition: width 0.3s ease;
+}
+
+.loyalty-sections {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+  gap: 2rem;
+}
+
+.loyalty-section {
+  padding: 1.5rem;
+}
+
+.section-header {
+  margin-bottom: 1.5rem;
+}
+
+.section-header h3 {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+.rewards-grid {
+  display: grid;
+  gap: 1rem;
+}
+
+.reward-card {
+  padding: 1rem;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.reward-card.can-redeem {
+  border-color: #10B981;
+}
+
+.reward-card.cannot-redeem {
+  opacity: 0.6;
+}
+
+.reward-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.reward-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.reward-header h4 {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.reward-cost {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-weight: 600;
+  color: #F59E0B;
+}
+
+.reward-description {
+  margin: 0.5rem 0;
+  font-size: 0.875rem;
+  color: #65676B;
+}
+
+.reward-discount {
+  display: inline-block;
+  padding: 0.25rem 0.75rem;
+  background-color: #10B98120;
+  color: #10B981;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  margin-bottom: 0.75rem;
+}
+
+.points-history {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.history-item {
+  padding: 1rem;
+  background-color: #F0F2F5;
+  border-radius: 8px;
+}
+
+.history-item-main {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.history-type {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.history-type-label {
+  font-weight: 600;
+  font-size: 0.875rem;
+  text-transform: uppercase;
+}
+
+.history-points {
+  font-size: 1.25rem;
+  font-weight: 700;
+}
+
+.history-points.positive {
+  color: #10B981;
+}
+
+.history-points.negative {
+  color: #EF4444;
+}
+
+.history-description {
+  font-size: 0.875rem;
+  color: #65676B;
+  margin-bottom: 0.25rem;
+}
+
+.history-date {
+  font-size: 0.75rem;
+  color: #8A8D91;
+}
+
+.referral-section {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.referral-code-display {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.referral-code {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem;
+  background-color: #F0F2F5;
+  border-radius: 8px;
+}
+
+.referral-code code {
+  flex: 1;
+  font-family: 'Courier New', monospace;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #1877F2;
+  background-color: white;
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+}
+
+.referral-description {
+  margin: 0;
+  font-size: 0.875rem;
+  color: #65676B;
+  line-height: 1.5;
+}
+
+.referral-stats {
+  display: flex;
+  gap: 2rem;
+  padding: 1rem;
+  background-color: #F0F2F5;
+  border-radius: 8px;
+}
+
+.referral-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.stat-label {
+  font-size: 0.875rem;
+  color: #65676B;
+}
+
+.stat-value {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #050505;
+}
+
+.apply-referral-btn {
+  width: 100%;
+}
+
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.modal-content {
+  background: white;
+  padding: 2rem;
+  border-radius: 12px;
+  max-width: 500px;
+  width: 90%;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+}
+
+.modal-content h3 {
+  margin: 0 0 1.5rem 0;
+  font-size: 1.5rem;
+  font-weight: 600;
+}
+
+.referral-input {
+  width: 100%;
+  padding: 0.75rem;
+  border: 2px solid #E4E6EB;
+  border-radius: 8px;
+  font-size: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.referral-input:focus {
+  outline: none;
+  border-color: #1877F2;
+}
+
+.modal-actions {
+  display: flex;
+  gap: 1rem;
+  justify-content: flex-end;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 2rem;
+  color: #65676B;
+}
+
+.rewards-loading,
+.history-loading {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.loyalty-program-empty {
+  padding: 2rem;
+  text-align: center;
+  color: #65676B;
+}
+
+@media (max-width: 768px) {
+  .loyalty-program {
+    padding: 1rem;
+  }
+
+  .loyalty-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1rem;
+  }
+
+  .loyalty-stats-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .loyalty-sections {
+    grid-template-columns: 1fr;
+  }
+
+  .referral-code {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .referral-code code {
+    text-align: center;
+  }
+}
+

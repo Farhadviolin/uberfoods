@@ -1,0 +1,173 @@
+.virtualized-table-container {
+  background: white;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+  border: 1px solid #E4E6EB;
+}
+
+.virtualized-table-header {
+  padding: 12px 16px;
+  background: #F0F2F5;
+  border-bottom: 1px solid #E4E6EB;
+  font-weight: 600;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #050505;
+}
+
+.virtualized-row {
+  border-bottom: 1px solid #E4E6EB;
+  padding: 0 16px;
+  display: flex;
+  align-items: center;
+  transition: background-color 0.2s;
+}
+
+.virtualized-row:hover {
+  background: #F0F2F5;
+}
+
+.virtualized-row:last-child {
+  border-bottom: none;
+}
+
+.virtualized-table-empty {
+  padding: 60px 20px;
+  text-align: center;
+  color: #65676B;
+  background: white;
+  border-radius: 8px;
+  border: 1px solid #E4E6EB;
+}
+
+/* Dark mode support */
+[data-theme='dark'] .virtualized-table-container {
+  background: #242526;
+  border-color: #3A3B3C;
+}
+
+[data-theme='dark'] .virtualized-table-header {
+  background: #3A3B3C;
+  border-bottom-color: #4E4F50;
+  color: #E4E6EB;
+}
+
+[data-theme='dark'] .virtualized-row {
+  border-bottom-color: #3A3B3C;
+  color: #E4E6EB;
+}
+
+[data-theme='dark'] .virtualized-row:hover {
+  background: #3A3B3C;
+}
+
+[data-theme='dark'] .virtualized-table-empty {
+  background: #242526;
+  border-color: #3A3B3C;
+  color: #B0B3B8;
+}
+
+/* VirtualizedDataTable Styles */
+.virtualized-data-table-container {
+  background: white;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+  border: 1px solid #E4E6EB;
+}
+
+.virtualized-table-header-row {
+  display: flex;
+  align-items: center;
+  padding: 12px 16px;
+  background: #F0F2F5;
+  border-bottom: 2px solid #E4E6EB;
+  font-weight: 600;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #050505;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.virtualized-table-header-cell {
+  padding: 0 8px;
+  font-weight: 600;
+  color: #050505;
+}
+
+.virtualized-table-row {
+  display: flex;
+  align-items: center;
+  padding: 12px 16px;
+  border-bottom: 1px solid #E4E6EB;
+  transition: background-color 0.2s;
+  min-height: 60px;
+}
+
+.virtualized-table-row:hover {
+  background: #F0F2F5;
+}
+
+.virtualized-table-row.selected {
+  background: #E3F2FD;
+}
+
+.virtualized-table-row.clickable {
+  cursor: pointer;
+}
+
+.virtualized-table-row:last-child {
+  border-bottom: none;
+}
+
+.virtualized-table-cell {
+  padding: 0 8px;
+  display: flex;
+  align-items: center;
+  color: #050505;
+  font-size: 14px;
+}
+
+.virtualized-table-cell.actions-cell {
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+/* Dark mode support for VirtualizedDataTable */
+[data-theme='dark'] .virtualized-data-table-container {
+  background: #242526;
+  border-color: #3A3B3C;
+}
+
+[data-theme='dark'] .virtualized-table-header-row {
+  background: #3A3B3C;
+  border-bottom-color: #4E4F50;
+  color: #E4E6EB;
+}
+
+[data-theme='dark'] .virtualized-table-header-cell {
+  color: #E4E6EB;
+}
+
+[data-theme='dark'] .virtualized-table-row {
+  border-bottom-color: #3A3B3C;
+  color: #E4E6EB;
+}
+
+[data-theme='dark'] .virtualized-table-row:hover {
+  background: #3A3B3C;
+}
+
+[data-theme='dark'] .virtualized-table-row.selected {
+  background: #1A4D7A;
+}
+
+[data-theme='dark'] .virtualized-table-cell {
+  color: #E4E6EB;
+}
+

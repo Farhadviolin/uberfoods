@@ -1,0 +1,9 @@
+🚀 Starte Performance Seed für Orders...
+📊 Erstelle Performance Test Daten...
+✅ Seed Performance Daten erstellt
+📈 Seed Metrics:
+  Orders: 75000
+  Restaurants: 15
+  Drivers: 50
+  Customers: 200
+✅ Performance Daten seeding completed in 45.2 seconds

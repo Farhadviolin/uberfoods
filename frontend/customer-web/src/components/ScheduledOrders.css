@@ -1,0 +1,185 @@
+.scheduled-orders {
+  padding: 2rem;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.scheduled-orders-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2rem;
+}
+
+.scheduled-orders-header h2 {
+  margin: 0;
+  font-size: 2rem;
+  font-weight: 700;
+}
+
+.scheduled-orders-section {
+  margin-bottom: 3rem;
+}
+
+.scheduled-orders-section h3 {
+  margin: 0 0 1.5rem 0;
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: #050505;
+}
+
+.scheduled-orders-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+  gap: 1.5rem;
+}
+
+.scheduled-order-card {
+  padding: 1.5rem;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.scheduled-order-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.scheduled-order-card.inactive {
+  opacity: 0.7;
+}
+
+.order-header {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid #E4E6EB;
+}
+
+.restaurant-image {
+  width: 64px;
+  height: 64px;
+  border-radius: 8px;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.restaurant-info h4 {
+  margin: 0 0 0.5rem 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #050505;
+}
+
+.restaurant-address {
+  margin: 0;
+  font-size: 0.875rem;
+  color: #65676B;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.order-details {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.detail-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+}
+
+.detail-item svg {
+  color: #65676B;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.detail-item > div {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.detail-label {
+  font-size: 0.75rem;
+  color: #8A8D91;
+  text-transform: uppercase;
+  font-weight: 600;
+}
+
+.detail-value {
+  font-size: 0.9375rem;
+  color: #050505;
+  font-weight: 500;
+}
+
+.order-items-count {
+  padding: 0.5rem 1rem;
+  background-color: #F0F2F5;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  color: #65676B;
+  font-weight: 500;
+  align-self: flex-start;
+}
+
+.order-actions {
+  display: flex;
+  gap: 0.75rem;
+  padding-top: 1rem;
+  border-top: 1px solid #E4E6EB;
+}
+
+.order-actions button {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+.delete-btn {
+  color: #EF4444;
+  border-color: #EF4444;
+}
+
+.delete-btn:hover {
+  background-color: #FEE;
+}
+
+.empty-state {
+  padding: 3rem;
+  text-align: center;
+}
+
+.empty-state svg {
+  margin-bottom: 1rem;
+}
+
+.empty-state p {
+  margin: 0 0 1.5rem 0;
+  font-size: 1.1rem;
+  color: #65676B;
+}
+
+@media (max-width: 768px) {
+  .scheduled-orders {
+    padding: 1rem;
+  }
+
+  .scheduled-orders-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1rem;
+  }
+
+  .scheduled-orders-grid {
+    grid-template-columns: 1fr;
+  }
+}
+

@@ -1,0 +1,80 @@
+global:
+  smtp_smarthost: 'smtp.gmail.com:587'
+  smtp_from: 'alerts@hmor-food-delivery.com'
+  smtp_auth_username: 'your-email@gmail.com'
+  smtp_auth_password: 'your-app-password'
+
+route:
+  group_by: ['alertname']
+  group_wait: 10s
+  group_interval: 10s
+  repeat_interval: 1h
+  receiver: 'hmor-team'
+  routes:
+  - match:
+      severity: critical
+    receiver: 'hmor-critical'
+    group_wait: 5s
+  - match:
+      severity: warning
+    receiver: 'hmor-warning'
+  - match:
+      team: backend
+    receiver: 'backend-team'
+  - match:
+      team: frontend
+    receiver: 'frontend-team'
+
+receivers:
+- name: 'hmor-team'
+  email_configs:
+  - to: 'team@hmor-food-delivery.com'
+    subject: 'HMOR Alert: {{ .GroupLabels.alertname }}'
+    body: |
+      {{ range .Alerts }}
+      Alert: {{ .Annotations.summary }}
+      Description: {{ .Annotations.description }}
+      Severity: {{ .Labels.severity }}
+      {{ end }}
+  slack_configs:
+  - api_url: 'https://hooks.slack.com/services/YOUR/SLACK/WEBHOOK'
+    channel: '#alerts'
+    title: 'HMOR Alert'
+    text: |
+      {{ range .Alerts }}
+      *{{ .Annotations.summary }}*
+      {{ .Annotations.description }}
+      Severity: {{ .Labels.severity }}
+      {{ end }}
+
+- name: 'hmor-critical'
+  email_configs:
+  - to: 'critical@hmor-food-delivery.com'
+  slack_configs:
+  - api_url: 'https://hooks.slack.com/services/YOUR/SLACK/WEBHOOK'
+    channel: '#critical-alerts'
+    title: '🚨 CRITICAL ALERT'
+  pagerduty_configs:
+  - service_key: 'your-pagerduty-service-key'
+
+- name: 'hmor-warning'
+  email_configs:
+  - to: 'warnings@hmor-food-delivery.com'
+  slack_configs:
+  - api_url: 'https://hooks.slack.com/services/YOUR/SLACK/WEBHOOK'
+    channel: '#warnings'
+
+- name: 'backend-team'
+  email_configs:
+  - to: 'backend@hmor-food-delivery.com'
+
+- name: 'frontend-team'
+  email_configs:
+  - to: 'frontend@hmor-food-delivery.com'
+
+inhibit_rules:
+  - source_match:
+      severity: 'critical'
+    target_match:
+      severity: 'warning'
+    equal: ['alertname', 'instance']

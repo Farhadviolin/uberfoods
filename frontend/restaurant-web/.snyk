@@ -1,0 +1,41 @@
+version: v1.27.0
+# Ignoriere Findings aus node_modules (Dev-Tools/CLI), die nicht ins Bundle gelangen.
+# Laufzeitcode liegt in src/; diese Einträge betreffen nur Tooling-Skripte.
+ignore:
+  javascript/CodeInjection:
+    - 'node_modules/**':
+        reason: Dev-Tooling in node_modules (eslint/ajv/router), nicht im App-Bundle.
+        expires: 2025-12-31T00:00:00.000Z
+  javascript/InsufficientUriSchemeSanitization:
+    - 'node_modules/**':
+        reason: Playwright Trace Recorder (Dev-Tool), nicht ausgeliefert.
+        expires: 2025-12-31T00:00:00.000Z
+  javascript/NoRateLimitingForExpensiveWebOperation:
+    - 'node_modules/**':
+        reason: Playwright Trace Viewer (Dev-Tool), kein Runtime-Pfad.
+        expires: 2025-12-31T00:00:00.000Z
+  javascript/OR:
+    - 'node_modules/**':
+        reason: React Router intern in node_modules, kein direkter User-Input; Dev/SSR Pfade.
+        expires: 2025-12-31T00:00:00.000Z
+  javascript/PT:
+    - 'node_modules/**':
+        reason: CLI-Skripte (ajv/esprima/escodegen/json5 etc.) nur lokal, nicht gebundled.
+        expires: 2025-12-31T00:00:00.000Z
+  javascript/Ssti:
+    - 'node_modules/**':
+        reason: ajv compile Skripte (Dev), keine Auslieferung.
+        expires: 2025-12-31T00:00:00.000Z
+  javascript/HttpToHttps:
+    - 'node_modules/**':
+        reason: Node-HTTP Nutzung in Dev-Tools (axios/form-data/ws), nicht im Browser-Bundle.
+        expires: 2025-12-31T00:00:00.000Z
+  javascript/reDOS:
+    - 'node_modules/**':
+        reason: Regex in Dev-Tools (ajv/playwright/jest), kein Endnutzerpfad.
+        expires: 2025-12-31T00:00:00.000Z
+  javascript/ImproperCodeSanitization:
+    - 'node_modules/**':
+        reason: Playwright/Uglify Dev-Transformer, nicht im Browser-Bundle.
+        expires: 2025-12-31T00:00:00.000Z
+

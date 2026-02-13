@@ -1,0 +1,111 @@
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1050;
+  padding: var(--fb-space-4);
+}
+
+.modal-content {
+  background: var(--fb-bg-primary);
+  border-radius: var(--fb-radius-md);
+  box-shadow: var(--fb-shadow-xl);
+  max-width: 600px;
+  width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--fb-space-5);
+  border-bottom: 1px solid var(--fb-border-primary);
+}
+
+.modal-header h2 {
+  margin: 0;
+  font-size: var(--fb-font-size-xl);
+  font-weight: 700;
+}
+
+.modal-close {
+  background: transparent;
+  border: none;
+  font-size: var(--fb-font-size-xl);
+  cursor: pointer;
+  color: var(--fb-text-secondary);
+  padding: var(--fb-space-2);
+  border-radius: var(--fb-radius-base);
+  transition: all var(--fb-transition-base);
+}
+
+.modal-close:hover {
+  background-color: var(--fb-bg-tertiary);
+  color: var(--fb-text-primary);
+}
+
+.modal-body {
+  padding: var(--fb-space-5);
+  flex: 1;
+  overflow-y: auto;
+}
+
+.order-details-section {
+  margin-bottom: var(--fb-space-5);
+}
+
+.order-details-section h3 {
+  font-size: var(--fb-font-size-lg);
+  font-weight: 600;
+  margin-bottom: var(--fb-space-3);
+  color: var(--fb-text-primary);
+}
+
+.info-row {
+  display: flex;
+  justify-content: space-between;
+  padding: var(--fb-space-2) 0;
+  border-bottom: 1px solid var(--fb-border-primary);
+}
+
+.info-label {
+  font-weight: 500;
+  color: var(--fb-text-secondary);
+}
+
+.order-items-list {
+  margin-bottom: var(--fb-space-4);
+}
+
+.order-item-row {
+  display: flex;
+  justify-content: space-between;
+  padding: var(--fb-space-3) 0;
+  border-bottom: 1px solid var(--fb-border-primary);
+}
+
+.order-total {
+  padding: var(--fb-space-4);
+  background-color: var(--fb-bg-secondary);
+  border-radius: var(--fb-radius-base);
+  text-align: right;
+}
+
+.modal-footer {
+  padding: var(--fb-space-5);
+  border-top: 1px solid var(--fb-border-primary);
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--fb-space-3);
+}
+

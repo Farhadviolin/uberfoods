@@ -1,0 +1,409 @@
+.restaurant-accounting {
+  padding: 24px;
+  background: var(--bg-primary, #ffffff);
+  min-height: 100vh;
+}
+
+.accounting-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.accounting-header h2 {
+  margin: 0;
+  font-size: 28px;
+  font-weight: 600;
+  color: var(--text-primary, #1a1a1a);
+}
+
+.accounting-controls {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.period-selector {
+  padding: 8px 12px;
+  border: 1px solid var(--border-color, #e0e0e0);
+  border-radius: 6px;
+  background: var(--bg-secondary, #ffffff);
+  color: var(--text-primary, #1a1a1a);
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.accounting-sub-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 24px;
+  border-bottom: 2px solid var(--border-color, #e0e0e0);
+  flex-wrap: wrap;
+  overflow-x: auto;
+}
+
+.sub-tab {
+  padding: 12px 20px;
+  background: transparent;
+  border: none;
+  border-bottom: 3px solid transparent;
+  color: var(--text-secondary, #666666);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.sub-tab:hover {
+  color: var(--primary-color, #1877F2);
+  background: var(--bg-tertiary, #f5f5f5);
+}
+
+.sub-tab.active {
+  color: var(--primary-color, #1877F2);
+  border-bottom-color: var(--primary-color, #1877F2);
+  font-weight: 600;
+}
+
+.accounting-metrics,
+.inventory-metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.metric-card {
+  background: var(--bg-secondary, #ffffff);
+  border: 1px solid var(--border-color, #e0e0e0);
+  border-radius: 8px;
+  padding: 20px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.metric-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.metric-card h3 {
+  margin: 0 0 12px 0;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-secondary, #666666);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.metric-value {
+  font-size: 32px;
+  font-weight: 700;
+  color: var(--primary-color, #1877F2);
+  margin-bottom: 8px;
+}
+
+.metric-value.positive {
+  color: #28a745;
+}
+
+.metric-value.negative {
+  color: #dc3545;
+}
+
+.metric-subtitle {
+  font-size: 12px;
+  color: var(--text-secondary, #666666);
+}
+
+.ea-rechnung-info,
+.bwa-info {
+  background: var(--bg-tertiary, #f5f5f5);
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 24px;
+}
+
+.ea-rechnung-info h3,
+.bwa-info h3 {
+  margin: 0 0 8px 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-primary, #1a1a1a);
+}
+
+.ea-rechnung-info p,
+.bwa-info p {
+  margin: 0;
+  font-size: 14px;
+  color: var(--text-secondary, #666666);
+}
+
+.ea-rechnung-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 24px;
+  margin-bottom: 24px;
+}
+
+.summary-section {
+  background: var(--bg-secondary, #ffffff);
+  border: 1px solid var(--border-color, #e0e0e0);
+  border-radius: 8px;
+  padding: 20px;
+}
+
+.summary-section h4 {
+  margin: 0 0 16px 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary, #1a1a1a);
+  padding-bottom: 12px;
+  border-bottom: 2px solid var(--border-color, #e0e0e0);
+}
+
+.summary-items {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.summary-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+  font-size: 14px;
+}
+
+.summary-item.total {
+  border-top: 2px solid var(--border-color, #e0e0e0);
+  padding-top: 12px;
+  margin-top: 8px;
+  font-weight: 600;
+}
+
+.item-label {
+  color: var(--text-secondary, #666666);
+}
+
+.item-value {
+  font-weight: 600;
+  color: var(--text-primary, #1a1a1a);
+}
+
+.summary-section.result {
+  background: var(--bg-tertiary, #f5f5f5);
+}
+
+.result-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px;
+  background: var(--bg-secondary, #ffffff);
+  border-radius: 6px;
+  font-size: 18px;
+}
+
+.result-label {
+  font-weight: 600;
+  color: var(--text-primary, #1a1a1a);
+}
+
+.result-value {
+  font-size: 24px;
+  font-weight: 700;
+}
+
+.result-value.positive {
+  color: #28a745;
+}
+
+.result-value.negative {
+  color: #dc3545;
+}
+
+.accounting-chart-card {
+  background: var(--bg-secondary, #ffffff);
+  border: 1px solid var(--border-color, #e0e0e0);
+  border-radius: 8px;
+  padding: 20px;
+  margin-bottom: 24px;
+}
+
+.accounting-chart-card h3 {
+  margin: 0 0 16px 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-primary, #1a1a1a);
+}
+
+.bwa-table-section,
+.inventory-table-section {
+  background: var(--bg-secondary, #ffffff);
+  border: 1px solid var(--border-color, #e0e0e0);
+  border-radius: 8px;
+  padding: 20px;
+}
+
+.bwa-table-section h3,
+.inventory-table-section h3 {
+  margin: 0 0 16px 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-primary, #1a1a1a);
+}
+
+.accounting-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.accounting-table thead {
+  background: var(--bg-tertiary, #f5f5f5);
+}
+
+.accounting-table th {
+  padding: 12px;
+  text-align: left;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary, #1a1a1a);
+  border-bottom: 2px solid var(--border-color, #e0e0e0);
+}
+
+.accounting-table td {
+  padding: 12px;
+  font-size: 14px;
+  color: var(--text-primary, #1a1a1a);
+  border-bottom: 1px solid var(--border-color, #e0e0e0);
+}
+
+.accounting-table tbody tr:hover {
+  background: var(--bg-tertiary, #f5f5f5);
+}
+
+.positive {
+  color: #28a745;
+  font-weight: 600;
+}
+
+.negative {
+  color: #dc3545;
+  font-weight: 600;
+}
+
+.category-badge {
+  padding: 4px 8px;
+  background: var(--bg-tertiary, #f5f5f5);
+  color: var(--text-primary, #1a1a1a);
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 500;
+  text-transform: uppercase;
+}
+
+.reports-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 16px;
+}
+
+.report-card {
+  background: var(--bg-secondary, #ffffff);
+  border: 1px solid var(--border-color, #e0e0e0);
+  border-radius: 8px;
+  padding: 20px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.report-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.report-card h3 {
+  margin: 0 0 16px 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-primary, #1a1a1a);
+}
+
+.report-details {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.report-detail {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+}
+
+.detail-label {
+  color: var(--text-secondary, #666666);
+}
+
+.detail-value {
+  font-weight: 600;
+  color: var(--text-primary, #1a1a1a);
+}
+
+.report-actions {
+  display: flex;
+  gap: 8px;
+}
+
+/* Dark Mode */
+[data-theme="dark"] .restaurant-accounting {
+  background: var(--bg-primary, #1a1a1a);
+}
+
+[data-theme="dark"] .metric-card,
+[data-theme="dark"] .summary-section,
+[data-theme="dark"] .accounting-chart-card,
+[data-theme="dark"] .bwa-table-section,
+[data-theme="dark"] .inventory-table-section,
+[data-theme="dark"] .report-card {
+  background: var(--bg-secondary, #2a2a2a);
+  border-color: var(--border-color, #3a3a3a);
+}
+
+[data-theme="dark"] .accounting-table thead {
+  background: var(--bg-tertiary, #333333);
+}
+
+[data-theme="dark"] .ea-rechnung-info,
+[data-theme="dark"] .bwa-info,
+[data-theme="dark"] .summary-section.result {
+  background: var(--bg-tertiary, #333333);
+}
+
+[data-theme="dark"] .result-item {
+  background: var(--bg-secondary, #2a2a2a);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .accounting-metrics,
+  .inventory-metrics {
+    grid-template-columns: 1fr;
+  }
+  
+  .ea-rechnung-summary {
+    grid-template-columns: 1fr;
+  }
+  
+  .accounting-sub-tabs {
+    overflow-x: auto;
+  }
+}
+

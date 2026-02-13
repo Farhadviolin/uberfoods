@@ -1,0 +1,199 @@
+.subscription-management {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 24px;
+}
+
+.subscription-management h1 {
+  font-size: 32px;
+  font-weight: 700;
+  margin-bottom: 32px;
+}
+
+.subscription-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 400px;
+  font-size: 18px;
+  color: #666;
+}
+
+.current-subscription-card {
+  background: #EEF2FF;
+  border: 2px solid #4338CA;
+  border-radius: 16px;
+  padding: 24px;
+  margin-bottom: 32px;
+}
+
+.current-subscription-card h2 {
+  margin: 0 0 16px 0;
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.subscription-info {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.status-badge {
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.status-badge.active {
+  background: #10B981;
+  color: white;
+}
+
+.status-badge.cancelled {
+  background: #F59E0B;
+  color: white;
+}
+
+.status-badge.expired {
+  background: #EF4444;
+  color: white;
+}
+
+.status-badge.trial {
+  background: #3B82F6;
+  color: white;
+}
+
+.subscription-actions {
+  display: flex;
+  gap: 12px;
+}
+
+.cancel-subscription-btn,
+.resume-subscription-btn {
+  padding: 12px 24px;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.cancel-subscription-btn {
+  background: #EF4444;
+  color: white;
+}
+
+.cancel-subscription-btn:hover {
+  background: #DC2626;
+}
+
+.resume-subscription-btn {
+  background: #10B981;
+  color: white;
+}
+
+.resume-subscription-btn:hover {
+  background: #059669;
+}
+
+.subscription-plans h2 {
+  font-size: 24px;
+  font-weight: 600;
+  margin-bottom: 24px;
+}
+
+.plans-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 24px;
+}
+
+.plan-card {
+  background: white;
+  border: 2px solid #E4E6EB;
+  border-radius: 16px;
+  padding: 24px;
+  position: relative;
+  transition: all 0.2s;
+}
+
+.plan-card:hover {
+  border-color: #4338CA;
+  box-shadow: 0 4px 12px rgba(67, 56, 202, 0.1);
+}
+
+.plan-card.popular {
+  border-color: #4338CA;
+  background: #F9FAFB;
+}
+
+.popular-badge {
+  position: absolute;
+  top: -12px;
+  right: 24px;
+  background: #4338CA;
+  color: white;
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.plan-card h3 {
+  margin: 0 0 16px 0;
+  font-size: 24px;
+  font-weight: 700;
+}
+
+.plan-price {
+  margin-bottom: 24px;
+}
+
+.price-amount {
+  font-size: 36px;
+  font-weight: 700;
+  color: #4338CA;
+}
+
+.price-interval {
+  font-size: 16px;
+  color: #666;
+  margin-left: 4px;
+}
+
+.plan-features {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 24px 0;
+}
+
+.plan-features li {
+  padding: 8px 0;
+  color: #374151;
+}
+
+.subscribe-btn {
+  width: 100%;
+  padding: 16px;
+  background: #4338CA;
+  color: white;
+  border: none;
+  border-radius: 12px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.subscribe-btn:hover:not(:disabled) {
+  background: #3730A3;
+}
+
+.subscribe-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

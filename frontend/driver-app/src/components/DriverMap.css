@@ -1,0 +1,9 @@
+.driver-map-container {
+  height: 400px;
+  width: 100%;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid #E4E6EB;
+  margin-bottom: 20px;
+}
+

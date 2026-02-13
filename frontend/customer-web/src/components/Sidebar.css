@@ -1,0 +1,403 @@
+/* Sidebar - wie Admin Panel */
+.fb-sidebar {
+  /* Desktop: position relative für normalen Flow */
+  position: relative;
+  height: 100vh;
+  width: 280px;
+  background: #FFFFFF;
+  border-right: 1px solid #E4E6EB;
+  display: flex;
+  flex-direction: column;
+  z-index: 1000;
+  transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 2px 0 4px rgba(0, 0, 0, 0.05);
+  overflow: hidden;
+}
+
+[data-theme='dark'] .fb-sidebar {
+  background: #242526;
+  border-right: 1px solid #3A3B3C;
+}
+
+.fb-sidebar.collapsed {
+  width: 64px;
+}
+
+.sidebar-header {
+  padding: 20px 16px;
+  border-bottom: 1px solid #E4E6EB;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #FFFFFF;
+  min-height: 80px;
+  flex-shrink: 0;
+}
+
+[data-theme='dark'] .sidebar-header {
+  background: #242526;
+  border-bottom: 1px solid #3A3B3C;
+}
+
+.sidebar-logo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+}
+
+.logo-icon {
+  font-size: 32px;
+  line-height: 1;
+}
+
+.logo-text h2 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+  color: #1877F2;
+  line-height: 1.2;
+}
+
+.logo-text p {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-secondary, #65676b);
+  line-height: 1.2;
+}
+
+.sidebar-toggle {
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: var(--bg-tertiary, #f0f2f5);
+  border-radius: 6px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  color: var(--text-primary, #1c1e21);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  flex-shrink: 0;
+}
+
+.sidebar-toggle:hover {
+  background: var(--hover-bg, #e4e6eb);
+  transform: scale(1.05);
+}
+
+.fb-sidebar-nav {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 12px 0;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-color, #e4e6eb) transparent;
+}
+
+.fb-sidebar-nav::-webkit-scrollbar {
+  width: 6px;
+}
+
+.fb-sidebar-nav::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.fb-sidebar-nav::-webkit-scrollbar-thumb {
+  background: var(--border-color, #e4e6eb);
+  border-radius: 3px;
+}
+
+.fb-sidebar-nav::-webkit-scrollbar-thumb:hover {
+  background: var(--text-secondary, #65676b);
+}
+
+.fb-sidebar-item {
+  width: 100%;
+  padding: 10px 16px;
+  background: transparent;
+  border: none;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  color: var(--text-secondary, #65676b);
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  text-align: left;
+  position: relative;
+  border-radius: 0 24px 24px 0;
+  margin-right: 12px;
+  text-decoration: none;
+}
+
+.fb-sidebar-item::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 3px;
+  height: 0;
+  background: #1877F2;
+  border-radius: 0 2px 2px 0;
+  transition: height 0.2s;
+}
+
+.fb-sidebar-item:hover {
+  background: #F0F2F5;
+  color: #050505;
+}
+
+[data-theme='dark'] .fb-sidebar-item:hover {
+  background: #3A3B3C;
+  color: #E4E6EB;
+}
+
+.fb-sidebar-item.active {
+  background: rgba(24, 119, 242, 0.1);
+  color: #1877F2;
+  font-weight: 600;
+}
+
+.fb-sidebar-item.active::before {
+  height: 24px;
+}
+
+.fb-sidebar-icon {
+  font-size: 16px;
+  flex-shrink: 0;
+  width: 20px;
+  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.fb-sidebar-label {
+  flex: 1;
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.fb-sidebar-badge {
+  background: #1877F2;
+  color: white;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 10px;
+  min-width: 20px;
+  text-align: center;
+  line-height: 1.4;
+}
+
+.fb-sidebar.collapsed .fb-sidebar-label,
+.fb-sidebar.collapsed .fb-sidebar-badge {
+  display: none;
+}
+
+/* Collapsed State - Items zentrieren */
+.fb-sidebar.collapsed .fb-sidebar-item {
+  justify-content: center;
+  padding: 12px;
+  margin-right: 0;
+  border-radius: 12px;
+  margin: 4px 8px;
+}
+
+/* Collapsed State - Icons größer machen */
+.fb-sidebar.collapsed .fb-sidebar-icon {
+  width: 24px;
+  font-size: 20px;
+}
+
+/* Collapsed State - Footer ausblenden */
+.fb-sidebar.collapsed .fb-sidebar-footer {
+  display: none;
+}
+
+/* Collapsed State - Header anpassen */
+.fb-sidebar.collapsed .sidebar-header {
+  padding: 20px 16px;
+  justify-content: center;
+}
+
+/* Collapsed State - Logo Icon zentrieren */
+.fb-sidebar.collapsed .logo-icon {
+  font-size: 28px;
+}
+
+/* Tooltip für collapsed State */
+.fb-sidebar-item[data-tooltip] {
+  position: relative;
+}
+
+.fb-sidebar.collapsed .fb-sidebar-item::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  left: 100%;
+  top: 50%;
+  transform: translateY(-50%);
+  margin-left: 12px;
+  padding: 6px 12px;
+  background: #050505;
+  color: white;
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+  border-radius: 6px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s;
+  z-index: 1000;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+[data-theme='dark'] .fb-sidebar.collapsed .fb-sidebar-item::after {
+  background: #3A3B3C;
+  color: #E4E6EB;
+}
+
+.fb-sidebar.collapsed .fb-sidebar-item:hover::after {
+  opacity: 1;
+}
+
+.fb-sidebar-footer {
+  padding: 16px;
+  border-top: 1px solid var(--border-color, #e4e6eb);
+  background: var(--bg-primary, #ffffff);
+  flex-shrink: 0;
+}
+
+[data-theme='dark'] .fb-sidebar-footer {
+  background: transparent;
+  border-top: 1px solid var(--border-color, #3A3B3C);
+}
+
+.fb-sidebar-user {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3, 0.75rem);
+  padding: var(--space-3, 0.75rem);
+  border-radius: var(--radius-lg, 0.75rem);
+  transition: background 0.2s;
+}
+
+.fb-sidebar-user:hover {
+  background: var(--hover-bg, #F0F2F5);
+}
+
+[data-theme='dark'] .fb-sidebar-user:hover {
+  background: var(--hover-bg, #3A3B3C);
+}
+
+.fb-avatar-small {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-full, 9999px);
+  background: linear-gradient(135deg, var(--primary-500, #1877F2), var(--primary-700, #1565C0));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-weight: 600;
+  font-size: 16px;
+  flex-shrink: 0;
+}
+
+.fb-sidebar-user-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.fb-sidebar-user-name {
+  font-size: 0.9375rem; /* 15px */
+  font-weight: 600;
+  color: var(--text-primary, #050505);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+[data-theme='dark'] .fb-sidebar-user-name {
+  color: var(--text-primary, #E4E6EB);
+}
+
+.fb-sidebar-user-email {
+  font-size: 0.8125rem; /* 13px */
+  color: var(--text-secondary, #65676B);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+[data-theme='dark'] .fb-sidebar-user-email {
+  color: var(--text-secondary, #B0B3B8);
+}
+
+/* Scrollbar für Sidebar */
+.fb-sidebar::-webkit-scrollbar {
+  width: 6px;
+}
+
+.fb-sidebar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.fb-sidebar::-webkit-scrollbar-thumb {
+  background: var(--border-color, #E4E6EB);
+  border-radius: 3px;
+}
+
+.fb-sidebar::-webkit-scrollbar-thumb:hover {
+  background: var(--text-tertiary, #8A8D91);
+}
+
+/* Mobile */
+@media (max-width: 1024px) {
+  .fb-sidebar {
+    /* Mobile: position fixed für Overlay */
+    position: fixed;
+    left: 0;
+    top: 0;
+    transform: translateX(-100%);
+    width: 280px;
+    max-width: 85vw;
+    box-shadow: 4px 0 12px rgba(0, 0, 0, 0.15);
+    z-index: 1001;
+  }
+
+  .fb-sidebar.open {
+    transform: translateX(0);
+  }
+
+  .fb-sidebar.collapsed {
+    width: 280px; /* Auf Mobile nicht collapsed */
+  }
+}
+
+@media (max-width: 768px) {
+  .fb-sidebar {
+    width: 100%;
+    max-width: 320px;
+  }
+
+  .fb-sidebar-item {
+    padding: clamp(0.75rem, 2vw, 1rem) clamp(1rem, 3vw, 1.5rem);
+    font-size: clamp(0.875rem, 2.5vw, 1rem);
+    min-height: 44px; /* Touch target */
+  }
+}
+
+/* Smooth transitions */
+.fb-sidebar,
+.fb-sidebar-item,
+.sidebar-toggle {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+

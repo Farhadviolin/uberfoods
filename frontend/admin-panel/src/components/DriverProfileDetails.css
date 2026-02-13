@@ -1,0 +1,224 @@
+.driver-profile-details {
+  padding: 20px;
+  background: #fff;
+  border-radius: 8px;
+  max-width: 900px;
+  max-height: 90vh;
+  overflow: auto;
+}
+
+.driver-profile-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 20px;
+  padding-bottom: 15px;
+  border-bottom: 2px solid #e9ecef;
+}
+
+.driver-profile-info h2 {
+  margin: 0 0 10px 0;
+  color: #1c1e21;
+  font-size: 24px;
+}
+
+.driver-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 15px;
+  margin-top: 10px;
+}
+
+.driver-meta span {
+  font-size: 14px;
+  color: #65676b;
+}
+
+.driver-status.active {
+  color: #28a745;
+  font-weight: 600;
+}
+
+.driver-status.inactive {
+  color: #dc3545;
+  font-weight: 600;
+}
+
+.driver-rating {
+  color: #ffc107;
+  font-weight: 600;
+}
+
+.driver-profile-tabs {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 20px;
+  border-bottom: 2px solid #e9ecef;
+}
+
+.driver-profile-tabs .tab {
+  background: none;
+  border: none;
+  padding: 12px 20px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  color: #65676b;
+  border-bottom: 3px solid transparent;
+  transition: all 0.2s;
+}
+
+.driver-profile-tabs .tab:hover {
+  color: #1877f2;
+}
+
+.driver-profile-tabs .tab.active {
+  color: #1877f2;
+  border-bottom-color: #1877f2;
+}
+
+.driver-profile-content {
+  margin-top: 20px;
+}
+
+.stats-grid,
+.earnings-grid,
+.performance-grid,
+.gamification-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 20px;
+}
+
+.stat-card,
+.earnings-card,
+.performance-card,
+.gamification-card {
+  background: #f8f9fa;
+  padding: 20px;
+  border-radius: 8px;
+  text-align: center;
+}
+
+.stat-card h3,
+.earnings-card h3,
+.performance-card h3,
+.gamification-card h3 {
+  margin: 0 0 10px 0;
+  font-size: 14px;
+  color: #65676b;
+  font-weight: 600;
+}
+
+.stat-value,
+.earnings-value,
+.performance-value,
+.gamification-value {
+  font-size: 24px;
+  font-weight: 700;
+  color: #1c1e21;
+}
+
+.earnings-value.total {
+  color: #28a745;
+  font-size: 28px;
+}
+
+.badges-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+  margin-top: 10px;
+}
+
+.badge {
+  background: #1877f2;
+  color: white;
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.no-badges {
+  color: #65676b;
+  font-style: italic;
+}
+
+.subscription-card {
+  background: #f8f9fa;
+  padding: 30px;
+  border-radius: 8px;
+  text-align: center;
+}
+
+.subscription-card h3 {
+  margin: 15px 0 10px 0;
+  font-size: 14px;
+  color: #65676b;
+  font-weight: 600;
+}
+
+.subscription-value {
+  font-size: 24px;
+  font-weight: 700;
+  color: #1c1e21;
+  margin-bottom: 20px;
+}
+
+.subscription-status {
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-weight: 600;
+  display: inline-block;
+  margin-bottom: 20px;
+}
+
+.subscription-status.active {
+  background: #d4edda;
+  color: #155724;
+}
+
+.subscription-status.trialing {
+  background: #fff3cd;
+  color: #856404;
+}
+
+.subscription-status.canceled {
+  background: #f8d7da;
+  color: #721c24;
+}
+
+.driver-profile-no-permission,
+.driver-profile-error {
+  padding: 40px;
+  text-align: center;
+  color: #dc3545;
+}
+
+[data-theme="dark"] .driver-profile-details {
+  background: #242526;
+  color: #e4e6eb;
+}
+
+[data-theme="dark"] .driver-profile-info h2 {
+  color: #e4e6eb;
+}
+
+[data-theme="dark"] .stat-card,
+[data-theme="dark"] .earnings-card,
+[data-theme="dark"] .performance-card,
+[data-theme="dark"] .gamification-card,
+[data-theme="dark"] .subscription-card {
+  background: #3a3b3c;
+}
+
+[data-theme="dark"] .stat-value,
+[data-theme="dark"] .earnings-value,
+[data-theme="dark"] .performance-value,
+[data-theme="dark"] .gamification-value,
+[data-theme="dark"] .subscription-value {
+  color: #e4e6eb;
+}
+

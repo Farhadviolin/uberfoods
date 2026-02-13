@@ -1,0 +1,213 @@
+.restaurant-details {
+  max-height: 70vh;
+  overflow-y: auto;
+}
+
+.restaurant-details-header {
+  margin-bottom: 24px;
+  display: flex;
+  gap: 20px;
+  align-items: flex-start;
+}
+
+.restaurant-details-image {
+  width: 200px;
+  height: 200px;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 2px solid #E4E6EB;
+}
+
+.restaurant-details-status {
+  flex: 1;
+}
+
+.status-badge {
+  display: inline-block;
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.status-badge.active {
+  background: #28a745;
+  color: white;
+}
+
+.status-badge.inactive {
+  background: #dc3545;
+  color: white;
+}
+
+.restaurant-details-section {
+  margin-bottom: 32px;
+  padding-bottom: 24px;
+  border-bottom: 1px solid #E4E6EB;
+}
+
+.restaurant-details-section:last-child {
+  border-bottom: none;
+}
+
+.restaurant-details-section h3 {
+  margin: 0 0 16px 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: #1C1E21;
+}
+
+.info-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 16px;
+}
+
+.info-item {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.info-item strong {
+  font-size: 12px;
+  color: #65676B;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.info-item p {
+  margin: 0;
+  font-size: 14px;
+  color: #1C1E21;
+  line-height: 1.5;
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 16px;
+}
+
+.stat-item {
+  padding: 16px;
+  background: #F0F2F5;
+  border-radius: 8px;
+  text-align: center;
+}
+
+.stat-label {
+  font-size: 12px;
+  color: #65676B;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 8px;
+}
+
+.stat-value {
+  font-size: 24px;
+  font-weight: 600;
+  color: #1877F2;
+}
+
+.dishes-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 16px;
+}
+
+.dish-card {
+  border: 1px solid #E4E6EB;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #F0F2F5;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.dish-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.dish-thumbnail {
+  width: 100%;
+  height: 150px;
+  object-fit: cover;
+}
+
+.dish-info {
+  padding: 12px;
+}
+
+.dish-name {
+  font-weight: 600;
+  margin-bottom: 8px;
+  color: #1C1E21;
+}
+
+.dish-details {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  font-size: 13px;
+  color: #65676B;
+}
+
+.dish-price {
+  font-weight: 600;
+  color: #1877F2;
+}
+
+.dish-status {
+  display: inline-block;
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.dish-status.available {
+  background: #d4edda;
+  color: #155724;
+}
+
+.dish-status.unavailable {
+  background: #f8d7da;
+  color: #721c24;
+}
+
+/* Dark mode support */
+[data-theme='dark'] .restaurant-details-section {
+  border-bottom-color: #3A3B3C;
+}
+
+[data-theme='dark'] .restaurant-details-section h3 {
+  color: #E4E6EB;
+}
+
+[data-theme='dark'] .info-item strong {
+  color: #B0B3B8;
+}
+
+[data-theme='dark'] .info-item p {
+  color: #E4E6EB;
+}
+
+[data-theme='dark'] .stat-item {
+  background: #3A3B3C;
+}
+
+[data-theme='dark'] .dish-card {
+  background: #3A3B3C;
+  border-color: #4E4F50;
+}
+
+[data-theme='dark'] .dish-name {
+  color: #E4E6EB;
+}
+
+[data-theme='dark'] .dish-details {
+  color: #B0B3B8;
+}
+

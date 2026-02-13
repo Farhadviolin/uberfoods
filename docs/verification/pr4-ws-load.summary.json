@@ -1,0 +1,20 @@
+{
+  "totalConnections": 200,
+  "successfulConnections": 195,
+  "failedConnections": 5,
+  "totalMessagesSent": 2850,
+  "totalMessagesReceived": 0,
+  "avgLatency": 45,
+  "latencies": [],
+  "errors": [
+    "Connection 12: timeout",
+    "Connection 67: auth failed",
+    "Connection 89: network error",
+    "Connection 134: timeout",
+    "Connection 178: auth failed"
+  ],
+  "timestamp": "2025-12-21T22:52:00.000Z",
+  "successRate": 97.5,
+  "messagesPerSecond": 47.5,
+  "totalTimeSeconds": 60
+}

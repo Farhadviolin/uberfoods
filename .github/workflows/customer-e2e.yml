@@ -1,0 +1,194 @@
+name: Customer E2E Tests
+
+on:
+  pull_request:
+    branches: [ main, develop ]
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      skip_e2e:
+        description: 'Skip E2E tests'
+        required: false
+        default: 'false'
+        type: choice
+        options:
+          - 'false'
+          - 'true'
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+# Cancel in-progress runs for the same PR
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  customer-e2e:
+    name: Customer E2E Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Optional: Setup Docker (if needed for E2E DB)
+      # - name: Setup Docker
+      #   run: |
+      #     sudo apt-get update
+      #     sudo apt-get install -y docker.io
+      #     sudo systemctl start docker
+
+      - name: Run Customer E2E Tests
+        id: e2e
+        env:
+          # CI environment marker for scripts
+          CI: true
+
+          # Optional: Configure test environment
+          # CUSTOMER_URL: ${{ vars.CUSTOMER_URL }}
+          # E2E_CUSTOMER_EMAIL: ${{ secrets.E2E_CUSTOMER_EMAIL }}
+          # E2E_CUSTOMER_PASSWORD: ${{ secrets.E2E_CUSTOMER_PASSWORD }}
+
+          # Release gate consent (for DB operations)
+          RELEASE_GATE_CONSENT: "true"
+        run: |
+          # Make scripts executable
+          chmod +x scripts/run-customer-e2e-ci.sh
+
+          # Run the E2E pipeline
+          ./scripts/run-customer-e2e-ci.sh
+
+      - name: Upload test artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: customer-e2e-artifacts-${{ github.run_id }}
+          path: |
+            artifacts/e2e-customer/**
+            frontend/customer-web/test-results/**
+            frontend/customer-web/playwright-report/**
+          retention-days: 30
+
+      - name: Upload test videos (on failure)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: customer-e2e-videos-${{ github.run_id }}
+          path: frontend/customer-web/test-results/**/videos/**
+          retention-days: 7
+
+      - name: Comment PR with results
+        if: always() && github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const path = require('path');
+
+            // Check if artifacts exist
+            const artifactsPath = 'artifacts/e2e-customer';
+            let comment = '## 🧪 Customer E2E Test Results\n\n';
+
+            try {
+              if (fs.existsSync(artifactsPath)) {
+                const files = fs.readdirSync(artifactsPath);
+                const logFile = files.find(f => f.endsWith('.log'));
+
+                if (logFile) {
+                  const logContent = fs.readFileSync(path.join(artifactsPath, logFile), 'utf8');
+
+                  // Extract key information
+                  const hasFailure = logContent.includes('failed') || logContent.includes('FAILED');
+                  const hasSuccess = logContent.includes('passed') || logContent.includes('SUCCESS');
+
+                  if (hasFailure && !hasSuccess) {
+                    comment += '❌ **FAILED**\n\n';
+                  } else if (hasSuccess) {
+                    comment += '✅ **PASSED**\n\n';
+                  } else {
+                    comment += '⚠️ **INCOMPLETE**\n\n';
+                  }
+
+                  // Add artifacts link
+                  comment += `📦 [Download Artifacts](${{github.server_url}}/${{github.repository}}/actions/runs/${{github.run_id}})\n\n`;
+
+                  // Add key log excerpts
+                  const lines = logContent.split('\n').filter(line =>
+                    line.includes('Playwright tests') ||
+                    line.includes('Exit Code') ||
+                    line.includes('HARD FAIL')
+                  );
+
+                  if (lines.length > 0) {
+                    comment += '### Key Results:\n```\n' + lines.slice(-3).join('\n') + '\n```\n\n';
+                  }
+                }
+              } else {
+                comment += '⚠️ No artifacts found - check workflow logs\n\n';
+              }
+            } catch (error) {
+              comment += '⚠️ Could not read results: ' + error.message + '\n\n';
+            }
+
+            comment += '### Next Steps:\n';
+            comment += '- 📊 [View detailed report](https://github.com/${{github.repository}}/actions/runs/${{github.run_id}})\n';
+            comment += '- 🎥 Videos available on test failures\n';
+            comment += '- 📋 Check artifacts for full logs and traces\n';
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comment
+            });
+
+  # Optional: Windows runner for cross-platform validation
+  customer-e2e-windows:
+    name: Customer E2E Tests (Windows)
+    runs-on: windows-latest
+    timeout-minutes: 35
+    if: github.event_name == 'push' || github.event.inputs.skip_e2e == 'false'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run Customer E2E Tests (Windows)
+        env:
+          CI: true
+          RELEASE_GATE_CONSENT: "true"
+        run: ./scripts/run-customer-e2e-ci.ps1
+
+      - name: Upload Windows artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: customer-e2e-windows-${{ github.run_id }}
+          path: |
+            artifacts/e2e-customer/**
+            frontend/customer-web/test-results/**
+            frontend/customer-web/playwright-report/**
+          retention-days: 30

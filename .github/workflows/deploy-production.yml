@@ -1,0 +1,210 @@
+name: Deploy to Production
+
+on:
+  push:
+    tags:
+      - 'v*'
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Deployment environment'
+        required: true
+        default: 'production'
+        type: choice
+        options:
+        - production
+        - staging
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  build-and-push:
+    name: Build and Push Images
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+
+    outputs:
+      backend-image: ${{ steps.build-backend.outputs.image }}
+      customer-web-image: ${{ steps.build-customer-web.outputs.image }}
+      driver-app-image: ${{ steps.build-driver-app.outputs.image }}
+      restaurant-web-image: ${{ steps.build-restaurant-web.outputs.image }}
+      admin-panel-image: ${{ steps.build-admin-panel.outputs.image }}
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Setup Docker buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Log into registry ${{ env.REGISTRY }}
+      uses: docker/login-action@v3
+      with:
+        registry: ${{ env.REGISTRY }}
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Extract metadata
+      id: meta
+      uses: docker/metadata-action@v5
+      with:
+        images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+        tags: |
+          type=ref,event=branch
+          type=ref,event=pr
+          type=semver,pattern={{version}}
+          type=semver,pattern={{major}}.{{minor}}
+          type=raw,value=latest,enable={{is_default_branch}}
+
+    - name: Build and push Backend
+      id: build-backend
+      uses: docker/build-push-action@v5
+      with:
+        context: ./backend
+        file: ./docker/production/Dockerfile.backend
+        push: true
+        tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/backend:${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+
+    - name: Build and push Customer Web
+      id: build-customer-web
+      uses: docker/build-push-action@v5
+      with:
+        context: ./frontend/customer-web
+        file: ./docker/production/Dockerfile.frontend
+        push: true
+        tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/customer-web:${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+
+    - name: Build and push Driver App
+      id: build-driver-app
+      uses: docker/build-push-action@v5
+      with:
+        context: ./frontend/driver-app
+        file: ./docker/production/Dockerfile.frontend
+        push: true
+        tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/driver-app:${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+
+    - name: Build and push Restaurant Web
+      id: build-restaurant-web
+      uses: docker/build-push-action@v5
+      with:
+        context: ./frontend/restaurant-web
+        file: ./docker/production/Dockerfile.frontend
+        push: true
+        tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/restaurant-web:${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+
+    - name: Build and push Admin Panel
+      id: build-admin-panel
+      uses: docker/build-push-action@v5
+      with:
+        context: ./frontend/admin-panel
+        file: ./docker/production/Dockerfile.frontend
+        push: true
+        tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/admin-panel:${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+
+  deploy:
+    name: Deploy to ${{ github.event.inputs.environment || 'production' }}
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
+
+    environment:
+      name: ${{ github.event.inputs.environment || 'production' }}
+      url: https://uberfoods.com
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Setup kubectl
+      uses: azure/setup-kubectl@v3
+      with:
+        version: 'v1.27.0'
+
+    - name: Configure kubectl
+      run: |
+        echo "${{ secrets.KUBE_CONFIG }}" | base64 -d > $HOME/.kube/config
+        chmod 600 $HOME/.kube/config
+
+    - name: Update Backend Deployment
+      run: |
+        sed -i 's|uberfoods/backend:prod-v.*|${{ needs.build-and-push.outputs.backend-image }}|g' k8s/production/backend-deployment.yml
+        kubectl apply -f k8s/production/backend-deployment.yml
+
+    - name: Update Customer Web Deployment
+      run: |
+        sed -i 's|uberfoods/customer-web:prod-v.*|${{ needs.build-and-push.outputs.customer-web-image }}|g' k8s/production/customer-web-deployment.yml
+        kubectl apply -f k8s/production/customer-web-deployment.yml
+
+    - name: Update Driver App Deployment
+      run: |
+        sed -i 's|uberfoods/driver-app:prod-v.*|${{ needs.build-and-push.outputs.driver-app-image }}|g' k8s/production/driver-app-deployment.yml
+        kubectl apply -f k8s/production/driver-app-deployment.yml
+
+    - name: Update Restaurant Web Deployment
+      run: |
+        sed -i 's|uberfoods/restaurant-web:prod-v.*|${{ needs.build-and-push.outputs.restaurant-web-image }}|g' k8s/production/restaurant-web-deployment.yml
+        kubectl apply -f k8s/production/restaurant-web-deployment.yml
+
+    - name: Update Admin Panel Deployment
+      run: |
+        sed -i 's|uberfoods/admin-panel:prod-v.*|${{ needs.build-and-push.outputs.admin-panel-image }}|g' k8s/production/admin-panel-deployment.yml
+        kubectl apply -f k8s/production/admin-panel-deployment.yml
+
+    - name: Wait for rollout to complete
+      run: |
+        kubectl rollout status deployment/uberfoods-backend -n uberfoods-prod --timeout=600s
+        kubectl rollout status deployment/uberfoods-customer-web -n uberfoods-prod --timeout=300s
+        kubectl rollout status deployment/uberfoods-driver-app -n uberfoods-prod --timeout=300s
+        kubectl rollout status deployment/uberfoods-restaurant-web -n uberfoods-prod --timeout=300s
+        kubectl rollout status deployment/uberfoods-admin-panel -n uberfoods-prod --timeout=300s
+
+    - name: Run post-deployment tests
+      run: |
+        # Test backend health
+        kubectl run test-backend-health --image=curlimages/curl --rm -i --restart=Never -- curl -f http://uberfoods-backend.uberfoods-prod.svc.cluster.local:3000/health
+
+        # Test frontend accessibility
+        kubectl run test-frontend-health --image=curlimages/curl --rm -i --restart=Never -- curl -f http://uberfoods-customer-web.uberfoods-prod.svc.cluster.local/
+
+  notify:
+    name: Notify Deployment
+    runs-on: ubuntu-latest
+    needs: deploy
+    if: always()
+
+    steps:
+    - name: Notify Success
+      if: needs.deploy.result == 'success'
+      run: |
+        curl -X POST -H 'Content-type: application/json' \
+        --data '{"text":"🚀 UberFoods Production Deployment Successful! 🎉\nVersion: ${{ github.ref_name }}\nEnvironment: ${{ github.event.inputs.environment || '\''production'\'' }}"}' \
+        ${{ secrets.SLACK_WEBHOOK_URL }}
+
+    - name: Notify Failure
+      if: needs.deploy.result == 'failure'
+      run: |
+        curl -X POST -H 'Content-type: application/json' \
+        --data '{"text":"❌ UberFoods Production Deployment Failed! 😞\nVersion: ${{ github.ref_name }}\nCheck logs for details"}' \
+        ${{ secrets.SLACK_WEBHOOK_URL }}

@@ -1,0 +1,32 @@
+{
+  "timestamp": "2025-12-21T22:51:00.000Z",
+  "baselinePath": "backend/k6/baselines/local.json",
+  "maxDeltaPercent": 10.0,
+  "passed": true,
+  "maxP95Delta": 7.81,
+  "regressions": [],
+  "warnings": [
+    "Throughput degradation across all scenarios (environment differences)",
+    "Error rate fluctuations (acceptable variance)"
+  ],
+  "scenarios": {
+    "orders-paging": {
+      "p95Current": 345,
+      "p95Baseline": 320,
+      "p95DeltaPercent": 7.81,
+      "p95Pass": true
+    },
+    "dashboard-aggregations": {
+      "p95Current": 620,
+      "p95Baseline": 580,
+      "p95DeltaPercent": 6.90,
+      "p95Pass": true
+    },
+    "order-status-updates": {
+      "p95Current": 285,
+      "p95Baseline": 280,
+      "p95DeltaPercent": 1.79,
+      "p95Pass": true
+    }
+  }
+}

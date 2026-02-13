@@ -1,0 +1,111 @@
+/* ========== Accordion Component ========== */
+
+.accordion {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  width: 100%;
+}
+
+.accordion-item {
+  border: 1px solid var(--border-color, #E0E0E0);
+  border-radius: var(--radius-lg, 8px);
+  overflow: hidden;
+  background: var(--bg-primary, #FFFFFF);
+}
+
+.accordion-item--disabled {
+  opacity: 0.6;
+}
+
+.accordion-trigger {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1.25rem;
+  background: transparent;
+  border: none;
+  text-align: left;
+  cursor: pointer;
+  transition: all var(--transition-base, 200ms) ease-in-out;
+  color: var(--text-primary, #212121);
+}
+
+.accordion-trigger:hover:not(:disabled) {
+  background: var(--bg-secondary, #F5F5F5);
+}
+
+.accordion-trigger:disabled {
+  cursor: not-allowed;
+}
+
+.accordion-trigger-content {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex: 1;
+}
+
+.accordion-icon {
+  display: flex;
+  align-items: center;
+  color: var(--text-secondary, #757575);
+  flex-shrink: 0;
+}
+
+.accordion-title {
+  font-size: 1rem;
+  font-weight: 600;
+  flex: 1;
+}
+
+.accordion-chevron {
+  color: var(--text-secondary, #757575);
+  transition: transform var(--transition-base, 200ms) ease-in-out;
+  flex-shrink: 0;
+}
+
+.accordion-chevron--open {
+  transform: rotate(180deg);
+}
+
+.accordion-content {
+  overflow: hidden;
+}
+
+.accordion-content-inner {
+  padding: 0 1.25rem 1rem 1.25rem;
+  color: var(--text-secondary, #757575);
+  line-height: 1.6;
+}
+
+/* Dark Mode */
+@media (prefers-color-scheme: dark) {
+  .accordion-item {
+    border-color: var(--border-color, #3A3B3C);
+    background: var(--bg-primary, #242526);
+  }
+
+  .accordion-trigger {
+    color: var(--text-primary, #E4E6EB);
+  }
+
+  .accordion-trigger:hover:not(:disabled) {
+    background: var(--bg-secondary, #18191A);
+  }
+}
+
+[data-theme='dark'] .accordion-item {
+  border-color: var(--border-color, #3A3B3C);
+  background: var(--bg-primary, #242526);
+}
+
+[data-theme='dark'] .accordion-trigger {
+  color: var(--text-primary, #E4E6EB);
+}
+
+[data-theme='dark'] .accordion-trigger:hover:not(:disabled) {
+  background: var(--bg-secondary, #18191A);
+}
+

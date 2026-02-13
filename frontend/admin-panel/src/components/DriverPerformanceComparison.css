@@ -1,0 +1,247 @@
+.driver-performance-comparison {
+  padding: 20px;
+  background: #fff;
+  border-radius: 8px;
+  max-width: 1400px;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.comparison-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  padding-bottom: 15px;
+  border-bottom: 2px solid #e9ecef;
+}
+
+.comparison-header h2 {
+  margin: 0;
+  color: #1c1e21;
+  font-size: 20px;
+}
+
+.header-controls {
+  display: flex;
+  align-items: center;
+}
+
+.driver-selection {
+  margin-bottom: 30px;
+  padding: 20px;
+  background: #f8f9fa;
+  border-radius: 8px;
+}
+
+.driver-selection h3 {
+  margin: 0 0 15px 0;
+  font-size: 16px;
+  color: #1c1e21;
+}
+
+.drivers-checkbox-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 10px;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.driver-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  padding: 8px;
+  border-radius: 6px;
+  transition: background 0.2s;
+}
+
+.driver-checkbox:hover {
+  background: #e4e6eb;
+}
+
+.driver-checkbox input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+}
+
+.comparison-table-container {
+  overflow-x: auto;
+  margin-bottom: 30px;
+}
+
+.comparison-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: #fff;
+}
+
+.comparison-table thead {
+  background: #f8f9fa;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.comparison-table th {
+  padding: 12px;
+  text-align: left;
+  font-weight: 600;
+  color: #1c1e21;
+  font-size: 14px;
+  border-bottom: 2px solid #e9ecef;
+}
+
+.comparison-table td {
+  padding: 12px;
+  border-bottom: 1px solid #e9ecef;
+  font-size: 14px;
+}
+
+.comparison-table tr.top-driver {
+  background: #fff3cd;
+}
+
+.comparison-table tr.top-driver:first-child {
+  background: #d4edda;
+}
+
+.comparison-table tr:hover {
+  background: #f8f9fa;
+}
+
+.driver-name-cell {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.rank-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  background: #1877f2;
+  color: white;
+  border-radius: 50%;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.metric-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.metric-cell .value {
+  font-weight: 600;
+  color: #1c1e21;
+}
+
+.metric-cell .vs-avg {
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.metric-cell .vs-avg.positive {
+  color: #28a745;
+}
+
+.metric-cell .vs-avg.negative {
+  color: #dc3545;
+}
+
+.efficiency-bar {
+  width: 100%;
+  height: 6px;
+  background: #e4e6eb;
+  border-radius: 3px;
+  overflow: hidden;
+  margin-top: 4px;
+}
+
+.efficiency-fill {
+  height: 100%;
+  transition: width 0.3s;
+}
+
+.average-row {
+  background: #f8f9fa;
+  font-weight: 600;
+}
+
+.average-row td {
+  border-top: 2px solid #e9ecef;
+  padding-top: 15px;
+}
+
+.comparison-charts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+  gap: 20px;
+}
+
+.chart-container {
+  padding: 20px;
+  background: #f8f9fa;
+  border-radius: 8px;
+}
+
+.chart-container h3 {
+  margin: 0 0 20px 0;
+  color: #1c1e21;
+  font-size: 16px;
+}
+
+.driver-comparison-no-permission {
+  padding: 40px;
+  text-align: center;
+  color: #dc3545;
+}
+
+[data-theme="dark"] .driver-performance-comparison {
+  background: #242526;
+  color: #e4e6eb;
+}
+
+[data-theme="dark"] .comparison-header h2 {
+  color: #e4e6eb;
+}
+
+[data-theme="dark"] .driver-selection {
+  background: #3a3b3c;
+}
+
+[data-theme="dark"] .comparison-table {
+  background: #242526;
+}
+
+[data-theme="dark"] .comparison-table thead {
+  background: #3a3b3c;
+}
+
+[data-theme="dark"] .comparison-table th {
+  color: #e4e6eb;
+}
+
+[data-theme="dark"] .comparison-table td {
+  color: #e4e6eb;
+}
+
+[data-theme="dark"] .comparison-table tr.top-driver {
+  background: #4a4b4c;
+}
+
+[data-theme="dark"] .metric-cell .value {
+  color: #e4e6eb;
+}
+
+[data-theme="dark"] .chart-container {
+  background: #3a3b3c;
+}
+

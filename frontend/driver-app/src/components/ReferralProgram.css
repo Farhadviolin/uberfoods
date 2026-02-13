@@ -1,0 +1,229 @@
+.referral-program {
+  background: var(--glass-bg);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-radius: var(--radius-xl);
+  padding: var(--spacing-lg);
+  box-shadow: var(--glass-shadow);
+  border: 1px solid var(--glass-border);
+  animation: fadeIn 0.5s ease-out;
+}
+
+.referral-program h2 {
+  margin: 0 0 var(--spacing-lg) 0;
+  background: var(--primary-gradient);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.referral-code-section {
+  background: linear-gradient(135deg, rgba(24, 119, 242, 0.1) 0%, rgba(255, 255, 255, 0.3) 100%);
+  padding: var(--spacing-xl);
+  border-radius: var(--radius-lg);
+  text-align: center;
+  margin-bottom: var(--spacing-xl);
+}
+
+.referral-code-section h3 {
+  margin: 0 0 var(--spacing-md) 0;
+}
+
+.code-display {
+  display: flex;
+  gap: var(--spacing-md);
+  align-items: center;
+  justify-content: center;
+  margin-bottom: var(--spacing-md);
+}
+
+.code-value {
+  font-size: 32px;
+  font-weight: 900;
+  font-family: 'Courier New', monospace;
+  background: var(--primary-gradient);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  letter-spacing: 4px;
+}
+
+.copy-button {
+  padding: var(--spacing-sm) var(--spacing-lg);
+  background: var(--primary-gradient);
+  color: white;
+  border: none;
+  border-radius: var(--radius-lg);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition-base);
+  box-shadow: var(--shadow-md);
+}
+
+.copy-button:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-lg);
+}
+
+.code-description {
+  color: var(--text-secondary);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.referral-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: var(--spacing-md);
+  margin-bottom: var(--spacing-xl);
+}
+
+.stat-card {
+  background: var(--surface-variant);
+  padding: var(--spacing-md);
+  border-radius: var(--radius-lg);
+  text-align: center;
+}
+
+.stat-value {
+  font-size: 24px;
+  font-weight: 800;
+  background: var(--primary-gradient);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin-bottom: var(--spacing-xs);
+}
+
+.stat-label {
+  font-size: 12px;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.referrals-list h3 {
+  margin-bottom: var(--spacing-md);
+}
+
+.referral-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--spacing-md);
+  background: var(--surface-variant);
+  border-radius: var(--radius-lg);
+  margin-bottom: var(--spacing-sm);
+  transition: all var(--transition-base);
+}
+
+.referral-item:hover {
+  transform: translateX(4px);
+  box-shadow: var(--shadow-sm);
+}
+
+.referral-info {
+  flex: 1;
+}
+
+.referral-code {
+  font-weight: 700;
+  font-size: 16px;
+  margin-bottom: var(--spacing-xs);
+}
+
+.referral-status {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-bottom: var(--spacing-xs);
+}
+
+.status-pending {
+  color: var(--warning);
+  font-weight: 600;
+}
+
+.status-completed {
+  color: var(--success);
+  font-weight: 600;
+}
+
+.status-rewarded {
+  color: var(--primary);
+  font-weight: 600;
+}
+
+.referral-date,
+.referral-completed {
+  font-size: 11px;
+  color: var(--text-tertiary);
+}
+
+.referral-reward {
+  text-align: right;
+}
+
+.reward-amount {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--success);
+  margin-bottom: var(--spacing-sm);
+}
+
+.claim-button {
+  padding: var(--spacing-sm) var(--spacing-md);
+  background: var(--success-gradient);
+  color: white;
+  border: none;
+  border-radius: var(--radius-lg);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition-base);
+}
+
+.claim-button:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+.claim-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.rewarded-badge {
+  background: var(--success-gradient);
+  color: white;
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border-radius: var(--radius-lg);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+@media (max-width: 768px) {
+  .code-display {
+    flex-direction: column;
+  }
+
+  .code-value {
+    font-size: 24px;
+  }
+
+  .referral-stats {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .referral-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--spacing-sm);
+  }
+
+  .referral-reward {
+    width: 100%;
+    text-align: left;
+  }
+}
+

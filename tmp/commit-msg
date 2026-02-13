@@ -1,0 +1,4 @@
+docs(test): document strategy and env examples
+
+Add test strategy guidance, update env examples, and record
+webhook endpoint in the API changelog.

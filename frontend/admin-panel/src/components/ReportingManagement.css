@@ -1,0 +1,255 @@
+.reporting-management {
+  padding: 24px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.reporting-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+}
+
+.reporting-header h2 {
+  margin: 0;
+  color: var(--color-text-primary);
+}
+
+.reporting-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 48px;
+  gap: 16px;
+}
+
+.reporting-loading p {
+  color: var(--color-text-secondary);
+  margin: 0;
+}
+
+.reporting-error {
+  margin: 24px 0;
+}
+
+.reports-content,
+.dashboards-content,
+.scheduled-content {
+  padding: 24px 0;
+}
+
+.reports-section h3,
+.dashboards-header h3,
+.scheduled-header h3 {
+  margin: 0 0 16px 0;
+  color: var(--color-text-primary);
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+.dashboards-header,
+.scheduled-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+}
+
+.quick-reports-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+  gap: 16px;
+  margin-bottom: 48px;
+}
+
+.report-card,
+.dashboard-card,
+.saved-report-card,
+.scheduled-report-card {
+  padding: 20px;
+  transition: all 0.2s ease;
+}
+
+.report-card:hover,
+.dashboard-card:hover,
+.saved-report-card:hover,
+.scheduled-report-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.report-header,
+.dashboard-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 12px;
+}
+
+.report-header h4,
+.dashboard-header h4 {
+  margin: 0;
+  color: var(--color-text-primary);
+  font-size: 1.1rem;
+}
+
+.report-card p {
+  margin: 0 0 16px 0;
+  color: var(--color-text-secondary);
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
+
+.report-actions,
+.dashboard-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.saved-reports-list,
+.dashboards-grid,
+.scheduled-reports-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.report-meta,
+.dashboard-meta,
+.report-details {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 16px;
+}
+
+.report-meta small,
+.dashboard-meta small,
+.report-details small {
+  color: var(--color-text-muted);
+  font-size: 0.8rem;
+}
+
+.report-schedule,
+.report-format,
+.report-recipients {
+  margin: 8px 0;
+  font-size: 0.9rem;
+}
+
+.report-recipients {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 8px 0;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 48px;
+  color: var(--color-text-muted);
+}
+
+.empty-state p {
+  margin: 0 0 16px 0;
+  font-size: 1.1rem;
+}
+
+.dashboards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+  gap: 16px;
+}
+
+/* Modal Styles */
+.report-modal-content {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  min-width: 400px;
+}
+
+.report-modal-content p {
+  margin: 0;
+  color: var(--color-text-secondary);
+}
+
+.date-fields {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .reporting-management {
+    padding: 16px;
+  }
+
+  .reporting-header {
+    flex-direction: column;
+    gap: 16px;
+    align-items: flex-start;
+  }
+
+  .dashboards-header,
+  .scheduled-header {
+    flex-direction: column;
+    gap: 16px;
+    align-items: flex-start;
+  }
+
+  .quick-reports-grid,
+  .dashboards-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .report-actions,
+  .dashboard-actions {
+    flex-direction: column;
+  }
+
+  .date-fields {
+    grid-template-columns: 1fr;
+  }
+
+  .report-modal-content {
+    min-width: auto;
+  }
+}
+
+/* Animation for loading states */
+@keyframes pulse {
+  0% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+.report-card,
+.dashboard-card,
+.saved-report-card,
+.scheduled-report-card {
+  animation: pulse 2s infinite;
+}
+
+.report-card:hover,
+.dashboard-card:hover,
+.saved-report-card:hover,
+.scheduled-report-card:hover {
+  animation: none;
+}

@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="72" height="72" viewBox="0 0 72 72" role="img" aria-label="UberFoods Badge">
+  <rect width="72" height="72" rx="14" fill="#0b5cff"/>
+  <path d="M18 36c0-10 8-16 18-16s18 6 18 16-8 16-18 16-18-6-18-16z" fill="#0fe3b0" opacity="0.2"/>
+  <text x="50%" y="55%" text-anchor="middle" font-family="Inter, Arial, sans-serif" font-size="22" font-weight="700" fill="#fff">UF</text>
+</svg>

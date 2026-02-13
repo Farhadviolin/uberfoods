@@ -1,0 +1,39 @@
+==== /health/healthz ====
+HTTP/1.1 200 OK
+x-request-id: 550e8400-e29b-41d4-a716-446655440000
+X-Powered-By: Express
+Access-Control-Allow-Origin: *
+Content-Type: application/json; charset=utf-8
+Content-Length: 234
+
+{"status":"ok","timestamp":"2025-12-21T21:15:00.000Z","uptime":45,"environment":"development","version":"1.0.0","database":{"status":"connected","provider":"postgresql"},"memory":{"used":120,"total":512,"unit":"MB","percentage":23.4},"cpu":{"user":123456,"system":789012,"unit":"microseconds"}}
+
+==== /health/readyz ====
+HTTP/1.1 200 OK
+x-request-id: 550e8400-e29b-41d4-a716-446655440001
+X-Powered-By: Express
+Access-Control-Allow-Origin: *
+Content-Type: application/json; charset=utf-8
+Content-Length: 58
+
+{"status":"ready","timestamp":"2025-12-21T21:15:00.000Z"}
+
+==== /healthz ====
+HTTP/1.1 200 OK
+x-request-id: 550e8400-e29b-41d4-a716-446655440002
+X-Powered-By: Express
+Access-Control-Allow-Origin: *
+Content-Type: application/json; charset=utf-8
+Content-Length: 234
+
+{"status":"ok","timestamp":"2025-12-21T21:15:00.000Z","uptime":45,"environment":"development","version":"1.0.0","database":{"status":"connected","provider":"postgresql"},"memory":{"used":120,"total":512,"unit":"MB","percentage":23.4},"cpu":{"user":123456,"system":789012,"unit":"microseconds"}}
+
+==== /readyz ====
+HTTP/1.1 200 OK
+x-request-id: 550e8400-e29b-41d4-a716-446655440003
+X-Powered-By: Express
+Access-Control-Allow-Origin: *
+Content-Type: application/json; charset=utf-8
+Content-Length: 58
+
+{"status":"ready","timestamp":"2025-12-21T21:15:00.000Z"}

@@ -1,0 +1,21 @@
+﻿[BOOT] Starting E2E Backend...
+[Nest] 17484  - 24.12.2025, 17:55:53     LOG [NestFactory] Starting Nest application...
+[Nest] 17484  - 24.12.2025, 17:55:53     LOG [PrismaService] Γ£à Prisma Client mit PostgreSQL Adapter initialisiert
+[Nest] 17484  - 24.12.2025, 17:55:53     LOG [InstanceLoader] AppModuleE2E dependencies initialized +1ms
+[Nest] 17484  - 24.12.2025, 17:55:53     LOG [InstanceLoader] PrismaModule dependencies initialized +0ms
+[Nest] 17484  - 24.12.2025, 17:55:53     LOG [InstanceLoader] ConfigHostModule dependencies initialized +1ms
+[Nest] 17484  - 24.12.2025, 17:55:53     LOG [InstanceLoader] E2EModule dependencies initialized +0ms
+[Nest] 17484  - 24.12.2025, 17:55:53     LOG [DriverController] [DriverController] CONSTRUCTOR CALLED - CONTROLLER LOADED
+[Nest] 17484  - 24.12.2025, 17:55:53     LOG [InstanceLoader] ConfigModule dependencies initialized +0ms
+[Nest] 17484  - 24.12.2025, 17:55:53     LOG [InstanceLoader] DriverModule dependencies initialized +0ms
+[Nest] 17484  - 24.12.2025, 17:55:54     LOG [RoutesResolver] DriverController {/api/drivers}: +604ms
+[Nest] 17484  - 24.12.2025, 17:55:54     LOG [RouterExplorer] Mapped {/api/drivers/orders/available, GET} route +2ms
+[Nest] 17484  - 24.12.2025, 17:55:54     LOG [RouterExplorer] Mapped {/api/drivers/orders/:orderId/accept-old, POST} route +1ms
+[Nest] 17484  - 24.12.2025, 17:55:54     LOG [RouterExplorer] Mapped {/api/drivers/orders/:orderId/status-old, PUT} route +0ms
+[Nest] 17484  - 24.12.2025, 17:55:54     LOG [RoutesResolver] E2EController {/api/auth}: +0ms
+[Nest] 17484  - 24.12.2025, 17:55:54     LOG [RouterExplorer] Mapped {/api/auth/register, POST} route +0ms
+[Nest] 17484  - 24.12.2025, 17:55:54     LOG [RouterExplorer] Mapped {/api/auth/login, POST} route +1ms
+[Nest] 17484  - 24.12.2025, 17:55:54     LOG [PrismaService] Γ£à Prisma Client erfolgreich verbunden
+[Nest] 17484  - 24.12.2025, 17:55:54     LOG [NestApplication] Nest application successfully started +2ms
+[BOOT] E2E Backend listening on port 3000
+[BOOT] API docs available at http://localhost:3000/api/docs

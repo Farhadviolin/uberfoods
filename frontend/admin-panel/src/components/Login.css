@@ -1,0 +1,128 @@
+.login-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  background: #ffffff;
+  padding: 20px;
+  position: relative;
+  z-index: 1;
+}
+
+.login-card {
+  background: white;
+  border-radius: 12px;
+  padding: 40px;
+  width: 100%;
+  max-width: 400px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+  position: relative;
+  z-index: 10;
+}
+
+.login-card h1 {
+  text-align: center;
+  margin-bottom: 8px;
+  color: #1877F2;
+}
+
+.login-card p {
+  text-align: center;
+  color: #65676B;
+  margin-bottom: 24px;
+}
+
+.login-card .form-group {
+  margin-bottom: 20px;
+}
+
+.login-card .form-group label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: 600;
+  color: #1c1e21;
+}
+
+.login-card .form-group input {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid #CCD0D5;
+  border-radius: 6px;
+  font-size: 16px;
+  box-sizing: border-box;
+  background-color: #FFFFFF;
+  pointer-events: auto !important;
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+.login-card .form-group input:focus {
+  outline: none;
+  border-color: #1877F2;
+  box-shadow: 0 0 0 3px rgba(24, 119, 242, 0.1);
+}
+
+.login-card .form-group input:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  background-color: #F0F2F5;
+}
+
+.login-card .form-group input::placeholder {
+  color: #8A8D91;
+}
+
+.login-button {
+  width: 100%;
+  padding: 12px;
+  background: #1877F2;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+  pointer-events: auto;
+  margin-bottom: 12px;
+}
+
+.login-button:hover:not(:disabled) {
+  background: #166fe5;
+}
+
+.login-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.forgot-password-link {
+  width: 100%;
+  padding: 8px;
+  background: transparent;
+  color: #1877F2;
+  border: none;
+  font-size: 14px;
+  cursor: pointer;
+  text-decoration: underline;
+  transition: color 0.2s;
+}
+
+.forgot-password-link:hover:not(:disabled) {
+  color: #166FE5;
+}
+
+.forgot-password-link:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.error-message {
+  background: #fee;
+  color: #c33;
+  padding: 12px;
+  border-radius: 6px;
+  margin-bottom: 20px;
+  border: 1px solid #fcc;
+}
+

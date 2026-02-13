@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Offline - UberFoods</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+    }
+
+    .offline-container {
+      max-width: 400px;
+      padding: 2rem;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 20px;
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+
+    .offline-icon {
+      font-size: 4rem;
+      margin-bottom: 1rem;
+      opacity: 0.8;
+    }
+
+    .offline-title {
+      font-size: 2rem;
+      font-weight: 700;
+      margin-bottom: 1rem;
+    }
+
+    .offline-message {
+      font-size: 1.1rem;
+      margin-bottom: 2rem;
+      opacity: 0.9;
+      line-height: 1.6;
+    }
+
+    .offline-actions {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .retry-button {
+      background: #FF6B6B;
+      color: white;
+      border: none;
+      padding: 1rem 2rem;
+      border-radius: 50px;
+      font-size: 1.1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+
+    .retry-button:hover {
+      background: #e55a5a;
+      transform: translateY(-2px);
+      box-shadow: 0 10px 20px rgba(255, 107, 107, 0.3);
+    }
+
+    .status-indicator {
+      display: inline-block;
+      width: 12px;
+      height: 12px;
+      background: #ff4757;
+      border-radius: 50%;
+      margin-left: 0.5rem;
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0% {
+        box-shadow: 0 0 0 0 rgba(255, 71, 87, 0.7);
+      }
+      70% {
+        box-shadow: 0 0 0 10px rgba(255, 71, 87, 0);
+      }
+      100% {
+        box-shadow: 0 0 0 0 rgba(255, 71, 87, 0);
+      }
+    }
+
+    .features-list {
+      text-align: left;
+      margin-top: 2rem;
+      padding-top: 2rem;
+      border-top: 1px solid rgba(255, 255, 255, 0.2);
+    }
+
+    .features-list h3 {
+      font-size: 1.2rem;
+      margin-bottom: 1rem;
+      opacity: 0.9;
+    }
+
+    .features-list ul {
+      list-style: none;
+      padding: 0;
+    }
+
+    .features-list li {
+      padding: 0.5rem 0;
+      opacity: 0.8;
+      display: flex;
+      align-items: center;
+    }
+
+    .features-list li:before {
+      content: "✓";
+      color: #2ed573;
+      font-weight: bold;
+      margin-right: 0.5rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="offline-container">
+    <div class="offline-icon">📱</div>
+    <h1 class="offline-title">
+      Du bist offline
+      <span class="status-indicator"></span>
+    </h1>
+    <p class="offline-message">
+      Kein Problem! Du kannst trotzdem einige Funktionen nutzen.
+      Neue Bestellungen werden automatisch synchronisiert, sobald du wieder online bist.
+    </p>
+
+    <div class="offline-actions">
+      <button class="retry-button" onclick="window.location.reload()">
+        Erneut versuchen
+      </button>
+    </div>
+
+    <div class="features-list">
+      <h3>Verfügbare Offline-Funktionen:</h3>
+      <ul>
+        <li>Warenkorb verwalten</li>
+        <li>Gespeicherte Adressen verwenden</li>
+        <li>Zahlungsmethoden anzeigen</li>
+        <li>Favoriten durchsuchen</li>
+        <li>Bestellhistorie anzeigen</li>
+      </ul>
+    </div>
+  </div>
+
+  <script>
+    // Check network status periodically
+    function checkOnlineStatus() {
+      return navigator.onLine;
+    }
+
+    // Retry connection every 5 seconds
+    setInterval(() => {
+      if (checkOnlineStatus()) {
+        // Attempt to reload if we're back online
+        window.location.reload();
+      }
+    }, 5000);
+
+    // Listen for online event
+    window.addEventListener('online', () => {
+      setTimeout(() => {
+        window.location.reload();
+      }, 1000);
+    });
+  </script>
+</body>
+</html>
+

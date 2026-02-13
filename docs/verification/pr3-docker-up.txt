@@ -1,0 +1,10 @@
+time="2025-12-21T22:31:03+01:00" level=warning msg="PROJECT_ROOT_PLACEHOLDER\\docker-compose.ws-scale.yml: the attribute `version` is obsolete, it will be ignored, please remove it to avoid potential confusion"
+ Container uberfoods_redis  Running
+ Container uberfoods_postgres  Running
+ Container uberfoods_backend  Running
+ Container uberfoods-backend2-1  Starting
+ Container uberfoods_redis  Waiting
+ Container uberfoods_postgres  Waiting
+ Container uberfoods-backend2-1  Started
+ Container uberfoods_redis  Healthy
+ Container uberfoods_postgres  Healthy

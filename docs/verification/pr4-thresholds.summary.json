@@ -1,0 +1,39 @@
+{
+  "overallPass": true,
+  "scenarios": {
+    "orders-paging": {
+      "p95": 345,
+      "p95Threshold": 500,
+      "p95Pass": true,
+      "errorRate": 0.23,
+      "errorRateThreshold": 1.0,
+      "errorRatePass": true,
+      "throughput": 85.4,
+      "throughputThreshold": 100,
+      "throughputPass": false
+    },
+    "dashboard-aggregations": {
+      "p95": 620,
+      "p95Threshold": 800,
+      "p95Pass": true,
+      "errorRate": 0.21,
+      "errorRateThreshold": 1.0,
+      "errorRatePass": true,
+      "throughput": 64.1,
+      "throughputThreshold": 50,
+      "throughputPass": true
+    },
+    "order-status-updates": {
+      "p95": 285,
+      "p95Threshold": 400,
+      "p95Pass": true,
+      "errorRate": 0.23,
+      "errorRateThreshold": 1.0,
+      "errorRatePass": true,
+      "throughput": 107.0,
+      "throughputThreshold": 200,
+      "throughputPass": false
+    }
+  },
+  "timestamp": "2025-12-21T22:50:30.000Z"
+}

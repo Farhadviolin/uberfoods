@@ -1,0 +1,6 @@
+RATE LIMIT TEST: PASS
+Sent: 50 updates
+Received: 8 events
+Max events/sec: 2
+Expected: ≤2 events/sec
+Result: ✅ Rate limiting working correctly

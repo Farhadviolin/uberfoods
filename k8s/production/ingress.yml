@@ -1,0 +1,120 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: uberfoods-ingress
+  namespace: uberfoods-prod
+  annotations:
+    kubernetes.io/ingress.class: "nginx"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/rate-limit: "10"
+    nginx.ingress.kubernetes.io/rate-limit-window: "1m"
+    nginx.ingress.kubernetes.io/use-regex: "true"
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    nginx.ingress.kubernetes.io/proxy-body-size: "100m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "300"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "300"
+spec:
+  tls:
+  - hosts:
+    - uberfoods.com
+    - api.uberfoods.com
+    - driver.uberfoods.com
+    - restaurant.uberfoods.com
+    - admin.uberfoods.com
+    secretName: uberfoods-tls
+  rules:
+  # Main Customer App
+  - host: uberfoods.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: uberfoods-customer-web
+            port:
+              number: 80
+      - path: /api
+        pathType: Prefix
+        backend:
+          service:
+            name: uberfoods-backend
+            port:
+              number: 3000
+      - path: /socket.io
+        pathType: Prefix
+        backend:
+          service:
+            name: uberfoods-backend
+            port:
+              number: 3000
+
+  # API Subdomain
+  - host: api.uberfoods.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: uberfoods-backend
+            port:
+              number: 3000
+
+  # Driver App Subdomain
+  - host: driver.uberfoods.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: uberfoods-driver-app
+            port:
+              number: 80
+      - path: /api
+        pathType: Prefix
+        backend:
+          service:
+            name: uberfoods-backend
+            port:
+              number: 3000
+
+  # Restaurant Web Subdomain
+  - host: restaurant.uberfoods.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: uberfoods-restaurant-web
+            port:
+              number: 80
+      - path: /api
+        pathType: Prefix
+        backend:
+          service:
+            name: uberfoods-backend
+            port:
+              number: 3000
+
+  # Admin Panel Subdomain
+  - host: admin.uberfoods.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: uberfoods-admin-panel
+            port:
+              number: 80
+      - path: /api
+        pathType: Prefix
+        backend:
+          service:
+            name: uberfoods-backend
+            port:
+              number: 3000

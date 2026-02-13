@@ -1,0 +1,69 @@
+.promo-code-input {
+  margin: 1rem 0;
+}
+
+.promo-code-field {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  background-color: #F0F2F5;
+  border-radius: 8px;
+}
+
+.promo-icon {
+  color: #65676B;
+  flex-shrink: 0;
+}
+
+.promo-input {
+  flex: 1;
+  border: none;
+  background: transparent;
+  font-size: 0.9375rem;
+  color: #050505;
+  outline: none;
+}
+
+.promo-input::placeholder {
+  color: #8A8D91;
+}
+
+.apply-btn {
+  flex-shrink: 0;
+}
+
+.promo-code-applied {
+  margin: 1rem 0;
+}
+
+.promo-code-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  background-color: #10B98120;
+  color: #10B981;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 0.875rem;
+}
+
+.remove-code-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border: none;
+  background: transparent;
+  color: #10B981;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: background-color 0.2s;
+}
+
+.remove-code-btn:hover {
+  background-color: rgba(16, 185, 129, 0.1);
+}
+

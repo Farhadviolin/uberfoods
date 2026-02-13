@@ -1,0 +1,51 @@
+.order-card {
+  background: var(--fb-bg-primary);
+  border-radius: var(--fb-radius-md);
+  padding: var(--fb-space-4);
+  border: 1px solid var(--fb-border-primary);
+  box-shadow: var(--fb-shadow-base);
+  cursor: pointer;
+  transition: all var(--fb-transition-base);
+}
+
+.order-card:hover {
+  box-shadow: var(--fb-shadow-md);
+  transform: translateY(-2px);
+  border-color: var(--fb-primary);
+}
+
+.order-card.active {
+  border-left: 4px solid var(--fb-primary);
+}
+
+.order-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: var(--fb-space-4);
+  padding-bottom: var(--fb-space-3);
+  border-bottom: 1px solid var(--fb-border-primary);
+}
+
+.order-status-badge {
+  color: white;
+  padding: 4px 8px;
+  border-radius: var(--fb-radius-full);
+  font-size: var(--fb-font-size-xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.order-card-body {
+  margin-bottom: var(--fb-space-4);
+}
+
+.order-card-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-top: var(--fb-space-3);
+  border-top: 1px solid var(--fb-border-primary);
+}
+

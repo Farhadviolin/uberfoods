@@ -1,0 +1,9 @@
+version: v1.28.0
+
+ignore:
+  javascript/PrototypePollution:
+    - '*':
+        reason: "False Positive: Query-Params werden strikt bereinigt (sanitizeId/timeframe Normalisierung)."
+        expires: "2026-01-01T00:00:00.000Z"
+        path:
+          - src/modules/predictive-ordering/predictive-ordering.controller.ts

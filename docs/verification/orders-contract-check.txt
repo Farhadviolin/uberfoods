@@ -1,0 +1,6 @@
+CONTRACT_FAIL
+hasData=true
+hasMore=false
+hasNextCursor=false
+dataLen=1
+DIFFERENT_PAGINATION_FORMAT

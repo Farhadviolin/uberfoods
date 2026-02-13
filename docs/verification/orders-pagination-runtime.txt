@@ -1,0 +1,14 @@
+==== PAGE1 CURL -i ====
+HTTP/1.1 200 OK
+X-Powered-By: Express
+Vary: Origin
+Access-Control-Allow-Credentials: true
+Content-Type: application/json; charset=utf-8
+Content-Length: 301
+ETag: W/"12d-AALCdAI9HNlg1nzg48lSe2c9Nk4"
+Date: Sun, 21 Dec 2025 21:19:11 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+==== PAGE1 BODY ====
+{"data":[{"id":"1","status":"PENDING","totalAmount":25.99,"createdAt":"2025-12-21T21:19:25.737Z","customer":{"name":"John Doe"},"restaurant":{"name":"Pizza Palace"},"items":[{"dish":{"name":"Margherita Pizza"},"quantity":1,"price":25.99}]}],"pagination":{"page":1,"limit":20,"total":1,"totalPages":1}}

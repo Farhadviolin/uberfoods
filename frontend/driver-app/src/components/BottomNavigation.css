@@ -1,0 +1,131 @@
+.bottom-navigation {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  background: var(--glass-bg);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-top: 1px solid var(--glass-border);
+  padding: var(--spacing-sm) 0 calc(var(--spacing-sm) + env(safe-area-inset-bottom));
+  z-index: var(--z-fixed);
+  box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.1);
+}
+
+.bottom-nav-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: var(--spacing-sm) var(--spacing-md);
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all var(--transition-base);
+  position: relative;
+  min-width: 64px;
+  flex: 1;
+  border-radius: var(--radius-lg);
+}
+
+.bottom-nav-item::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 0;
+  height: 3px;
+  background: var(--primary-gradient);
+  border-radius: 0 0 var(--radius-full) var(--radius-full);
+  transition: width var(--transition-base);
+}
+
+.bottom-nav-item.active::before {
+  width: 40px;
+}
+
+.bottom-nav-item:active {
+  transform: scale(0.95);
+}
+
+.bottom-nav-item.active {
+  color: var(--primary);
+  background: var(--primary-light);
+}
+
+.bottom-nav-icon {
+  font-size: 24px;
+  line-height: 1;
+  transition: transform var(--transition-bounce);
+}
+
+.bottom-nav-item.active .bottom-nav-icon {
+  transform: scale(1.2) rotate(5deg);
+}
+
+.bottom-nav-label {
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.2;
+  text-align: center;
+}
+
+.bottom-nav-badge {
+  position: absolute;
+  top: 4px;
+  right: 8px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  background: var(--danger-gradient);
+  color: white;
+  border-radius: var(--radius-full);
+  font-size: 10px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: var(--shadow-md);
+  animation: pulse-badge 2s ease-in-out infinite;
+}
+
+@keyframes pulse-badge {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.1); }
+}
+
+/* Desktop: Verstecke Bottom Navigation */
+@media (min-width: 769px) {
+  .bottom-navigation {
+    display: none;
+  }
+}
+
+/* Mobile Optimierungen */
+@media (max-width: 768px) {
+  .bottom-navigation {
+    padding-bottom: calc(12px + env(safe-area-inset-bottom));
+  }
+
+  .bottom-nav-label {
+    font-size: 10px;
+  }
+
+  .bottom-nav-icon {
+    font-size: 22px;
+  }
+}
+
+/* Safe Area für iOS Notch */
+@supports (padding: max(0px)) {
+  .bottom-navigation {
+    padding-bottom: max(8px, env(safe-area-inset-bottom));
+  }
+}
+

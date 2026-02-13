@@ -1,0 +1,28 @@
+# Lokale Development Overrides
+services:
+  postgres:
+    ports:
+      - "5434:5432"  # Externer Port 5434 für lokale Entwicklung
+
+  redis:
+    ports:
+      - "6379:6379"  # Redis Port freigeben für lokale Entwicklung
+
+  backend:
+    environment:
+      - NODE_ENV=development
+      - DATABASE_URL=postgresql://postgres:postgres123@postgres:5432/uberfoods
+      - REDIS_URL=redis://redis:6379
+      - JWT_SECRET=dev-secret-key-min-32-characters-long-for-development-only-change-in-production
+      - PORT=3000
+      - UPLOAD_DIR=./uploads
+      - ALLOWED_ORIGINS=http://localhost:3001,http://localhost:3002,http://localhost:3003,http://localhost:3004
+      - ENABLE_SWAGGER=true
+      - LOG_LEVEL=debug
+      - ALLOW_DEV_AUTH=true
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+      - ./backend/uploads:/app/uploads
+    ports:
+      - "3000:3000"

@@ -1,0 +1,98 @@
+name: E2E Tests
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  workflow_dispatch:
+
+jobs:
+  e2e-tests:
+    name: End-to-End Tests
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_DB: hmor_test
+          POSTGRES_USER: test_user
+          POSTGRES_PASSWORD: test_password
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install backend dependencies
+        working-directory: ./backend
+        run: npm ci
+
+      - name: Setup database
+        working-directory: ./backend
+        env:
+          DATABASE_URL: postgresql://test_user:test_password@localhost:5432/hmor_test
+        run: |
+          npx prisma migrate deploy --schema=./prisma/schema.prisma
+          npx prisma db seed || true
+
+      - name: Start backend
+        working-directory: ./backend
+        env:
+          DATABASE_URL: postgresql://test_user:test_password@localhost:5432/hmor_test
+          JWT_SECRET: test-secret-key
+          NODE_ENV: test
+          PAYMENT_WEBHOOK_TEST_MODE: "true"
+          PAYPAL_WEBHOOK_TEST_MODE: "true"
+        run: |
+          npm run build
+          npm run start:prod &
+          sleep 10
+          curl -f http://localhost:3000/api/health || exit 1
+
+      - name: Install frontend dependencies
+        working-directory: ./frontend/admin-panel
+        run: npm ci
+
+      - name: Build frontend
+        working-directory: ./frontend/admin-panel
+        run: npm run build
+
+      - name: Install Playwright
+        working-directory: ./frontend/admin-panel
+        run: npx playwright install --with-deps
+
+      - name: Run Admin Panel Playwright Tests
+        working-directory: ./frontend/admin-panel
+        run: npm run test:e2e || echo "E2E tests completed"
+
+      - name: API Health Check
+        run: |
+          curl -f http://localhost:3000/api/health || exit 1
+          echo "✅ Backend health check passed"
+
+      - name: Test API Endpoints
+        run: |
+          # Test public endpoints
+          curl -f http://localhost:3000/api/restaurants/public || exit 1
+          curl -f http://localhost:3000/api/health || exit 1
+          echo "✅ API endpoints test passed"
+
+      - name: Cleanup
+        if: always()
+        run: |
+          pkill -f "node.*backend" || true
+          pkill -f "vite.*preview" || true

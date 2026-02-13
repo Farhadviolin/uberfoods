@@ -1,0 +1,237 @@
+.personalized-chef-card {
+  padding: 1.5rem;
+  margin: 2rem 0;
+  background: linear-gradient(135deg, rgba(24, 119, 242, 0.05) 0%, rgba(220, 53, 69, 0.05) 100%);
+  border: 1px solid rgba(24, 119, 242, 0.2);
+}
+
+.chef-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 1.5rem;
+}
+
+.chef-header-content {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.chef-icon {
+  width: 40px;
+  height: 40px;
+  color: #1877F2;
+}
+
+.chef-header h3 {
+  margin: 0 0 4px 0;
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--text-primary, #050505);
+}
+
+.chef-subtitle {
+  margin: 0;
+  font-size: 14px;
+  color: var(--text-secondary, #65676B);
+}
+
+.chef-toggle {
+  background: transparent;
+  border: 1px solid #E4E6EB;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 20px;
+  color: #65676B;
+  transition: all 0.2s;
+}
+
+.chef-toggle:hover {
+  background: #F0F2F5;
+  border-color: #1877F2;
+  color: #1877F2;
+}
+
+.chef-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.chef-stat {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem;
+  background: white;
+  border-radius: 12px;
+  border: 1px solid #E4E6EB;
+}
+
+.stat-icon {
+  width: 32px;
+  height: 32px;
+  color: #1877F2;
+  flex-shrink: 0;
+}
+
+.chef-stat > div {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.stat-label {
+  font-size: 12px;
+  color: var(--text-secondary, #65676B);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-weight: 600;
+}
+
+.stat-value {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-primary, #050505);
+}
+
+.stat-confidence {
+  margin-top: 4px;
+}
+
+.confidence-bar {
+  height: 4px;
+  background: linear-gradient(90deg, #1877F2 0%, #dc3545 100%);
+  border-radius: 2px;
+}
+
+.chef-details {
+  padding-top: 1.5rem;
+  border-top: 1px solid #E4E6EB;
+}
+
+.chef-section {
+  margin-bottom: 1.5rem;
+}
+
+.chef-section h4 {
+  margin: 0 0 1rem 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary, #050505);
+}
+
+.cuisine-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.cuisine-tag {
+  padding: 6px 12px;
+  background: linear-gradient(135deg, #1877F2 0%, #dc3545 100%);
+  color: white;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.taste-profile {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.taste-item {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.taste-item span {
+  min-width: 80px;
+  font-size: 14px;
+  color: var(--text-secondary, #65676B);
+}
+
+.taste-bar {
+  flex: 1;
+  height: 8px;
+  background: #E4E6EB;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.taste-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #1877F2 0%, #dc3545 100%);
+  border-radius: 4px;
+  transition: width 0.3s ease;
+}
+
+.preferences-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.preference-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  background: white;
+  border-radius: 8px;
+  border: 1px solid #E4E6EB;
+}
+
+.preference-icon {
+  width: 20px;
+  height: 20px;
+  color: #1877F2;
+}
+
+.preference-item span {
+  font-size: 14px;
+  color: var(--text-primary, #050505);
+}
+
+.chef-actions {
+  display: flex;
+  gap: 1rem;
+  margin-top: 1.5rem;
+}
+
+[data-theme='dark'] .personalized-chef-card {
+  background: linear-gradient(135deg, rgba(24, 119, 242, 0.1) 0%, rgba(220, 53, 69, 0.1) 100%);
+  border-color: rgba(24, 119, 242, 0.3);
+}
+
+[data-theme='dark'] .chef-stat {
+  background: #2E3032;
+  border-color: #3A3B3C;
+}
+
+[data-theme='dark'] .preference-item {
+  background: #2E3032;
+  border-color: #3A3B3C;
+}
+
+@media (max-width: 768px) {
+  .chef-stats {
+    grid-template-columns: 1fr;
+  }
+
+  .chef-actions {
+    flex-direction: column;
+  }
+}
+

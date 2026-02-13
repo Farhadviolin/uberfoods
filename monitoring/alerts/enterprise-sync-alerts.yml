@@ -1,0 +1,220 @@
+# Enterprise Sync Alerting Rules
+# Diese Regeln definieren kritische Events, die sofortige Aufmerksamkeit erfordern
+
+groups:
+  - name: enterprise_sync_critical
+    interval: 30s
+    rules:
+      # System Health Critical
+      - alert: SystemHealthCritical
+        expr: enterprise_sync_system_health == 0
+        for: 1m
+        labels:
+          severity: critical
+          component: system_health
+        annotations:
+          summary: "System Health ist CRITICAL"
+          description: "Das System ist in einem kritischen Zustand. Sofortige Maßnahmen erforderlich."
+
+      # High CPU Usage
+      - alert: HighCPUUsage
+        expr: enterprise_sync_cpu_usage > 90
+        for: 5m
+        labels:
+          severity: critical
+          component: performance
+        annotations:
+          summary: "CPU Usage über 90%"
+          description: "CPU Usage ist bei {{ $value }}% - System kann überlastet sein."
+
+      # High Memory Usage
+      - alert: HighMemoryUsage
+        expr: enterprise_sync_memory_usage > 90
+        for: 5m
+        labels:
+          severity: critical
+          component: performance
+        annotations:
+          summary: "Memory Usage über 90%"
+          description: "Memory Usage ist bei {{ $value }}% - Memory-Leak möglich."
+
+      # High Response Time
+      - alert: HighResponseTime
+        expr: enterprise_sync_response_time > 1000
+        for: 5m
+        labels:
+          severity: high
+          component: performance
+        annotations:
+          summary: "Response Time über 1 Sekunde"
+          description: "Durchschnittliche Response Time ist {{ $value }}ms - Performance-Problem."
+
+      # High Error Rate
+      - alert: HighErrorRate
+        expr: enterprise_sync_error_rate > 0.1
+        for: 5m
+        labels:
+          severity: critical
+          component: errors
+        annotations:
+          summary: "Error Rate über 10%"
+          description: "Error Rate ist bei {{ $value | humanizePercentage }} - Viele Requests schlagen fehl."
+
+      # Service Down
+      - alert: ServiceDown
+        expr: enterprise_sync_service_status{status="down"} == 1
+        for: 2m
+        labels:
+          severity: critical
+          component: services
+        annotations:
+          summary: "Service {{ $labels.service }} ist DOWN"
+          description: "Service {{ $labels.service }} ist seit {{ $for }} nicht verfügbar."
+
+      # Service Degraded
+      - alert: ServiceDegraded
+        expr: enterprise_sync_service_status{status="degraded"} == 1
+        for: 5m
+        labels:
+          severity: high
+          component: services
+        annotations:
+          summary: "Service {{ $labels.service }} ist DEGRADED"
+          description: "Service {{ $labels.service }} funktioniert eingeschränkt."
+
+  - name: enterprise_sync_security
+    interval: 30s
+    rules:
+      # Critical Security Event
+      - alert: CriticalSecurityEvent
+        expr: increase(enterprise_sync_security_events_total{severity="critical"}[5m]) > 0
+        for: 0m
+        labels:
+          severity: critical
+          component: security
+        annotations:
+          summary: "Kritisches Security-Event erkannt"
+          description: "Ein kritisches Security-Event wurde erkannt - sofortige Untersuchung erforderlich."
+
+      # Multiple Failed Logins
+      - alert: MultipleFailedLogins
+        expr: increase(enterprise_sync_security_events_total{type="failed_login"}[10m]) > 10
+        for: 5m
+        labels:
+          severity: high
+          component: security
+        annotations:
+          summary: "Mehrere fehlgeschlagene Login-Versuche"
+          description: "{{ $value }} fehlgeschlagene Login-Versuche in den letzten 10 Minuten."
+
+      # Unauthorized Access Attempt
+      - alert: UnauthorizedAccessAttempt
+        expr: increase(enterprise_sync_security_events_total{type="unauthorized_access"}[5m]) > 0
+        for: 0m
+        labels:
+          severity: critical
+          component: security
+        annotations:
+          summary: "Unautorisierter Zugriffsversuch erkannt"
+          description: "Ein Versuch auf unautorisierte Ressourcen zuzugreifen wurde erkannt."
+
+      # Data Breach Attempt
+      - alert: DataBreachAttempt
+        expr: increase(enterprise_sync_security_events_total{type="data_breach"}[5m]) > 0
+        for: 0m
+        labels:
+          severity: critical
+          component: security
+        annotations:
+          summary: "Möglicher Data Breach erkannt"
+          description: "Ein möglicher Data Breach wurde erkannt - sofortige Maßnahmen erforderlich."
+
+  - name: enterprise_sync_financial
+    interval: 1m
+    rules:
+      # Payment Processing Failure
+      - alert: PaymentProcessingFailure
+        expr: increase(enterprise_sync_financial_events_total{type="payment_failed"}[10m]) > 5
+        for: 5m
+        labels:
+          severity: high
+          component: financial
+        annotations:
+          summary: "Viele fehlgeschlagene Zahlungen"
+          description: "{{ $value }} Zahlungen sind in den letzten 10 Minuten fehlgeschlagen."
+
+      # Payout Processing Failure
+      - alert: PayoutProcessingFailure
+        expr: increase(enterprise_sync_financial_events_total{type="payout_failed"}[10m]) > 0
+        for: 5m
+        labels:
+          severity: critical
+          component: financial
+        annotations:
+          summary: "Payout-Verarbeitung fehlgeschlagen"
+          description: "Payout-Verarbeitung schlägt fehl - finanzielle Auswirkungen möglich."
+
+  - name: enterprise_sync_notifications
+    interval: 1m
+    rules:
+      # Notification Delivery Failure
+      - alert: NotificationDeliveryFailure
+        expr: rate(enterprise_sync_notifications_failed_total[5m]) > 0.1
+        for: 5m
+        labels:
+          severity: high
+          component: notifications
+        annotations:
+          summary: "Viele Benachrichtigungen können nicht zugestellt werden"
+          description: "{{ $value | humanizePercentage }} der Benachrichtigungen schlagen fehl."
+
+      # High Notification Queue
+      - alert: HighNotificationQueue
+        expr: enterprise_sync_notifications_queue_size > 1000
+        for: 5m
+        labels:
+          severity: medium
+          component: notifications
+        annotations:
+          summary: "Hohe Anzahl von Benachrichtigungen in der Warteschlange"
+          description: "{{ $value }} Benachrichtigungen warten auf Zustellung."
+
+  - name: enterprise_sync_analytics
+    interval: 5m
+    rules:
+      # Analytics Processing Failure
+      - alert: AnalyticsProcessingFailure
+        expr: increase(enterprise_sync_analytics_events_failed_total[10m]) > 10
+        for: 5m
+        labels:
+          severity: medium
+          component: analytics
+        annotations:
+          summary: "Viele Analytics-Events können nicht verarbeitet werden"
+          description: "{{ $value }} Analytics-Events sind in den letzten 10 Minuten fehlgeschlagen."
+
+  - name: enterprise_sync_ml
+    interval: 5m
+    rules:
+      # Low ML Prediction Accuracy
+      - alert: LowMLPredictionAccuracy
+        expr: enterprise_sync_ml_prediction_accuracy < 0.7
+        for: 10m
+        labels:
+          severity: medium
+          component: ml
+        annotations:
+          summary: "Niedrige ML-Prediction-Genauigkeit"
+          description: "ML-Prediction-Genauigkeit ist bei {{ $value | humanizePercentage }} - Model sollte überprüft werden."
+
+      # ML Prediction Service Down
+      - alert: MLPredictionServiceDown
+        expr: enterprise_sync_ml_service_status == 0
+        for: 5m
+        labels:
+          severity: high
+          component: ml
+        annotations:
+          summary: "ML-Prediction-Service ist nicht verfügbar"
+          description: "ML-Prediction-Service ist seit {{ $for }} nicht verfügbar."
+

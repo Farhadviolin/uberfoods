@@ -1,0 +1,89 @@
+.geofencing-container {
+  margin-top: 16px;
+  padding: 16px;
+  background: #E7F3FF;
+  border-radius: 8px;
+  border: 2px solid #1877F2;
+}
+
+.geofencing-error {
+  background: #ff6b6b;
+  color: white;
+  padding: 12px 16px;
+  border-radius: 6px;
+  margin-bottom: 12px;
+  font-size: 14px;
+}
+
+.geofencing-checkin {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+}
+
+.checkin-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+}
+
+.checkin-icon {
+  font-size: 32px;
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: white;
+  border-radius: 50%;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.checkin-details h4 {
+  margin: 0 0 4px 0;
+  color: #050505;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.checkin-details p {
+  margin: 0;
+  color: #65676B;
+  font-size: 14px;
+}
+
+.checkin-button {
+  background: #28a745;
+  color: white;
+  border: none;
+  padding: 12px 24px;
+  border-radius: 8px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+  white-space: nowrap;
+}
+
+.checkin-button:hover:not(:disabled) {
+  background: #218838;
+}
+
+.checkin-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+@media (max-width: 768px) {
+  .geofencing-checkin {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .checkin-button {
+    width: 100%;
+  }
+}
+

@@ -1,0 +1,35 @@
+.fb-header {
+  background: var(--fb-bg-primary);
+  border-bottom: 1px solid var(--fb-border-primary);
+  padding: 0 var(--fb-space-4);
+  position: sticky;
+  top: 0;
+  z-index: 1020;
+  box-shadow: var(--fb-shadow-sm);
+  transition: background-color var(--fb-transition-base), border-color var(--fb-transition-base);
+}
+
+.fb-header-content {
+  max-width: 1400px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 56px;
+}
+
+.fb-logo {
+  font-size: var(--fb-font-size-xl);
+  font-weight: 700;
+  color: var(--fb-primary);
+  text-decoration: none;
+  display: flex;
+  align-items: center;
+  gap: var(--fb-space-2);
+  transition: color var(--fb-transition-base);
+}
+
+.fb-logo:hover {
+  color: var(--fb-primary-hover);
+}
+

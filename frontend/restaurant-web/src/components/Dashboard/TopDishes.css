@@ -1,0 +1,27 @@
+.top-dishes-container {
+  background: var(--fb-bg-primary);
+  border-radius: var(--fb-radius-md);
+  padding: var(--fb-space-5);
+  border: 1px solid var(--fb-border-primary);
+  box-shadow: var(--fb-shadow-base);
+}
+
+.top-dishes-list {
+  display: grid;
+  gap: var(--fb-space-3);
+}
+
+.top-dish-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--fb-space-3);
+  background-color: var(--fb-bg-secondary);
+  border-radius: var(--fb-radius-base);
+  transition: background-color var(--fb-transition-base);
+}
+
+.top-dish-item:hover {
+  background-color: var(--fb-bg-tertiary);
+}
+

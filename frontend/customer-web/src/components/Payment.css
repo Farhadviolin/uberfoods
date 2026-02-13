@@ -1,0 +1,217 @@
+.payment-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.payment-content {
+  background: white;
+  border-radius: 12px;
+  padding: 24px;
+  max-width: 500px;
+  width: 90%;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.payment-content h2 {
+  margin: 0 0 20px 0;
+  font-size: 24px;
+  color: #1c1e21;
+}
+
+.payment-amount {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px;
+  background: #f0f2f5;
+  border-radius: 8px;
+  margin-bottom: 24px;
+  font-size: 18px;
+}
+
+.payment-amount strong {
+  font-size: 24px;
+  color: #1877f2;
+}
+
+.saved-methods {
+  margin-bottom: 24px;
+  padding: 16px;
+  background: #f0f2f5;
+  border-radius: 8px;
+}
+
+.saved-methods label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  cursor: pointer;
+}
+
+.method-select {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid #dddfe2;
+  border-radius: 8px;
+  font-size: 16px;
+  margin-top: 8px;
+}
+
+.payment-method-selector {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 24px;
+}
+
+.method-btn {
+  flex: 1;
+  padding: 12px;
+  border: 2px solid #dddfe2;
+  background: white;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.2s;
+}
+
+.method-btn:hover {
+  border-color: #1877f2;
+  background: #f0f2f5;
+}
+
+.method-btn.active {
+  border-color: #1877f2;
+  background: #1877f2;
+  color: white;
+}
+
+.card-form {
+  margin-bottom: 24px;
+}
+
+.form-group {
+  margin-bottom: 16px;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: 500;
+  color: #1c1e21;
+}
+
+.form-group input {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid #dddfe2;
+  border-radius: 8px;
+  font-size: 16px;
+  box-sizing: border-box;
+}
+
+.form-group input:focus {
+  outline: none;
+  border-color: #1877f2;
+}
+
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  margin-top: 8px;
+}
+
+.paypal-info,
+.apple-pay-info {
+  padding: 16px;
+  background: #f0f2f5;
+  border-radius: 8px;
+  margin-bottom: 24px;
+  text-align: center;
+}
+
+.apple-pay-btn {
+  width: 100%;
+  padding: 16px;
+  background: #000;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 18px;
+  font-weight: 600;
+  cursor: pointer;
+  margin-top: 12px;
+  transition: background 0.2s;
+}
+
+.apple-pay-btn:hover {
+  background: #333;
+}
+
+.payment-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+.cancel-btn,
+.pay-btn {
+  flex: 1;
+  padding: 14px;
+  border: none;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.cancel-btn {
+  background: #e4e6eb;
+  color: #1c1e21;
+}
+
+.cancel-btn:hover:not(:disabled) {
+  background: #d0d2d6;
+}
+
+.pay-btn {
+  background: #1877f2;
+  color: white;
+}
+
+.pay-btn:hover:not(:disabled) {
+  background: #166fe5;
+}
+
+.cancel-btn:disabled,
+.pay-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.error-message {
+  background: #fee;
+  color: #c33;
+  padding: 12px;
+  border-radius: 8px;
+  margin-bottom: 16px;
+}
+

@@ -1,0 +1,126 @@
+config:
+  target: 'http://localhost:3000'
+  phases:
+    - duration: 60
+      arrivalRate: 5
+      name: "Warm up phase"
+    - duration: 120
+      arrivalRate: 10
+      name: "Load testing phase"
+    - duration: 60
+      arrivalRate: 20
+      name: "Stress testing phase"
+    - duration: 30
+      arrivalRate: 5
+      name: "Cool down phase"
+  defaults:
+    headers:
+      Content-Type: 'application/json'
+
+scenarios:
+  - name: "Customer Registration"
+    weight: 10
+    flow:
+      - post:
+          url: "/auth/register"
+          json:
+            email: "loadtest{{ $randomInt }}@example.com"
+            password: "password123"
+            firstName: "Load"
+            lastName: "Test"
+          expect:
+            - statusCode: 201
+
+  - name: "Customer Login"
+    weight: 20
+    flow:
+      - post:
+          url: "/auth/login"
+          json:
+            email: "test@example.com"
+            password: "password123"
+          expect:
+            - statusCode: 200
+
+  - name: "Restaurant Search"
+    weight: 30
+    flow:
+      - get:
+          url: "/restaurants"
+          expect:
+            - statusCode: 200
+
+  - name: "Restaurant Details"
+    weight: 20
+    flow:
+      - get:
+          url: "/restaurants/test-restaurant-1"
+          expect:
+            - statusCode: 200
+
+  - name: "Menu Fetch"
+    weight: 25
+    flow:
+      - get:
+          url: "/restaurants/test-restaurant-1/menu"
+          expect:
+            - statusCode: 200
+
+  - name: "Order Placement"
+    weight: 15
+    flow:
+      - post:
+          url: "/orders"
+          headers:
+            Authorization: "Bearer test-jwt-token"
+          json:
+            restaurantId: "test-restaurant-1"
+            items:
+              - dishId: "dish-1"
+                quantity: 2
+            deliveryAddress:
+              street: "Test Street 123"
+              city: "Vienna"
+              zipCode: "1010"
+          expect:
+            - statusCode: 201
+
+  - name: "Order Status Check"
+    weight: 25
+    flow:
+      - get:
+          url: "/orders/test-order-1"
+          headers:
+            Authorization: "Bearer test-jwt-token"
+          expect:
+            - statusCode: 200
+
+  - name: "Driver Status Update"
+    weight: 10
+    flow:
+      - put:
+          url: "/drivers/me/status"
+          headers:
+            Authorization: "Bearer test-jwt-token"
+          json:
+            status: "online"
+          expect:
+            - statusCode: 200
+
+  - name: "Available Orders"
+    weight: 15
+    flow:
+      - get:
+          url: "/drivers/me/orders/available"
+          headers:
+            Authorization: "Bearer test-jwt-token"
+          expect:
+            - statusCode: 200
+
+  - name: "System Health Check"
+    weight: 5
+    flow:
+      - get:
+          url: "/health"
+          expect:
+            - statusCode: 200

@@ -1,0 +1,57 @@
+.profile {
+  padding: var(--fb-space-6);
+}
+
+.profile-form {
+  max-width: 600px;
+}
+
+.form-group {
+  margin-bottom: var(--fb-space-4);
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: var(--fb-space-2);
+  font-weight: 600;
+  color: var(--fb-text-primary);
+}
+
+.profile-details {
+  max-width: 800px;
+}
+
+.profile-section {
+  background: var(--fb-bg-secondary);
+  padding: var(--fb-space-6);
+  border-radius: var(--fb-radius-md);
+  margin-bottom: var(--fb-space-6);
+}
+
+.profile-section h3 {
+  margin: 0 0 var(--fb-space-4) 0;
+  font-size: var(--fb-font-size-lg);
+  font-weight: 600;
+}
+
+.profile-field {
+  display: flex;
+  padding: var(--fb-space-3) 0;
+  border-bottom: 1px solid var(--fb-border-primary);
+}
+
+.profile-field:last-child {
+  border-bottom: none;
+}
+
+.field-label {
+  font-weight: 600;
+  min-width: 150px;
+  color: var(--fb-text-secondary);
+}
+
+.field-value {
+  flex: 1;
+  color: var(--fb-text-primary);
+}
+

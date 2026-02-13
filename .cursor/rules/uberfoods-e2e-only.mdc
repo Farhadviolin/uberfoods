@@ -1,0 +1,60 @@
+---
+description: "UberFoods — E2E ONLY Auto-Fix Loop (Real Integration, No Bypass)"
+globs:
+  - "frontend/customer-web/**"
+  - "scripts/release-gate.mjs"
+  - "scripts/reset-db-e2e.mjs"
+  - "docs/e2e/**"
+---
+
+# MODE: AGENT — E2E ONLY AUTO-FIX LOOP (REAL INTEGRATION)
+
+## GOAL
+Run ONLY customer-web E2E: targeted → validation → stability (10/10) → release-gate.
+If any fails, fix minimal root cause and rerun until all green — WITH REAL INTEGRATION.
+
+## HARD RULES (NON-NEGOTIABLE)
+- No product features.
+- No mocks in validation/release-gate. Always enforce: VITE_E2E_MOCK="false".
+- UI prefs disable flag is E2E-scoped only (never global defaults).
+- DB bootstrap policy: Prisma first → verify tables → SQL fallback; CI hard-fail if both fail.
+- NO TEST BYPASS:
+  - Never use page.goto('about:blank') in E2E.
+  - Never comment out API validation.
+  - Never replace assertions with placeholders.
+
+## REQUIRED HEALTH CHECKS (FAIL FAST)
+Before running Playwright (use the ports printed by release-gate logs):
+- Backend must respond 200: http://localhost:<BACKEND_PORT>/api/health
+- Frontend must respond 200/HTML: http://localhost:<FRONTEND_PORT>/
+
+If either fails → exit 1 (do not run Playwright).
+
+## RUN ORDER
+1) pnpm --filter customer-web test:e2e:targeted
+2) pnpm --filter customer-web test:e2e:validation
+3) pnpm --filter customer-web test:e2e:stability   (must be 10/10)
+4) Release-Gate Proof (PowerShell):
+   $env:PRISMA_USER_CONSENT_FOR_DANGEROUS_AI_ACTION="I explicitly consent to the database reset operation for E2E testing"
+   $env:VITE_E2E_MOCK="false"
+   node scripts/release-gate.mjs --yes
+   echo RELEASE_GATE_EXIT_CODE=$LASTEXITCODE
+
+## FIX LOOP BEHAVIOR
+If any step fails:
+- Identify FIRST failing test and root cause.
+- Apply minimal patch (no bypass).
+- Rerun the same step until PASS.
+- Continue to next step.
+- Update docs/e2e/acceptance.md with:
+  - timestamp
+  - branch/commit
+  - summary lines for targeted/validation/stability/release-gate
+  - evidence: Real API via Vite proxy, backend port, frontend port, paginated {data,pagination}
+
+## OUTPUT FORMAT
+- Summary (targeted/validation/stability/release-gate)
+- First failing test + log snippet
+- Patch (files + diff)
+- Rerun proof (PASS)
+- acceptance.md updated

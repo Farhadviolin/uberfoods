@@ -1,0 +1,3 @@
+# Backend Command After Fix
+# docker compose config shows backend service without command override
+# Dockerfile.dev CMD ["node", "dist/main.js"] is now active

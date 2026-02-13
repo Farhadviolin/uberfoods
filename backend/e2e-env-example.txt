@@ -1,0 +1,46 @@
+# E2E Environment Configuration
+# Copy this file to .env.e2e and adjust values as needed
+
+# Database
+DATABASE_URL=postgresql://postgres:password@localhost:5432/uberfoods_test
+
+# Application
+NODE_ENV=e2e
+PORT=3000
+
+# JWT
+JWT_SECRET=e2e-jwt-secret-key-for-testing-only-not-for-production
+
+# Redis (if used)
+REDIS_URL=redis://localhost:6379
+
+# Admin Test Credentials
+TEST_ADMIN_EMAIL=admin@uberfoods.com
+TEST_ADMIN_PASSWORD=admin123
+
+# E2E Test Credentials (alternative naming)
+E2E_ADMIN_EMAIL=admin@uberfoods.com
+E2E_ADMIN_PASSWORD=admin123
+
+# Email (disabled for E2E)
+SMTP_HOST=localhost
+SMTP_PORT=1025
+SMTP_USER=
+SMTP_PASS=
+
+# Stripe (test keys for E2E)
+STRIPE_SECRET_KEY=STRIPE_SECRET_KEY_PLACEHOLDER
+STRIPE_PUBLISHABLE_KEY=STRIPE_PUBLISHABLE_KEY_PLACEHOLDER
+STRIPE_WEBHOOK_SECRET=STRIPE_WEBHOOK_SECRET_PLACEHOLDER
+
+# Logging
+LOG_LEVEL=debug
+
+# Seed Passwords
+SEED_CUSTOMER_PASSWORD=customer123
+SEED_RESTAURANT_PASSWORD=restaurant123
+SEED_DRIVER_PASSWORD=driver123
+
+# Feature Flags (E2E specific)
+FEATURE_DUAL_PUBLISH=false
+WRITE_GUARD_ENABLED=false
