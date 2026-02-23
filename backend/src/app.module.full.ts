@@ -7,7 +7,6 @@ import { APP_INTERCEPTOR, APP_FILTER, APP_GUARD } from "@nestjs/core";
 // Database and Core Services
 import { DatabaseModule } from "./common/database/database.module";
 import { RedisService } from "./common/services/redis.service";
-import { MetricsService } from "./common/services/metrics.service";
 import { IdempotencyService } from "./common/services/idempotency.service";
 import { RateLimiterService } from "./common/services/rate-limiter.service";
 
@@ -16,12 +15,14 @@ import { HealthModule } from "./common/health/health.module";
 import { LoggerModule } from "./common/logger/logger.module";
 import { CacheModule } from "./common/cache/cache.module";
 import { StorageModule } from "./common/storage/storage.module";
+import { MetricsModule } from "./common/services/metrics.module";
 
 // Feature Modules (temporarily excluding admin until build is stable)
 import { AuthModule } from "./modules/auth/auth.module";
 import { CustomerModule } from "./modules/customer/customer.module";
 import { DriverModule } from "./modules/driver/driver.module.final";
 import { RestaurantModule } from "./modules/restaurant/restaurant.module";
+import { DishModule } from "./modules/dish/dish.module";
 import { OrderModule } from "./modules/order/order.module";
 import { PaymentModule } from "./modules/payment/payment.module";
 import { NotificationModule } from "./modules/notification/notification.module";
@@ -35,6 +36,7 @@ import { LoggingInterceptor } from "./common/interceptors/logging.interceptor";
 import { TransformInterceptor } from "./common/interceptors/transform.interceptor";
 import { ValidationInterceptor } from "./common/interceptors/validation.interceptor";
 import { SecurityAuditInterceptor } from "./common/interceptors/security-audit.interceptor";
+import { AuditLedgerService } from "./common/audit/audit-ledger.service";
 import { SanitizeInterceptor } from "./common/interceptors/sanitize.interceptor";
 import { IdempotencyInterceptor } from "./common/interceptors/idempotency.interceptor";
 import { RateLimitGuard } from "./common/guards/rate-limit.guard";
@@ -64,12 +66,14 @@ import { RateLimitGuard } from "./common/guards/rate-limit.guard";
     CacheModule,
     StorageModule,
     HealthModule,
+    MetricsModule,
 
     // Feature Modules
     AuthModule,
     CustomerModule,
     DriverModule,
     RestaurantModule,
+    DishModule,
     OrderModule,
     PaymentModule,
     NotificationModule,
@@ -80,11 +84,11 @@ import { RateLimitGuard } from "./common/guards/rate-limit.guard";
     AdminModule,
   ],
   providers: [
-    // Core Services
+    // Core Services (MetricsService only via MetricsModule @Global())
     RedisService,
-    MetricsService,
     IdempotencyService,
     RateLimiterService,
+    AuditLedgerService,
 
     // Global Guards
     {

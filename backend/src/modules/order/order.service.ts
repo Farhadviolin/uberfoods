@@ -701,6 +701,11 @@ export class OrderService {
         deliveryAddress: data.deliveryAddress || data.address,
         paymentMethod: data.paymentMethod || "CREDIT_CARD",
         status: "PENDING",
+        subtotal,
+        totalAmount,
+        deliveryFee,
+        taxAmount: Number(taxAmount.toFixed(2)),
+        discountAmount,
         items: {
           create: orderItems as any,
         },
@@ -730,16 +735,17 @@ export class OrderService {
     const startTime = Date.now();
     const order = await this.findOne(id);
 
-    // Simple status validation for tests
+    // Simple status validation for tests / MVP
     const allowed = [
       "PENDING",
       "CONFIRMED",
       "PREPARING",
+      "READY",
+      "READY_FOR_PICKUP",
+      "ACCEPTED",
       "IN_TRANSIT",
       "DELIVERED",
       "CANCELLED",
-      "READY",
-      "ACCEPTED",
     ];
     if (!allowed.includes(status)) {
       throw new BadRequestException("Invalid status");

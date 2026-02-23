@@ -25,7 +25,19 @@ export class DriverEndpointsController {
   // @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: "Get available orders for driver" })
   @ApiResponse({ status: 200, description: "Available orders retrieved" })
-  async getAvailableOrders() {
+  async getAvailableOrders(): Promise<unknown> {
+    return this.getAvailableOrdersImpl();
+  }
+
+  /** Alias for driver-app: GET /drivers/:driverId/orders/available (driverId from JWT in app; param ignored for MVP) */
+  @Get(":driverId/orders/available")
+  @ApiOperation({ summary: "Get available orders (alias with driverId in path)" })
+  @ApiResponse({ status: 200, description: "Available orders retrieved" })
+  async getAvailableOrdersByDriverId(@Param("driverId") _driverId: string): Promise<unknown> {
+    return this.getAvailableOrdersImpl();
+  }
+
+  private async getAvailableOrdersImpl(): Promise<unknown> {
     try {
       const orders = await this.prisma.order.findMany({
         where: {
@@ -65,6 +77,22 @@ export class DriverEndpointsController {
     @GetUser("id") driverId: string,
     @Param("orderId") orderId: string,
   ) {
+    return this.acceptOrderImpl(driverId, orderId);
+  }
+
+  /** Alias for driver-app: POST /drivers/:driverId/orders/:orderId/accept */
+  @Post(":driverId/orders/:orderId/accept")
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: "Accept an order (alias with driverId in path)" })
+  @ApiResponse({ status: 200, description: "Order accepted successfully" })
+  async acceptOrderWithDriverId(
+    @GetUser("id") driverId: string,
+    @Param("orderId") orderId: string,
+  ) {
+    return this.acceptOrderImpl(driverId, orderId);
+  }
+
+  private async acceptOrderImpl(driverId: string, orderId: string) {
     try {
       const order = await this.prisma.order.findUnique({
         where: { id: orderId },
@@ -78,7 +106,7 @@ export class DriverEndpointsController {
       });
       return updated;
     } catch (error) {
-      this.logger.error(`Failed to accept order: ${error.message}`);
+      this.logger.error(`Failed to accept order: ${(error as Error).message}`);
       throw error;
     }
   }
@@ -92,6 +120,27 @@ export class DriverEndpointsController {
     @Param("orderId") orderId: string,
     @Body() body: { status: string },
   ) {
+    return this.updateOrderStatusImpl(driverId, orderId, body.status);
+  }
+
+  /** Alias for driver-app: PUT /drivers/:driverId/orders/:orderId/status */
+  @Put(":driverId/orders/:orderId/status")
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: "Update delivery status (alias with driverId in path)" })
+  @ApiResponse({ status: 200, description: "Status updated successfully" })
+  async updateOrderStatusWithDriverId(
+    @GetUser("id") driverId: string,
+    @Param("orderId") orderId: string,
+    @Body() body: { status: string },
+  ) {
+    return this.updateOrderStatusImpl(driverId, orderId, body.status);
+  }
+
+  private async updateOrderStatusImpl(
+    driverId: string,
+    orderId: string,
+    status: string,
+  ) {
     try {
       const order = await this.prisma.order.findUnique({
         where: { id: orderId },
@@ -101,11 +150,13 @@ export class DriverEndpointsController {
       }
       const updated = await this.prisma.order.update({
         where: { id: orderId },
-        data: { status: body.status },
+        data: { status },
       });
       return updated;
     } catch (error) {
-      this.logger.error(`Failed to update order status: ${error.message}`);
+      this.logger.error(
+        `Failed to update order status: ${(error as Error).message}`,
+      );
       throw error;
     }
   }

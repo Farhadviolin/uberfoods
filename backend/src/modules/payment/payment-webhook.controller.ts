@@ -21,8 +21,10 @@ export class PaymentWebhookController {
     private readonly configService: ConfigService,
     private readonly paymentService: PaymentService,
   ) {
-    const secretKey = this.configService.get<string>("STRIPE_SECRET_KEY");
-    this.stripe = new Stripe(secretKey ?? "", {
+    const secretKey =
+      this.configService.get<string>("STRIPE_SECRET_KEY") ||
+      "STRIPE_SECRET_KEY_PLACEHOLDER";
+    this.stripe = new Stripe(secretKey, {
       apiVersion: "2025-10-29.clover",
     });
   }

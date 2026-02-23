@@ -9,8 +9,10 @@
     "e2e:gate:a": "npm --prefix frontend/admin-panel run e2e:gate:a",
     "e2e:gate:b": "npm --prefix frontend/admin-panel run e2e:gate:b",
     "e2e:all": "npm --prefix frontend/admin-panel run e2e:all",
+    "dev:admin": "npm --prefix frontend/admin-panel run dev:fixed",
     "verify:local": "powershell -NoLogo -NoProfile -ExecutionPolicy Bypass -File scripts/verify-local.ps1",
-    "verify:local:no-docker": "powershell -NoLogo -NoProfile -ExecutionPolicy Bypass -File scripts/verify-local-no-docker.ps1"
+    "verify:local:no-docker": "powershell -NoLogo -NoProfile -ExecutionPolicy Bypass -File scripts/verify-local-no-docker.ps1",
+    "smoke:mvp": "powershell -NoLogo -NoProfile -ExecutionPolicy Bypass -File scripts/smoke-mvp.ps1"
   },
   "dependencies": {
     "@prisma/client": "^7.1.0",

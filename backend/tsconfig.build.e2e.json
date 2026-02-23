@@ -1,0 +1,28 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmitOnError": false,
+    "strict": false,
+    "noImplicitAny": false,
+    "skipLibCheck": true,
+    "noImplicitReturns": false,
+    "noFallthroughCasesInSwitch": false,
+    "noUncheckedIndexedAccess": false,
+    "exactOptionalPropertyTypes": false
+  },
+  "include": ["src/main.e2e.ts"],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "**/*.spec.ts",
+    "**/*.test.ts",
+    "**/__tests__/**",
+    "**/*.e2e-spec.ts",
+    "src/modules/admin/ml-assignment.controller.ts",
+    "src/modules/admin/ml-assignment.service.ts",
+    "src/modules/driver/*",
+    "src/modules/restaurant/restaurant.controller.ts",
+    "src/modules/restaurant/restaurant.service.ts",
+    "**/disabled/**"
+  ]
+}

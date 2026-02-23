@@ -1,7 +1,7 @@
 import { Test, TestingModule } from "@nestjs/testing";
 import { INestApplication, ValidationPipe } from "@nestjs/common";
 import * as request from "supertest";
-import { AppModule } from "../../src/app.module";
+import { AppModuleE2E } from "../../src/app.module.e2e";
 import { PrismaService } from "../../src/prisma/prisma.service";
 import { getTestEmail, getTestPassword, getTestToken } from "../utils/test-credentials";
 
@@ -19,12 +19,17 @@ describe("API Endpoints Integration Tests (e2e)", () => {
 
   beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
-      imports: [AppModule],
+      imports: [AppModuleE2E],
     }).compile();
 
     app = moduleFixture.createNestApplication();
     prisma = moduleFixture.get<PrismaService>(PrismaService);
 
+    app.enableCors({ origin: true, credentials: true });
+    app.setGlobalPrefix("api");
+    app.getHttpAdapter().get("/api/health", (_req, res) => {
+      res.json({ status: "ok", timestamp: new Date().toISOString() });
+    });
     app.useGlobalPipes(
       new ValidationPipe({
         whitelist: true,
@@ -130,18 +135,20 @@ describe("API Endpoints Integration Tests (e2e)", () => {
         .get("/api/restaurants/public")
         .expect(200)
         .expect((res) => {
-          expect(Array.isArray(res.body)).toBe(true);
+          const items = res.body?.data ?? res.body;
+          expect(Array.isArray(items)).toBe(true);
         });
     });
 
     it("GET /api/restaurants/public/:id should return restaurant", async () => {
-      // First get list to find an ID
+      // First get list to find an ID (API may return { data: [...] } or [...])
       const listResponse = await request(app.getHttpServer())
         .get("/api/restaurants/public")
         .expect(200);
 
-      if (listResponse.body.length > 0) {
-        const restaurantId = listResponse.body[0].id;
+      const items = listResponse.body?.data ?? listResponse.body;
+      if (items?.length > 0) {
+        const restaurantId = items[0].id;
         return request(app.getHttpServer())
           .get(`/api/restaurants/public/${restaurantId}`)
           .expect(200)
@@ -160,17 +167,18 @@ describe("API Endpoints Integration Tests (e2e)", () => {
         return;
       }
 
-      // First get a restaurant
+      // First get a restaurant (API returns { data: [...] } or [...])
       const restaurantResponse = await request(app.getHttpServer())
         .get("/api/restaurants/public")
         .expect(200);
 
-      if (restaurantResponse.body.length === 0) {
+      const restaurants = restaurantResponse.body?.data ?? restaurantResponse.body;
+      if (!restaurants?.length) {
         console.warn("Skipping order creation - no restaurants available");
         return;
       }
 
-      const restaurant = restaurantResponse.body[0];
+      const restaurant = restaurants[0];
       testRestaurantId = restaurant.id;
 
       // Get dishes for restaurant
@@ -179,12 +187,13 @@ describe("API Endpoints Integration Tests (e2e)", () => {
         .set("Authorization", `Bearer ${customerToken}`)
         .expect(200);
 
-      if (dishesResponse.body.length === 0) {
+      const dishesList = dishesResponse.body?.data ?? dishesResponse.body;
+      if (!dishesList?.length) {
         console.warn("Skipping order creation - no dishes available");
         return;
       }
 
-      const dish = dishesResponse.body[0];
+      const dish = dishesList[0];
 
       const response = await request(app.getHttpServer())
         .post("/api/orders/customer")
@@ -222,7 +231,8 @@ describe("API Endpoints Integration Tests (e2e)", () => {
         .set("Authorization", `Bearer ${customerToken}`)
         .expect(200)
         .expect((res) => {
-          expect(Array.isArray(res.body)).toBe(true);
+          const items = res.body?.data ?? res.body;
+          expect(Array.isArray(items)).toBe(true);
         });
     });
   });
@@ -340,7 +350,8 @@ describe("API Endpoints Integration Tests (e2e)", () => {
         .get("/api/restaurants/public")
         .expect(200);
 
-      if (restaurantResponse.body.length === 0) {
+      const restaurants = restaurantResponse.body?.data ?? restaurantResponse.body;
+      if (!restaurants?.length) {
         console.warn("Skipping - no restaurants available");
         return;
       }
@@ -349,7 +360,7 @@ describe("API Endpoints Integration Tests (e2e)", () => {
         .post("/api/group-orders")
         .set("Authorization", `Bearer ${customerToken}`)
         .send({
-          restaurantId: restaurantResponse.body[0].id,
+          restaurantId: restaurants[0].id,
           expiresAt: new Date(Date.now() + 3600000).toISOString(),
         });
 
@@ -400,22 +411,24 @@ describe("API Endpoints Integration Tests (e2e)", () => {
         .get("/api/restaurants/public")
         .expect(200);
 
-      if (restaurantResponse.body.length === 0) {
+      const restaurants = restaurantResponse.body?.data ?? restaurantResponse.body;
+      if (!restaurants?.length) {
         console.warn("Skipping - no restaurants available");
         return;
       }
 
       const dishesResponse = await request(app.getHttpServer())
-        .get(`/api/dishes/restaurant/${restaurantResponse.body[0].id}`)
+        .get(`/api/dishes/restaurant/${restaurants[0].id}`)
         .set(
           "Authorization",
           `Bearer ${customerToken || getTestToken("TEST_CUSTOMER_TOKEN", "customer")}`,
         )
         .expect(200);
 
-      if (dishesResponse.body.length > 0) {
+      const dishes = dishesResponse.body?.data ?? dishesResponse.body;
+      if (dishes?.length > 0) {
         return request(app.getHttpServer())
-          .get(`/api/dishes/${dishesResponse.body[0].id}/nutrition`)
+          .get(`/api/dishes/${dishes[0].id}/nutrition`)
           .expect(200)
           .expect((res) => {
             expect(res.body).toHaveProperty("calories");

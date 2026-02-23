@@ -6,11 +6,10 @@ import { WebhookService } from "./webhook.service";
 import { DatabaseModule } from "../../common/database/database.module";
 import { PaymentModule } from "../payment/payment.module";
 import { CacheModule } from "../../common/cache/cache.module";
-import { MetricsModule } from "../../common/services/metrics.module";
 
 @Module({
-  imports: [DatabaseModule, PaymentModule, CacheModule, MetricsModule],
-  controllers: [OrderController],
+  imports: [DatabaseModule, PaymentModule, CacheModule],
+  controllers: [OrderController, DriverEndpointsController],
   providers: [OrderService, WebhookService],
   exports: [OrderService, WebhookService],
 })

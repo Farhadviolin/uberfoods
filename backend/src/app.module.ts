@@ -37,7 +37,7 @@ import { AuditLedgerService } from "./common/audit/audit-ledger.service";
     // Global Configuration
     ConfigModule.forRoot({
       isGlobal: true,
-      envFilePath: [".env.local", ".env"],
+      envFilePath: [".env.e2e", ".env.local", ".env"],
     }),
 
     // Core Infrastructure

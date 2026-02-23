@@ -15,7 +15,7 @@ export default defineConfig(({ mode }) => ({
     },
   },
   server: {
-    host: '127.0.0.1',
+    host: '::',
     port: 3002,
     strictPort: true,
     proxy: {

@@ -114,8 +114,13 @@ export class JwtAuthGuard extends AuthGuard("jwt") {
       return true;
     }
 
-    // In Development: Only bypass for non-driver endpoints
-    if ((allowDevAuth || nodeEnv !== "production") && !isDriverEndpoint) {
+    // In Development: Only bypass for non-driver endpoints. Never bypass in E2E.
+    const isE2E = nodeEnv === "e2e";
+    if (
+      !isE2E &&
+      (allowDevAuth || nodeEnv !== "production") &&
+      !isDriverEndpoint
+    ) {
       this.logger.debug(
         `🔓 Dev Mode: Bypassing authentication for ${request.url}`,
       );
@@ -154,7 +159,12 @@ export class JwtAuthGuard extends AuthGuard("jwt") {
       const isDriverEndpoint = requestPath.startsWith("/api/drivers/");
       const isAuthEndpoint = requestPath.startsWith("/api/auth/");
 
-      if ((allowDevAuth || nodeEnv !== "production") && !isDriverEndpoint) {
+      const isE2EBypass = nodeEnv === "e2e";
+      if (
+        !isE2EBypass &&
+        (allowDevAuth || nodeEnv !== "production") &&
+        !isDriverEndpoint
+      ) {
         this.logger.debug(
           `🔓 Dev Mode: JWT validation failed, but allowing as admin: ${err?.message || info?.message || "Unknown error"}`,
         );

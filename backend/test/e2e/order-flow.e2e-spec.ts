@@ -54,6 +54,13 @@ describe("Order Flow E2E", () => {
       .expect(401);
   });
 
+  it("GET /api/orders mit invalid token sollte 401 zurückgeben", () => {
+    return request(app.getHttpServer())
+      .get("/api/orders")
+      .set("Authorization", "Bearer invalid-token-xyz")
+      .expect(401);
+  });
+
   it("GET /api/health sollte 200 zurückgeben", () => {
     return request(app.getHttpServer())
       .get("/api/health")

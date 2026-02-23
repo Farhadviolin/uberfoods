@@ -60,7 +60,7 @@ export const SocialManagement: React.FC = () => {
 
   const handleSyncAll = async () => {
     try {
-      await syncMutation.mutateAsync();
+      await syncMutation.mutateAsync(undefined);
       alert('Social Media Synchronisation erfolgreich abgeschlossen');
     } catch (error) {
       alert('Fehler bei der Synchronisation');

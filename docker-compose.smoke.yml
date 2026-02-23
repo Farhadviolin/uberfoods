@@ -1,0 +1,12 @@
+# Override for Smoke/Go-Live: Backend runs ONLY from image (no src/dist mounts).
+# Use:
+#   docker compose -f docker-compose.yml -f docker-compose.smoke.yml up -d --build
+#
+# Guarantees the container uses the built code from the image, not host dist.
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.dev
+    volumes: []   # override base volumes: no mounts -> /app from image only

@@ -35,6 +35,6 @@ import { RbacModule } from "../rbac/rbac.module";
   ],
   providers: [AuthService, JwtStrategy, SocialAuthService, MfaService],
   controllers: [AuthController],
-  exports: [AuthService, JwtStrategy, SocialAuthService, MfaService],
+  exports: [AuthService, JwtStrategy, SocialAuthService, MfaService, JwtModule],
 })
 export class AuthModule {}

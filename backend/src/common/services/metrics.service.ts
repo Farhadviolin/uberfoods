@@ -42,14 +42,114 @@ export class MetricsService {
   public circuitBreakerState: Gauge<string>;
 
   constructor() {
-    // Enable default Node.js metrics
-    collectDefaultMetrics({ prefix: "uberfoods_" });
+    const g: any = globalThis as any;
+
+    // ---- HARD-GUARD: Default metrics dürfen pro Prozess nur EINMAL registriert werden
+    // Schutz gegen: doppelte Instanz, hot-reload, test runner, module duplication
+    const FLAG = "__UBERFOODS_DEFAULT_METRICS__";
+    const MARKER_METRIC = "uberfoods_process_cpu_user_seconds_total";
+
+    if (g[FLAG] === "done") {
+      this.logger.debug(
+        "Default metrics already registered (global marker done); skipping collectDefaultMetrics()",
+      );
+    } else if (g[FLAG] === "init") {
+      this.logger.debug(
+        "Default metrics registration already in progress (global marker init); skipping collectDefaultMetrics()",
+      );
+    } else {
+      g[FLAG] = "init";
+      try {
+        if (register.getSingleMetric(MARKER_METRIC)) {
+          this.logger.debug(
+            `Default metrics already registered (found ${MARKER_METRIC}); skipping collectDefaultMetrics()`,
+          );
+        } else {
+          collectDefaultMetrics({ prefix: "uberfoods_" });
+        }
+        g[FLAG] = "done";
+      } catch (e: any) {
+        const msg = String(e?.message ?? e);
+        if (msg.includes("already been registered")) {
+          this.logger.warn(
+            `Prometheus default metrics already registered; continuing startup. (${msg})`,
+          );
+          g[FLAG] = "done";
+        } else {
+          g[FLAG] = undefined;
+          throw e;
+        }
+      }
+    }
 
     this.initializeMetrics();
     this.logger.log("Prometheus metrics initialized");
   }
 
   private initializeMetrics(): void {
+    // ---- HARD-GUARD: Custom metrics dürfen nicht doppelt registriert werden (REUSE statt new)
+    const existingHttpDuration = register.getSingleMetric(
+      "uberfoods_http_request_duration_seconds",
+    ) as Histogram<string> | undefined;
+
+    if (existingHttpDuration) {
+      const sanity = register.getSingleMetric("uberfoods_http_requests_total");
+      if (!sanity) {
+        this.logger.warn(
+          "Custom metrics partially missing in registry; recreating metrics",
+        );
+      } else {
+        this.httpRequestDuration = existingHttpDuration;
+        this.httpRequestsTotal = register.getSingleMetric(
+          "uberfoods_http_requests_total",
+        ) as Counter<string>;
+        this.httpRequestsInFlight = register.getSingleMetric(
+          "uberfoods_http_requests_in_flight",
+        ) as Gauge<string>;
+        this.dbConnectionsTotal = register.getSingleMetric(
+          "uberfoods_db_connections_total",
+        ) as Gauge<string>;
+        this.dbQueryDuration = register.getSingleMetric(
+          "uberfoods_db_query_duration_seconds",
+        ) as Histogram<string>;
+        this.wsConnectionsActive = register.getSingleMetric(
+          "uberfoods_ws_connections_active",
+        ) as Gauge<string>;
+        this.wsMessagesTotal = register.getSingleMetric(
+          "uberfoods_ws_messages_total",
+        ) as Counter<string>;
+        this.ordersCreatedTotal = register.getSingleMetric(
+          "uberfoods_orders_created_total",
+        ) as Counter<string>;
+        this.ordersStatusChangesTotal = register.getSingleMetric(
+          "uberfoods_orders_status_changes_total",
+        ) as Counter<string>;
+        this.outboxMessagesTotal = register.getSingleMetric(
+          "uberfoods_outbox_messages_total",
+        ) as Counter<string>;
+        this.outboxMessagesProcessedTotal = register.getSingleMetric(
+          "uberfoods_outbox_messages_processed_total",
+        ) as Counter<string>;
+        this.outboxQueueDepth = register.getSingleMetric(
+          "uberfoods_outbox_queue_depth",
+        ) as Gauge<string>;
+        this.rateLimitExceededTotal = register.getSingleMetric(
+          "uberfoods_rate_limit_exceeded_total",
+        ) as Counter<string>;
+        this.rateLimitRequestsTotal = register.getSingleMetric(
+          "uberfoods_rate_limit_requests_total",
+        ) as Counter<string>;
+        this.circuitBreakerState = register.getSingleMetric(
+          "uberfoods_circuit_breaker_state",
+        ) as Gauge<string>;
+
+        this.logger.debug(
+          "Custom metrics already registered; reusing existing prom-client metrics",
+        );
+        return;
+      }
+    }
+
     // HTTP Metrics
     this.httpRequestDuration = new Histogram({
       name: "uberfoods_http_request_duration_seconds",

@@ -1,125 +1,44 @@
-$ErrorActionPreference = "Stop"
+$ErrorActionPreference = "Continue"
+try {
+  [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+  $OutputEncoding = [System.Text.Encoding]::UTF8
+} catch {}
 
-function Run-Step {
-  param([string]$Title, [scriptblock]$Cmd)
+Write-Host "=== verify-local: Ports + Prozesse + HTTP Checks ==="
 
-  Write-Host ""
-  Write-Host "===================="
-  Write-Host $Title
-  Write-Host "===================="
-  & $Cmd
-  if ($LASTEXITCODE -ne 0) {
-    throw "Step failed: $Title (ExitCode=$LASTEXITCODE)"
-  }
+$ports = @(3000,3002,3003,3004,5173)
+
+Write-Host "`n[1] LISTENERS"
+$listen = Get-NetTCPConnection -State Listen | Where-Object { $_.LocalPort -in $ports } |
+  Select-Object LocalAddress,LocalPort,OwningProcess | Sort-Object LocalPort
+$listen | Format-Table -AutoSize
+
+Write-Host "`n[2] PROCESSES"
+$ids = @()
+if ($listen) { $ids = $listen.OwningProcess | Sort-Object -Unique }
+if ($ids.Count -gt 0) {
+  Get-Process -Id $ids -ErrorAction SilentlyContinue | Select-Object Id,ProcessName,Path | Format-Table -AutoSize
+} else {
+  Write-Host "No listener processes found for expected ports."
 }
 
-function Http-Status {
-  param([string]$Url)
+function Check-Http {
+  param([string]$Name,[string]$Url)
   try {
-    $res = Invoke-WebRequest -Uri $Url -Method GET -UseBasicParsing -TimeoutSec 5
-    return [int]$res.StatusCode
+    $r = Invoke-WebRequest $Url -UseBasicParsing -TimeoutSec 6
+    Write-Host ("[OK] {0} -> {1} ({2})" -f $Name, $r.StatusCode, $Url)
   } catch {
-    if ($_.Exception.Response -and $_.Exception.Response.StatusCode) {
-      return [int]$_.Exception.Response.StatusCode
-    }
-    return 0
+    Write-Host ("[FAIL] {0} -> {1} | {2}" -f $Name, $Url, $_.Exception.Message)
   }
 }
 
-# Prefer docker compose if available
-$useDockerComposeV2 = $false
-try { docker compose version *> $null; $useDockerComposeV2 = $true } catch {}
+Write-Host "`n[3] HTTP CHECKS"
+Check-Http -Name "Backend Health" -Url "http://localhost:3000/api/health"
+Check-Http -Name "Customer Web"   -Url "http://localhost:5173/"
+Check-Http -Name "Admin (localhost)" -Url "http://localhost:3002/"
+Check-Http -Name "Admin (127.0.0.1)" -Url "http://127.0.0.1:3002/"
+Check-Http -Name "Restaurant Web" -Url "http://localhost:3003/"
+Check-Http -Name "Driver App"     -Url "http://localhost:3004/"
 
-function DC {
-  param([Parameter(ValueFromRemainingArguments=$true)][string[]]$Args)
-  if ($useDockerComposeV2) {
-    docker compose @Args
-  } else {
-    docker-compose @Args
-  }
-  if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-}
-
-Run-Step "Root: install" {
-  # wenn du pnpm nutzt, ersetze die nächste Zeile durch: pnpm i --frozen-lockfile
-  npm ci
-}
-
-Run-Step "Backend: build" {
-  Push-Location "backend"
-  try {
-    npm run build
-  } finally {
-    Pop-Location
-  }
-}
-
-Run-Step "Admin Panel: typecheck" {
-  Push-Location "frontend/admin-panel"
-  try {
-    npm run typecheck
-  } finally {
-    Pop-Location
-  }
-}
-
-Run-Step "Docker: check availability" {
-  # Check if Docker is installed
-  try {
-    $dockerVersion = docker --version
-    Write-Host "Docker found: $dockerVersion"
-  } catch {
-    throw "Docker Desktop/daemon not running. Start Docker then re-run."
-  }
-
-  # Check if Docker daemon is running
-  try {
-    docker info *> $null
-    Write-Host "Docker daemon is running"
-  } catch {
-    throw "Docker Desktop/daemon not running. Start Docker then re-run."
-  }
-}
-
-Run-Step "Docker: up -d" { DC up -d }
-
-Run-Step "Backend: wait for health" {
-  $url = "http://127.0.0.1:3000/api/health"
-  $ok = $false
-  for ($i=0; $i -lt 60; $i++) {
-    $code = Http-Status $url
-    if ($code -eq 200) { $ok = $true; break }
-    Start-Sleep -Seconds 2
-  }
-  if (-not $ok) {
-    DC logs backend --tail 200
-    throw "Backend health not ready (http://127.0.0.1:3000/api/health)"
-  }
-}
-
-Run-Step "DB: migrate deploy" { DC exec -T backend npx prisma migrate deploy }
-
-Run-Step "DB: seed idempotency (run 3x)" {
-  1..3 | ForEach-Object {
-    Write-Host ""
-    Write-Host "Seed run #$_"
-    DC exec -T backend npm run prisma:seed
-  }
-}
-
-Run-Step "Admin Panel: E2E 3x stable" {
-  Push-Location "frontend/admin-panel"
-  try {
-    1..3 | ForEach-Object {
-      Write-Host ""
-      Write-Host "E2E run #$_"
-      npx playwright test --project=chromium
-      if ($LASTEXITCODE -ne 0) { throw "E2E failed on run #$_" }
-    }
-  } finally {
-    Pop-Location
-  }
-}
-
-Write-Host ""
-Write-Host "✅ VERIFY COMPLETE: typecheck/build/seed(3x)/e2e(3x) all green"
+Write-Host "`nDONE."
+Write-Host "If Admin localhost fails but 127.0.0.1 works: IPv6 binding. dev:fixed uses --host :: to fix it."

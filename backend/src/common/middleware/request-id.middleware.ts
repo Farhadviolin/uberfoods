@@ -1,12 +1,12 @@
 import { Injectable, NestMiddleware } from "@nestjs/common";
 import { Request, Response, NextFunction } from "express";
-import { v4 as uuidv4 } from "uuid";
+import { randomUUID } from "crypto";
 
 @Injectable()
 export class RequestIdMiddleware implements NestMiddleware {
   use(req: Request, res: Response, next: NextFunction) {
-    // Generiere UUID für diese Request
-    const requestId = uuidv4();
+    // Generiere UUID für diese Request (Node built-in, CJS/ESM safe)
+    const requestId = randomUUID();
 
     // Setze requestId auf Request-Objekt für spätere Verwendung
     req.requestId = requestId;

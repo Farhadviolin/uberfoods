@@ -172,6 +172,7 @@ export class OrderController {
   }
 
   @Get()
+  @UseGuards(JwtAuthGuard)
   @Throttle({ default: { limit: 50, ttl: 60000 } }) // 50 requests per minute for order read operations (lower due to potential large datasets)
   @ApiOperation({
     summary: "Get all orders",

@@ -12,7 +12,7 @@ import {
   Patch,
 } from "@nestjs/common";
 
-@Controller()
+@Controller("e2e")
 export class E2EController {
   constructor() {
     console.log("E2E CONTROLLER CONSTRUCTOR CALLED");
