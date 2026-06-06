@@ -1,6 +1,7 @@
 import { lazy, Suspense, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { CartProvider } from './contexts/CartContext';
 import { FavoritesProvider } from './contexts/FavoritesContext';
 import { ToastProvider, useToast } from './contexts/ToastContext';
 import { ThemeProvider } from './design-system/ThemeProvider';
@@ -33,6 +34,7 @@ const LoyaltyProgram = lazy(() => import('./components/LoyaltyProgram').then(m =
 const ScheduledOrders = lazy(() => import('./components/ScheduledOrders').then(m => ({ default: m.ScheduledOrders })));
 const GiftCards = lazy(() => import('./components/GiftCards').then(m => ({ default: m.GiftCards })));
 const RestaurantDetails = lazy(() => import('./components/RestaurantDetails').then(m => ({ default: m.RestaurantDetails })));
+const Checkout = lazy(() => import('./components/Checkout').then(m => ({ default: m.Checkout })));
 const SocialFoodNetwork = lazy(() => import('./components/SocialFoodNetwork').then(m => ({ default: m.SocialFoodNetwork })));
 const GroupOrdering = lazy(() => import('./components/GroupOrdering').then(m => ({ default: m.GroupOrdering })));
 const Chat = lazy(() => import('./components/Chat'));
@@ -96,14 +98,16 @@ function App() {
             <GlobalToastRegistrar>
               <AuthProvider>
                 <FavoritesProvider>
-                  <BrowserRouter>
-                  <Layout>
-                    <Suspense fallback={<LoadingFallback />}>
-                      <PageTransition>
-                        <Routes>
+                  <CartProvider>
+                    <BrowserRouter>
+                    <Layout>
+                      <Suspense fallback={<LoadingFallback />}>
+                        <PageTransition>
+                          <Routes>
                           {/* Öffentliche Routen */}
                           <Route path="/" element={<RestaurantList />} />
                           <Route path="/restaurant/:id" element={<Menu />} />
+                          <Route path="/checkout" element={<Checkout />} />
                           <Route path="/restaurant/:id/details" element={<RestaurantDetails />} />
                           <Route path="/restaurant/:restaurantId/ar-menu" element={<ProtectedRoute element={<ARMenuPreview />} />} />
                           <Route path="/restaurant/:restaurantId/recipes" element={<ProtectedRoute element={<RecipeIntegration />} />} />
@@ -148,14 +152,15 @@ function App() {
                           
                           {/* Fallback */}
                           <Route path="*" element={<Navigate to="/" replace />} />
-                        </Routes>
-                      </PageTransition>
-                    </Suspense>
-                    <FloatingCart />
-                    {enableVoice && <VoiceAssistant />}
-                    <PWAInstallPrompt />
-                  </Layout>
-                </BrowserRouter>
+                          </Routes>
+                        </PageTransition>
+                      </Suspense>
+                      <FloatingCart />
+                      {enableVoice && <VoiceAssistant />}
+                      <PWAInstallPrompt />
+                    </Layout>
+                  </BrowserRouter>
+                  </CartProvider>
               </FavoritesProvider>
             </AuthProvider>
             </GlobalToastRegistrar>

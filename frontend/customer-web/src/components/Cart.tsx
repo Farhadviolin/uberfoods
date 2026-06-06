@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../contexts/AuthContext';
+import { useCart } from '../contexts/CartContext';
 import { useGeocodeAddress } from '../hooks/useGeocoding';
 import api from '../utils/api';
 import { Payment } from './Payment';
@@ -34,10 +35,10 @@ interface CartItem {
 }
 
 interface CartProps {
-  cart: CartItem[];
-  restaurant: Restaurant;
-  updateQuantity: (dishId: string, quantity: number) => void;
-  onClearCart: () => void;
+  cart?: CartItem[];
+  restaurant?: Restaurant;
+  updateQuantity?: (dishId: string, quantity: number) => void;
+  onClearCart?: () => void;
 }
 
 export function Cart({ cart, restaurant, updateQuantity, onClearCart }: CartProps) {
@@ -64,7 +65,38 @@ export function Cart({ cart, restaurant, updateQuantity, onClearCart }: CartProp
     address: '',
   });
   const { user } = useAuth();
+  const cartContext = useCart();
   const navigate = useNavigate();
+  const effectiveCart = cart ?? cartContext.items.map(item => ({
+    dish: {
+      id: item.dishId,
+      name: item.name,
+      price: item.price,
+    },
+    quantity: item.quantity,
+  }));
+  const effectiveRestaurant = restaurant ?? {
+    id: cartContext.restaurantId || 'unknown',
+    name: t('cart.title'),
+  };
+  const effectiveUpdateQuantity = updateQuantity ?? ((dishId: string, quantity: number) => {
+    const current = cartContext.items.find(item => item.dishId === dishId);
+    if (!current) return;
+    if (quantity <= 0) {
+      cartContext.removeItem(dishId);
+      return;
+    }
+    if (quantity > current.quantity) {
+      for (let i = 0; i < quantity - current.quantity; i++) {
+        cartContext.increaseQuantity(dishId);
+      }
+    } else if (quantity < current.quantity) {
+      for (let i = 0; i < current.quantity - quantity; i++) {
+        cartContext.decreaseQuantity(dishId);
+      }
+    }
+  });
+  const effectiveClearCart = onClearCart ?? cartContext.clearCart;
 
   // Geocode user address or guest address using the hook
   const addressToGeocode = user?.address || guestInfo.address || '';
@@ -72,19 +104,19 @@ export function Cart({ cart, restaurant, updateQuantity, onClearCart }: CartProp
 
   // Memoize subtotal calculation
   const subtotal = useMemo(
-    () => cart.reduce((sum, item) => sum + item.dish.price * item.quantity, 0),
-    [cart]
+    () => effectiveCart.reduce((sum, item) => sum + item.dish.price * item.quantity, 0),
+    [effectiveCart]
   );
 
   // Lade Delivery Fee und Min Order Amount
   useEffect(() => {
     const loadDeliveryInfo = async () => {
       const address = user?.address || guestInfo.address;
-      if (!address || !restaurant.id) return;
+      if (!address || !effectiveRestaurant.id) return;
 
       try {
         // Validiere Min Order Amount
-        const minOrderResponse = await api.post(`/restaurants/${restaurant.id}/validate-min-order`, {
+        const minOrderResponse = await api.post(`/restaurants/${effectiveRestaurant.id}/validate-min-order`, {
           subtotal,
         });
         
@@ -97,7 +129,7 @@ export function Cart({ cart, restaurant, updateQuantity, onClearCart }: CartProp
         const customerLocation = geocodeData?.coordinates || { lat: 0, lng: 0 };
 
         // Berechne Delivery Fee mit echten Koordinaten
-        const deliveryFeeResponse = await api.post(`/restaurants/${restaurant.id}/delivery-fee`, {
+        const deliveryFeeResponse = await api.post(`/restaurants/${effectiveRestaurant.id}/delivery-fee`, {
           subtotal,
           customerLocation,
         });
@@ -108,7 +140,7 @@ export function Cart({ cart, restaurant, updateQuantity, onClearCart }: CartProp
         }
 
         // Geschätzte Lieferzeit
-        const deliveryTimeResponse = await api.post(`/restaurants/${restaurant.id}/estimated-delivery-time`, {
+        const deliveryTimeResponse = await api.post(`/restaurants/${effectiveRestaurant.id}/estimated-delivery-time`, {
           customerLocation,
         });
 
@@ -128,7 +160,7 @@ export function Cart({ cart, restaurant, updateQuantity, onClearCart }: CartProp
     };
 
     loadDeliveryInfo();
-  }, [subtotal, restaurant.id, user?.address, guestInfo.address, geocodeData, deliverySpeed]);
+  }, [subtotal, effectiveRestaurant.id, user?.address, guestInfo.address, geocodeData, deliverySpeed]);
   
   // Memoize discount calculation
   const discountAmount = useMemo(() => {
@@ -147,7 +179,7 @@ export function Cart({ cart, restaurant, updateQuantity, onClearCart }: CartProp
   );
 
   const placeOrder = useCallback(async () => {
-    if (cart.length === 0) {
+    if (effectiveCart.length === 0) {
       setError(t('cart.emptyError'));
       return;
     }
@@ -176,8 +208,8 @@ export function Cart({ cart, restaurant, updateQuantity, onClearCart }: CartProp
 
     try {
       const order = {
-        restaurantId: restaurant.id,
-        items: cart.map(item => ({
+        restaurantId: effectiveRestaurant.id,
+        items: effectiveCart.map(item => ({
           dishId: item.dish.id,
           quantity: item.quantity,
           price: item.dish.price,
@@ -202,12 +234,12 @@ export function Cart({ cart, restaurant, updateQuantity, onClearCart }: CartProp
     } finally {
       setLoading(false);
     }
-  }, [cart, user, guestInfo, restaurant.id, totalAmount, promoCode, minOrderMissing, minOrderAmount, deliverySpeed, estimatedDeliveryTime, t]);
+  }, [effectiveCart, user, guestInfo, effectiveRestaurant.id, totalAmount, promoCode, minOrderMissing, minOrderAmount, deliverySpeed, estimatedDeliveryTime, t]);
 
   const handlePaymentSuccess = useCallback(() => {
     // Warenkorb leeren
-    onClearCart();
-    localStorage.removeItem(`cart_${restaurant.id}`);
+    effectiveClearCart();
+    localStorage.removeItem(`cart_${effectiveRestaurant.id}`);
     setShowPayment(false);
     // Zur Bestellverfolgung navigieren
     if (orderId) {
@@ -217,7 +249,7 @@ export function Cart({ cart, restaurant, updateQuantity, onClearCart }: CartProp
       }
       navigate(`/orders/${orderId}`);
     }
-  }, [onClearCart, restaurant.id, orderId, navigate, user, guestInfo.email]);
+  }, [effectiveClearCart, effectiveRestaurant.id, orderId, navigate, user, guestInfo.email]);
 
   const handlePaymentCancel = useCallback(() => {
     setShowPayment(false);
@@ -237,7 +269,7 @@ export function Cart({ cart, restaurant, updateQuantity, onClearCart }: CartProp
       )}
       <div className="cart" data-testid="cart">
         <h3>{t('cart.title')}</h3>
-        {cart.length === 0 ? (
+        {effectiveCart.length === 0 ? (
         <div className="cart-empty">
           <div style={{ fontSize: '48px', marginBottom: '12px' }}>🛒</div>
           <p style={{ color: '#65676B', fontSize: '15px' }}>{t('cart.empty')}</p>
@@ -246,7 +278,7 @@ export function Cart({ cart, restaurant, updateQuantity, onClearCart }: CartProp
         <>
           {error && <div className="error-message">{error}</div>}
           
-          {cart.map(item => (
+          {effectiveCart.map(item => (
             <div key={item.dish.id} className="cart-item">
               <div className="cart-item-info">
                 <strong>{item.dish.name}</strong>
@@ -256,8 +288,8 @@ export function Cart({ cart, restaurant, updateQuantity, onClearCart }: CartProp
               </div>
               <div className="cart-item-actions">
                 <button
-                  onClick={() => updateQuantity(item.dish.id, item.quantity - 1)}
-                  onKeyDown={(e) => handleKeyboardButton(e, () => updateQuantity(item.dish.id, item.quantity - 1))}
+                  onClick={() => effectiveUpdateQuantity(item.dish.id, item.quantity - 1)}
+                  onKeyDown={(e) => handleKeyboardButton(e, () => effectiveUpdateQuantity(item.dish.id, item.quantity - 1))}
                   className="quantity-btn"
                   aria-label={t('cart.decreaseQuantity', { dish: item.dish.name })}
                 >
@@ -265,8 +297,8 @@ export function Cart({ cart, restaurant, updateQuantity, onClearCart }: CartProp
                 </button>
                 <span className="quantity" aria-label={t('cart.currentQuantity', { quantity: item.quantity })}>{item.quantity}</span>
                 <button
-                  onClick={() => updateQuantity(item.dish.id, item.quantity + 1)}
-                  onKeyDown={(e) => handleKeyboardButton(e, () => updateQuantity(item.dish.id, item.quantity + 1))}
+                  onClick={() => effectiveUpdateQuantity(item.dish.id, item.quantity + 1)}
+                  onKeyDown={(e) => handleKeyboardButton(e, () => effectiveUpdateQuantity(item.dish.id, item.quantity + 1))}
                   className="quantity-btn"
                   aria-label={t('cart.increaseQuantity', { dish: item.dish.name })}
                 >
@@ -277,7 +309,7 @@ export function Cart({ cart, restaurant, updateQuantity, onClearCart }: CartProp
           ))}
           
           <PromoCodeInput
-            restaurantId={restaurant.id}
+            restaurantId={effectiveRestaurant.id}
             subtotal={subtotal}
             onCodeApplied={(code, discountValue, discountTypeValue, promoId) => {
               setPromoCode(code);

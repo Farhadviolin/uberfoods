@@ -37,7 +37,9 @@ export function useRestaurantDishes(restaurantId: string | null) {
       const response = await api.get<Dish[]>(
         `/dishes/restaurant/${restaurantId}`,
       );
-      return response.data || [];
+      const payload = response.data as Dish[] | { data?: Dish[] };
+      if (Array.isArray(payload)) return payload;
+      return Array.isArray(payload?.data) ? payload.data : [];
     },
     enabled: !!restaurantId,
   });
@@ -54,7 +56,9 @@ export function useMenu() {
     queryFn: async () => {
       if (!restaurantId) return [];
       const response = await api.get(`/restaurants/${restaurantId}/menu`);
-      return response.data || [];
+      const payload = response.data as Dish[] | { data?: Dish[] };
+      if (Array.isArray(payload)) return payload;
+      return Array.isArray(payload?.data) ? payload.data : [];
     },
     enabled: !!restaurantId,
   });

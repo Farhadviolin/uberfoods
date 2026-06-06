@@ -58,7 +58,7 @@ export function LiveTracking() {
   const fetchOrder = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await api.get(`/orders/customer/${id}`);
+      const response = await api.get(`/orders/${id}`);
       const orderData = response.data;
       setOrder(orderData);
 
@@ -93,14 +93,15 @@ export function LiveTracking() {
 
   useEffect(() => {
     if (socket && order?.driver) {
-      socket.emit('join-room', `driver-${order.driver.id}`);
+      const driverId = order.driver.id;
+      socket.emit('join-room', `driver-${driverId}`);
 
       socket.on('driver-location-update', (location: DriverLocation) => {
         setDriverLocation(location);
       });
 
       return () => {
-        socket.emit('leave-room', `driver-${order.driver.id}`);
+        socket.emit('leave-room', `driver-${driverId}`);
         socket.off('driver-location-update');
       };
     }
