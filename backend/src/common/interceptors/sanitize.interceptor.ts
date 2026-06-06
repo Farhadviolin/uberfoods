@@ -17,20 +17,9 @@ export class SanitizeInterceptor implements NestInterceptor {
   intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
     const request = context.switchToHttp().getRequest();
 
-    // Sanitize request body
-    if (request.body && typeof request.body === "object") {
-      request.body = SanitizeUtil.sanitizeObject(request.body, false);
-    }
-
-    // Sanitize query parameters
-    if (request.query && typeof request.query === "object") {
-      request.query = SanitizeUtil.sanitizeObject(request.query, false);
-    }
-
-    // Sanitize route parameters
-    if (request.params && typeof request.params === "object") {
-      request.params = SanitizeUtil.sanitizeObject(request.params, false);
-    }
+    this.sanitizeRequestProperty(request, "body");
+    this.sanitizeRequestProperty(request, "query");
+    this.sanitizeRequestProperty(request, "params");
 
     return next.handle().pipe(
       map((data) => {
@@ -39,5 +28,29 @@ export class SanitizeInterceptor implements NestInterceptor {
         return data;
       }),
     );
+  }
+
+  private sanitizeRequestProperty(
+    request: Record<string, any>,
+    property: "body" | "query" | "params",
+  ): void {
+    const value = request[property];
+
+    if (!value || typeof value !== "object") {
+      return;
+    }
+
+    const sanitized = SanitizeUtil.sanitizeObject(value, false);
+
+    try {
+      request[property] = sanitized;
+    } catch {
+      Object.defineProperty(request, property, {
+        configurable: true,
+        enumerable: true,
+        writable: true,
+        value: sanitized,
+      });
+    }
   }
 }
