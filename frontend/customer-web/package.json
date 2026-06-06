@@ -21,6 +21,7 @@
     "test:e2e:with-mocks": "VITE_E2E_MOCK=true powershell -ExecutionPolicy Bypass -File start-e2e-mock-servers.ps1",
     "test:e2e:deterministic": "run-e2e-deterministic.cmd",
     "test:e2e:full-lifecycle": "playwright test full-order-lifecycle.spec.ts",
+    "test:e2e:full-platform": "playwright test -c playwright.full-platform.config.ts",
     "test:e2e:debug": "playwright test --debug full-order-lifecycle.spec.ts",
     "test:setup-auth": "node scripts/setup-auth.js",
     "test:e2e:isolated": "RUN_ID=$(date +%s)_${RANDOM} playwright test",
