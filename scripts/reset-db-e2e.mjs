@@ -400,7 +400,7 @@ function verifyCoreTablesExist() {
   const serviceName = 'postgres-e2e';
 
   // Core tables that should exist for E2E tests
-  const coreTables = ['restaurants', 'users', 'orders'];
+  const coreTables = ['restaurants', 'customers', 'orders', 'admins'];
 
   try {
     for (const table of coreTables) {
@@ -440,7 +440,14 @@ function applySqlFallback() {
     }
 
     // Apply the SQL file
-    execSync(`docker compose -f "${composeFile}" exec -T ${serviceName} psql -U uberfoods -d uberfoods_e2e -f /app/scripts/create-tables.sql`, {
+    const localSqlPath = join(process.cwd(), 'scripts', 'create-tables.sql');
+    const containerSqlPath = `/tmp/create-tables.sql`;
+    execSync(`docker compose -f "${composeFile}" cp "${localSqlPath}" ${serviceName}:${containerSqlPath}`, {
+      timeout: 30000,
+      stdio: 'inherit',
+      cwd: process.cwd()
+    });
+    execSync(`docker compose -f "${composeFile}" exec -T ${serviceName} psql -U uberfoods -d uberfoods_e2e -f ${containerSqlPath}`, {
       timeout: 30000, // 30 seconds
       stdio: 'inherit',
       cwd: process.cwd()

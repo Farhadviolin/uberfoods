@@ -104,6 +104,10 @@ Run-Step "DB: migrate deploy" {
   Push-Location "backend"
   try {
     npx prisma migrate deploy
+    if ($LASTEXITCODE -ne 0) {
+      Write-Host "migrate deploy failed; falling back to prisma db push for local schema sync"
+      npx prisma db push --schema=./prisma/schema.prisma
+    }
   } finally {
     Pop-Location
   }
