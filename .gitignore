@@ -39,7 +39,7 @@ uploads/
 *.sqlite
 
 # Prisma
-backend/prisma/migrations/
+# Keep migrations tracked for CI/production; ignore only generated runtime artifacts elsewhere.
 
 # Coverage
 coverage/
@@ -61,6 +61,9 @@ deps_temp_*/
 # Temporary files
 *.tmp
 *.temp
+tmp.*.yml
+tmp.compose.effective.yml
+tmp.smoke.effective.yml
 
 # E2E artifacts and summaries
 tmp/summary-*.json

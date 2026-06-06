@@ -3,6 +3,12 @@
   "version": "1.0.0",
   "description": "UberFoods Delivery Platform",
   "scripts": {
+    "build": "npm --prefix backend run build && npm --prefix frontend/admin-panel run build && npm --prefix frontend/customer-web run build && npm --prefix frontend/restaurant-web run build && npm --prefix frontend/driver-app run build",
+    "typecheck": "npm --prefix frontend/admin-panel run typecheck && npm --prefix frontend/customer-web run type-check && npm --prefix frontend/restaurant-web run typecheck",
+    "test:smoke": "powershell -NoLogo -NoProfile -ExecutionPolicy Bypass -File scripts/smoke-mvp.ps1",
+    "test:e2e:full": "npm --prefix frontend/customer-web run test:e2e:full-platform",
+    "test:backend": "npm --prefix backend run test:backend",
+    "test:backend:detect-open-handles": "npm --prefix backend run test:backend:detect-open-handles",
     "e2e": "node scripts/run-e2e.mjs",
     "e2e:setup": "node scripts/setup-e2e.mjs",
     "e2e:seed": "node scripts/seed-e2e.mjs",
@@ -12,7 +18,15 @@
     "dev:admin": "npm --prefix frontend/admin-panel run dev:fixed",
     "verify:local": "powershell -NoLogo -NoProfile -ExecutionPolicy Bypass -File scripts/verify-local.ps1",
     "verify:local:no-docker": "powershell -NoLogo -NoProfile -ExecutionPolicy Bypass -File scripts/verify-local-no-docker.ps1",
-    "smoke:mvp": "powershell -NoLogo -NoProfile -ExecutionPolicy Bypass -File scripts/smoke-mvp.ps1"
+    "prisma:generate": "npm --prefix backend run prisma:generate",
+    "prisma:migrate:dev": "npm --prefix backend run prisma:migrate:dev",
+    "prisma:migrate:deploy": "npm --prefix backend run prisma:migrate:deploy",
+    "prisma:db:push": "npm --prefix backend run prisma:db:push",
+    "prisma:seed": "npm --prefix backend run prisma:seed",
+    "smoke:mvp": "powershell -NoLogo -NoProfile -ExecutionPolicy Bypass -File scripts/smoke-mvp.ps1",
+    "smoke:up": "powershell -NoLogo -NoProfile -ExecutionPolicy Bypass -File scripts/smoke-up.ps1",
+    "smoke:mounts": "powershell -NoLogo -NoProfile -ExecutionPolicy Bypass -File scripts/smoke-verify-mounts.ps1",
+    "debug:admin": "powershell -NoLogo -NoProfile -ExecutionPolicy Bypass -File scripts/debug-admin.ps1"
   },
   "dependencies": {
     "@prisma/client": "^7.1.0",
