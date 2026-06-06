@@ -150,3 +150,29 @@ docker compose up -d
 ```
 
 Smoke-Tests wie oben mit `http://localhost:3000`.
+
+---
+
+## 6) Smoke/Go-Live IMAGE-ONLY (Standalone Compose)
+
+Für einen echten Go-Live-Szenario-Test (Backend läuft **nur** aus dem Docker-Image, ohne Host-Bind-Mounts) gibt es ein eigenes Smoke-Compose-File:
+
+- `docker-compose.smoke.yml` (Standalone; **nicht** als Merge/Override mit `docker-compose.yml` nutzen)
+
+Kanonischer Befehl (aus Repo-Root):
+
+```powershell
+npm run smoke:up
+```
+
+Dieses Script (`scripts/smoke-up.ps1`) führt aus:
+
+1. `docker compose -f docker-compose.smoke.yml down --remove-orphans`
+2. `docker compose -f docker-compose.smoke.yml up -d --build --force-recreate`
+3. Wartet auf `http://localhost:3000/api/health` (Status 200)
+4. Prüft die Mounts von `uberfoods_backend`:
+   - Erwartung: **nur** Volume `/app/node_modules`, **keine** Bind-Mounts (`./backend/src`, `./backend/dist`, …)
+5. Führt im Container `npm run prisma:deploy` (optional) und `npm run prisma:seed` aus
+6. Startet den MVP Smoke Test: `npm run smoke:mvp` – dabei wird `admin@uberfoods.com` als SUPER_ADMIN verwendet, sodass `GET /api/admin/audit` nach erfolgreichem Seed im Normalfall **PASS** liefert.
+
+Nur wenn der Mount-Check keine Bind-Mounts findet, gilt der Smoke/Go-Live-Test als **IMAGE-ONLY** bestanden.

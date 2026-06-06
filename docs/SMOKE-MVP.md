@@ -59,10 +59,12 @@ Alle Routen mit Global-Prefix `/api`. Quelle: `backend/src/modules/**/*.controll
 
 | Ziel | Befehl |
 |------|--------|
-| **Dev-Up inkl. Smoke** | `powershell -NoLogo -NoProfile -ExecutionPolicy Bypass -File .\scripts\dev-up.ps1` |
-| **Dev-Up ohne Smoke** | `powershell -NoLogo -NoProfile -ExecutionPolicy Bypass -File .\scripts\dev-up.ps1 -SkipSmoke` |
+| **Dev-Up inkl. Smoke (Dev-Stack)** | `powershell -NoLogo -NoProfile -ExecutionPolicy Bypass -File .\scripts\dev-up.ps1` |
+| **Dev-Up ohne Smoke (Dev-Stack)** | `powershell -NoLogo -NoProfile -ExecutionPolicy Bypass -File .\scripts\dev-up.ps1 -SkipSmoke` |
 | **Nur Ports + HTTP prüfen** | `powershell -NoLogo -NoProfile -ExecutionPolicy Bypass -File .\scripts\verify-local.ps1` |
-| **Nur Smoke-Test** | `npm run smoke:mvp` |
+| **Nur Smoke-Test (aktuelles Backend)** | `npm run smoke:mvp` |
+| **Smoke/Go-Live IMAGE-ONLY (Standalone Compose)** | `npm run smoke:up` |
+| **Nur Mounts prüfen (IMAGE-ONLY-Check)** | `npm run smoke:mounts` |
 
 `dev-up.ps1` startet Docker Compose, die 4 Frontends (Admin, Customer, Restaurant, Driver) auf festen Ports und optional den Smoke-Test. Pfade zeigen auf das echte Repo-Root (z. B. `…\UberFoods\frontend\admin-panel`), nicht auf `scripts\frontend\...`.
 
@@ -146,7 +148,7 @@ Beispiel (gekürzt):
 RESULT: PASS (xx steps passed)
 ```
 
-**Hinweis:** Schritt **AdminAudit** kann als `[SKIP]` erscheinen (z. B. 403), wenn Audit-Berechtigungen deaktiviert sind. Der Smoke-Test gilt weiterhin als **PASS**, sofern alle anderen Schritte bestanden sind.
+**Hinweis:** Schritt **AdminAudit** kann als `[SKIP]` erscheinen (z. B. 403 „Unzulässig“), wenn der verwendete Admin keine Berechtigung `audit:read` hat oder nicht als SUPER_ADMIN angelegt ist. Der Smoke-Test gilt weiterhin als **PASS**, sofern alle anderen Schritte bestanden sind. Im Seed wird `admin@uberfoods.com` als SUPER_ADMIN im `admins`-Model angelegt und das JWT enthält die Admin-Rolle, sodass AdminAudit nach `npm run prisma:seed` im Smoke-Setup typischerweise **PASS** ist.
 
 ---
 

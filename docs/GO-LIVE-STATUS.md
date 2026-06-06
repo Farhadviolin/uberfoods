@@ -75,7 +75,7 @@ Bei BuildKit-Fehlern (z. B. „parent snapshot … does not exist“): `powershe
 3. **Smoke Test (neues Terminal, Repo-Root):**  
    `npm run smoke:mvp`
 
-Wenn das Backend läuft und die DB geseeded ist, durchläuft der Smoke Test alle 4 Rollen (Health → Admin → Restaurant/Dish → Customer Register/Login → Restaurants/Dishes → Order erstellen → Restaurant Status PREPARING/READY/READY_FOR_PICKUP → Driver Login → Driver Accept → Driver DELIVERING/DELIVERED → Admin Order + Audit) und endet mit **RESULT: PASS**. Schritt **AdminAudit** kann als SKIP (z. B. 403) erscheinen, wenn Audit-Berechtigungen deaktiviert sind; der Gesamtergebnis bleibt PASS.
+Wenn das Backend läuft und die DB geseeded ist, durchläuft der Smoke Test alle 4 Rollen (Health → Admin → Restaurant/Dish → Customer Register/Login → Restaurants/Dishes → Order erstellen → Restaurant Status PREPARING/READY/READY_FOR_PICKUP → Driver Login → Driver Accept → Driver DELIVERING/DELIVERED → Admin Order + Audit) und endet mit **RESULT: PASS**. Schritt **AdminAudit** kann als SKIP (z. B. 403) erscheinen, wenn der Admin nicht über Berechtigung `audit:read` bzw. Rolle SUPER_ADMIN verfügt; der Gesamtergebnis bleibt PASS. Im Repo-Seed wird `admin@uberfoods.com` als SUPER_ADMIN angelegt – nach `prisma:seed` sollte AdminAudit durchlaufen.
 
 ---
 
