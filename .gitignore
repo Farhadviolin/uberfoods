@@ -68,6 +68,12 @@ tmp.smoke.effective.yml
 # E2E artifacts and summaries
 tmp/summary-*.json
 artifacts/
+test-results/
+playwright-report/
+**/test-results/
+**/playwright-report/
+*.trace
+*.webm
 
 # Snyk Security Extension - AI Rules (auto-generated)
 .cursor/rules/snyk_rules.mdc
