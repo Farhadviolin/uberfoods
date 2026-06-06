@@ -47,7 +47,7 @@ export class RedisSocketAdapter extends IoAdapter {
     }
   }
 
-  async createIOServer(port: number, options?: ServerOptions): Promise<Server> {
+  createIOServer(port: number, options?: ServerOptions): Server {
     const corsOrigins = [
       "http://localhost:3002", // Admin Panel
       "http://localhost:3001", // Customer Web
@@ -115,15 +115,21 @@ export class RedisSocketAdapter extends IoAdapter {
         });
 
         // Connect to Redis
-        await Promise.all([pubClient.connect(), subClient.connect()]);
-
-        // Create and set the Redis adapter
-        const redisAdapter = createAdapter(pubClient, subClient);
-        server.adapter(redisAdapter);
-
-        this.logger.log(
-          "Redis adapter successfully configured for horizontal scaling",
-        );
+        Promise.all([pubClient.connect(), subClient.connect()])
+          .then(() => {
+            const redisAdapter = createAdapter(pubClient, subClient);
+            server.adapter(redisAdapter);
+            this.logger.log(
+              "Redis adapter successfully configured for horizontal scaling",
+            );
+          })
+          .catch((error) => {
+            this.logger.error(
+              "Failed to connect Redis adapter clients, continuing with local adapter",
+              error,
+            );
+            this.redisAdapterEnabled = false;
+          });
 
         // Cleanup on process exit
         const cleanup = async () => {

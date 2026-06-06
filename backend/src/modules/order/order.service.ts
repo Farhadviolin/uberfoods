@@ -58,6 +58,16 @@ interface OrderFilters {
   status?: string;
 }
 
+function normalizeStatusWhere(status?: string) {
+  if (!status) return undefined;
+  const statuses = status
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+  if (statuses.length === 0) return undefined;
+  return statuses.length === 1 ? statuses[0] : { in: statuses };
+}
+
 interface OrderModifications {
   extras?: string[];
   removals?: string[];
@@ -109,7 +119,8 @@ export class OrderService {
     if (filters.restaurantId) where.restaurantId = filters.restaurantId;
     if (filters.customerId) where.customerId = filters.customerId;
     if (filters.driverId) where.driverId = filters.driverId;
-    if (filters.status) where.status = filters.status;
+    const normalizedStatus = normalizeStatusWhere(filters.status);
+    if (normalizedStatus) where.status = normalizedStatus;
 
     // Cursor-basierte Filter für Keyset Pagination
     if (cursor) {
@@ -377,7 +388,8 @@ export class OrderService {
     if (filters?.restaurantId) where.restaurantId = filters.restaurantId;
     if (filters?.customerId) where.customerId = filters.customerId;
     if (filters?.driverId) where.driverId = filters.driverId;
-    if (filters?.status) where.status = filters.status;
+    const normalizedStatus = normalizeStatusWhere(filters?.status);
+    if (normalizedStatus) where.status = normalizedStatus as any;
 
     try {
       const pagination = QueryOptimizer.normalizePagination(paginationOptions);

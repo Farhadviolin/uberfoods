@@ -11,8 +11,10 @@ import {
   UseGuards,
   HttpException,
   HttpStatus,
+  BadRequestException,
   Logger,
   Res,
+  Request,
 } from "@nestjs/common";
 import { Response } from "express";
 import {
@@ -56,6 +58,16 @@ interface DeliveryZoneData {
 
 interface CSVData {
   [key: string]: unknown;
+}
+
+interface AuthenticatedRequest {
+  user?: {
+    id?: string;
+    sub?: string;
+    role?: string;
+    type?: string;
+    [key: string]: unknown;
+  };
 }
 
 @ApiTags("Restaurants")
@@ -209,6 +221,102 @@ export class RestaurantController {
     return {
       peakHours,
       message: "Peak hours based on order history",
+    };
+  }
+
+  private getCurrentRestaurantId(req: AuthenticatedRequest): string {
+    const restaurantId = req.user?.id || req.user?.sub;
+    if (!restaurantId) {
+      throw new BadRequestException("Restaurant ID not found");
+    }
+    return restaurantId;
+  }
+
+  @Get("me")
+  @UseGuards(JwtAuthGuard)
+  async findMe(@Request() req: AuthenticatedRequest) {
+    return this.restaurantService.findOne(this.getCurrentRestaurantId(req));
+  }
+
+  @Get("me/stats")
+  @UseGuards(JwtAuthGuard)
+  async getMyStats(@Request() req: AuthenticatedRequest) {
+    const restaurantId = this.getCurrentRestaurantId(req);
+    const [orders, dishes] = await Promise.all([
+      this.prisma.order.findMany({
+        where: { restaurantId },
+        select: { status: true, totalAmount: true },
+      }),
+      this.prisma.dish.findMany({
+        where: { restaurantId },
+        select: { isAvailable: true, isActive: true },
+      }),
+    ]);
+    const completedOrders = orders.filter((order) => order.status === "DELIVERED");
+    const activeOrders = orders.filter((order) =>
+      ["PENDING", "CONFIRMED", "PREPARING", "READY", "OUT_FOR_DELIVERY"].includes(
+        order.status,
+      ),
+    );
+    const totalRevenue = completedOrders.reduce(
+      (sum, order) => sum + order.totalAmount,
+      0,
+    );
+
+    return {
+      totalOrders: orders.length,
+      totalRevenue,
+      averageOrderValue:
+        completedOrders.length > 0 ? totalRevenue / completedOrders.length : 0,
+      totalDishes: dishes.length,
+      activeDishes: dishes.filter((dish) => dish.isAvailable && dish.isActive).length,
+      completedOrders: completedOrders.length,
+      activeOrders: activeOrders.length,
+      completionRate:
+        orders.length > 0 ? Math.round((completedOrders.length / orders.length) * 100) : 0,
+    };
+  }
+
+  @Get("me/revenue")
+  @UseGuards(JwtAuthGuard)
+  async getMyRevenue(
+    @Request() req: AuthenticatedRequest,
+    @Query() query: { period?: string },
+  ) {
+    const analytics = await this.restaurantService.getAnalytics(
+      this.getCurrentRestaurantId(req),
+      query.period || "week",
+    );
+    return analytics.ordersByStatus
+      ? [{ date: new Date().toISOString().slice(0, 10), revenue: analytics.totalRevenue }]
+      : [];
+  }
+
+  @Get("me/analytics")
+  @UseGuards(JwtAuthGuard)
+  async getMyAnalytics(
+    @Request() req: AuthenticatedRequest,
+    @Query() query: { period?: string },
+  ) {
+    return this.restaurantService.getAnalytics(
+      this.getCurrentRestaurantId(req),
+      query.period || "week",
+    );
+  }
+
+  @Get("me/performance")
+  @UseGuards(JwtAuthGuard)
+  async getMyPerformance(@Request() req: AuthenticatedRequest) {
+    const performance = await this.restaurantService.getPerformance(
+      this.getCurrentRestaurantId(req),
+    );
+    return {
+      ...performance,
+      averagePreparationTime: performance.avgPrepTime || 0,
+      averageDeliveryTime: 0,
+      onTimeDeliveryRate: performance.completionRate || 0,
+      customerSatisfaction: performance.rating || 0,
+      peakHours: [],
     };
   }
 

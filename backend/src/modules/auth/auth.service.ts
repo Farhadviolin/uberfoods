@@ -181,27 +181,6 @@ export class AuthService {
           userType = "driver";
           if (user) {
             this.logger.log(`Found driver user: ${normalizedEmail}`);
-          } else {
-            // Create default driver for testing
-            this.logger.log(`Creating default driver: ${normalizedEmail}`);
-            const defaultDriverPassword =
-              process.env.DEFAULT_DRIVER_PASSWORD || "driver123"; // Fallback for E2E
-            if (!defaultDriverPassword) {
-              throw new Error(
-                "DEFAULT_DRIVER_PASSWORD environment variable is required but not set.",
-              );
-            }
-            const hashedPassword = await bcrypt.hash(defaultDriverPassword, 10);
-            user = await this.prisma.driver.create({
-              data: {
-                name: "Default Driver",
-                email: normalizedEmail,
-                password: hashedPassword,
-                phone: "+1234567890",
-                isActive: true,
-              },
-            });
-            userType = "driver";
           }
         }
       }
@@ -281,7 +260,7 @@ export class AuthService {
         // Debug logging for driver login
         if (userType === "driver") {
           this.logger.warn(
-            `Driver login failed for ${user.email}: password=${password}, hash exists=${!!user.password}`,
+            `Driver login failed for ${user.email}: invalid password, hash exists=${!!user.password}`,
           );
         }
         // Log failed attempt
@@ -374,10 +353,16 @@ export class AuthService {
     user: UserData,
     includeRefreshToken: boolean = false,
   ): Promise<LoginResult> {
+    const userType =
+      typeof user.userType === "string" ? user.userType.toLowerCase() : undefined;
+    const role = user.role || userType || "customer";
     const payload = {
       email: user.email,
       sub: user.id,
-      role: user.role || "customer",
+      role,
+      type: user.userType ?? role.toUpperCase(),
+      isActive: user.isActive,
+      currentStatus: user.currentStatus,
     };
 
     const result: LoginResult = {
@@ -387,8 +372,7 @@ export class AuthService {
 
     // Generate refresh token if requested
     if (includeRefreshToken) {
-      const userType = user.role || "customer";
-      result.refresh_token = await this.generateRefreshToken(user.id, userType);
+      result.refresh_token = await this.generateRefreshToken(user.id, role);
     }
 
     return result;
@@ -408,18 +392,19 @@ export class AuthService {
       `Driver found: ${driver.id}, has password: ${!!driver.password}`,
     );
 
-    // In development, skip password validation
-    const nodeEnv = process.env.NODE_ENV || "development";
-    if (nodeEnv !== "production") {
-      this.logger.debug(
-        `Dev mode: Skipping password validation for driver ${driver.id}`,
+    if (!driver.password) {
+      throw new UnauthorizedException(
+        "Password authentication not available for this account",
       );
-    } else {
-      const isPasswordValid = await bcrypt.compare(password, driver.password);
-      if (!isPasswordValid) {
-        throw new UnauthorizedException("Invalid credentials");
-      }
     }
+
+    const isPasswordValid = await bcrypt.compare(password, driver.password);
+    if (!isPasswordValid) {
+      await this.logFailedLoginAttempt(driver.id, "driver", "INVALID_PASSWORD");
+      throw new UnauthorizedException("Invalid credentials");
+    }
+
+    await this.logSuccessfulLogin(driver.id, "driver");
 
     const { password: _, ...result } = driver;
     // Include refresh token for driver login
@@ -433,6 +418,12 @@ export class AuthService {
     });
     if (!restaurant) {
       throw new UnauthorizedException("Invalid credentials");
+    }
+
+    if (!restaurant.password) {
+      throw new UnauthorizedException(
+        "Password authentication not available for this account",
+      );
     }
 
     const isPasswordValid = await bcrypt.compare(password, restaurant.password);
@@ -459,7 +450,12 @@ export class AuthService {
     }
 
     const { password: _, ...result } = admin;
-    return this.login({ ...result, role: "admin" });
+    // Rolle und userType für Admin explizit setzen
+    return this.login({
+      ...result,
+      role: admin.role,
+      userType: "ADMIN",
+    });
   }
 
   async customerRegister(data: {
@@ -752,7 +748,7 @@ export class AuthService {
     try {
       // Verify refresh token
       const payload = this.jwtService.verify(refreshToken, {
-        secret: process.env.JWT_REFRESH_SECRET || "refresh-secret-key",
+        secret: this.getRefreshTokenSecret(),
       });
 
       // Validate session if provided
@@ -894,9 +890,31 @@ export class AuthService {
     };
 
     return this.jwtService.sign(payload, {
-      secret: process.env.JWT_REFRESH_SECRET || "refresh-secret-key",
+      secret: this.getRefreshTokenSecret(),
       expiresIn: "7d",
     });
+  }
+
+  private getRefreshTokenSecret(): string {
+    const refreshSecret = process.env.JWT_REFRESH_SECRET;
+    if (refreshSecret) {
+      return refreshSecret;
+    }
+
+    if (process.env.NODE_ENV === "production") {
+      throw new Error(
+        "JWT_REFRESH_SECRET environment variable is required in production",
+      );
+    }
+
+    const jwtSecret = process.env.JWT_SECRET;
+    if (!jwtSecret) {
+      throw new Error(
+        "JWT_SECRET environment variable is required when JWT_REFRESH_SECRET is not set",
+      );
+    }
+
+    return jwtSecret;
   }
 
   private async getUserById(id: string, userType: string) {

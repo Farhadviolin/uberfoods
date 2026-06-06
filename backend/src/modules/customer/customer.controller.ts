@@ -3,12 +3,14 @@ import {
   Get,
   Put,
   Post,
+  Delete,
   Body,
   UseGuards,
   Request,
   BadRequestException,
   Query,
   Headers,
+  Param,
 } from "@nestjs/common";
 import { ApiTags, ApiBearerAuth, ApiOperation } from "@nestjs/swagger";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
@@ -125,5 +127,89 @@ export class CustomerController {
     });
 
     return updatedCustomer;
+  }
+
+  private getCurrentCustomerId(
+    req: AuthenticatedRequest,
+    userIdQuery?: string,
+    userIdHeader?: string,
+  ): string {
+    const userId = userIdQuery || userIdHeader || req.user?.sub || req.user?.id;
+    if (!userId) {
+      throw new BadRequestException("User ID not found");
+    }
+    return userId;
+  }
+
+  @Get("me/favorites")
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: "Get current customer favorite restaurants" })
+  async getFavorites(
+    @Request() req: AuthenticatedRequest,
+    @Query("userId") userIdQuery?: string,
+    @Headers("x-user-id") userIdHeader?: string,
+  ) {
+    const customerId = this.getCurrentCustomerId(req, userIdQuery, userIdHeader);
+    return this.prisma.customerFavorite.findMany({
+      where: { customerId },
+      include: {
+        restaurant: {
+          select: {
+            id: true,
+            name: true,
+            imageUrl: true,
+            rating: true,
+            status: true,
+            isActive: true,
+          },
+        },
+      },
+      orderBy: { id: "desc" },
+    });
+  }
+
+  @Post("me/favorites")
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: "Add favorite restaurant for current customer" })
+  async addFavorite(
+    @Request() req: AuthenticatedRequest,
+    @Body() body: { restaurantId?: string },
+    @Query("userId") userIdQuery?: string,
+    @Headers("x-user-id") userIdHeader?: string,
+  ) {
+    const customerId = this.getCurrentCustomerId(req, userIdQuery, userIdHeader);
+    if (!body.restaurantId) {
+      throw new BadRequestException("restaurantId is required");
+    }
+
+    return this.prisma.customerFavorite.upsert({
+      where: {
+        customerId_restaurantId: {
+          customerId,
+          restaurantId: body.restaurantId,
+        },
+      },
+      update: {},
+      create: {
+        customerId,
+        restaurantId: body.restaurantId,
+      },
+    });
+  }
+
+  @Delete("me/favorites/:restaurantId")
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: "Remove favorite restaurant for current customer" })
+  async removeFavorite(
+    @Request() req: AuthenticatedRequest,
+    @Param("restaurantId") restaurantId: string,
+    @Query("userId") userIdQuery?: string,
+    @Headers("x-user-id") userIdHeader?: string,
+  ) {
+    const customerId = this.getCurrentCustomerId(req, userIdQuery, userIdHeader);
+    await this.prisma.customerFavorite.deleteMany({
+      where: { customerId, restaurantId },
+    });
+    return { success: true };
   }
 }
