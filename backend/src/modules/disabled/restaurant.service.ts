@@ -20,6 +20,7 @@ interface OperatingHours {
   [day: string]: {
     open: string;
     close: string;
+    isOpen?: boolean;
     isClosed?: boolean;
   };
 }
@@ -28,6 +29,7 @@ interface DeliveryZone {
   id?: string;
   name: string;
   coordinates: Array<{ lat: number; lng: number }>;
+  polygon?: Array<{ lat: number; lng: number }>;
   isActive?: boolean;
   deliveryFee?: number;
   minOrderAmount?: number;
@@ -82,6 +84,8 @@ export interface RestaurantFindAllResult extends PaginatedResult<RestaurantData>
     limit: number;
     total: number;
     totalPages: number;
+    hasNext: boolean;
+    hasPrev: boolean;
   };
 }
 
@@ -89,6 +93,8 @@ interface RestaurantSettings {
   autoAcceptOrders?: boolean;
   maxConcurrentOrders?: number;
   preparationTimeBuffer?: number;
+  maxCapacity?: number;
+  currentCapacity?: number;
   [key: string]: unknown;
 }
 
@@ -455,8 +461,8 @@ export class RestaurantService {
         phone: data.phone,
         description: data.description,
         imageUrl: data.imageUrl,
-        operatingHours: data.operatingHours,
-        deliveryZones: data.deliveryZones,
+        operatingHours: data.operatingHours as any,
+        deliveryZones: data.deliveryZones as any,
         minOrderAmount: data.minOrderAmount || data.minimumOrder || 0,
         deliveryFee: data.deliveryFee || 2.5,
         location: data.location
@@ -510,9 +516,11 @@ export class RestaurantService {
   }
 
   async update(id: string, data: RestaurantUpdateData) {
+    await this.findOne(id);
+
     const result = await this.prisma.restaurant.update({
       where: { id },
-      data,
+      data: data as any,
     });
 
     // Invalidate cache after update
@@ -666,7 +674,7 @@ export class RestaurantService {
   async updateDeliveryZones(id: string, zones: DeliveryZone[]) {
     return this.prisma.restaurant.update({
       where: { id },
-      data: { deliveryZones: zones },
+      data: { deliveryZones: zones as any },
     });
   }
 
@@ -803,7 +811,7 @@ export class RestaurantService {
           ...settings,
           maxCapacity: data.maxCapacity,
           currentCapacity: data.currentCapacity ?? settings.currentCapacity,
-        },
+        } as any,
       },
     });
   }
@@ -825,8 +833,8 @@ export class RestaurantService {
       data: {
         settings: {
           ...settings,
-          currentCapacity: (settings.currentCapacity || 0) + amount,
-        },
+          currentCapacity: (Number(settings.currentCapacity) || 0) + amount,
+        } as any,
       },
     });
   }

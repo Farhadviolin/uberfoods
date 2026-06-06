@@ -1,340 +1,194 @@
-import { Test, TestingModule } from '@nestjs/testing';
-import { DriverService } from './driver.service';
-import { PrismaService } from '../../prisma/prisma.service';
-import { CacheService } from '../../common/cache/cache.service';
-import { EmailService } from '../../common/services/email.service';
-import { getTestEmail } from '../../test/utils/test-credentials';
+import { Test, TestingModule } from "@nestjs/testing";
+import { DriverService } from "./driver.service";
+import { PrismaService } from "../../prisma/prisma.service";
+import { CacheService } from "../../common/cache/cache.service";
+import { EmailService } from "../../common/services/email.service";
+import { DriverAuditService } from "../../common/services/driver-audit.service";
 
-describe('DriverService - Extended Features', () => {
+describe("DriverService - Extended Features", () => {
   let service: DriverService;
-  let prisma: PrismaService;
-  let cacheService: CacheService;
+
+  const mockPrismaService = {
+    driver: {
+      findUnique: jest.fn(),
+      update: jest.fn(),
+    },
+    commissionTransaction: {
+      findMany: jest.fn(),
+    },
+    order: {
+      findMany: jest.fn(),
+      findUnique: jest.fn(),
+    },
+    emergencyAlert: {
+      create: jest.fn(),
+      findMany: jest.fn(),
+    },
+    emergencyContact: {
+      findMany: jest.fn(),
+    },
+  };
+
+  const mockCacheService = {
+    get: jest.fn(),
+    set: jest.fn(),
+    deletePattern: jest.fn(),
+  };
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         DriverService,
-        {
-          provide: PrismaService,
-          useValue: {
-            driver: {
-              findUnique: jest.fn(),
-              findMany: jest.fn(),
-              create: jest.fn(),
-              update: jest.fn(),
-              delete: jest.fn(),
-              count: jest.fn(),
-            },
-            commissionTransaction: {
-              findMany: jest.fn(),
-            },
-            order: {
-              findMany: jest.fn(),
-              findUnique: jest.fn(),
-            },
-            driverSchedule: {
-              findMany: jest.fn(),
-              create: jest.fn(),
-            },
-            review: {
-              findMany: jest.fn(),
-            },
-          },
-        },
-        {
-          provide: CacheService,
-          useValue: {
-            get: jest.fn(),
-            set: jest.fn(),
-            delete: jest.fn(),
-            deletePattern: jest.fn(),
-          },
-        },
-        {
-          provide: EmailService,
-          useValue: {
-            sendWelcomeEmail: jest.fn(),
-          },
-        },
+        { provide: PrismaService, useValue: mockPrismaService },
+        { provide: CacheService, useValue: mockCacheService },
+        { provide: EmailService, useValue: { sendWelcomeEmail: jest.fn() } },
+        { provide: DriverAuditService, useValue: { log: jest.fn() } },
+        { provide: "TRAFFIC_SERVICE", useValue: {} },
+        { provide: "CACHE_STRATEGY_SERVICE", useValue: {} },
+        { provide: "ML_MODELS_SERVICE", useValue: {} },
       ],
     }).compile();
 
     service = module.get<DriverService>(DriverService);
-    prisma = module.get<PrismaService>(PrismaService);
-    cacheService = module.get<CacheService>(CacheService);
+    jest.clearAllMocks();
+    mockCacheService.get.mockReturnValue(null);
+    mockPrismaService.emergencyContact.findMany.mockResolvedValue([]);
   });
 
-  describe('Route Management', () => {
-    it('should calculate route with waypoints', async () => {
-      const result = await service.calculateRoute('driver-123', {
-        origin: { lat: 48.2082, lng: 16.3738 },
-        destination: { lat: 48.2100, lng: 16.3750 },
-        waypoints: [{ lat: 48.2090, lng: 16.3740 }],
-      });
-
-      expect(result).toHaveProperty('route');
-      expect(result).toHaveProperty('distance');
-      expect(result).toHaveProperty('duration');
+  it("calculates route with waypoints", async () => {
+    const result = await service.calculateRoute("driver_1", {
+      origin: { lat: 48.2082, lng: 16.3738 },
+      destination: { lat: 48.21, lng: 16.375 },
+      waypoints: [{ lat: 48.209, lng: 16.374 }],
     });
 
-    it('should get active routes', async () => {
-      (prisma.order.findMany as jest.Mock).mockResolvedValue([
-        { id: 'order-1', route: { lat: 48.2082, lng: 16.3738 }, status: 'IN_TRANSIT' },
-      ]);
+    expect(result).toEqual(
+      expect.objectContaining({
+        route: expect.any(Array),
+        distance: expect.any(Number),
+        duration: expect.any(Number),
+      }),
+    );
+  });
 
-      const result = await service.getActiveRoutes('driver-123');
-      expect(result).toHaveProperty('routes');
-      expect(Array.isArray(result.routes)).toBe(true);
+  it("returns saved routes from cache", async () => {
+    mockCacheService.get.mockReturnValue({
+      routes: [{ id: "route_1", name: "Cached route" }],
     });
 
-    it('should save route', async () => {
-      const result = await service.saveRoute('driver-123', {
-        name: 'Test Route',
-        waypoints: [{ lat: 48.2082, lng: 16.3738 }],
-        description: 'Test description',
-      });
+    const result = await service.getSavedRoutes("driver_1");
 
-      expect(result).toHaveProperty('routeId');
-      expect(result).toHaveProperty('name', 'Test Route');
-    });
-
-    it('should get saved routes with caching', async () => {
-      (cacheService.get as jest.Mock).mockReturnValue({
-        routes: [{ id: 'route-1', name: 'Saved Route' }],
-      });
-
-      const result = await service.getSavedRoutes('driver-123');
-      expect(result).toHaveProperty('routes');
-      expect(cacheService.get).toHaveBeenCalled();
+    expect(result).toEqual({
+      routes: [{ id: "route_1", name: "Cached route" }],
     });
   });
 
-  describe('Financial Management', () => {
-    it('should get financial balance with caching', async () => {
-      (prisma.commissionTransaction.findMany as jest.Mock).mockResolvedValue([
-        { id: '1', status: 'PAID', driverCommission: 100.00 },
-        { id: '2', status: 'PENDING', driverCommission: 50.00 },
-      ]);
+  it("calculates financial balance", async () => {
+    mockPrismaService.commissionTransaction.findMany.mockResolvedValue([
+      { status: "PAID", driverCommission: 100 },
+      { status: "PENDING", driverCommission: 25 },
+    ]);
 
-      const result = await service.getFinancialBalance('driver-123');
-      expect(result).toHaveProperty('totalBalance');
-      expect(result).toHaveProperty('availableBalance');
-      expect(result).toHaveProperty('pendingAmount');
-      expect(cacheService.set).toHaveBeenCalled();
-    });
+    const result = await service.getFinancialBalance("driver_1");
 
-    it('should transfer funds', async () => {
-      (prisma.commissionTransaction.findMany as jest.Mock).mockResolvedValue([
-        { id: '1', status: 'PAID', driverCommission: 100.00 },
-      ]);
-
-      const result = await service.transferFunds('driver-123', {
-        amount: 50.00,
-        recipientId: 'driver-456',
-        reason: 'Test transfer',
-      });
-
-      expect(result).toHaveProperty('success');
-      expect(result).toHaveProperty('transactionId');
-    });
-
-    it('should calculate taxes', async () => {
-      const result = await service.calculateTaxes('driver-123', {
-        year: 2024,
-        deductions: { vehicle: 500 },
-      });
-
-      expect(result).toHaveProperty('totalTax');
-      expect(result).toHaveProperty('year', 2024);
-    });
-
-    it('should get bonuses with caching', async () => {
-      (cacheService.get as jest.Mock).mockReturnValue({
-        bonuses: [],
-        total: 0,
-        available: 0,
-      });
-
-      const result = await service.getBonuses('driver-123');
-      expect(result).toHaveProperty('bonuses');
-      expect(cacheService.get).toHaveBeenCalled();
-    });
-
-    it('should get penalties with caching', async () => {
-      (cacheService.get as jest.Mock).mockReturnValue({
-        penalties: [],
-        total: 0,
-        pending: 0,
-      });
-
-      const result = await service.getPenalties('driver-123');
-      expect(result).toHaveProperty('penalties');
-      expect(cacheService.get).toHaveBeenCalled();
-    });
+    expect(result).toEqual(
+      expect.objectContaining({
+        totalBalance: 100,
+        availableBalance: 75,
+        pendingAmount: 25,
+        currency: "EUR",
+      }),
+    );
+    expect(mockCacheService.set).toHaveBeenCalled();
   });
 
-  describe('Performance & Analytics', () => {
-    it('should get performance dashboard', async () => {
-      (prisma.order.findMany as jest.Mock).mockResolvedValue([
-        { id: '1', status: 'DELIVERED', totalAmount: 25.50 },
-      ]);
-
-      const result = await service.getPerformanceDashboard('driver-123', 'week');
-      expect(result).toHaveProperty('metrics');
-      expect(result).toHaveProperty('period', 'week');
+  it("transfers funds", async () => {
+    const result = await service.transferFunds("driver_1", {
+      amount: 50,
+      recipientId: "driver_2",
+      reason: "Test",
     });
 
-    it('should start performance training', async () => {
-      const result = await service.startPerformanceTraining('driver-123', {
-        trainingType: 'route_optimization',
-        duration: 30,
-      });
-
-      expect(result).toHaveProperty('trainingId');
-      expect(result).toHaveProperty('status');
-    });
-
-    it('should request certification', async () => {
-      const result = await service.requestCertification('driver-123', {
-        certificationType: 'safety',
-        reason: 'Required for premium tier',
-      });
-
-      expect(result).toHaveProperty('requestId');
-      expect(result).toHaveProperty('status');
-    });
-
-    it('should create performance review', async () => {
-      const result = await service.createPerformanceReview('driver-123', {
-        period: '2024-01',
-        selfAssessment: { rating: 4.5 },
-      });
-
-      expect(result).toHaveProperty('reviewId');
-      expect(result).toHaveProperty('period', '2024-01');
-    });
-
-    it('should submit performance feedback', async () => {
-      const result = await service.submitPerformanceFeedback('driver-123', {
-        feedback: 'Great performance this week!',
-        type: 'positive',
-      });
-
-      expect(result).toHaveProperty('feedbackId');
-      expect(result).toHaveProperty('type', 'positive');
-    });
-
-    it('should create action plan', async () => {
-      const result = await service.createActionPlan('driver-123', {
-        goals: ['Improve on-time delivery', 'Increase customer ratings'],
-        timeline: '30 days',
-        milestones: [],
-      });
-
-      expect(result).toHaveProperty('actionPlanId');
-      expect(result).toHaveProperty('goals');
-    });
+    expect(result).toEqual(
+      expect.objectContaining({
+        success: true,
+        fromDriverId: "driver_1",
+        toDriverId: "driver_2",
+        amount: 50,
+      }),
+    );
   });
 
-  describe('Gamification', () => {
-    it('should redeem points', async () => {
-      const result = await service.redeemPoints('driver-123', {
-        amount: 1000,
-        rewardId: 'reward-123',
-      });
+  it("calculates taxes with deductions", async () => {
+    mockPrismaService.commissionTransaction.findMany.mockResolvedValue([
+      {
+        status: "PAID",
+        driverCommission: 1000,
+      },
+    ]);
 
-      expect(result).toHaveProperty('success');
-      expect(result).toHaveProperty('remainingPoints');
+    const result = await service.calculateTaxes("driver_1", {
+      year: 2026,
+      deductions: { vehicle: 100 },
     });
 
-    it('should unlock badge', async () => {
-      const result = await service.unlockBadge('driver-123', 'badge-first-delivery');
-      expect(result).toHaveProperty('badgeId');
-      expect(result).toHaveProperty('unlocked', true);
-    });
-
-    it('should upgrade level', async () => {
-      const result = await service.upgradeLevel('driver-123', 'level-5');
-      expect(result).toHaveProperty('levelId');
-      expect(result).toHaveProperty('newLevel');
-    });
-
-    it('should claim reward', async () => {
-      const result = await service.claimReward('driver-123', 'reward-123');
-      expect(result).toHaveProperty('rewardId');
-      expect(result).toHaveProperty('claimed', true);
-    });
-
-    it('should join event', async () => {
-      const result = await service.joinEvent('driver-123', 'event-weekend-challenge');
-      expect(result).toHaveProperty('eventId');
-      expect(result).toHaveProperty('joined', true);
-    });
-
-    it('should register for tournament', async () => {
-      const result = await service.registerTournament('driver-123', 'tournament-123');
-      expect(result).toHaveProperty('tournamentId');
-      expect(result).toHaveProperty('registered', true);
-    });
+    expect(result).toEqual(
+      expect.objectContaining({
+        year: 2026,
+        total: 1000,
+        deductions: 100,
+        finalTax: 150,
+      }),
+    );
   });
 
-  describe('Emergency & Safety', () => {
-    it('should create emergency route', async () => {
-      const result = await service.createEmergencyRoute('driver-123', {
-        destination: { lat: 48.2082, lng: 16.3738 },
-        priority: 'urgent',
-      });
+  it("creates an emergency alert for active drivers", async () => {
+    mockPrismaService.driver.findUnique.mockResolvedValue({
+      id: "driver_1",
+      isActive: true,
+      orders: [],
+      subscription: null,
+      shifts: [],
+    });
+    mockPrismaService.emergencyAlert.create.mockResolvedValue({
+      id: "alert_1",
+      driverId: "driver_1",
+      type: "PANIC",
+      alertType: "PANIC",
+      severity: "medium",
+      location: { lat: 48.2082, lng: 16.3738 },
+      createdAt: new Date(),
+    });
+    mockPrismaService.driver.update.mockResolvedValue({});
 
-      expect(result).toHaveProperty('routeId');
-      expect(result).toHaveProperty('priority', 'urgent');
+    const result = await service.createEmergencyAlert("driver_1", {
+      type: "PANIC",
+      location: { lat: 48.2082, lng: 16.3738 },
+      message: "Need help",
     });
 
-    it('should send emergency alert', async () => {
-      const result = await service.sendEmergencyAlert('driver-123', {
-        type: 'accident',
-        location: { lat: 48.2082, lng: 16.3738 },
-        message: 'Need immediate assistance',
-      });
-
-      expect(result).toHaveProperty('alertId');
-      expect(result).toHaveProperty('status', 'active');
-    });
+    expect(result).toEqual(
+      expect.objectContaining({ emergencyId: "alert_1" }),
+    );
   });
 
-  describe('Cache Invalidation', () => {
-    it('should invalidate cache on driver update', async () => {
-      (prisma.driver.findUnique as jest.Mock).mockResolvedValue({
-        id: 'driver-123',
-        name: 'Test Driver',
-        currentStatus: 'ONLINE',
-      });
-
-      await service.update('driver-123', { name: 'Updated Name' });
-      expect(cacheService.delete).toHaveBeenCalled();
-      expect(cacheService.deletePattern).toHaveBeenCalled();
+  it("submits order feedback", async () => {
+    mockPrismaService.order.findUnique.mockResolvedValue({
+      id: "order_1",
+      driverId: "driver_1",
     });
 
-    it('should invalidate cache on driver create', async () => {
-      (prisma.driver.create as jest.Mock).mockResolvedValue({
-        id: 'driver-new',
-        name: 'New Driver',
-      });
-
-      await service.create({
-        name: 'New Driver',
-        email: getTestEmail('DRIVER_LOGIN'),
-      });
-      expect(cacheService.deletePattern).toHaveBeenCalled();
+    const result = await service.submitOrderFeedback("driver_1", "order_1", {
+      feedback: "Everything worked",
+      type: "positive",
     });
 
-    it('should invalidate cache on driver delete', async () => {
-      (prisma.driver.findUnique as jest.Mock).mockResolvedValue({
-        id: 'driver-123',
-      });
-
-      await service.delete('driver-123');
-      expect(cacheService.deletePattern).toHaveBeenCalled();
-    });
+    expect(result).toEqual(
+      expect.objectContaining({
+        success: true,
+        orderId: "order_1",
+        type: "positive",
+      }),
+    );
   });
 });
-

@@ -2,13 +2,13 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { ExecutionContext, ForbiddenException } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { PermissionGuard } from './permission.guard';
-import { RBACService } from '../../rbac/rbac.service';
-import { PERMISSIONS_KEY } from '../../../common/decorators/require-permission.decorator';
+import { RbacService } from '../../rbac/rbac.service';
+import { PrismaService } from '../../../prisma/prisma.service';
 
 describe('PermissionGuard', () => {
   let guard: PermissionGuard;
   let reflector: Reflector;
-  let rbacService: RBACService;
+  let rbacService: RbacService;
 
   const mockReflector = {
     getAllAndOverride: jest.fn(),
@@ -17,6 +17,12 @@ describe('PermissionGuard', () => {
   const mockRBACService = {
     getUserPermissions: jest.fn(),
     incrementPermissionDenial: jest.fn(),
+  };
+
+  const mockPrismaService = {
+    admin: {
+      findUnique: jest.fn(),
+    },
   };
 
   const createMockContext = (user: any) => {
@@ -45,15 +51,19 @@ describe('PermissionGuard', () => {
           useValue: mockReflector,
         },
         {
-          provide: RBACService,
+          provide: RbacService,
           useValue: mockRBACService,
+        },
+        {
+          provide: PrismaService,
+          useValue: mockPrismaService,
         },
       ],
     }).compile();
 
     guard = module.get<PermissionGuard>(PermissionGuard);
     reflector = module.get<Reflector>(Reflector);
-    rbacService = module.get<RBACService>(RBACService);
+    rbacService = module.get<RbacService>(RbacService);
   });
 
   afterEach(() => {

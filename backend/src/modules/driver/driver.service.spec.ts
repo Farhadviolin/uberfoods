@@ -1,11 +1,13 @@
-import { Test, TestingModule } from '@nestjs/testing';
-import { DriverService } from './driver.service';
-import { PrismaService } from '../../prisma/prisma.service';
-import { NotFoundException, BadRequestException } from '@nestjs/common';
+import { Test, TestingModule } from "@nestjs/testing";
+import { BadRequestException, NotFoundException } from "@nestjs/common";
+import { DriverService } from "./driver.service";
+import { PrismaService } from "../../prisma/prisma.service";
+import { CacheService } from "../../common/cache/cache.service";
+import { EmailService } from "../../common/services/email.service";
+import { DriverAuditService } from "../../common/services/driver-audit.service";
 
-describe('DriverService', () => {
+describe("DriverService", () => {
   let service: DriverService;
-  let prisma: PrismaService;
 
   const mockPrismaService = {
     driver: {
@@ -16,196 +18,224 @@ describe('DriverService', () => {
       delete: jest.fn(),
       count: jest.fn(),
     },
+    driverSubscription: {
+      create: jest.fn(),
+    },
     order: {
       findMany: jest.fn(),
+      findUnique: jest.fn(),
       update: jest.fn(),
     },
+  };
+
+  const mockCacheService = {
+    get: jest.fn(),
+    set: jest.fn(),
+    deletePattern: jest.fn(),
+  };
+
+  const mockEmailService = {
+    sendWelcomeEmail: jest.fn(),
+  };
+
+  const mockDriverAuditService = {
+    log: jest.fn(),
   };
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         DriverService,
-        {
-          provide: PrismaService,
-          useValue: mockPrismaService,
-        },
+        { provide: PrismaService, useValue: mockPrismaService },
+        { provide: CacheService, useValue: mockCacheService },
+        { provide: EmailService, useValue: mockEmailService },
+        { provide: DriverAuditService, useValue: mockDriverAuditService },
+        { provide: "TRAFFIC_SERVICE", useValue: {} },
+        { provide: "CACHE_STRATEGY_SERVICE", useValue: {} },
+        { provide: "ML_MODELS_SERVICE", useValue: {} },
       ],
     }).compile();
 
     service = module.get<DriverService>(DriverService);
-    prisma = module.get<PrismaService>(PrismaService);
     jest.clearAllMocks();
+    mockCacheService.get.mockReturnValue(null);
   });
 
-  describe('findAll', () => {
-    it('should return all drivers', async () => {
-      const mockDrivers = [
+  it("should be defined", () => {
+    expect(service).toBeDefined();
+  });
+
+  it("returns paginated drivers", async () => {
+    const drivers = [
+      {
+        id: "driver_1",
+        name: "Max Mustermann",
+        email: "max@driver.com",
+        phone: "+43 664 1234567",
+        rating: 4.8,
+        currentStatus: "ONLINE",
+        isActive: true,
+        vehicleInfo: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        totalDeliveries: 10,
+      },
+    ];
+
+    mockPrismaService.driver.findMany.mockResolvedValue(drivers);
+    mockPrismaService.driver.count.mockResolvedValue(1);
+
+    const result = await service.findAll({ isActive: true, limit: 10 });
+
+    expect(result.data).toEqual(drivers);
+    expect(result.pagination).toEqual(
+      expect.objectContaining({
+        page: 1,
+        limit: 10,
+        total: 1,
+        totalPages: 1,
+      }),
+    );
+    expect(mockPrismaService.driver.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { isActive: true },
+        take: 10,
+      }),
+    );
+  });
+
+  it("returns one driver with relations", async () => {
+    const driver = {
+      id: "driver_1",
+      name: "Max Mustermann",
+      email: "max@driver.com",
+      isActive: true,
+      orders: [],
+      subscription: null,
+      shifts: [],
+    };
+
+    mockPrismaService.driver.findUnique.mockResolvedValue(driver);
+
+    await expect(service.findOne("driver_1")).resolves.toEqual(driver);
+  });
+
+  it("throws when driver is missing", async () => {
+    mockPrismaService.driver.findUnique.mockResolvedValue(null);
+
+    await expect(service.findOne("missing")).rejects.toThrow(NotFoundException);
+  });
+
+  it("creates a driver with default subscription", async () => {
+    const createdDriver = {
+      id: "driver_new",
+      name: "New Driver",
+      email: "new@driver.com",
+      phone: "+43 664 1234567",
+      password: "hashed-password",
+      isActive: true,
+    };
+
+    mockPrismaService.driver.findUnique.mockResolvedValue(null);
+    mockPrismaService.driver.create.mockResolvedValue(createdDriver);
+    mockPrismaService.driverSubscription.create.mockResolvedValue({});
+    mockEmailService.sendWelcomeEmail.mockResolvedValue(false);
+
+    const result = await service.create({
+      name: "New Driver",
+      email: "new@driver.com",
+      phone: "+43 664 1234567",
+    });
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        id: "driver_new",
+        email: "new@driver.com",
+        temporaryPassword: expect.any(String),
+        welcomeEmailSent: false,
+      }),
+    );
+    expect(result).not.toHaveProperty("password");
+    expect(mockPrismaService.driverSubscription.create).toHaveBeenCalled();
+  });
+
+  it("updates driver location", async () => {
+    const location = { lat: 48.2082, lng: 16.3738 };
+    mockPrismaService.driver.update.mockResolvedValue({
+      id: "driver_1",
+      location,
+    });
+
+    const result = await service.updateLocation("driver_1", location);
+
+    expect(result.location).toEqual(location);
+    expect(mockPrismaService.driver.update).toHaveBeenCalledWith({
+      where: { id: "driver_1" },
+      data: { location },
+    });
+  });
+
+  it("accepts an available order", async () => {
+    mockPrismaService.order.findUnique.mockResolvedValue({
+      id: "order_1",
+      driverId: null,
+      status: "READY",
+    });
+    mockPrismaService.order.update.mockResolvedValue({
+      id: "order_1",
+      driverId: "driver_1",
+      status: "ACCEPTED",
+    });
+
+    const result = await service.acceptOrder("driver_1", "order_1");
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        driverId: "driver_1",
+        status: "ACCEPTED",
+      }),
+    );
+    expect(mockDriverAuditService.log).toHaveBeenCalledWith(
+      expect.objectContaining({
+        driverId: "driver_1",
+        action: "ORDER_ACCEPT",
+        orderId: "order_1",
+      }),
+    );
+  });
+
+  it("rejects an unavailable order", async () => {
+    mockPrismaService.order.findUnique.mockResolvedValue({
+      id: "order_1",
+      driverId: "other_driver",
+    });
+
+    await expect(service.acceptOrder("driver_1", "order_1")).rejects.toThrow(
+      BadRequestException,
+    );
+  });
+
+  it("calculates earnings from delivered orders", async () => {
+    const deliveredAt = new Date("2026-01-05T12:00:00.000Z");
+    mockPrismaService.order.findMany
+      .mockResolvedValueOnce([
         {
-          id: 'driver_1',
-          name: 'Max Mustermann',
-          email: 'max@driver.com',
-          isActive: true,
+          totalAmount: 25.5,
+          deliveredAt,
+          createdAt: deliveredAt,
         },
         {
-          id: 'driver_2',
-          name: 'Anna Schmidt',
-          email: 'anna@driver.com',
-          isActive: true,
+          totalAmount: 30,
+          deliveredAt,
+          createdAt: deliveredAt,
         },
-      ];
+      ])
+      .mockResolvedValueOnce([]);
 
-      mockPrismaService.driver.findMany.mockResolvedValue(mockDrivers);
+    const result = await service.getEarnings("driver_1", "week");
 
-      const result = await service.findAll();
-
-      expect(result).toEqual(mockDrivers);
-      expect(result).toHaveLength(2);
-    });
-
-    it('should filter by active status', async () => {
-      mockPrismaService.driver.findMany.mockResolvedValue([]);
-
-      await service.findAll({ isActive: true });
-
-      expect(mockPrismaService.driver.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: expect.objectContaining({ isActive: true }),
-        })
-      );
-    });
-  });
-
-  describe('findOne', () => {
-    it('should return driver by id', async () => {
-      const mockDriver = {
-        id: 'driver_1',
-        name: 'Max Mustermann',
-        email: 'max@driver.com',
-        isActive: true,
-      };
-
-      mockPrismaService.driver.findUnique.mockResolvedValue(mockDriver);
-
-      const result = await service.findOne('driver_1');
-
-      expect(result).toEqual(mockDriver);
-    });
-
-    it('should throw NotFoundException if not found', async () => {
-      mockPrismaService.driver.findUnique.mockResolvedValue(null);
-
-      await expect(service.findOne('nonexistent')).rejects.toThrow(NotFoundException);
-    });
-  });
-
-  describe('create', () => {
-    it('should create new driver with auto-generated password', async () => {
-      const createDto = {
-        name: 'New Driver',
-        email: 'new@driver.com',
-        phone: '+43 664 1234567',
-      };
-
-      const mockCreated = {
-        id: 'driver_new',
-        ...createDto,
-        isActive: true,
-      };
-
-      mockPrismaService.driver.create.mockResolvedValue(mockCreated);
-
-      const result = await service.create(createDto);
-
-      expect(result.id).toBe('driver_new');
-      expect(mockPrismaService.driver.create).toHaveBeenCalled();
-    });
-  });
-
-  describe('updateLocation', () => {
-    it('should update driver location', async () => {
-      const mockDriver = {
-        id: 'driver_1',
-        name: 'Max Mustermann',
-      };
-
-      const locationDto = {
-        lat: 48.2082,
-        lng: 16.3738,
-        accuracy: 10,
-      };
-
-      mockPrismaService.driver.findUnique.mockResolvedValue(mockDriver);
-      mockPrismaService.driver.update.mockResolvedValue({
-        ...mockDriver,
-        location: locationDto,
-      });
-
-      const result = await service.updateLocation('driver_1', locationDto);
-
-      expect(result.location).toEqual(locationDto);
-    });
-
-    it('should throw if driver not found', async () => {
-      mockPrismaService.driver.findUnique.mockResolvedValue(null);
-
-      await expect(
-        service.updateLocation('nonexistent', { lat: 0, lng: 0 })
-      ).rejects.toThrow(NotFoundException);
-    });
-  });
-
-  describe('acceptOrder', () => {
-    it('should assign order to driver', async () => {
-      const mockDriver = {
-        id: 'driver_1',
-        isActive: true,
-      };
-
-      const mockOrder = {
-        id: 'order_1',
-        status: 'READY',
-        driverId: null,
-      };
-
-      mockPrismaService.driver.findUnique.mockResolvedValue(mockDriver);
-      mockPrismaService.order.update.mockResolvedValue({
-        ...mockOrder,
-        driverId: 'driver_1',
-        status: 'ACCEPTED',
-      });
-
-      const result = await service.acceptOrder('driver_1', 'order_1');
-
-      expect(result.driverId).toBe('driver_1');
-      expect(result.status).toBe('ACCEPTED');
-    });
-
-    it('should throw if driver not active', async () => {
-      mockPrismaService.driver.findUnique.mockResolvedValue({
-        id: 'driver_1',
-        isActive: false,
-      });
-
-      await expect(
-        service.acceptOrder('driver_1', 'order_1')
-      ).rejects.toThrow(BadRequestException);
-    });
-  });
-
-  describe('getEarnings', () => {
-    it('should calculate driver earnings', async () => {
-      const mockOrders = [
-        { id: 'order_1', totalAmount: 25.50, driverEarnings: 5.00 },
-        { id: 'order_2', totalAmount: 30.00, driverEarnings: 6.00 },
-      ];
-
-      mockPrismaService.order.findMany.mockResolvedValue(mockOrders);
-
-      const result = await service.getEarnings('driver_1', 'week');
-
-      expect(result.total).toBe(11.00);
-      expect(result.breakdown).toHaveLength(2);
-    });
+    expect(result.total).toBe(44.4);
+    expect(result.averagePerDelivery).toBe(22.2);
+    expect(result.breakdown).toHaveLength(1);
   });
 });

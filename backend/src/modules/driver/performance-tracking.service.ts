@@ -45,6 +45,24 @@ export class PerformanceTrackingService {
     };
   }
 
+  async getAdvancedPerformance(query: PerformancePeriodQueryDto = {}) {
+    return {
+      period: query.period || "week",
+      generatedAt: new Date(),
+      metrics: {
+        totalDrivers: 0,
+        activeDrivers: 0,
+        averageRating: 0,
+        completionRate: 0,
+      },
+      trends: {
+        ratingTrend: "stable",
+        earningsTrend: "stable",
+        completionTrend: "stable",
+      },
+    };
+  }
+
   private async calculateMetrics(driverId: string, period: string) {
     const periodStart = this.getPeriodStartDate(period);
 

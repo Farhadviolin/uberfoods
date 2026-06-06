@@ -2,7 +2,17 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { AdminService } from './admin.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { NotFoundException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { CacheService } from '../../common/cache/cache.service';
+import { SubscriptionService } from '../driver/subscription.service';
+import { SubscriptionAnalyticsService } from '../driver/subscription-analytics.service';
+import { SubscriptionAdvancedAnalyticsService } from '../driver/subscription-advanced-analytics.service';
+import { SubscriptionBulkOperationsService } from '../driver/subscription-bulk-operations.service';
+import { SubscriptionLifecycleService } from '../driver/subscription-lifecycle.service';
+import { SubscriptionFinancialService } from '../driver/subscription-financial.service';
+import { SubscriptionAuditService } from '../driver/subscription-audit.service';
+import { SubscriptionDriverInsightsService } from '../driver/subscription-driver-insights.service';
+import { SubscriptionTierConfigService } from '../driver/subscription-tier-config.service';
 
 describe('AdminService - Emergency Management', () => {
   let service: AdminService;
@@ -53,22 +63,22 @@ describe('AdminService - Emergency Management', () => {
           useValue: mockPrismaService,
         },
         {
-          provide: (require('@nestjs/config').ConfigService),
+          provide: ConfigService,
           useValue: { get: jest.fn() },
         },
         {
           provide: CacheService,
           useValue: { get: jest.fn(), set: jest.fn(), del: jest.fn() },
         },
-        { provide: (require('../driver/subscription.service').DriverSubscriptionService), useValue: {} },
-        { provide: (require('../driver/subscription-analytics.service').SubscriptionAnalyticsService), useValue: {} },
-        { provide: (require('../driver/subscription-advanced-analytics.service').SubscriptionAdvancedAnalyticsService), useValue: {} },
-        { provide: (require('../driver/subscription-bulk-operations.service').SubscriptionBulkOperationsService), useValue: {} },
-        { provide: (require('../driver/subscription-lifecycle.service').SubscriptionLifecycleService), useValue: {} },
-        { provide: (require('../driver/subscription-financial.service').SubscriptionFinancialService), useValue: {} },
-        { provide: (require('../driver/subscription-audit.service').SubscriptionAuditService), useValue: {} },
-        { provide: (require('../driver/subscription-driver-insights.service').SubscriptionDriverInsightsService), useValue: {} },
-        { provide: (require('../driver/subscription-tier-config.service').SubscriptionTierConfigService), useValue: {} },
+        { provide: SubscriptionService, useValue: {} },
+        { provide: SubscriptionAnalyticsService, useValue: {} },
+        { provide: SubscriptionAdvancedAnalyticsService, useValue: {} },
+        { provide: SubscriptionBulkOperationsService, useValue: {} },
+        { provide: SubscriptionLifecycleService, useValue: {} },
+        { provide: SubscriptionFinancialService, useValue: {} },
+        { provide: SubscriptionAuditService, useValue: {} },
+        { provide: SubscriptionDriverInsightsService, useValue: {} },
+        { provide: SubscriptionTierConfigService, useValue: {} },
       ],
     }).compile();
 

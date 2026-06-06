@@ -15,11 +15,13 @@ describe('AuthService', () => {
 
   // Set required environment variables for tests
   beforeAll(() => {
-    process.env.DEFAULT_DRIVER_PASSWORD = 'test-driver-password';
+    process.env.JWT_SECRET = 'test-jwt-secret';
+    process.env.JWT_REFRESH_SECRET = 'test-refresh-secret';
   });
 
   afterAll(() => {
-    delete process.env.DEFAULT_DRIVER_PASSWORD;
+    delete process.env.JWT_SECRET;
+    delete process.env.JWT_REFRESH_SECRET;
   });
 
   const mockPrismaService = {
@@ -114,7 +116,6 @@ describe('AuthService', () => {
     });
 
     it('should throw UnauthorizedException for invalid email', async () => {
-      // Ensure all user types return null to prevent auto-driver creation
       mockPrismaService.customer.findUnique.mockResolvedValue(null);
       mockPrismaService.admin.findUnique.mockResolvedValue(null);
       mockPrismaService.restaurant.findUnique.mockResolvedValue(null);
@@ -123,6 +124,7 @@ describe('AuthService', () => {
       await expect(
         service.validateUser('nonexistent@example.com', 'password123')
       ).rejects.toThrow(UnauthorizedException);
+      expect(mockPrismaService.driver.create).not.toHaveBeenCalled();
     });
 
     it('should throw UnauthorizedException for invalid password', async () => {
@@ -172,6 +174,38 @@ describe('AuthService', () => {
       mockPrismaService.driver.findUnique.mockResolvedValue(null);
 
       await expect(service.validateUser('nonexistent', 'password123')).rejects.toThrow(UnauthorizedException);
+      expect(mockPrismaService.driver.create).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('driverLogin', () => {
+    it('should reject invalid driver password in every environment', async () => {
+      const previousNodeEnv = process.env.NODE_ENV;
+      const mockDriver = {
+        id: 'driver_1',
+        email: 'driver@example.com',
+        password: 'hashed-password',
+        isActive: true,
+      };
+
+      process.env.NODE_ENV = 'development';
+      mockPrismaService.driver.findUnique.mockResolvedValue(mockDriver);
+      (bcrypt.compare as jest.Mock).mockResolvedValue(false);
+
+      await expect(
+        service.driverLogin('driver@example.com', 'wrong-password')
+      ).rejects.toThrow(UnauthorizedException);
+
+      expect(bcrypt.compare).toHaveBeenCalledWith('wrong-password', 'hashed-password');
+      expect(mockPrismaService.auditLog.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            action: 'LOGIN_FAILED',
+            entity: 'driver',
+          }),
+        }),
+      );
+      process.env.NODE_ENV = previousNodeEnv;
     });
   });
 

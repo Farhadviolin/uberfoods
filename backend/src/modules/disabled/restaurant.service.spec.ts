@@ -2,6 +2,9 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { RestaurantService } from './restaurant.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { NotFoundException, BadRequestException } from '@nestjs/common';
+import { CacheService } from '../../common/cache/cache.service';
+import { MetricsService } from '../../common/services/metrics.service';
+import { EmailService } from '../../common/services/email.service';
 
 describe('RestaurantService', () => {
   let service: RestaurantService;
@@ -26,6 +29,28 @@ describe('RestaurantService', () => {
           provide: PrismaService,
           useValue: mockPrismaService,
         },
+        {
+          provide: CacheService,
+          useValue: {
+            get: jest.fn(),
+            set: jest.fn(),
+            delete: jest.fn(),
+            deletePattern: jest.fn(),
+          },
+        },
+        {
+          provide: MetricsService,
+          useValue: {
+            incrementCounter: jest.fn(),
+            recordHistogram: jest.fn(),
+          },
+        },
+        {
+          provide: EmailService,
+          useValue: {
+            sendWelcomeEmail: jest.fn(),
+          },
+        },
       ],
     }).compile();
 
@@ -49,7 +74,7 @@ describe('RestaurantService', () => {
       mockPrismaService.restaurant.findMany.mockResolvedValue(mockRestaurants);
       mockPrismaService.restaurant.count.mockResolvedValue(1);
 
-      const result = await service.findAll({ page: 1, limit: 20 });
+      const result = await service.findAll({}, { page: 1, limit: 20 });
 
       expect(result.data).toEqual(mockRestaurants);
       expect(result.pagination.total).toBe(1);
@@ -59,7 +84,7 @@ describe('RestaurantService', () => {
       mockPrismaService.restaurant.findMany.mockResolvedValue([]);
       mockPrismaService.restaurant.count.mockResolvedValue(0);
 
-      await service.findAll({ page: 1, limit: 20, isActive: true });
+      await service.findAll({ isActive: true }, { page: 1, limit: 20 });
 
       expect(mockPrismaService.restaurant.findMany).toHaveBeenCalledWith(
         expect.objectContaining({

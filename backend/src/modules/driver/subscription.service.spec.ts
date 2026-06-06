@@ -1,305 +1,121 @@
-import { Test, TestingModule } from '@nestjs/testing';
-import { DriverSubscriptionService } from './subscription.service';
-import { PrismaService } from '../../prisma/prisma.service';
-import { NotFoundException } from '@nestjs/common';
+import { Test, TestingModule } from "@nestjs/testing";
+import { SubscriptionService } from "./subscription.service";
+import { PrismaService } from "../../prisma/prisma.service";
 
-describe('DriverSubscriptionService', () => {
-  let service: DriverSubscriptionService;
-  let prismaService: PrismaService;
-
-  const mockTierConfig = {
-    id: 'tier-1',
-    tier: 'BASIC',
-    name: 'Basic Plan',
-    price: 29.99,
-  };
+describe("SubscriptionService", () => {
+  let service: SubscriptionService;
 
   const mockPrismaService = {
-    driverSubscription: {
-      findUnique: jest.fn(),
-      create: jest.fn(),
-      update: jest.fn(),
-      findMany: jest.fn(),
-      count: jest.fn(),
-    },
-    subscriptionTierConfig: {
-      findUnique: jest.fn(),
-      findFirst: jest.fn(),
-    },
     driver: {
       findUnique: jest.fn(),
+      update: jest.fn(),
     },
-    subscriptionTier: {
-      findUnique: jest.fn(),
+    order: {
+      count: jest.fn(),
+      aggregate: jest.fn(),
     },
   };
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
-        DriverSubscriptionService,
-        {
-          provide: PrismaService,
-          useValue: mockPrismaService,
-        },
+        SubscriptionService,
+        { provide: PrismaService, useValue: mockPrismaService },
       ],
     }).compile();
 
-    service = module.get<DriverSubscriptionService>(DriverSubscriptionService);
-    prismaService = module.get<PrismaService>(PrismaService);
+    service = module.get<SubscriptionService>(SubscriptionService);
+    jest.clearAllMocks();
   });
 
-  it('should be defined', () => {
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it("should be defined", () => {
     expect(service).toBeDefined();
   });
 
-  describe('getDriverSubscription', () => {
-    it('should return subscription with tier config', async () => {
-      const mockSubscription = {
-        id: '1',
-        driverId: 'driver-1',
-        tier: 'BASIC',
-        status: 'ACTIVE',
-        currentPeriodStart: new Date(),
-        currentPeriodEnd: new Date(),
-      };
+  it("returns available tiers", () => {
+    const tiers = service.getAvailableTiers();
 
-      mockPrismaService.driverSubscription.findUnique.mockResolvedValue(mockSubscription);
-      mockPrismaService.subscriptionTierConfig.findFirst.mockResolvedValue(mockTierConfig);
-
-      const result = await service.getDriverSubscription('driver-1');
-
-      expect(result).toEqual({
-        ...mockSubscription,
-        tierConfig: mockTierConfig,
-      });
-    });
-
-    it('should return null for non-existent subscription', async () => {
-      mockPrismaService.driverSubscription.findUnique.mockResolvedValue(null);
-
-      const result = await service.getDriverSubscription('driver-999');
-
-      expect(result).toBeDefined();
-      expect(result?.status).toBe('INACTIVE');
-    });
+    expect(tiers).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: "free", name: "Free" }),
+        expect.objectContaining({ id: "premium", name: "Premium" }),
+      ]),
+    );
   });
 
-  describe('createDriverSubscription', () => {
-    it('should create subscription successfully', async () => {
-      const mockDriver = {
-        id: 'driver-1',
-        name: 'Test Driver',
-        email: 'driver@test.com',
-      };
+  it("returns subscription details with usage", async () => {
+    mockPrismaService.driver.findUnique.mockResolvedValue({
+      id: "driver_1",
+      subscription: {
+        tier: "premium",
+        currentPeriodStart: new Date("2026-01-01T00:00:00.000Z"),
+      },
+    });
+    mockPrismaService.order.count.mockResolvedValue(8);
+    mockPrismaService.order.aggregate.mockResolvedValue({
+      _sum: { deliveryFee: 100, tip: 25 },
+    });
 
-      const mockTier = {
-        id: 'tier-1',
-        name: 'Basic Plan',
-      };
+    const result = await service.getSubscription("driver_1");
 
-      const mockSubscription = {
-        id: 'sub-1',
-        driverId: 'driver-1',
-        tierId: 'tier-1',
-        status: 'ACTIVE',
-        currentPeriodStart: expect.any(Date),
-        currentPeriodEnd: expect.any(Date),
-      };
+    expect(result.currentTier.id).toBe("premium");
+    expect(result.usage).toEqual(
+      expect.objectContaining({
+        ordersThisMonth: 8,
+        earningsThisMonth: 125,
+      }),
+    );
+  });
 
-      mockPrismaService.driver.findUnique.mockResolvedValue(mockDriver);
-      mockPrismaService.subscriptionTier.findUnique.mockResolvedValue(mockTier);
-      mockPrismaService.driverSubscription.create.mockResolvedValue(mockSubscription);
+  it("throws when subscription driver is missing", async () => {
+    mockPrismaService.driver.findUnique.mockResolvedValue(null);
 
-      const result = await service.createDriverSubscription('driver-1', 'tier-1');
+    await expect(service.getSubscription("missing")).rejects.toThrow(
+      "Driver not found",
+    );
+  });
 
-      expect(result).toEqual(mockSubscription);
-      expect(mockPrismaService.driverSubscription.create).toHaveBeenCalledWith({
+  it("upgrades to a paid tier", async () => {
+    jest.spyOn(Math, "random").mockReturnValue(0.1);
+    mockPrismaService.driver.update.mockResolvedValue({});
+
+    await service.upgradeSubscription("driver_1", { tierId: "premium" });
+
+    expect(mockPrismaService.driver.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: "driver_1" },
         data: expect.objectContaining({
-          driverId: 'driver-1',
-          tierId: 'tier-1',
-          status: 'ACTIVE',
+          subscription: expect.objectContaining({
+            upsert: expect.any(Object),
+          }),
         }),
-        include: {
-          driver: true,
-          tier: true,
-        },
-      });
-    });
-
-    it('should throw NotFoundException for non-existent driver', async () => {
-      mockPrismaService.driver.findUnique.mockResolvedValue(null);
-
-      await expect(service.createDriverSubscription('driver-999', 'tier-1'))
-        .rejects
-        .toThrow(NotFoundException);
-    });
-
-    it('should throw NotFoundException for non-existent tier', async () => {
-      const mockDriver = { id: 'driver-1' };
-      mockPrismaService.driver.findUnique.mockResolvedValue(mockDriver);
-      mockPrismaService.subscriptionTier.findUnique.mockResolvedValue(null);
-
-      await expect(service.createDriverSubscription('driver-1', 'tier-999'))
-        .rejects
-        .toThrow(NotFoundException);
-    });
+      }),
+    );
   });
 
-  describe('updateDriverSubscription', () => {
-    it('should update subscription successfully', async () => {
-      const mockSubscription = {
-        id: 'sub-1',
-        driverId: 'driver-1',
-        status: 'ACTIVE',
-      };
-
-      const updateData = { status: 'CANCELLED' };
-      const updatedSubscription = { ...mockSubscription, ...updateData };
-
-      mockPrismaService.driverSubscription.findUnique.mockResolvedValue(mockSubscription);
-      mockPrismaService.driverSubscription.update.mockResolvedValue(updatedSubscription);
-
-      const result = await service.updateDriverSubscription('driver-1', updateData);
-
-      expect(result).toEqual(updatedSubscription);
-      expect(mockPrismaService.driverSubscription.update).toHaveBeenCalledWith({
-        where: { driverId: 'driver-1' },
-        data: updateData,
-        include: {
-          driver: true,
-        },
-      });
+  it("cancels an active paid subscription", async () => {
+    mockPrismaService.driver.findUnique.mockResolvedValue({
+      subscription: { tier: "premium" },
     });
+    mockPrismaService.driver.update.mockResolvedValue({});
 
-    it('should throw NotFoundException for non-existent subscription', async () => {
-      mockPrismaService.driverSubscription.findUnique.mockResolvedValue(null);
+    await service.cancelSubscription("driver_1");
 
-      await expect(service.updateDriverSubscription('driver-999', { status: 'CANCELLED' }))
-        .rejects
-        .toThrow(NotFoundException);
-    });
-  });
-
-  describe('cancelDriverSubscription', () => {
-    it('should cancel subscription successfully', async () => {
-      const mockSubscription = {
-        id: 'sub-1',
-        driverId: 'driver-1',
-        status: 'ACTIVE',
-      };
-
-      const cancelledSubscription = {
-        ...mockSubscription,
-        status: 'CANCELLED',
-        cancelledAt: expect.any(Date),
-      };
-
-      mockPrismaService.driverSubscription.findUnique.mockResolvedValue(mockSubscription);
-      mockPrismaService.driverSubscription.update.mockResolvedValue(cancelledSubscription);
-
-      const result = await service.cancelDriverSubscription('driver-1');
-
-      expect(result).toEqual(cancelledSubscription);
-      expect(mockPrismaService.driverSubscription.update).toHaveBeenCalledWith({
-        where: { driverId: 'driver-1' },
-        data: expect.objectContaining({
-          status: 'CANCELLED',
-        }),
-        include: {
-          driver: true,
+    expect(mockPrismaService.driver.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: "driver_1" },
+        data: {
+          subscription: {
+            update: {
+              cancelAtPeriodEnd: true,
+            },
+          },
         },
-      });
-    });
-  });
-
-  describe('upgradeDriverSubscription', () => {
-    it('should upgrade subscription successfully', async () => {
-      const mockSubscription = {
-        id: 'sub-1',
-        driverId: 'driver-1',
-        tier: 'BASIC',
-      };
-
-      const mockNewTier = {
-        id: 'tier-pro',
-        name: 'Pro Plan',
-      };
-
-      const upgradedSubscription = {
-        ...mockSubscription,
-        tier: 'PRO',
-        upgradedAt: expect.any(Date),
-      };
-
-      mockPrismaService.driverSubscription.findUnique.mockResolvedValue(mockSubscription);
-      mockPrismaService.subscriptionTier.findUnique.mockResolvedValue(mockNewTier);
-      mockPrismaService.driverSubscription.update.mockResolvedValue(upgradedSubscription);
-
-      const result = await service.upgradeDriverSubscription('driver-1', 'tier-pro');
-
-      expect(result).toEqual(upgradedSubscription);
-      expect(mockPrismaService.driverSubscription.update).toHaveBeenCalledWith({
-        where: { driverId: 'driver-1' },
-        data: expect.objectContaining({
-          tierId: 'tier-pro',
-          upgradedAt: expect.any(Date),
-        }),
-        include: {
-          driver: true,
-          tier: true,
-        },
-      });
-    });
-  });
-
-  describe('getAllSubscriptions', () => {
-    it('should return all subscriptions', async () => {
-      const mockSubscriptions = [
-        {
-          id: 'sub-1',
-          driverId: 'driver-1',
-          driver: { name: 'Driver 1' },
-          tier: { name: 'Basic' },
-        },
-        {
-          id: 'sub-2',
-          driverId: 'driver-2',
-          driver: { name: 'Driver 2' },
-          tier: { name: 'Pro' },
-        },
-      ];
-
-      mockPrismaService.driverSubscription.findMany.mockResolvedValue(mockSubscriptions);
-
-      const result = await service.getAllSubscriptions();
-
-      expect(result).toEqual(mockSubscriptions);
-      expect(mockPrismaService.driverSubscription.findMany).toHaveBeenCalledWith({
-        include: {
-          driver: true,
-        },
-      });
-    });
-  });
-
-  describe('getSubscription alias', () => {
-    it('should alias getDriverSubscription', async () => {
-      const mockSubscription = {
-        id: 'sub-1',
-        driverId: 'driver-1',
-        tier: 'BASIC',
-      };
-
-      mockPrismaService.driverSubscription.findUnique.mockResolvedValue(mockSubscription);
-      mockPrismaService.subscriptionTierConfig.findUnique.mockResolvedValue(null);
-
-      const result = await service.getSubscription('driver-1');
-
-      expect(result).toEqual({
-        ...mockSubscription,
-        tierConfig: mockTierConfig,
-      });
-    });
+      }),
+    );
   });
 });
