@@ -15,7 +15,7 @@ interface Restaurant {
   id: string;
   name: string;
   description: string;
-  imageUrl: string;
+  imageUrl?: string;
   address: string;
   dishes: Dish[];
 }
@@ -25,7 +25,7 @@ interface Dish {
   name: string;
   description: string;
   price: number;
-  imageUrl: string;
+  imageUrl?: string | null;
   category: string;
   isAvailable: boolean;
 }

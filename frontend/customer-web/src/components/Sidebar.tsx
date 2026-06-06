@@ -28,7 +28,7 @@ export function Sidebar({ onCollapseChange }: SidebarProps) {
   // const { preferences, isLoading: loadingPreferences, updatePreference } = useUIPreferences();
   const preferences = { sidebarCollapsed: false };
   const loadingPreferences = false;
-  const updatePreference = () => {};
+  const updatePreference = (_key: string, _value: boolean) => {};
   const enableSocial = (import.meta.env.VITE_ENABLE_SOCIAL_FEATURES ?? 'false') === 'true';
   const enableGamification = (import.meta.env.VITE_ENABLE_GAMIFICATION ?? 'false') === 'true';
   const enableAnalytics = (import.meta.env.VITE_ENABLE_ANALYTICS ?? 'false') === 'true';
@@ -73,7 +73,7 @@ export function Sidebar({ onCollapseChange }: SidebarProps) {
       label: t('sidebar.orders'),
       icon: <Package size={20} />,
       path: '/orders',
-      badge: orders?.filter(o => o.status === 'PENDING' || o.status === 'PREPARING').length,
+      badge: orders?.filter((o: { status: string }) => o.status === 'PENDING' || o.status === 'PREPARING').length,
     },
     {
       id: 'favorites',

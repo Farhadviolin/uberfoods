@@ -180,7 +180,7 @@ export function getImageUrl(imagePath?: string | null): string {
       }
       const hostname = url.hostname.toLowerCase();
       const allowedHostsEnv = import.meta.env.VITE_IMAGE_HOST_WHITELIST || '';
-      const allowedHosts = allowedHostsEnv.split(',').map(h => h.trim().toLowerCase()).filter(Boolean);
+      const allowedHosts = allowedHostsEnv.split(',').map((h: string) => h.trim().toLowerCase()).filter(Boolean);
       const isSameOrigin = typeof window !== 'undefined' && url.origin === window.location.origin;
       const isAllowedHost = allowedHosts.length > 0 && allowedHosts.includes(hostname);
       const isPrivate =

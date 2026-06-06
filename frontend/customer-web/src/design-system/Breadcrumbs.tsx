@@ -10,7 +10,7 @@ export interface BreadcrumbItem {
   icon?: ReactNode;
 }
 
-export interface BreadcrumbsProps extends HTMLAttributes<HTMLNavElement> {
+export interface BreadcrumbsProps extends HTMLAttributes<HTMLElement> {
   items: BreadcrumbItem[];
   separator?: ReactNode;
   showHomeIcon?: boolean;

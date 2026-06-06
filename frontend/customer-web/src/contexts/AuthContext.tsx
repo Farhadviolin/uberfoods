@@ -20,6 +20,7 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<void>;
   register: (email: string, password: string, name: string, phone: string, address?: string) => Promise<void>;
   logout: () => void;
+  updateUser: (updates: Partial<User>) => void;
   isAuthenticated: boolean;
   loading: boolean;
 }
@@ -37,6 +38,14 @@ export function AuthProvider({ children, initialAuthState }: { children: ReactNo
     delete api.defaults.headers.common['Authorization'];
     setToken(null);
     setUser(null);
+  }
+
+  function updateUser(updates: Partial<User>) {
+    setUser((current) => {
+      const nextUser = current ? { ...current, ...updates } : (updates as User);
+      localStorage.setItem('customer_user', JSON.stringify(nextUser));
+      return nextUser;
+    });
   }
 
   useEffect(() => {
@@ -147,6 +156,7 @@ export function AuthProvider({ children, initialAuthState }: { children: ReactNo
         login,
         register,
         logout,
+        updateUser,
         isAuthenticated: !!token,
         loading,
       }}
@@ -166,6 +176,7 @@ export function useAuth() {
       login: async () => {},
       register: async () => {},
       logout: () => {},
+      updateUser: () => {},
       isAuthenticated: false,
       loading: false,
     };

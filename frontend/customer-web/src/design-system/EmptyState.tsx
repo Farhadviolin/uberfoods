@@ -12,7 +12,7 @@ export interface EmptyStateProps extends HTMLAttributes<HTMLDivElement> {
   icon?: ReactNode;
   title?: string;
   description?: string;
-  action?: {
+  action?: ReactNode | {
     label: string;
     onClick: () => void;
   };
@@ -24,6 +24,12 @@ const defaultIcons = {
   error: AlertCircle,
   'no-results': Search,
   empty: Package,
+};
+
+const isActionConfig = (
+  action: EmptyStateProps['action']
+): action is { label: string; onClick: () => void } => {
+  return !!action && typeof action === 'object' && !('type' in action) && 'label' in action && 'onClick' in action;
 };
 
 export function EmptyState({
@@ -43,17 +49,19 @@ export function EmptyState({
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3 }}
-      {...props}
+      {...(props as any)}
     >
       <div className="empty-state-icon">
         {typeof Icon === 'function' ? <Icon size={64} /> : Icon}
       </div>
       {title && <h3 className="empty-state-title">{title}</h3>}
       {description && <p className="empty-state-description">{description}</p>}
-      {action && (
+      {isActionConfig(action) ? (
         <Button variant="primary" onClick={action.onClick}>
           {action.label}
         </Button>
+      ) : (
+        action
       )}
     </motion.div>
   );

@@ -230,6 +230,7 @@ interface EditChefProfileModalProps {
 }
 
 function EditChefProfileModal({ profile, allergies: _allergies, onClose, onSave }: EditChefProfileModalProps) {
+  const { t } = useTranslation();
   const [dietaryType, setDietaryType] = useState<DietaryPreference['type']>(profile.dietaryType.type);
   const [priceRange, setPriceRange] = useState<ChefProfile['preferredPriceRange']>(profile.preferredPriceRange);
   const [tasteProfile, setTasteProfile] = useState(profile.tasteProfile);

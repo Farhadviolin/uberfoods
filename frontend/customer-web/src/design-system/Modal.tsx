@@ -5,7 +5,7 @@ import { clsx } from 'clsx';
 import { createPortal } from 'react-dom';
 import './Modal.css';
 
-export type ModalSize = 'sm' | 'md' | 'lg' | 'xl' | 'fullscreen';
+export type ModalSize = 'sm' | 'md' | 'lg' | 'xl' | 'fullscreen' | 'small' | 'medium' | 'large';
 export type ModalVariant = 'default' | 'alert' | 'confirm';
 
 export interface ModalProps {
@@ -38,6 +38,7 @@ export function Modal({
   className,
 }: ModalProps) {
   const modalRef = useRef<HTMLDivElement>(null);
+  const normalizedSize = size === 'small' ? 'sm' : size === 'medium' ? 'md' : size === 'large' ? 'lg' : size;
 
   // Prevent body scroll when modal is open
   useEffect(() => {
@@ -48,6 +49,7 @@ export function Modal({
         document.body.style.overflow = originalOverflow;
       };
     }
+    return undefined;
   }, [isOpen, preventBodyScroll]);
 
   // Close on Escape key
@@ -96,6 +98,7 @@ export function Modal({
         document.removeEventListener('keydown', handleTab);
       };
     }
+    return undefined;
   }, [isOpen]);
 
   if (typeof window === 'undefined') return null;
@@ -124,7 +127,7 @@ export function Modal({
               ref={modalRef}
               className={clsx(
                 'modal-content',
-                `modal-content--${size}`,
+                `modal-content--${normalizedSize}`,
                 `modal-content--${variant}`,
                 className
               )}

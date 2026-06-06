@@ -49,13 +49,6 @@ export function RestaurantDetails() {
   const [error, setError] = useState<string | null>(null);
   const [isOpen, setIsOpen] = useState<{ isOpen: boolean; message?: string } | null>(null);
 
-  useEffect(() => {
-    if (id) {
-      fetchRestaurant();
-      checkOperatingHours();
-    }
-  }, [id, fetchRestaurant, checkOperatingHours]);
-
   const fetchRestaurant = useCallback(async () => {
     try {
       setLoading(true);
@@ -78,6 +71,13 @@ export function RestaurantDetails() {
       logDebug('Fehler beim Laden der Öffnungszeiten', err, { component: 'RestaurantDetails', action: 'checkOperatingHours', metadata: { restaurantId: id } });
     }
   }, [id]);
+
+  useEffect(() => {
+    if (id) {
+      fetchRestaurant();
+      checkOperatingHours();
+    }
+  }, [id, fetchRestaurant, checkOperatingHours]);
 
   const formatOperatingHours = (hours: RestaurantDetails['operatingHours']) => {
     if (!hours) return null;

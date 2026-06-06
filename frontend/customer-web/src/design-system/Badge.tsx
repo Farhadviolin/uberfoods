@@ -3,7 +3,7 @@ import { clsx } from 'clsx';
 import './Badge.css';
 
 export type BadgeVariant = 'default' | 'primary' | 'success' | 'warning' | 'error' | 'info';
-export type BadgeSize = 'sm' | 'md' | 'lg';
+export type BadgeSize = 'sm' | 'md' | 'lg' | 'small' | 'medium' | 'large';
 export type BadgeShape = 'rounded' | 'pill' | 'dot';
 
 export interface BadgeProps {
@@ -25,6 +25,7 @@ export function Badge({
   max,
   showZero = false,
 }: BadgeProps) {
+  const normalizedSize = size === 'small' ? 'sm' : size === 'medium' ? 'md' : size === 'large' ? 'lg' : size;
   // If max is provided and children is a number, show count with max
   const displayValue =
     typeof children === 'number' && max !== undefined
@@ -41,7 +42,7 @@ export function Badge({
   if (shape === 'dot') {
     return (
       <span
-        className={clsx('badge', 'badge--dot', `badge--${variant}`, `badge--${size}`, className)}
+        className={clsx('badge', 'badge--dot', `badge--${variant}`, `badge--${normalizedSize}`, className)}
         aria-label={typeof children === 'string' ? children : undefined}
       />
     );
@@ -52,7 +53,7 @@ export function Badge({
       className={clsx(
         'badge',
         `badge--${variant}`,
-        `badge--${size}`,
+        `badge--${normalizedSize}`,
         `badge--${shape}`,
         className
       )}

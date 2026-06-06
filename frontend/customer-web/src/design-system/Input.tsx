@@ -17,6 +17,7 @@ export interface InputProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 
   errorMessage?: string;
   leftIcon?: ReactNode;
   rightIcon?: ReactNode;
+  iconRight?: ReactNode;
   clearable?: boolean;
   fullWidth?: boolean;
   onClear?: () => void;
@@ -33,6 +34,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
       errorMessage,
       leftIcon,
       rightIcon,
+      iconRight,
       clearable = false,
       fullWidth = false,
       className,
@@ -44,6 +46,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
     },
     ref
   ) => {
+    const effectiveRightIcon = rightIcon ?? iconRight;
     const hasValue = value !== undefined && value !== null && value !== '';
     const showClearButton = clearable && hasValue && !disabled && onClear;
     const finalState = disabled ? 'disabled' : state;
@@ -68,7 +71,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
               `input--${finalState}`,
               {
                 'input--with-left-icon': leftIcon,
-                'input--with-right-icon': rightIcon || showClearButton,
+                'input--with-right-icon': effectiveRightIcon || showClearButton,
               },
               className
             )}
@@ -77,7 +80,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
             disabled={disabled}
             whileFocus={{ scale: 1.01 }}
             transition={{ duration: 0.2 }}
-            {...props}
+            {...(props as any)}
           />
           {showClearButton && (
             <button
@@ -89,7 +92,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
               <X size={16} />
             </button>
           )}
-          {!showClearButton && rightIcon && <span className="input-icon-right">{rightIcon}</span>}
+          {!showClearButton && effectiveRightIcon && <span className="input-icon-right">{effectiveRightIcon}</span>}
         </div>
         {(helperText || errorMessage) && (
           <div className={clsx('input-helper', { 'input-helper--error': hasError })}>

@@ -246,6 +246,7 @@ export function Refunds() {
             orderId: '',
             amount: '',
             reason: '',
+            description: '',
           });
         }}
         title={t('refunds.requestRefund')}
@@ -285,6 +286,7 @@ export function Refunds() {
                   orderId: '',
                   amount: '',
                   reason: '',
+                  description: '',
                 });
               }}
               variant="outline"

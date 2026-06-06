@@ -115,7 +115,7 @@ export function PredictiveDelivery() {
       recommendations.push('Längere Lieferzeit erwartet. Bestelle jetzt für später.');
     }
 
-    if (historical && historical.peakHours.includes(currentHour)) {
+    if (historical?.peakHours?.includes(currentHour)) {
       recommendations.push('Hauptbestellzeit! Erwarte längere Wartezeiten.');
     }
 
