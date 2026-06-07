@@ -135,6 +135,45 @@ function Get-CustomerIdFromResponse {
   return $id
 }
 
+function Get-OrderIdFromResponse {
+  param(
+    [Parameter(Mandatory = $false)]
+    $ResponseJson
+  )
+
+  if ($null -eq $ResponseJson) {
+    return $null
+  }
+
+  $id = $null
+
+  if (-not $id -and $ResponseJson.data -and $ResponseJson.data.id) {
+    $id = $ResponseJson.data.id
+  }
+
+  if (-not $id -and $ResponseJson.data -and $ResponseJson.data.order -and $ResponseJson.data.order.id) {
+    $id = $ResponseJson.data.order.id
+  }
+
+  if (-not $id -and $ResponseJson.data -and $ResponseJson.data.orderId) {
+    $id = $ResponseJson.data.orderId
+  }
+
+  if (-not $id -and $ResponseJson.order -and $ResponseJson.order.id) {
+    $id = $ResponseJson.order.id
+  }
+
+  if (-not $id -and $ResponseJson.orderId) {
+    $id = $ResponseJson.orderId
+  }
+
+  if (-not $id -and $ResponseJson.id) {
+    $id = $ResponseJson.id
+  }
+
+  return $id
+}
+
 function Wait-ForBackend {
   param([int]$MaxWaitSeconds = 60)
 
@@ -333,11 +372,25 @@ if ($order.Status -ne 201) {
     Write-Host "❌ Order Creation Failed: $($order.Status) $($order.Body)" -ForegroundColor Red
     exit 1
 }
-$orderId = $order.Json.data.id
+$orderId = Get-OrderIdFromResponse -ResponseJson $order.Json
+if (-not $orderId) {
+    Write-Host "❌ Order ID could not be resolved." -ForegroundColor Red
+    if ($order.Json) {
+        Write-Host "   Order response top-level keys: $($order.Json.PSObject.Properties.Name -join ', ')" -ForegroundColor White
+        if ($order.Json.data) {
+            Write-Host "   Order response data keys: $($order.Json.data.PSObject.Properties.Name -join ', ')" -ForegroundColor White
+        }
+    }
+    throw "Order verification failed - no orderId resolved"
+}
+$orderId = [string]$orderId
 Write-Host "✅ Order Created: $($order.Status) - ID: $orderId" -ForegroundColor Green
 
 # Step 2: Restaurant sets order to READY_FOR_PICKUP (200)
 Write-Host "   Step 2: Restaurant sets READY_FOR_PICKUP..." -ForegroundColor Cyan
+if (-not $orderId -or [string]::IsNullOrWhiteSpace($orderId)) {
+    throw "Cannot update order status because orderId is empty"
+}
 $ready = Invoke-CurlJson -Method "PATCH" -Url "$baseUrl/api/orders/$orderId/status" -Headers @{
     Authorization = "Bearer $adminToken"
 } -Body @{
