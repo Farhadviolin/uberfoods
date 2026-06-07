@@ -88,6 +88,53 @@ function Get-AccessTokenFromResponse {
   return $null
 }
 
+function Get-CustomerIdFromResponse {
+  param(
+    [Parameter(Mandatory = $false)]
+    $ResponseJson
+  )
+
+  if ($null -eq $ResponseJson) {
+    return $null
+  }
+
+  $id = $null
+
+  if (-not $id -and $ResponseJson.data -and $ResponseJson.data.user -and $ResponseJson.data.user.id) {
+    $id = $ResponseJson.data.user.id
+  }
+
+  if (-not $id -and $ResponseJson.data -and $ResponseJson.data.customer -and $ResponseJson.data.customer.id) {
+    $id = $ResponseJson.data.customer.id
+  }
+
+  if (-not $id -and $ResponseJson.data -and $ResponseJson.data.profile -and $ResponseJson.data.profile.id) {
+    $id = $ResponseJson.data.profile.id
+  }
+
+  if (-not $id -and $ResponseJson.data -and $ResponseJson.data.id) {
+    $id = $ResponseJson.data.id
+  }
+
+  if (-not $id -and $ResponseJson.user -and $ResponseJson.user.id) {
+    $id = $ResponseJson.user.id
+  }
+
+  if (-not $id -and $ResponseJson.customer -and $ResponseJson.customer.id) {
+    $id = $ResponseJson.customer.id
+  }
+
+  if (-not $id -and $ResponseJson.profile -and $ResponseJson.profile.id) {
+    $id = $ResponseJson.profile.id
+  }
+
+  if (-not $id -and $ResponseJson.id) {
+    $id = $ResponseJson.id
+  }
+
+  return $id
+}
+
 function Wait-ForBackend {
   param([int]$MaxWaitSeconds = 60)
 
@@ -170,9 +217,24 @@ $customerLogin = Invoke-CurlJson -Method "POST" -Url "$baseUrl/api/auth/customer
     password = $customerPassword
 }
 $customerToken = Get-AccessTokenFromResponse -ResponseJson $customerLogin.Json
+$customerId = Get-CustomerIdFromResponse -ResponseJson $customerLogin.Json
 if ($customerLogin.Status -notin @(200, 201) -or -not $customerToken) {
     Write-Host "❌ Customer Login Failed: $($customerLogin.Status) $($customerLogin.Body)" -ForegroundColor Red
     exit 1
+}
+if (-not $customerId) {
+    Write-Host "Customer ID could not be resolved in smoke-driver." -ForegroundColor Yellow
+    if ($customerLogin.Json) {
+        Write-Host "Login response keys: $($customerLogin.Json.PSObject.Properties.Name -join ', ')" -ForegroundColor Yellow
+        if ($customerLogin.Json.data) {
+            Write-Host "Login response data keys: $($customerLogin.Json.data.PSObject.Properties.Name -join ', ')" -ForegroundColor Yellow
+        }
+    }
+    throw "Smoke driver failed - no customerId resolved"
+}
+$customerId = [string]$customerId
+if ([string]::IsNullOrWhiteSpace($customerId)) {
+    throw "Cannot create test order because customerId is empty"
 }
 Write-Host "✅ Customer Login: $($customerLogin.Status)" -ForegroundColor Green
 
@@ -240,7 +302,7 @@ Write-Host "`n4. Testing Driver Order Operations..." -ForegroundColor Yellow
 # Create a test order first
 Write-Host "   Creating test order..." -ForegroundColor Cyan
 $order = Invoke-CurlJson -Method "POST" -Url "$baseUrl/api/orders" -Body @{
-    customerId = $customerLogin.Json.data.user.id
+    customerId = $customerId
     restaurantId = $restaurantId
     items = @(
         @{
@@ -252,7 +314,7 @@ $order = Invoke-CurlJson -Method "POST" -Url "$baseUrl/api/orders" -Body @{
     Authorization = "Bearer $customerToken"
 }
 if ($order.Status -ne 201) {
-    Write-Host "❌ Test Order Creation Failed: $($order.Status) $($order.Body)" -ForegroundColor Red
+    Write-Host "❌ Test Order Creation Failed: $($order.Status)" -ForegroundColor Red
     exit 1
 }
 $testOrderId = $order.Json.data.id
