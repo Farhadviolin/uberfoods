@@ -83,6 +83,18 @@ jobs:
       env:
         DATABASE_URL: postgresql://postgres:postgres123@localhost:5434/uberfoods
 
+    - name: Create test restaurant and dish
+      working-directory: ./backend
+      run: node scripts/create-test-restaurant.js
+      env:
+        DATABASE_URL: postgresql://postgres:postgres123@localhost:5434/uberfoods
+        RESTAURANT_TEST_NAME: CI Test Restaurant
+        RESTAURANT_TEST_EMAIL: ci-restaurant@example.test
+        RESTAURANT_TEST_PASSWORD: ci-restaurant-password-placeholder
+        RESTAURANT_TEST_ADDRESS: CI Test Street 1
+        DISH_TEST_NAME: CI Test Dish
+        DISH_TEST_PRICE: 1290
+
     - name: Start E2E backend
       working-directory: ./backend
       run: |
