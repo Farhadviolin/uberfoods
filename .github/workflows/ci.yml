@@ -75,8 +75,18 @@ jobs:
         # Wait for backend to be ready (scripts handle their own health checks)
         sleep 20
       env:
+        CI: true
+        NODE_ENV: test
+        PORT: 3000
         DATABASE_URL: postgresql://postgres:postgres123@localhost:5434/uberfoods
         REDIS_URL: redis://localhost:6379
+        JWT_SECRET: ci-jwt-secret-placeholder
+        JWT_EXPIRES_IN: 1h
+        STRIPE_SECRET_KEY: STRIPE_SECRET_KEY_PLACEHOLDER
+        STRIPE_WEBHOOK_SECRET: STRIPE_WEBHOOK_SECRET_PLACEHOLDER
+        PAYPAL_CLIENT_ID: PAYPAL_CLIENT_ID_PLACEHOLDER
+        PAYPAL_CLIENT_SECRET: PAYPAL_CLIENT_SECRET_PLACEHOLDER
+        ALLOWED_ORIGINS: http://localhost:3000,http://localhost:3001,http://localhost:3002,http://localhost:3003,http://localhost:3004
 
     - name: Run API verification scripts
       working-directory: ./backend
@@ -153,8 +163,18 @@ jobs:
         sleep 20
         curl -f http://localhost:3000/api/health || (echo "Backend failed to start" && exit 1)
       env:
+        CI: true
+        NODE_ENV: test
+        PORT: 3000
         DATABASE_URL: postgresql://postgres:postgres123@localhost:5434/uberfoods
         REDIS_URL: redis://localhost:6379
+        JWT_SECRET: ci-jwt-secret-placeholder
+        JWT_EXPIRES_IN: 1h
+        STRIPE_SECRET_KEY: STRIPE_SECRET_KEY_PLACEHOLDER
+        STRIPE_WEBHOOK_SECRET: STRIPE_WEBHOOK_SECRET_PLACEHOLDER
+        PAYPAL_CLIENT_ID: PAYPAL_CLIENT_ID_PLACEHOLDER
+        PAYPAL_CLIENT_SECRET: PAYPAL_CLIENT_SECRET_PLACEHOLDER
+        ALLOWED_ORIGINS: http://localhost:3000,http://localhost:3001,http://localhost:3002,http://localhost:3003,http://localhost:3004
 
     - name: Install frontend dependencies
       run: |
@@ -251,8 +271,18 @@ jobs:
         sleep 15
         curl -f http://localhost:3000/api/health || (echo "Backend failed to start" && exit 1)
       env:
+        CI: true
+        NODE_ENV: test
+        PORT: 3000
         DATABASE_URL: postgresql://postgres:postgres123@localhost:5434/uberfoods
         REDIS_URL: redis://localhost:6379
+        JWT_SECRET: ci-jwt-secret-placeholder
+        JWT_EXPIRES_IN: 1h
+        STRIPE_SECRET_KEY: STRIPE_SECRET_KEY_PLACEHOLDER
+        STRIPE_WEBHOOK_SECRET: STRIPE_WEBHOOK_SECRET_PLACEHOLDER
+        PAYPAL_CLIENT_ID: PAYPAL_CLIENT_ID_PLACEHOLDER
+        PAYPAL_CLIENT_SECRET: PAYPAL_CLIENT_SECRET_PLACEHOLDER
+        ALLOWED_ORIGINS: http://localhost:3000,http://localhost:3001,http://localhost:3002,http://localhost:3003,http://localhost:3004
 
     - name: Run customer web E2E tests
       working-directory: ./frontend/customer-web
