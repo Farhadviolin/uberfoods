@@ -88,6 +88,53 @@ function Get-AccessTokenFromResponse {
   return $null
 }
 
+function Get-CustomerIdFromResponse {
+  param(
+    [Parameter(Mandatory = $false)]
+    $ResponseJson
+  )
+
+  if ($null -eq $ResponseJson) {
+    return $null
+  }
+
+  $id = $null
+
+  if (-not $id -and $ResponseJson.data -and $ResponseJson.data.user -and $ResponseJson.data.user.id) {
+    $id = $ResponseJson.data.user.id
+  }
+
+  if (-not $id -and $ResponseJson.data -and $ResponseJson.data.customer -and $ResponseJson.data.customer.id) {
+    $id = $ResponseJson.data.customer.id
+  }
+
+  if (-not $id -and $ResponseJson.data -and $ResponseJson.data.profile -and $ResponseJson.data.profile.id) {
+    $id = $ResponseJson.data.profile.id
+  }
+
+  if (-not $id -and $ResponseJson.data -and $ResponseJson.data.id) {
+    $id = $ResponseJson.data.id
+  }
+
+  if (-not $id -and $ResponseJson.user -and $ResponseJson.user.id) {
+    $id = $ResponseJson.user.id
+  }
+
+  if (-not $id -and $ResponseJson.customer -and $ResponseJson.customer.id) {
+    $id = $ResponseJson.customer.id
+  }
+
+  if (-not $id -and $ResponseJson.profile -and $ResponseJson.profile.id) {
+    $id = $ResponseJson.profile.id
+  }
+
+  if (-not $id -and $ResponseJson.id) {
+    $id = $ResponseJson.id
+  }
+
+  return $id
+}
+
 function Wait-ForBackend {
   param([int]$MaxWaitSeconds = 60)
 
@@ -178,14 +225,15 @@ Write-Host "✅ Admin Login: $($adminLogin.Status)" -ForegroundColor Green
 Write-Host "`n2b. Testing Customer Login..." -ForegroundColor Yellow
 $customerEmail = "final-verification-" + [guid]::NewGuid().ToString("N").Substring(0, 12) + "@smoke.local"
 $customerPassword = "SmokeTest123!"
+$customerRegister = $null
 try {
-    Invoke-CurlJson -Method "POST" -Url "$baseUrl/api/auth/customer/register" -Body @{
+    $customerRegister = Invoke-CurlJson -Method "POST" -Url "$baseUrl/api/auth/customer/register" -Body @{
         email = $customerEmail
         password = $customerPassword
         firstName = "Final"
         lastName = "Verification"
         phone = "+43123456789"
-    } | Out-Null
+    }
 } catch {
     # Registration can be skipped if the account already exists from a prior run.
 }
@@ -199,12 +247,27 @@ if ($customerLogin.Status -notin @(200, 201) -or -not $customerToken) {
     Write-Host "❌ Customer Login Failed: $($customerLogin.Status) $($customerLogin.Body)" -ForegroundColor Red
     exit 1
 }
-$customerId = $null
-if ($customerLogin.Json.data.user) {
-    $customerId = $customerLogin.Json.data.user.id
-} elseif ($customerLogin.Json.data.id) {
-    $customerId = $customerLogin.Json.data.id
+$customerId = Get-CustomerIdFromResponse -ResponseJson $customerRegister.Json
+if (-not $customerId) {
+    $customerId = Get-CustomerIdFromResponse -ResponseJson $customerLogin.Json
 }
+if (-not $customerId -and $customerToken) {
+    $customerProfile = Invoke-CurlJson -Method "GET" -Url "$baseUrl/api/customers/profile" -Headers @{
+        Authorization = "Bearer $customerToken"
+    }
+    $customerId = Get-CustomerIdFromResponse -ResponseJson $customerProfile.Json
+}
+if (-not $customerId) {
+    Write-Host "❌ Customer ID could not be resolved." -ForegroundColor Red
+    if ($customerRegister.Json) {
+        Write-Host "   Register response keys: $($customerRegister.Json.PSObject.Properties.Name -join ', ')" -ForegroundColor White
+    }
+    if ($customerLogin.Json) {
+        Write-Host "   Login response keys: $($customerLogin.Json.PSObject.Properties.Name -join ', ')" -ForegroundColor White
+    }
+    exit 1
+}
+$customerId = [string]$customerId
 Write-Host "✅ Customer Login: $($customerLogin.Status)" -ForegroundColor Green
 
 Write-Host "`n2c. Loading Restaurant + Dish..." -ForegroundColor Yellow
