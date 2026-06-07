@@ -62,6 +62,32 @@ function Invoke-CurlJson {
   }
 }
 
+function Get-AccessTokenFromResponse {
+  param(
+    [Parameter(Mandatory = $true)]
+    $ResponseJson
+  )
+
+  if ($null -eq $ResponseJson) {
+    return $null
+  }
+
+  if ($ResponseJson.data -and $ResponseJson.data.access_token) {
+    return $ResponseJson.data.access_token
+  }
+  if ($ResponseJson.access_token) {
+    return $ResponseJson.access_token
+  }
+  if ($ResponseJson.accessToken) {
+    return $ResponseJson.accessToken
+  }
+  if ($ResponseJson.token) {
+    return $ResponseJson.token
+  }
+
+  return $null
+}
+
 function Wait-ForBackend {
   param([int]$MaxWaitSeconds = 60)
 
@@ -113,11 +139,11 @@ if ($login.Status -notin @(200, 201)) {
     Write-Host "❌ Driver Login Failed: $($login.Status) $($login.Body)" -ForegroundColor Red
     exit 1
 }
-if (-not $login.Json.data.access_token) {
+$accessToken = Get-AccessTokenFromResponse -ResponseJson $login.Json
+if (-not $accessToken) {
     Write-Host "❌ Driver login failed - no access token in response" -ForegroundColor Red
     exit 1
 }
-$accessToken = $login.Json.data.access_token
 $driverId = $login.Json.data.user.id
 Write-Host "✅ Driver Login: $($login.Status)" -ForegroundColor Green
 Write-Host "   Driver ID: $driverId" -ForegroundColor White
@@ -143,11 +169,11 @@ $customerLogin = Invoke-CurlJson -Method "POST" -Url "$baseUrl/api/auth/customer
     email = $customerEmail
     password = $customerPassword
 }
-if ($customerLogin.Status -notin @(200, 201) -or -not $customerLogin.Json.data.access_token) {
+$customerToken = Get-AccessTokenFromResponse -ResponseJson $customerLogin.Json
+if ($customerLogin.Status -notin @(200, 201) -or -not $customerToken) {
     Write-Host "❌ Customer Login Failed: $($customerLogin.Status) $($customerLogin.Body)" -ForegroundColor Red
     exit 1
 }
-$customerToken = $customerLogin.Json.data.access_token
 Write-Host "✅ Customer Login: $($customerLogin.Status)" -ForegroundColor Green
 
 Write-Host "`n1c2. Testing Admin Login..." -ForegroundColor Yellow
@@ -155,11 +181,11 @@ $adminLogin = Invoke-CurlJson -Method "POST" -Url "$baseUrl/api/auth/login" -Bod
     email = "admin@uberfoods.com"
     password = "admin123"
 }
-if ($adminLogin.Status -notin @(200, 201) -or -not $adminLogin.Json.data.access_token) {
+$adminToken = Get-AccessTokenFromResponse -ResponseJson $adminLogin.Json
+if ($adminLogin.Status -notin @(200, 201) -or -not $adminToken) {
     Write-Host "❌ Admin Login Failed: $($adminLogin.Status) $($adminLogin.Body)" -ForegroundColor Red
     exit 1
 }
-$adminToken = $adminLogin.Json.data.access_token
 Write-Host "✅ Admin Login: $($adminLogin.Status)" -ForegroundColor Green
 
 Write-Host "`n1c. Loading Restaurant + Dish..." -ForegroundColor Yellow
