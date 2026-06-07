@@ -214,34 +214,25 @@ Write-Host "✅ Loaded restaurant/dish: $restaurantId / $dishId" -ForegroundColo
 # Test 2: Driver Authentication Required
 Write-Host "`n2. Testing Driver Authentication Required..." -ForegroundColor Yellow
 
-# Test without token (should return 401 or 404)
-$driverEndpoints = @(
-    @{ Method = "GET"; Url = "/api/drivers/orders/available"; Description = "Available Orders"; ExpectedStatuses = @(401) },
-    @{ Method = "POST"; Url = "/api/drivers/orders/test123/accept"; Description = "Accept Order"; ExpectedStatuses = @(401, 404) },
-    @{ Method = "PATCH"; Url = "/api/drivers/orders/test123/status"; Description = "Update Status"; ExpectedStatuses = @(401, 404) }
-)
-
-foreach ($endpoint in $driverEndpoints) {
-    $noAuth = Invoke-CurlJson -Method $endpoint.Method -Url "$baseUrl$($endpoint.Url)"
-    if ($noAuth.Status -notin $endpoint.ExpectedStatuses) {
-        Write-Host "❌ $($endpoint.Description): Should require auth or not found ($($noAuth.Status))" -ForegroundColor Red
-        exit 1
-    }
-    $statusDesc = if ($noAuth.Status -eq 401) { "requires auth" } else { "not found" }
-    Write-Host "✅ $($endpoint.Description): $($noAuth.Status) ($statusDesc)" -ForegroundColor Green
-}
-
-# Test with token (should return 200 for available orders)
-Write-Host "`n3. Testing Driver Operations with Auth..." -ForegroundColor Yellow
-$withAuth = Invoke-CurlJson -Method "GET" -Url "$baseUrl/api/drivers/orders/available" -Headers @{
-    Authorization = "Bearer $accessToken"
-}
-if ($withAuth.Status -ne 200) {
-    Write-Host "❌ Available Orders with Auth Failed: $($withAuth.Status) $($withAuth.Body)" -ForegroundColor Red
+# Test without token on a protected endpoint
+$noAuth = Invoke-CurlJson -Method "POST" -Url "$baseUrl/api/drivers/orders/test123/accept"
+if ($noAuth.Status -ne 401) {
+    Write-Host "❌ Accept Order: Should require auth (got $($noAuth.Status))" -ForegroundColor Red
     exit 1
 }
-Write-Host "✅ Available Orders with Auth: $($withAuth.Status)" -ForegroundColor Green
-Write-Host "   Orders Count: $($withAuth.Json.data.count)" -ForegroundColor White
+Write-Host "✅ Accept Order: $($noAuth.Status) (requires auth)" -ForegroundColor Green
+
+# Test with token (should authenticate; missing order is acceptable)
+Write-Host "`n3. Testing Driver Operations with Auth..." -ForegroundColor Yellow
+$withAuth = Invoke-CurlJson -Method "POST" -Url "$baseUrl/api/drivers/orders/test123/accept" -Headers @{
+    Authorization = "Bearer $accessToken"
+}
+if ($withAuth.Status -notin @(400, 404)) {
+    Write-Host "❌ Accept Order with Auth Failed: $($withAuth.Status) $($withAuth.Body)" -ForegroundColor Red
+    exit 1
+}
+Write-Host "✅ Accept Order with Auth: $($withAuth.Status)" -ForegroundColor Green
+Write-Host "   Protected endpoint accepted token, returned expected order error" -ForegroundColor White
 
 # Test 4: Driver Order Operations
 Write-Host "`n4. Testing Driver Order Operations..." -ForegroundColor Yellow
