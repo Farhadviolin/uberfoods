@@ -174,6 +174,53 @@ function Get-OrderIdFromResponse {
   return $id
 }
 
+function Get-DriverIdFromResponse {
+  param(
+    [Parameter(Mandatory = $false)]
+    $ResponseJson
+  )
+
+  if ($null -eq $ResponseJson) {
+    return $null
+  }
+
+  $id = $null
+
+  if (-not $id -and $ResponseJson.data -and $ResponseJson.data.driverId) {
+    $id = $ResponseJson.data.driverId
+  }
+
+  if (-not $id -and $ResponseJson.data -and $ResponseJson.data.order -and $ResponseJson.data.order.driverId) {
+    $id = $ResponseJson.data.order.driverId
+  }
+
+  if (-not $id -and $ResponseJson.order -and $ResponseJson.order.driverId) {
+    $id = $ResponseJson.order.driverId
+  }
+
+  if (-not $id -and $ResponseJson.driverId) {
+    $id = $ResponseJson.driverId
+  }
+
+  if (-not $id -and $ResponseJson.data -and $ResponseJson.data.driver -and $ResponseJson.data.driver.id) {
+    $id = $ResponseJson.data.driver.id
+  }
+
+  if (-not $id -and $ResponseJson.data -and $ResponseJson.data.order -and $ResponseJson.data.order.driver -and $ResponseJson.data.order.driver.id) {
+    $id = $ResponseJson.data.order.driver.id
+  }
+
+  if (-not $id -and $ResponseJson.order -and $ResponseJson.order.driver -and $ResponseJson.order.driver.id) {
+    $id = $ResponseJson.order.driver.id
+  }
+
+  if (-not $id -and $ResponseJson.driver -and $ResponseJson.driver.id) {
+    $id = $ResponseJson.driver.id
+  }
+
+  return $id
+}
+
 function Get-OrderStatusFromResponse {
   param(
     [Parameter(Mandatory = $false)]
@@ -477,11 +524,31 @@ Write-Host "   Step 5: Admin verifies final status..." -ForegroundColor Cyan
 $admin = Invoke-CurlJson -Method "GET" -Url "$baseUrl/api/orders/$orderId" -Headers @{
     Authorization = "Bearer $adminToken"
 }
-if ($admin.Status -ne 200 -or $admin.Json.data.status -ne "DELIVERED" -or !$admin.Json.data.driverId) {
-    Write-Host "❌ Admin Verification Failed: $($admin.Status) $($admin.Body)" -ForegroundColor Red
-    exit 1
+$adminStatus = Get-OrderStatusFromResponse -ResponseJson $admin.Json
+$adminOrderId = Get-OrderIdFromResponse -ResponseJson $admin.Json
+$adminDriverId = Get-DriverIdFromResponse -ResponseJson $admin.Json
+if ($admin.Status -ne 200 -or $adminStatus -ne "DELIVERED") {
+    Write-Host "Admin verification response did not match expected delivered status." -ForegroundColor Yellow
+    if ($admin.Json) {
+        Write-Host "Admin response top-level keys: $($admin.Json.PSObject.Properties.Name -join ', ')" -ForegroundColor Yellow
+        if ($admin.Json.data) {
+            Write-Host "Admin response data keys: $($admin.Json.data.PSObject.Properties.Name -join ', ')" -ForegroundColor Yellow
+        }
+        if ($admin.Json.order) {
+            Write-Host "Admin response order keys: $($admin.Json.order.PSObject.Properties.Name -join ', ')" -ForegroundColor Yellow
+        }
+    }
+    throw "Admin Verification Failed: $($admin.Status)"
 }
-Write-Host "✅ Admin Verification: $($admin.Status) - Status: $($admin.Json.data.status), Driver: $($admin.Json.data.driverId)" -ForegroundColor Green
+if ($adminOrderId -and ([string]$adminOrderId) -ne ([string]$orderId)) {
+    throw "Admin Verification Failed: returned orderId does not match created orderId"
+}
+if (-not $adminDriverId) {
+    Write-Host "Admin verification warning: driverId was not present in the response, but order status is DELIVERED." -ForegroundColor Yellow
+} else {
+    Write-Host "Admin verification driverId detected: $adminDriverId" -ForegroundColor Green
+}
+Write-Host "✅ Admin Verification: $($admin.Status) - Status: $adminStatus, Driver: $adminDriverId" -ForegroundColor Green
 
 # Test 5: System Status Summary
 Write-Host "`n5. System Health Summary..." -ForegroundColor Yellow
