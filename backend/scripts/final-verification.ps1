@@ -174,6 +174,37 @@ function Get-OrderIdFromResponse {
   return $id
 }
 
+function Get-OrderStatusFromResponse {
+  param(
+    [Parameter(Mandatory = $false)]
+    $ResponseJson
+  )
+
+  if ($null -eq $ResponseJson) {
+    return $null
+  }
+
+  $status = $null
+
+  if (-not $status -and $ResponseJson.data -and $ResponseJson.data.status) {
+    $status = $ResponseJson.data.status
+  }
+
+  if (-not $status -and $ResponseJson.data -and $ResponseJson.data.order -and $ResponseJson.data.order.status) {
+    $status = $ResponseJson.data.order.status
+  }
+
+  if (-not $status -and $ResponseJson.order -and $ResponseJson.order.status) {
+    $status = $ResponseJson.order.status
+  }
+
+  if (-not $status -and $ResponseJson.status) {
+    $status = $ResponseJson.status
+  }
+
+  return $status
+}
+
 function Wait-ForBackend {
   param([int]$MaxWaitSeconds = 60)
 
@@ -396,11 +427,18 @@ $ready = Invoke-CurlJson -Method "PATCH" -Url "$baseUrl/api/orders/$orderId/stat
 } -Body @{
     status = "READY_FOR_PICKUP"
 }
-if ($ready.Status -ne 200 -or $ready.Json.data.status -ne "READY_FOR_PICKUP") {
-    Write-Host "❌ Restaurant Status Update Failed: $($ready.Status) $($ready.Body)" -ForegroundColor Red
-    exit 1
+$readyStatus = Get-OrderStatusFromResponse -ResponseJson $ready.Json
+if ($ready.Status -ne 200 -or $readyStatus -ne "READY_FOR_PICKUP") {
+    Write-Host "Restaurant Status Update response did not match expected status." -ForegroundColor Red
+    if ($ready.Json) {
+        Write-Host "Status response top-level keys: $($ready.Json.PSObject.Properties.Name -join ', ')" -ForegroundColor White
+        if ($ready.Json.data) {
+            Write-Host "Status response data keys: $($ready.Json.data.PSObject.Properties.Name -join ', ')" -ForegroundColor White
+        }
+    }
+    throw "Restaurant Status Update Failed: $($ready.Status)"
 }
-Write-Host "✅ Order Status Updated: $($ready.Status) - Status: $($ready.Json.data.status)" -ForegroundColor Green
+Write-Host "✅ Order Status Updated: $($ready.Status) - Status: $readyStatus" -ForegroundColor Green
 
 # Step 3: Driver accepts order (200/201)
 Write-Host "   Step 3: Driver accepts order..." -ForegroundColor Cyan
