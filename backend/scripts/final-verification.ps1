@@ -458,11 +458,19 @@ $deliver = Invoke-CurlJson -Method "PUT" -Url "$baseUrl/api/drivers/orders/$orde
 } -Body @{
     status = "DELIVERED"
 }
-if ($deliver.Status -ne 200 -or $deliver.Json.data.status -ne "DELIVERED") {
+$deliveredStatus = Get-OrderStatusFromResponse -ResponseJson $deliver.Json
+if ($deliver.Status -ne 200 -or $deliveredStatus -ne "DELIVERED") {
+    Write-Host "Delivery Status Update response did not match expected status." -ForegroundColor Yellow
+    if ($deliver.Json) {
+        Write-Host "Delivery response top-level keys: $($deliver.Json.PSObject.Properties.Name -join ', ')" -ForegroundColor Yellow
+        if ($deliver.Json.data) {
+            Write-Host "Delivery response data keys: $($deliver.Json.data.PSObject.Properties.Name -join ', ')" -ForegroundColor Yellow
+        }
+    }
     Write-Host "❌ Delivery Status Update Failed: $($deliver.Status) $($deliver.Body)" -ForegroundColor Red
     exit 1
 }
-Write-Host "✅ Order Delivered: $($deliver.Status) - Status: $($deliver.Json.data.status)" -ForegroundColor Green
+Write-Host "✅ Order Delivered: $($deliver.Status) - Status: $deliveredStatus" -ForegroundColor Green
 
 # Step 5: Admin verifies final order status (200)
 Write-Host "   Step 5: Admin verifies final status..." -ForegroundColor Cyan
