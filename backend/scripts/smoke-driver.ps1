@@ -177,13 +177,16 @@ if ($customerLogin.Status -notin @(200, 201) -or -not $customerToken) {
 Write-Host "✅ Customer Login: $($customerLogin.Status)" -ForegroundColor Green
 
 Write-Host "`n1c2. Testing Admin Login..." -ForegroundColor Yellow
+$adminEmail = if ($env:ADMIN_TEST_EMAIL) { $env:ADMIN_TEST_EMAIL } else { "ci-admin@example.test" }
+$adminPassword = if ($env:ADMIN_TEST_PASSWORD) { $env:ADMIN_TEST_PASSWORD } else { "ci-admin-password-placeholder" }
 $adminLogin = Invoke-CurlJson -Method "POST" -Url "$baseUrl/api/auth/login" -Body @{
-    email = "admin@uberfoods.com"
-    password = "admin123"
+    email = $adminEmail
+    password = $adminPassword
+    userType = "admin"
 }
 $adminToken = Get-AccessTokenFromResponse -ResponseJson $adminLogin.Json
 if ($adminLogin.Status -notin @(200, 201) -or -not $adminToken) {
-    Write-Host "❌ Admin Login Failed: $($adminLogin.Status) $($adminLogin.Body)" -ForegroundColor Red
+    Write-Host "❌ Admin Login Failed: status=$($adminLogin.Status), emailConfigured=$([bool]$adminEmail), response=$($adminLogin.Body)" -ForegroundColor Red
     exit 1
 }
 Write-Host "✅ Admin Login: $($adminLogin.Status)" -ForegroundColor Green
