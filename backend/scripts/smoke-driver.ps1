@@ -135,6 +135,45 @@ function Get-CustomerIdFromResponse {
   return $id
 }
 
+function Get-OrderIdFromResponse {
+  param(
+    [Parameter(Mandatory = $false)]
+    $ResponseJson
+  )
+
+  if ($null -eq $ResponseJson) {
+    return $null
+  }
+
+  $id = $null
+
+  if (-not $id -and $ResponseJson.data -and $ResponseJson.data.id) {
+    $id = $ResponseJson.data.id
+  }
+
+  if (-not $id -and $ResponseJson.data -and $ResponseJson.data.order -and $ResponseJson.data.order.id) {
+    $id = $ResponseJson.data.order.id
+  }
+
+  if (-not $id -and $ResponseJson.data -and $ResponseJson.data.orderId) {
+    $id = $ResponseJson.data.orderId
+  }
+
+  if (-not $id -and $ResponseJson.order -and $ResponseJson.order.id) {
+    $id = $ResponseJson.order.id
+  }
+
+  if (-not $id -and $ResponseJson.orderId) {
+    $id = $ResponseJson.orderId
+  }
+
+  if (-not $id -and $ResponseJson.id) {
+    $id = $ResponseJson.id
+  }
+
+  return $id
+}
+
 function Wait-ForBackend {
   param([int]$MaxWaitSeconds = 60)
 
@@ -317,11 +356,28 @@ if ($order.Status -ne 201) {
     Write-Host "❌ Test Order Creation Failed: $($order.Status)" -ForegroundColor Red
     exit 1
 }
-$testOrderId = $order.Json.data.id
+$testOrderId = Get-OrderIdFromResponse -ResponseJson $order.Json
+if (-not $testOrderId) {
+    Write-Host "Test order ID could not be resolved in smoke-driver." -ForegroundColor Yellow
+    if ($order.Json) {
+        Write-Host "Test order response top-level keys: $($order.Json.PSObject.Properties.Name -join ', ')" -ForegroundColor Yellow
+        if ($order.Json.data) {
+            Write-Host "Test order response data keys: $($order.Json.data.PSObject.Properties.Name -join ', ')" -ForegroundColor Yellow
+        }
+        if ($order.Json.order) {
+            Write-Host "Test order response order keys: $($order.Json.order.PSObject.Properties.Name -join ', ')" -ForegroundColor Yellow
+        }
+    }
+    throw "Smoke driver failed - no testOrderId resolved"
+}
+$testOrderId = [string]$testOrderId
 Write-Host "✅ Test Order Created: $($order.Status) - ID: $testOrderId" -ForegroundColor Green
 
 # Set order to READY_FOR_PICKUP
 Write-Host "   Setting order to READY_FOR_PICKUP..." -ForegroundColor Cyan
+if (-not $testOrderId -or [string]::IsNullOrWhiteSpace($testOrderId)) {
+    throw "Cannot update test order status because testOrderId is empty"
+}
 $ready = Invoke-CurlJson -Method "PATCH" -Url "$baseUrl/api/orders/$testOrderId/status" -Headers @{
     Authorization = "Bearer $adminToken"
 } -Body @{
