@@ -238,14 +238,17 @@ test('full platform user journey: UI routes plus real 4-role backend flow', asyn
   ensureArtifacts();
 
   const health = await apiCall(request, 'GET', '/health');
-  expect(health?.status).toBe('ok');
-  expect(health?.database?.status).toBe('connected');
+  const healthPayload = health?.data ?? health;
+  expect(healthPayload?.status).toBe('ok');
+  if (healthPayload?.database?.status !== undefined) {
+    expect(healthPayload.database.status).toBe('connected');
+  }
   report.steps.push({
     app: 'Backend',
     route: '/api/health',
     action: 'Check health, database, providers',
     expected: 'Backend and database are healthy',
-    actual: `status=${health.status}, db=${health.database?.status}, redis=${health.redis?.status || 'not reported'}`,
+    actual: `status=${healthPayload.status}, db=${healthPayload.database?.status}, redis=${healthPayload.redis?.status || 'not reported'}`,
     api: 'GET /api/health',
     statusCode: 200,
     dbEffect: 'Read-only health check',

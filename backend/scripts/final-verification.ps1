@@ -73,7 +73,14 @@ function Wait-ForBackend {
   while ((Get-Date) -lt $timeout) {
     try {
       $health = Invoke-CurlJson -Method "GET" -Url "$baseUrl/api/health"
-      if ($health.Status -eq 200 -and $health.Json.status -eq "ok") {
+      $healthStatus = $null
+      if ($health.Json -and $health.Json.data -and $health.Json.data.status) {
+        $healthStatus = $health.Json.data.status
+      } elseif ($health.Json -and $health.Json.status) {
+        $healthStatus = $health.Json.status
+      }
+
+      if ($health.Status -eq 200 -and $healthStatus -eq "ok") {
         $elapsed = [math]::Round(((Get-Date) - $startTime).TotalSeconds, 1)
         Write-Host "✅ Backend ready after ${elapsed}s" -ForegroundColor Green
         return $true
@@ -125,6 +132,72 @@ $accessToken = $login.Json.data.access_token
 Write-Host "✅ Driver Login: $($login.Status)" -ForegroundColor Green
 Write-Host "   Access Token: $($accessToken.Substring(0, 50))..." -ForegroundColor White
 
+# Test 2a: Admin Login for order status updates
+Write-Host "`n2a. Testing Admin Login..." -ForegroundColor Yellow
+$adminLogin = Invoke-CurlJson -Method "POST" -Url "$baseUrl/api/auth/login" -Body @{
+    email = "admin@uberfoods.com"
+    password = "admin123"
+}
+if ($adminLogin.Status -notin @(200, 201) -or -not $adminLogin.Json.data.access_token) {
+    Write-Host "❌ Admin Login Failed: $($adminLogin.Status) $($adminLogin.Body)" -ForegroundColor Red
+    exit 1
+}
+$adminToken = $adminLogin.Json.data.access_token
+Write-Host "✅ Admin Login: $($adminLogin.Status)" -ForegroundColor Green
+
+# Test 2b: Customer Login for order creation
+Write-Host "`n2b. Testing Customer Login..." -ForegroundColor Yellow
+$customerEmail = "final-verification-" + [guid]::NewGuid().ToString("N").Substring(0, 12) + "@smoke.local"
+$customerPassword = "SmokeTest123!"
+try {
+    Invoke-CurlJson -Method "POST" -Url "$baseUrl/api/auth/customer/register" -Body @{
+        email = $customerEmail
+        password = $customerPassword
+        firstName = "Final"
+        lastName = "Verification"
+        phone = "+43123456789"
+    } | Out-Null
+} catch {
+    # Registration can be skipped if the account already exists from a prior run.
+}
+
+$customerLogin = Invoke-CurlJson -Method "POST" -Url "$baseUrl/api/auth/customer/login" -Body @{
+    email = $customerEmail
+    password = $customerPassword
+}
+if ($customerLogin.Status -notin @(200, 201) -or -not $customerLogin.Json.data.access_token) {
+    Write-Host "❌ Customer Login Failed: $($customerLogin.Status) $($customerLogin.Body)" -ForegroundColor Red
+    exit 1
+}
+$customerToken = $customerLogin.Json.data.access_token
+$customerId = $null
+if ($customerLogin.Json.data.user) {
+    $customerId = $customerLogin.Json.data.user.id
+} elseif ($customerLogin.Json.data.id) {
+    $customerId = $customerLogin.Json.data.id
+}
+Write-Host "✅ Customer Login: $($customerLogin.Status)" -ForegroundColor Green
+
+Write-Host "`n2c. Loading Restaurant + Dish..." -ForegroundColor Yellow
+$restaurants = Invoke-CurlJson -Method "GET" -Url "$baseUrl/api/restaurants/public"
+$restaurantList = @()
+if ($restaurants.Json.data) { $restaurantList = @($restaurants.Json.data) } else { $restaurantList = @($restaurants.Json) }
+$restaurantId = $restaurantList[0].id
+if (-not $restaurantId) { $restaurantId = $restaurantList[0].restaurantId }
+if (-not $restaurantId) {
+    Write-Host "❌ Restaurant lookup failed: no restaurant found" -ForegroundColor Red
+    exit 1
+}
+$dishes = Invoke-CurlJson -Method "GET" -Url "$baseUrl/api/dishes/restaurant/$restaurantId"
+$dishList = @()
+if ($dishes.Json.data) { $dishList = @($dishes.Json.data) } else { $dishList = @($dishes.Json) }
+$dishId = $dishList[0].id
+if (-not $dishId) {
+    Write-Host "❌ Dish lookup failed: no dish found for restaurant $restaurantId" -ForegroundColor Red
+    exit 1
+}
+Write-Host "✅ Loaded restaurant/dish: $restaurantId / $dishId" -ForegroundColor Green
+
 # Test 3: Driver Authentication (401 without token, 200 with token)
 Write-Host "`n3. Testing Driver Authentication RBAC..." -ForegroundColor Yellow
 
@@ -153,16 +226,16 @@ Write-Host "`n4. Testing E2E Order Lifecycle..." -ForegroundColor Yellow
 # Step 1: Customer creates order (201)
 Write-Host "   Step 1: Customer creates order..." -ForegroundColor Cyan
 $order = Invoke-CurlJson -Method "POST" -Url "$baseUrl/api/orders" -Body @{
-    customerId = "customer_test_123"
-    restaurantId = "restaurant_test_123"
+    customerId = $customerId
+    restaurantId = $restaurantId
     items = @(
         @{
-            dishId = "dish_test_123"
-            quantity = 2
-            price = 12.99
+            dishId = $dishId
+            quantity = 10
         }
     )
-    totalAmount = 25.99
+} -Headers @{
+    Authorization = "Bearer $customerToken"
 }
 if ($order.Status -ne 201) {
     Write-Host "❌ Order Creation Failed: $($order.Status) $($order.Body)" -ForegroundColor Red
@@ -173,7 +246,9 @@ Write-Host "✅ Order Created: $($order.Status) - ID: $orderId" -ForegroundColor
 
 # Step 2: Restaurant sets order to READY_FOR_PICKUP (200)
 Write-Host "   Step 2: Restaurant sets READY_FOR_PICKUP..." -ForegroundColor Cyan
-$ready = Invoke-CurlJson -Method "PUT" -Url "$baseUrl/api/restaurants/orders/$orderId/status" -Body @{
+$ready = Invoke-CurlJson -Method "PATCH" -Url "$baseUrl/api/orders/$orderId/status" -Headers @{
+    Authorization = "Bearer $adminToken"
+} -Body @{
     status = "READY_FOR_PICKUP"
 }
 if ($ready.Status -ne 200 -or $ready.Json.data.status -ne "READY_FOR_PICKUP") {
@@ -195,7 +270,7 @@ Write-Host "✅ Order Accepted: $($accept.Status) - Status: $($accept.Json.data.
 
 # Step 4: Driver marks order as DELIVERED (200)
 Write-Host "   Step 4: Driver marks DELIVERED..." -ForegroundColor Cyan
-$deliver = Invoke-CurlJson -Method "PATCH" -Url "$baseUrl/api/drivers/orders/$orderId/status" -Headers @{
+$deliver = Invoke-CurlJson -Method "PUT" -Url "$baseUrl/api/drivers/orders/$orderId/status" -Headers @{
     Authorization = "Bearer $accessToken"
 } -Body @{
     status = "DELIVERED"
@@ -208,7 +283,9 @@ Write-Host "✅ Order Delivered: $($deliver.Status) - Status: $($deliver.Json.da
 
 # Step 5: Admin verifies final order status (200)
 Write-Host "   Step 5: Admin verifies final status..." -ForegroundColor Cyan
-$admin = Invoke-CurlJson -Method "GET" -Url "$baseUrl/api/admin/orders/$orderId"
+$admin = Invoke-CurlJson -Method "GET" -Url "$baseUrl/api/orders/$orderId" -Headers @{
+    Authorization = "Bearer $adminToken"
+}
 if ($admin.Status -ne 200 -or $admin.Json.data.status -ne "DELIVERED" -or !$admin.Json.data.driverId) {
     Write-Host "❌ Admin Verification Failed: $($admin.Status) $($admin.Body)" -ForegroundColor Red
     exit 1
