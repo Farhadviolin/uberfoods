@@ -235,10 +235,14 @@ jobs:
 
     - name: Setup Authentication States
       working-directory: ./frontend/customer-web
+      env:
+        RELEASE_GATE_MANAGED: true
       run: npm run test:setup-auth
 
     - name: Run Full Order Lifecycle UI-E2E Test
       working-directory: ./frontend/customer-web
+      env:
+        RELEASE_GATE_MANAGED: true
       run: RUN_ID=${{ github.run_id }}_${{ github.run_attempt }} npx playwright test full-order-lifecycle.spec.ts --reporter=line,html,junit
       env:
         RUN_ID: ${{ github.run_id }}_${{ github.run_attempt }}
@@ -320,6 +324,8 @@ jobs:
 
     - name: Run customer web E2E tests
       working-directory: ./frontend/customer-web
+      env:
+        RELEASE_GATE_MANAGED: true
       run: |
         npm ci
         npm run build
