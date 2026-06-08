@@ -211,13 +211,13 @@ jobs:
         npm ci --prefix frontend/driver-app
 
     - name: Start all frontend apps
-      working-directory: ./frontend
       run: |
-        # Start all frontend apps
-        cd customer-web && npm run dev > ../logs/customer-web.log 2>&1 &
-        cd ../admin-panel && npm run dev:localhost > ../logs/admin-panel.log 2>&1 &
-        cd ../restaurant-web && npm run dev > ../logs/restaurant-web.log 2>&1 &
-        cd ../driver-app && npm run dev > ../logs/driver-app.log 2>&1 &
+        mkdir -p frontend/logs
+        # Start all frontend apps from the repo root so relative paths stay stable
+        npm run dev --prefix frontend/customer-web > frontend/logs/customer-web.log 2>&1 &
+        npm run dev:localhost --prefix frontend/admin-panel > frontend/logs/admin-panel.log 2>&1 &
+        npm run dev --prefix frontend/restaurant-web > frontend/logs/restaurant-web.log 2>&1 &
+        npm run dev --prefix frontend/driver-app > frontend/logs/driver-app.log 2>&1 &
         sleep 15
 
         # Verify all apps are running
