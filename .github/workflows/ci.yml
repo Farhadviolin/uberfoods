@@ -49,6 +49,8 @@ jobs:
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
+      with:
+        submodules: false
 
     - name: Setup Node.js
       uses: actions/setup-node@v4
@@ -170,6 +172,8 @@ jobs:
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
+      with:
+        submodules: false
 
     - name: Setup Node.js
       uses: actions/setup-node@v4
@@ -214,14 +218,17 @@ jobs:
       run: |
         mkdir -p frontend/logs
         # Start all frontend apps from the repo root so relative paths stay stable
-        npm run dev --prefix frontend/customer-web > frontend/logs/customer-web.log 2>&1 &
+        PORT=3001 npm run dev --prefix frontend/customer-web -- --host 0.0.0.0 --port 3001 > frontend/logs/customer-web.log 2>&1 &
         npm run dev:localhost --prefix frontend/admin-panel > frontend/logs/admin-panel.log 2>&1 &
         npm run dev --prefix frontend/restaurant-web > frontend/logs/restaurant-web.log 2>&1 &
         npm run dev --prefix frontend/driver-app > frontend/logs/driver-app.log 2>&1 &
         sleep 15
+        cat frontend/logs/customer-web.log || true
+        ps aux | grep -E "vite|node" || true
+        ls -la frontend/logs || true
 
         # Verify all apps are running
-        curl -f http://localhost:3001 || (echo "Customer web failed" && exit 1)
+        curl -v http://localhost:3001 || (echo "Customer web failed" && exit 1)
         curl -f http://localhost:3002 || (echo "Admin panel failed" && exit 1)
         curl -f http://localhost:3003 || (echo "Restaurant web failed" && exit 1)
         curl -f http://localhost:3004 || (echo "Driver app failed" && exit 1)
@@ -277,6 +284,8 @@ jobs:
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
+      with:
+        submodules: false
 
     - name: Setup Node.js
       uses: actions/setup-node@v4
