@@ -205,12 +205,10 @@ jobs:
 
     - name: Install frontend dependencies
       run: |
-        cd frontend
-        npm ci
-        cd customer-web && npm ci
-        cd ../admin-panel && npm ci
-        cd ../restaurant-web && npm ci
-        cd ../driver-app && npm ci
+        npm ci --prefix frontend/customer-web
+        npm ci --prefix frontend/admin-panel
+        npm ci --prefix frontend/restaurant-web
+        npm ci --prefix frontend/driver-app
 
     - name: Start all frontend apps
       working-directory: ./frontend
