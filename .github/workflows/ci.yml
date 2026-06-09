@@ -146,6 +146,8 @@ jobs:
   ui-e2e-lifecycle:
     runs-on: ubuntu-latest
     needs: api-verification
+    env:
+      DATABASE_URL: postgresql://postgres:postgres123@localhost:5434/uberfoods
     services:
       postgres:
         image: postgres:15
@@ -273,6 +275,8 @@ jobs:
   frontend-e2e:
     runs-on: ubuntu-latest
     needs: api-verification
+    env:
+      DATABASE_URL: postgresql://postgres:postgres123@localhost:5434/uberfoods
     services:
       postgres:
         image: postgres:15
