@@ -220,10 +220,10 @@ jobs:
     - name: Start all frontend apps
       run: |
         mkdir -p frontend/logs
-        cd customer-web && npm run dev:e2e > ../logs/customer-web.log 2>&1 &
-        cd ../admin-panel && npm run dev:localhost > ../logs/admin-panel.log 2>&1 &
-        cd ../restaurant-web && npm run dev > ../logs/restaurant-web.log 2>&1 &
-        cd ../driver-app && npm run dev > ../logs/driver-app.log 2>&1 &
+        npm run dev:e2e --prefix frontend/customer-web > frontend/logs/customer-web.log 2>&1 &
+        npm run dev:localhost --prefix frontend/admin-panel > frontend/logs/admin-panel.log 2>&1 &
+        npm run dev --prefix frontend/restaurant-web > frontend/logs/restaurant-web.log 2>&1 &
+        npm run dev --prefix frontend/driver-app > frontend/logs/driver-app.log 2>&1 &
         for i in {1..60}; do
           if curl -fsS http://127.0.0.1:3102 >/dev/null; then
             echo "customer-web is ready on 3102"
