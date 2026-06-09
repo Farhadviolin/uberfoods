@@ -247,6 +247,7 @@ jobs:
       working-directory: ./frontend/customer-web
       env:
         RELEASE_GATE_MANAGED: true
+        CUSTOMER_URL: http://127.0.0.1:3102
       run: npm run test:setup-auth
 
     - name: Run Full Order Lifecycle UI-E2E Test
@@ -255,6 +256,7 @@ jobs:
       env:
         RUN_ID: ${{ github.run_id }}_${{ github.run_attempt }}
         RELEASE_GATE_MANAGED: true
+        CUSTOMER_URL: http://127.0.0.1:3102
 
     - name: Upload UI-E2E test results
       if: always()
@@ -335,6 +337,7 @@ jobs:
       working-directory: ./frontend/customer-web
       env:
         RELEASE_GATE_MANAGED: true
+        CUSTOMER_URL: http://127.0.0.1:3102
       run: |
         npm ci
         npx playwright install chromium --with-deps
