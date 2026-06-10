@@ -255,7 +255,11 @@ jobs:
         npm run dev:e2e --prefix frontend/customer-web > frontend/logs/customer-web.log 2>&1 &
         echo $! > frontend/logs/customer-web.pid
 
-        npm run dev:localhost --prefix frontend/admin-panel > frontend/logs/admin-panel.log 2>&1 &
+        echo "Checking port 3002 before starting admin-panel"
+        (lsof -i :3002 || true)
+        (ss -ltnp | grep ':3002' || true)
+
+        npm run dev:fixed --prefix frontend/admin-panel > frontend/logs/admin-panel.log 2>&1 &
         echo $! > frontend/logs/admin-panel.pid
 
         npm run dev --prefix frontend/restaurant-web -- --host 0.0.0.0 --port 3003 > frontend/logs/restaurant-web.log 2>&1 &
