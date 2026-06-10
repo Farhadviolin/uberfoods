@@ -1,4 +1,5 @@
-import { test, expect, TestHelpers, testUsers, testUrls, testSelectors } from './test-helpers';
+import { expect } from '@playwright/test';
+import { test, TestHelpers, testUsers, testUrls, testSelectors } from './test-helpers';
 import { testDataFactory } from '../../test-utils/test-data-factory';
 
 // Generate unique run ID for test isolation

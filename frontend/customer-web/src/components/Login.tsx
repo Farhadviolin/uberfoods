@@ -44,6 +44,7 @@ export function Login() {
           <div className="form-group">
             <label>{t('auth.email')}</label>
             <input
+              data-testid="email-input"
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
@@ -55,6 +56,7 @@ export function Login() {
           <div className="form-group">
             <label>{t('auth.password')}</label>
             <input
+              data-testid="password-input"
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
@@ -63,7 +65,7 @@ export function Login() {
             />
           </div>
 
-          <button type="submit" disabled={loading} className="auth-button">
+          <button type="submit" disabled={loading} className="auth-button" data-testid="login-button">
             {loading ? t('auth.loggingIn') : t('auth.login')}
           </button>
         </form>
