@@ -252,10 +252,17 @@ jobs:
           return 1
         }
 
-        (cd customer-web && npm run dev:e2e > ../logs/customer-web.log 2>&1 & echo $! > ../logs/customer-web.pid)
-        (cd ../admin-panel && npm run dev:localhost > ../logs/admin-panel.log 2>&1 & echo $! > ../logs/admin-panel.pid)
-        (cd ../restaurant-web && npm run dev > ../logs/restaurant-web.log 2>&1 & echo $! > ../logs/restaurant-web.pid)
-        (cd ../driver-app && npm run dev > ../logs/driver-app.log 2>&1 & echo $! > ../logs/driver-app.pid)
+        npm run dev:e2e --prefix frontend/customer-web > frontend/logs/customer-web.log 2>&1 &
+        echo $! > frontend/logs/customer-web.pid
+
+        npm run dev:localhost --prefix frontend/admin-panel > frontend/logs/admin-panel.log 2>&1 &
+        echo $! > frontend/logs/admin-panel.pid
+
+        npm run dev --prefix frontend/restaurant-web -- --host 0.0.0.0 --port 3003 > frontend/logs/restaurant-web.log 2>&1 &
+        echo $! > frontend/logs/restaurant-web.pid
+
+        npm run dev --prefix frontend/driver-app -- --host 0.0.0.0 --port 3004 > frontend/logs/driver-app.log 2>&1 &
+        echo $! > frontend/logs/driver-app.pid
 
         wait_for_url "customer-web" "http://127.0.0.1:3102" "frontend/logs/customer-web.log" "$(cat frontend/logs/customer-web.pid)"
         wait_for_url "admin-panel" "http://127.0.0.1:3002" "frontend/logs/admin-panel.log" "$(cat frontend/logs/admin-panel.pid)"
