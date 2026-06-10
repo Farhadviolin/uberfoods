@@ -1,7 +1,9 @@
 import { test as setup, expect } from '@playwright/test';
+import { mkdirSync } from 'node:fs';
 import { testDataFactory } from '../../test-utils/test-data-factory';
 
 const authFile = 'playwright/.auth';
+mkdirSync(authFile, { recursive: true });
 
 // Setup authentication state for each role
 setup('authenticate as customer', async ({ page, context }) => {

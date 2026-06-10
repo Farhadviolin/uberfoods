@@ -196,9 +196,9 @@ export class TestDataFactory {
   getFrontendUrls() {
     return {
       customer: process.env.BASE_URL || process.env.CUSTOMER_URL || 'http://127.0.0.1:3002',
-      restaurant: process.env.RESTAURANT_URL || '',
-      driver: process.env.DRIVER_URL || '',
-      admin: process.env.ADMIN_URL || ''
+      restaurant: process.env.RESTAURANT_URL || 'http://127.0.0.1:3003',
+      driver: process.env.DRIVER_URL || 'http://127.0.0.1:3004',
+      admin: process.env.ADMIN_URL || 'http://127.0.0.1:3001'
     };
   }
 
