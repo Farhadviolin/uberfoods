@@ -78,8 +78,8 @@ export class TestDataFactory {
   getTestRestaurant(): TestUser {
     return {
       id: this.generateId('restaurant', 'e2e'),
-      email: 'testrestaurant@example.com',
-      password: 'TestPassword123!',
+      email: 'restaurant@uberfoods.local',
+      password: 'restaurant123',
       name: 'Test Restaurant',
       phone: '+43 987 654 321',
       role: 'restaurant'
@@ -89,8 +89,8 @@ export class TestDataFactory {
   getTestDriver(): TestUser {
     return {
       id: this.generateId('driver', 'e2e'),
-      email: 'testdriver@example.com',
-      password: 'TestPassword123!',
+      email: 'driver@uberfoods.local',
+      password: 'driver123',
       name: 'Test Driver',
       phone: '+43 555 123 456',
       role: 'driver'
@@ -100,8 +100,8 @@ export class TestDataFactory {
   getTestAdmin(): TestUser {
     return {
       id: this.generateId('admin', 'e2e'),
-      email: 'testadmin@example.com',
-      password: 'TestPassword123!',
+      email: 'admin@uberfoods.com',
+      password: 'admin123',
       name: 'Test Admin',
       phone: '+43 111 222 333',
       role: 'admin'
