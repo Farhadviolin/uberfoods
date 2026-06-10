@@ -222,28 +222,45 @@ jobs:
     - name: Start all frontend apps
       run: |
         mkdir -p frontend/logs
-        npm run dev:e2e --prefix frontend/customer-web > frontend/logs/customer-web.log 2>&1 &
-        npm run dev:localhost --prefix frontend/admin-panel > frontend/logs/admin-panel.log 2>&1 &
-        npm run dev --prefix frontend/restaurant-web > frontend/logs/restaurant-web.log 2>&1 &
-        npm run dev --prefix frontend/driver-app > frontend/logs/driver-app.log 2>&1 &
-        for i in {1..60}; do
-          if curl -fsS http://127.0.0.1:3102 >/dev/null; then
-            echo "customer-web is ready on 3102"
-            break
-          fi
-          echo "waiting for customer-web on 3102..."
-          sleep 2
-        done
+        wait_for_url() {
+          local name="$1"
+          local url="$2"
+          local log_file="$3"
+          local pid="$4"
 
-        # Verify all apps are running
-        if ! curl -f http://localhost:3102 >/dev/null; then
-          echo "Customer web failed"
-          cat frontend/logs/customer-web.log || true
-          exit 1
-        fi
-        curl -f http://localhost:3002 || (echo "Admin panel failed" && exit 1)
-        curl -f http://localhost:3003 || (echo "Restaurant web failed" && exit 1)
-        curl -f http://localhost:3004 || (echo "Driver app failed" && exit 1)
+          echo "Waiting for $name at $url"
+          for i in {1..60}; do
+            if curl -fsS "$url" >/dev/null 2>&1; then
+              echo "$name is ready at $url"
+              return 0
+            fi
+
+            if ! kill -0 "$pid" >/dev/null 2>&1; then
+              echo "$name process exited before becoming ready"
+              echo "===== $name log ====="
+              cat "$log_file" || true
+              return 1
+            fi
+
+            echo "waiting for $name at $url..."
+            sleep 2
+          done
+
+          echo "$name did not become ready at $url"
+          echo "===== $name log ====="
+          cat "$log_file" || true
+          return 1
+        }
+
+        (cd customer-web && npm run dev:e2e > ../logs/customer-web.log 2>&1 & echo $! > ../logs/customer-web.pid)
+        (cd ../admin-panel && npm run dev:localhost > ../logs/admin-panel.log 2>&1 & echo $! > ../logs/admin-panel.pid)
+        (cd ../restaurant-web && npm run dev > ../logs/restaurant-web.log 2>&1 & echo $! > ../logs/restaurant-web.pid)
+        (cd ../driver-app && npm run dev > ../logs/driver-app.log 2>&1 & echo $! > ../logs/driver-app.pid)
+
+        wait_for_url "customer-web" "http://127.0.0.1:3102" "frontend/logs/customer-web.log" "$(cat frontend/logs/customer-web.pid)"
+        wait_for_url "admin-panel" "http://127.0.0.1:3002" "frontend/logs/admin-panel.log" "$(cat frontend/logs/admin-panel.pid)"
+        wait_for_url "restaurant-web" "http://127.0.0.1:3003" "frontend/logs/restaurant-web.log" "$(cat frontend/logs/restaurant-web.pid)"
+        wait_for_url "driver-app" "http://127.0.0.1:3004" "frontend/logs/driver-app.log" "$(cat frontend/logs/driver-app.pid)"
 
     - name: Setup Authentication States
       working-directory: ./frontend/customer-web

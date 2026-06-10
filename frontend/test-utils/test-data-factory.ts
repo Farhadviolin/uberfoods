@@ -198,7 +198,7 @@ export class TestDataFactory {
       customer: process.env.BASE_URL || process.env.CUSTOMER_URL || 'http://127.0.0.1:3002',
       restaurant: process.env.RESTAURANT_URL || 'http://127.0.0.1:3003',
       driver: process.env.DRIVER_URL || 'http://127.0.0.1:3004',
-      admin: process.env.ADMIN_URL || 'http://127.0.0.1:3001'
+      admin: process.env.ADMIN_URL || 'http://127.0.0.1:3002'
     };
   }
 
