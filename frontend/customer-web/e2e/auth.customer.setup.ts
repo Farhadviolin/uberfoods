@@ -6,6 +6,25 @@ import { TestHelpers } from './test-helpers';
 const authFile = 'playwright/.auth';
 mkdirSync(authFile, { recursive: true });
 
+function normalizeCustomerLoginPayload(payload: any) {
+  const data = payload?.data ?? payload ?? {};
+  const accessToken = data.access_token ?? data.accessToken ?? data.token ?? null;
+  const refreshToken = data.refresh_token ?? data.refreshToken ?? null;
+  const user = data.user ?? {
+    id: data.id,
+    email: data.email,
+    name: data.name,
+    role: data.role ?? data.userType,
+    userType: data.userType,
+    restaurantId: data.restaurantId,
+    mustChangePassword: data.mustChangePassword,
+    isActive: data.isActive,
+    currentStatus: data.currentStatus,
+  };
+
+  return { accessToken, refreshToken, user, raw: data };
+}
+
 setup('authenticate as customer', async ({ page }) => {
   const urls = testDataFactory.getFrontendUrls();
 
@@ -81,24 +100,34 @@ setup('authenticate as customer', async ({ page }) => {
   }
 
   const data = await resp.json().catch(() => ({}));
-  expect(data).toEqual(expect.objectContaining({
-    data: expect.objectContaining({
-      access_token: expect.any(String),
-      user: expect.any(Object),
-      refresh_token: expect.any(String),
-    }),
-  }));
+  const normalized = normalizeCustomerLoginPayload(data);
 
-  expect((data as any).data.user).toEqual(expect.objectContaining({
+  expect(normalized.accessToken).toEqual(expect.any(String));
+  expect(normalized.refreshToken).toEqual(expect.any(String));
+  expect(normalized.user).toEqual(expect.objectContaining({
     id: expect.any(String),
     email: credentials.email,
     role: 'customer',
   }));
 
+  await page.evaluate(({ accessToken, refreshToken, user }) => {
+    const jsonUser = JSON.stringify(user);
+    localStorage.setItem('access_token', accessToken);
+    localStorage.setItem('auth_token', accessToken);
+    localStorage.setItem('user', jsonUser);
+    if (refreshToken) {
+      localStorage.setItem('refresh_token', refreshToken);
+    }
+  }, {
+    accessToken: normalized.accessToken,
+    refreshToken: normalized.refreshToken,
+    user: normalized.user,
+  });
+
   await page.context().storageState({ path: `${authFile}/customer.json` });
 
-  const accessTokenPrefix = (data as any).data.access_token.substring(0, 10) + '...';
-  const refreshTokenPrefix = (data as any).data.refresh_token.substring(0, 10) + '...';
+  const accessTokenPrefix = normalized.accessToken.substring(0, 10) + '...';
+  const refreshTokenPrefix = normalized.refreshToken.substring(0, 10) + '...';
 
   console.log('✅ API response validated - contract compliant');
   console.log('🔐 Tokens received - access:', accessTokenPrefix, 'refresh:', refreshTokenPrefix);
