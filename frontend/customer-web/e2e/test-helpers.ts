@@ -62,34 +62,25 @@ export class TestHelpers {
 
   static async registerCustomer(page: Page, user: TestUser, appUrl: string) {
     await page.goto(`${appUrl}/register`);
+    const uniqueEmail = `customer-${RUN_ID}-${randomUUID()}@example.test`;
 
-    const [localPart, domain = 'example.com'] = user.email.split('@');
-    const uniqueEmail = `${localPart}+${RUN_ID}-${randomUUID()}@${domain}`;
-    const passwordFields = page.locator('input[type="password"]');
-
-    await page.locator('input[type="text"]').first().fill(user.name);
-    await page.locator('input[type="email"]').fill(uniqueEmail);
-    await page.locator('input[type="tel"]').fill(user.phone);
-    await passwordFields.nth(0).fill(user.password);
-    await passwordFields.nth(1).fill(user.password);
-
-    const [registerResponse] = await Promise.all([
-      page.waitForResponse(
-        response =>
-          new URL(response.url()).pathname === '/api/auth/customer/register'
-          && response.status() === 201,
-        { timeout: 10000 },
-      ),
-      page.locator('button[type="submit"], button:has-text("Register")').click(),
-    ]);
-
-    if (registerResponse.status() !== 201) {
-      throw new Error(`Customer registration failed with status ${registerResponse.status()}`);
-    }
-
-    await page.waitForURL(url =>
-      url.pathname === '/' || /\/(dashboard|home|verify)/i.test(url.pathname),
+    // Wait for register API response
+    const registerResponsePromise = page.waitForResponse(
+      response => response.url().includes('/api/auth/customer/register') && response.status() === 201,
+      { timeout: 10000 }
     );
+
+    await page.locator('input[name="firstName"]').fill('Test');
+    await page.locator('input[name="lastName"]').fill('Customer');
+    await page.locator('input[type="email"]').fill(uniqueEmail);
+    await page.locator('input[type="password"]').fill(user.password);
+    await page.locator('input[name="phone"]').fill(user.phone);
+    await page.locator('button[type="submit"], button:has-text("Register")').click();
+
+    // Wait for register API response
+    await registerResponsePromise;
+
+    await page.waitForURL(/.*(dashboard|home|verify)/i);
   }
 
   static getSelectors() {

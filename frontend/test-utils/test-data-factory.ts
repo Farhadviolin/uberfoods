@@ -68,7 +68,7 @@ export class TestDataFactory {
     return {
       id: this.generateId('customer', 'e2e'),
       email: process.env.E2E_CUSTOMER_EMAIL || 'customer@uberfoods.local',
-      password: 'test123',
+      password: 'customer123',
       name: 'Test Customer',
       phone: '+43 123 456 789',
       role: 'customer'
