@@ -81,7 +81,9 @@ export class TestHelpers {
   }
 
   static async registerCustomer(page: Page, user: Pick<TestUser, 'email' | 'password' | 'name' | 'phone'>, appUrl: string) {
-    await page.goto(`${appUrl}/register`);
+    const registerUrl = `${appUrl}/register`;
+    console.log('[customer-e2e] register navigation', { appUrl, registerUrl, apiBaseUrl: process.env.API_BASE_URL || process.env.VITE_API_BASE_URL || 'unset' });
+    await page.goto(registerUrl, { waitUntil: 'domcontentloaded' });
     const registerRoute = '/api/auth/customer/register';
     const registerResponsePromise = page.waitForResponse(
       response => response.request().method() === 'POST'
@@ -114,7 +116,7 @@ export class TestHelpers {
 
   static async loginCustomer(page: Page, credentials: Pick<CustomerCredentials, 'email' | 'password'>, appUrl: string) {
     if (!page.url().includes('/login')) {
-      await page.goto(`${appUrl}/login`);
+      await page.goto(`${appUrl}/login`, { waitUntil: 'domcontentloaded' });
     }
 
     const loginResponsePromise = page.waitForResponse((response) =>
