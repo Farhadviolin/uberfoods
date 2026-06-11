@@ -399,7 +399,7 @@ jobs:
           cat ../logs/customer-web.log || true
           exit 1
         fi
-        npx playwright test --grep-invert "full-order-lifecycle"
+        npm run test:e2e:customer
 
     - name: Run admin panel unit tests
       working-directory: ./frontend/admin-panel
