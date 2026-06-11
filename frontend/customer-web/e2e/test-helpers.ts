@@ -1,4 +1,5 @@
 import { test as base, Page, BrowserContext } from '@playwright/test';
+import { randomUUID } from 'node:crypto';
 import { testDataFactory, TestUser } from '../../test-utils/test-data-factory';
 
 // Generate unique run ID for test isolation
@@ -63,7 +64,7 @@ export class TestHelpers {
     await page.goto(`${appUrl}/register`);
 
     const [localPart, domain = 'example.com'] = user.email.split('@');
-    const uniqueEmail = `${localPart}+${RUN_ID}@${domain}`;
+    const uniqueEmail = `${localPart}+${RUN_ID}-${randomUUID()}@${domain}`;
     const passwordFields = page.locator('input[type="password"]');
 
     await page.locator('input[type="text"]').first().fill(user.name);

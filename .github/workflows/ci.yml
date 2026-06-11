@@ -353,6 +353,7 @@ jobs:
         npm ci
         npx prisma generate --schema=./prisma/schema.prisma
         npx prisma migrate deploy --schema=./prisma/schema.prisma
+        npm run prisma:seed
         npm run start:e2e &
         sleep 15
         curl -f http://localhost:3000/api/health || (echo "Backend failed to start" && exit 1)
@@ -362,6 +363,9 @@ jobs:
         PORT: 3000
         DATABASE_URL: postgresql://postgres:postgres123@localhost:5434/uberfoods
         REDIS_URL: redis://localhost:6379
+        SEED_CUSTOMER_PASSWORD: test123
+        SEED_RESTAURANT_PASSWORD: restaurant123
+        SEED_DRIVER_PASSWORD: driver123
         JWT_SECRET: ci-jwt-secret-placeholder
         JWT_EXPIRES_IN: 1h
         STRIPE_SECRET_KEY: STRIPE_SECRET_KEY_PLACEHOLDER
