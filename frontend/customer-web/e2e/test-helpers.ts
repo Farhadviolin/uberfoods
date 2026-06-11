@@ -113,7 +113,9 @@ export class TestHelpers {
   }
 
   static async loginCustomer(page: Page, credentials: Pick<CustomerCredentials, 'email' | 'password'>, appUrl: string) {
-    await page.goto(`${appUrl}/login`);
+    if (!page.url().includes('/login')) {
+      await page.goto(`${appUrl}/login`);
+    }
 
     const loginResponsePromise = page.waitForResponse((response) =>
       response.request().method() === 'POST'
