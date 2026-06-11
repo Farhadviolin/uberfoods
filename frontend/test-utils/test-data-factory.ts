@@ -195,7 +195,9 @@ export class TestDataFactory {
   // Frontend URLs
   getFrontendUrls() {
     return {
-      customer: process.env.BASE_URL || process.env.CUSTOMER_URL || 'http://127.0.0.1:3002',
+      // Customer-only E2E runs the customer web app on its dedicated port.
+      // Prefer CUSTOMER_URL so we don't accidentally point at another frontend.
+      customer: process.env.CUSTOMER_URL || process.env.BASE_URL || 'http://127.0.0.1:3102',
       restaurant: process.env.RESTAURANT_URL || 'http://127.0.0.1:3003',
       driver: process.env.DRIVER_URL || 'http://127.0.0.1:3004',
       admin: process.env.ADMIN_URL || 'http://127.0.0.1:3002'
