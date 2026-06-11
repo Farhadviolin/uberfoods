@@ -5,7 +5,28 @@ import { testDataFactory } from '../../test-utils/test-data-factory';
 const authFile = 'playwright/.auth';
 mkdirSync(authFile, { recursive: true });
 
-type ApiLoginRole = 'admin' | 'restaurant' | 'driver';
+type AuthRole = 'customer' | 'admin' | 'restaurant' | 'driver';
+type ApiLoginRole = Exclude<AuthRole, 'customer'>;
+
+const authRoles = new Set(
+  (process.env.E2E_AUTH_ROLES ?? 'customer')
+    .split(',')
+    .map((role) => role.trim())
+    .filter((role): role is AuthRole =>
+      ['customer', 'admin', 'restaurant', 'driver'].includes(role),
+    ),
+);
+
+console.log(`Creating auth state for roles: ${[...authRoles].join(',')}`);
+
+function registerAuthSetup(role: AuthRole, title: string, callback: any) {
+  if (authRoles.has(role)) {
+    setup(title, callback);
+    return;
+  }
+
+  console.log(`Skipping auth state for role ${role}`);
+}
 
 function normalizeApiLoginPayload(payload: any) {
   const data = payload?.data ?? payload ?? {};
@@ -103,7 +124,7 @@ async function createStorageStateViaApi({
 }
 
 // Setup authentication state for each role
-setup('authenticate as customer', async ({ page, context }) => {
+registerAuthSetup('customer', 'authenticate as customer', async ({ page, context }) => {
   const customer = testDataFactory.getTestCustomer();
   const urls = testDataFactory.getFrontendUrls();
 
@@ -196,26 +217,20 @@ setup('authenticate as customer', async ({ page, context }) => {
     data = {};
   }
 
-  // If login succeeds, validate the response structure
-  if (resp.status() < 300) {
-    expect(data).toEqual(expect.objectContaining({
-      access_token: expect.any(String),
-      user: expect.any(Object),
-      refresh_token: expect.any(String)
-    }));
-    expect(data.user).toEqual(expect.objectContaining({
-      id: expect.any(String),
-      email: customer.email,
-      role: 'customer'
-    }));
-
-    // Store auth state for reuse
-    await page.context().storageState({ path: 'playwright/.auth/customer.json' });
-  } else {
-    // Auth failed, but routing worked - create empty auth state
-    console.log('⚠️ Auth failed but routing works - creating empty auth state');
-    await page.context().storageState({ path: 'playwright/.auth/customer.json' });
+  if (resp.status() >= 300) {
+    throw new Error(`Customer UI login failed with status ${resp.status()}`);
   }
+
+  expect(data).toEqual(expect.objectContaining({
+    access_token: expect.any(String),
+    user: expect.any(Object),
+    refresh_token: expect.any(String)
+  }));
+  expect(data.user).toEqual(expect.objectContaining({
+    id: expect.any(String),
+    email: customer.email,
+    role: 'customer'
+  }));
 
   // SECURITY: Log token presence but NOT the actual tokens
   const accessTokenPrefix = data.access_token ? data.access_token.substring(0, 10) + '...' : 'MISSING';
@@ -273,7 +288,7 @@ setup('authenticate as customer', async ({ page, context }) => {
   await page.context().storageState({ path: `${authFile}/customer.json` });
 });
 
-setup('authenticate as restaurant', async ({ page, context }) => {
+registerAuthSetup('restaurant', 'authenticate as restaurant', async ({ page, context }) => {
   const urls = testDataFactory.getFrontendUrls();
   setup.skip(!urls.restaurant, "RESTAURANT_URL not set – skipping restaurant auth setup");
 
@@ -289,7 +304,7 @@ setup('authenticate as restaurant', async ({ page, context }) => {
   });
 });
 
-setup('authenticate as driver', async ({ page, context }) => {
+registerAuthSetup('driver', 'authenticate as driver', async ({ page, context }) => {
   const urls = testDataFactory.getFrontendUrls();
   setup.skip(!urls.driver, "DRIVER_URL not set – skipping driver auth setup");
 
@@ -305,7 +320,7 @@ setup('authenticate as driver', async ({ page, context }) => {
   });
 });
 
-setup('authenticate as admin', async ({ page, context }) => {
+registerAuthSetup('admin', 'authenticate as admin', async ({ page, context }) => {
   const urls = testDataFactory.getFrontendUrls();
   setup.skip(!urls.admin, "ADMIN_URL not set – skipping admin auth setup");
 

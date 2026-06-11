@@ -191,6 +191,7 @@ jobs:
         npm ci
         npx prisma generate --schema=./prisma/schema.prisma
         npx prisma migrate deploy --schema=./prisma/schema.prisma
+        npm run prisma:seed
         node scripts/create-test-driver.js
         npm run start:e2e &
         sleep 20
@@ -201,6 +202,9 @@ jobs:
         PORT: 3000
         DATABASE_URL: postgresql://postgres:postgres123@localhost:5434/uberfoods
         REDIS_URL: redis://localhost:6379
+        SEED_CUSTOMER_PASSWORD: test123
+        SEED_RESTAURANT_PASSWORD: restaurant123
+        SEED_DRIVER_PASSWORD: driver123
         JWT_SECRET: ci-jwt-secret-placeholder
         JWT_EXPIRES_IN: 1h
         STRIPE_SECRET_KEY: STRIPE_SECRET_KEY_PLACEHOLDER
@@ -278,6 +282,7 @@ jobs:
       env:
         RELEASE_GATE_MANAGED: true
         CUSTOMER_URL: http://127.0.0.1:3102
+        E2E_AUTH_ROLES: customer,admin,restaurant,driver
       run: npm run test:setup-auth
 
     - name: Run Full Order Lifecycle UI-E2E Test
@@ -370,6 +375,7 @@ jobs:
       env:
         RELEASE_GATE_MANAGED: true
         CUSTOMER_URL: http://127.0.0.1:3102
+        E2E_AUTH_ROLES: customer
       run: |
         npm ci
         npx playwright install chromium --with-deps
