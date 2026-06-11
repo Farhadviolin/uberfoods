@@ -406,10 +406,6 @@ jobs:
       run: |
         npm ci
         npm test -- --testPathPattern=SocialManagement.test.tsx --watchAll=false
-        if ($LASTEXITCODE -ne 0) {
-          Write-Error "Admin panel SocialManagement tests failed"
-          exit 1
-        }
 
     - name: Run admin panel E2E tests
       working-directory: ./frontend/admin-panel
