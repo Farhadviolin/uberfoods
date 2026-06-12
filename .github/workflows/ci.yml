@@ -415,7 +415,7 @@ jobs:
         npm ci
         npm run build
         mkdir -p ../logs
-        npm run preview:e2e > ../logs/admin-panel.log 2>&1 &
+        npm run dev:e2e > ../logs/admin-panel.log 2>&1 &
         for i in {1..60}; do
           if curl -fsS http://127.0.0.1:3002 >/dev/null; then
             echo "admin-panel is ready on 3002"
