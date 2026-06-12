@@ -2,6 +2,7 @@ import { test, expect } from '@playwright/test';
 
 test.describe('Offline-Funktionalität', () => {
   test.beforeEach(async ({ page }) => {
+    await page.context().setOffline(false);
     await page.goto('/');
     await page.evaluate(() => {
       localStorage.setItem('driver_token', 'mock-token');
@@ -12,6 +13,10 @@ test.describe('Offline-Funktionalität', () => {
       }));
     });
     await page.reload();
+  });
+
+  test.afterEach(async ({ context }) => {
+    await context.setOffline(false);
   });
 
   test('zeigt Offline-Indikator bei Netzwerkausfall', async ({ page }) => {

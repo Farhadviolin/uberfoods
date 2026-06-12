@@ -146,6 +146,7 @@ jobs:
   ui-e2e-lifecycle:
     runs-on: ubuntu-latest
     needs: api-verification
+    timeout-minutes: 20
     env:
       DATABASE_URL: postgresql://postgres:postgres123@localhost:5434/uberfoods
     services:
