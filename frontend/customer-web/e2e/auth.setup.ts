@@ -5,6 +5,8 @@ import { TestHelpers } from './test-helpers';
 
 const authFile = 'playwright/.auth';
 mkdirSync(authFile, { recursive: true });
+const LIFECYCLE_RUN_ID = process.env.GITHUB_RUN_ID || process.env.RUN_ID || `run_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+const LIFECYCLE_RUN_ATTEMPT = process.env.GITHUB_RUN_ATTEMPT || '1';
 
 type AuthRole = 'customer' | 'admin' | 'restaurant' | 'driver';
 type ApiLoginRole = Exclude<AuthRole, 'customer'>;
@@ -46,6 +48,16 @@ function normalizeApiLoginPayload(payload: any) {
   };
 
   return { accessToken, refreshToken, user, raw: data };
+}
+
+function createLifecycleCustomerCredentials() {
+  const token = `${LIFECYCLE_RUN_ID}.${LIFECYCLE_RUN_ATTEMPT}.${Date.now()}.${Math.random().toString(36).slice(2, 8)}`;
+  return {
+    email: `customer.lifecycle.${token}@example.test`,
+    password: `customer.${token}`,
+    name: `Lifecycle Customer ${token}`,
+    phone: '+43 123 456 789',
+  };
 }
 
 async function createStorageStateViaApi({
@@ -128,7 +140,7 @@ async function createStorageStateViaApi({
 registerAuthSetup('customer', 'authenticate as customer', async ({ page, context }) => {
   const urls = testDataFactory.getFrontendUrls();
   const loginRoute = '/api/auth/customer/login';
-  const customer = TestHelpers.createCustomerCredentials();
+  const customer = createLifecycleCustomerCredentials();
 
   // Add request/response logging for debugging (SECURITY: mask sensitive data)
   page.on('request', (r) => {
