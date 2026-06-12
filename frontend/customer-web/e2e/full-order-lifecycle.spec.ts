@@ -94,6 +94,8 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
         await customerPage.waitForTimeout(500);
       }
 
+      await expect(customerPage.locator('[data-testid="cart-placeholder"]')).toContainText(/Cart: [1-9]/i);
+
       // Go to cart and checkout
       const cartButton = customerPage.locator('[data-testid="cart-btn"], .cart-btn, a[href*="cart"], [data-testid="cart-button"]');
       if (await cartButton.isVisible()) {

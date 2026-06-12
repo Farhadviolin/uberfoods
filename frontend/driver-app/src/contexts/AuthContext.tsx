@@ -28,7 +28,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     // ECHTE JWT-AUTHENTIFIZIERUNG - Token aus localStorage laden
     const storedToken = localStorage.getItem('driver_token');
-    const storedDriver = localStorage.getItem('driver_data');
+    const storedDriver = localStorage.getItem('driver_data') || localStorage.getItem('driver_user');
 
     if (storedToken && storedDriver) {
       try {
@@ -37,10 +37,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setToken(storedToken);
         // Token in API-Headers setzen
         api.defaults.headers.common['Authorization'] = `Bearer ${storedToken}`;
+        localStorage.setItem('driver_data', JSON.stringify(driverData));
+        localStorage.setItem('driver_user', JSON.stringify(driverData));
       } catch (error) {
         logger.error('Fehler beim Laden der gespeicherten Auth-Daten', 'AuthContext', error);
         localStorage.removeItem('driver_token');
         localStorage.removeItem('driver_data');
+        localStorage.removeItem('driver_user');
       }
     }
 
@@ -80,10 +83,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (refresh_token) {
         localStorage.setItem('driver_refresh_token', refresh_token);
       }
-      localStorage.setItem('driver_user', JSON.stringify({ ...driverData, mustChangePassword: needsPasswordChange }));
+      const storedDriver = { ...driverData, mustChangePassword: needsPasswordChange };
+      localStorage.setItem('driver_data', JSON.stringify(storedDriver));
+      localStorage.setItem('driver_user', JSON.stringify(storedDriver));
       
       setToken(access_token);
-      setDriver({ ...driverData, mustChangePassword: needsPasswordChange } as Driver);
+      setDriver(storedDriver as Driver);
       setMustChangePassword(needsPasswordChange);
       api.defaults.headers.common['Authorization'] = `Bearer ${access_token}`;
     } catch (error: any) {
@@ -113,6 +118,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = () => {
     localStorage.removeItem('driver_token');
     localStorage.removeItem('driver_refresh_token');
+    localStorage.removeItem('driver_data');
     localStorage.removeItem('driver_user');
     delete api.defaults.headers.common['Authorization'];
     setToken(null);
