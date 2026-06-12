@@ -6,12 +6,14 @@ import { config } from './config';
 import './index.css';
 import { logger } from './utils/logger';
 
+const safeProcessEnv = typeof process !== 'undefined' ? process.env : undefined;
+
 // Sentry Error-Tracking Initialisierung (optional)
 if (config.sentryDsn && config.sentryDsn.trim() !== '') {
   import('@sentry/react').then((Sentry) => {
     // Release-Version aus package.json oder env
-    const release = process.env.VITE_APP_VERSION ||
-                   process.env.npm_package_version ||
+    const release = safeProcessEnv?.VITE_APP_VERSION ||
+                   safeProcessEnv?.npm_package_version ||
                    '1.0.0';
 
     Sentry.init({

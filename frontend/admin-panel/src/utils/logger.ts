@@ -1,6 +1,7 @@
 /* eslint-disable no-console */
 
-const isDev = process.env.NODE_ENV !== "production";
+const safeProcessEnv = typeof process !== 'undefined' ? process.env : undefined;
+const isDev = safeProcessEnv?.NODE_ENV !== "production";
 
 type LogLevel = "error" | "warn" | "info" | "debug";
 
