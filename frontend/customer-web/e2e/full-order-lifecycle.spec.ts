@@ -80,9 +80,11 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
       const restaurantCard = customerPage.locator('[data-testid="restaurant-card"], .restaurant-card').first();
       await expect(restaurantCard).toBeVisible();
       await restaurantCard.click();
+      await customerPage.waitForURL(/\/restaurant\/[^/]+$/);
+      await expect(customerPage.locator('[data-testid="menu-content"]')).toBeVisible();
 
       // Add items to cart and checkout
-      const addToCartButtons = customerPage.locator('button[data-testid*="add-to-cart"], .add-to-cart');
+      const addToCartButtons = customerPage.locator('[data-testid="add-to-cart-button"]');
       const addToCartButtonCount = await addToCartButtons.count();
       expect(addToCartButtonCount).toBeGreaterThan(0);
 
@@ -93,7 +95,7 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
       }
 
       // Go to cart and checkout
-      const cartButton = customerPage.locator('[data-testid="cart-btn"], .cart-btn, a[href*="cart"]');
+      const cartButton = customerPage.locator('[data-testid="cart-btn"], .cart-btn, a[href*="cart"], [data-testid="cart-button"]');
       if (await cartButton.isVisible()) {
         await cartButton.click();
       } else {
