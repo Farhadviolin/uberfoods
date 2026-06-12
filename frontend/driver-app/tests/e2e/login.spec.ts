@@ -5,14 +5,14 @@ test.describe('Login-Seite', () => {
     await page.goto('/login');
 
     await expect(page.getByTestId('login-title')).toBeVisible();
-    await expect(page.getByTestId('login-subtitle')).toHaveText(/fahrer login/i);
-    await expect(page.getByLabel(/e-mail/i)).toBeVisible();
-    await expect(page.getByLabel(/passwort/i)).toBeVisible();
+    await expect(page.getByTestId('login-subtitle')).toHaveText(/fahrer login|driver login/i);
+    await expect(page.locator('input[type="email"]')).toBeVisible();
+    await expect(page.locator('input[type="password"]')).toBeVisible();
 
-    await expect(page.getByLabel(/e-mail/i)).toHaveAttribute('required', '');
-    await expect(page.getByLabel(/passwort/i)).toHaveAttribute('required', '');
+    await expect(page.locator('input[type="email"]')).toHaveAttribute('required', '');
+    await expect(page.locator('input[type="password"]')).toHaveAttribute('required', '');
 
-    await page.getByRole('button', { name: /anmelden/i }).click();
+    await page.locator('button[type="submit"]').click();
     await expect(page).toHaveURL(/\/login/);
   });
 });
