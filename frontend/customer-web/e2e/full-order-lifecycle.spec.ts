@@ -22,6 +22,9 @@ function createLifecycleCustomerCredentials() {
 test.describe('Full Order Lifecycle UI-E2E', () => {
   let orderId: string;
   let customerCredentials = createLifecycleCustomerCredentials();
+  const selectors = testSelectors;
+  const testOrder = testDataFactory.getTestOrder();
+  const driverUser = testDataFactory.getTestDriver();
 
   test.beforeAll(() => {
     // Reset test data factory with consistent seed for this run
@@ -33,7 +36,7 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
     console.log(`🆔 Test Run ID: ${RUN_ID}`);
   });
 
-  test.setTimeout(180000); // 3 minutes for full lifecycle
+  test.setTimeout(300000); // 5 minutes for full lifecycle across four apps
 
   test('Complete Order Lifecycle: Customer → Restaurant → Driver → Admin', async ({ browser }) => {
     console.log(`🆔 Starting Full Order Lifecycle Test (Run: ${RUN_ID})`);

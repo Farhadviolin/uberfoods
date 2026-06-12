@@ -16,12 +16,16 @@ test.describe('Offline-Funktionalität', () => {
 
   test('zeigt Offline-Indikator bei Netzwerkausfall', async ({ page }) => {
     await page.goto('/');
+    await expect(page.getByTestId('driver-dashboard')).toBeVisible();
     // Simuliere Offline-Status erst nach erfolgreichem Laden der App
     await page.context().setOffline(true);
-    await page.reload();
+    await page.evaluate(() => {
+      window.dispatchEvent(new Event('offline'));
+    });
     
     // Warte auf Offline-Indikator
-    await expect(page.getByText(/offline|keine verbindung/i)).toBeVisible({ timeout: 5000 });
+    await expect(page.locator('.offline-indicator.offline')).toBeVisible({ timeout: 5000 });
+    await expect(page.locator('.offline-indicator.offline .offline-text').first()).toContainText(/offline/i);
   });
 
   test('queued Requests bei Offline-Status', async ({ page }) => {
@@ -45,11 +49,17 @@ test.describe('Offline-Funktionalität', () => {
 
   test('synchronisiert Requests bei Wiederverbindung', async ({ page }) => {
     await page.goto('/');
+    await expect(page.getByTestId('driver-dashboard')).toBeVisible();
     await page.context().setOffline(true);
-    await page.reload();
+    await page.evaluate(() => {
+      window.dispatchEvent(new Event('offline'));
+    });
 
     // Setze wieder online
     await page.context().setOffline(false);
+    await page.evaluate(() => {
+      window.dispatchEvent(new Event('online'));
+    });
 
     // Warte auf Sync (wird automatisch durch offlineService getriggert)
     await page.waitForTimeout(2000);
