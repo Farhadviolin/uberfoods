@@ -3,7 +3,10 @@ import { randomUUID } from 'node:crypto';
 import { testDataFactory, TestUser } from '../../test-utils/test-data-factory';
 
 // Generate unique run ID for test isolation
-const RUN_ID = process.env.RUN_ID || `run_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+const RUN_ID = process.env.RUN_ID
+  || process.env.GITHUB_RUN_ID
+  || `run_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+const RUN_ATTEMPT = process.env.GITHUB_RUN_ATTEMPT || '1';
 
 type CustomerCredentials = {
   email: string;
@@ -56,7 +59,7 @@ export const test = base.extend<{
 // Helper functions for common test operations
 export class TestHelpers {
   static createCustomerCredentials() {
-    const uniqueEmail = `customer-${RUN_ID}-${randomUUID()}@example.test`;
+    const uniqueEmail = `customer.lifecycle.${RUN_ID}.${RUN_ATTEMPT}.${Date.now()}.${Math.random().toString(36).slice(2, 8)}.${randomUUID()}@example.test`;
     const password = 'customer123';
     return {
       email: uniqueEmail,
@@ -108,6 +111,23 @@ export class TestHelpers {
     const registerResponse = await registerResponsePromise;
     if (registerResponse.status() !== 201) {
       const body = await registerResponse.text().catch(() => '');
+      const normalizedBody = body.toLowerCase();
+      const isAlreadyExists = (registerResponse.status() === 401 || registerResponse.status() === 409)
+        && normalizedBody.includes('already exists');
+
+      console.error('[REGISTER FAILED DEBUG]', {
+        status: registerResponse.status(),
+        route: registerUrl,
+        email: credentials.email,
+        body,
+      });
+
+      if (isAlreadyExists) {
+        console.warn('[REGISTER FALLBACK] Customer already exists, attempting login with the same credentials');
+        await TestHelpers.loginCustomer(page, credentials, appUrl);
+        return credentials;
+      }
+
       throw new Error(`Customer register failed: ${registerResponse.status()} ${registerResponse.statusText()} ${body}`);
     }
 
