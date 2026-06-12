@@ -1,16 +1,32 @@
 import { expect } from '@playwright/test';
-import { test, TestHelpers, testUsers, testUrls, testSelectors } from './test-helpers';
+import { randomUUID } from 'node:crypto';
+import { test, TestHelpers, testUrls, testSelectors } from './test-helpers';
 import { testDataFactory } from '../../test-utils/test-data-factory';
 
 // Generate unique run ID for test isolation
-const RUN_ID = process.env.RUN_ID || `run_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+const RUN_ID = process.env.GITHUB_RUN_ID
+  || process.env.RUN_ID
+  || `run_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+const RUN_ATTEMPT = process.env.GITHUB_RUN_ATTEMPT || '1';
+
+function createLifecycleCustomerCredentials() {
+  const token = `${RUN_ID}.${RUN_ATTEMPT}.${Date.now()}.${Math.random().toString(36).slice(2, 8)}.${randomUUID()}`;
+  return {
+    email: `customer.lifecycle.fullorder.${token}@example.test`,
+    password: `customer.${token}`,
+    name: `Full Order Lifecycle Customer ${token}`,
+    phone: '+43 123 456 789',
+  };
+}
 
 test.describe('Full Order Lifecycle UI-E2E', () => {
   let orderId: string;
+  let customerCredentials = createLifecycleCustomerCredentials();
 
   test.beforeAll(() => {
     // Reset test data factory with consistent seed for this run
     testDataFactory.resetSeed(1234567890); // Fixed seed for deterministic results
+    customerCredentials = createLifecycleCustomerCredentials();
   });
 
   test.beforeEach(async () => {
@@ -52,13 +68,13 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
       await TestHelpers.waitForStablePage(customerPage);
 
       // Customer registration (fresh session)
-      await TestHelpers.registerCustomer(customerPage, testUsers.customer, testUrls.customer);
+      await TestHelpers.registerCustomer(customerPage, customerCredentials, testUrls.customer);
 
       // Take screenshot for debugging if needed
       await TestHelpers.takeScreenshot(customerPage, 'customer_registered');
 
       // Browse restaurants
-      await customerPage.goto(`${urls.customer}/restaurants`);
+      await customerPage.goto(`${testUrls.customer}/restaurants`);
       await testDataFactory.waitForStablePage(customerPage);
 
       const restaurantCard = customerPage.locator('[data-testid="restaurant-card"], .restaurant-card').first();
@@ -80,7 +96,7 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
       if (await cartButton.isVisible()) {
         await cartButton.click();
       } else {
-        await customerPage.goto(`${urls.customer}/cart`);
+        await customerPage.goto(`${testUrls.customer}/cart`);
       }
 
       // Verify cart has items
