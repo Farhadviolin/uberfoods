@@ -1110,7 +1110,6 @@ export class AdminController {
 
   @Get("financial/overview")
   @Roles("SUPER_ADMIN", "ADMIN")
-  @RequirePermission("financial:read")
   async getFinancialOverview(
     @Query("period") period = "month",
     @Query("currency") currency = "EUR",
