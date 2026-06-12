@@ -1,6 +1,7 @@
 import { test as setup, expect } from '@playwright/test';
 import { mkdirSync } from 'node:fs';
 import { testDataFactory } from '../../test-utils/test-data-factory';
+import { TestHelpers } from './test-helpers';
 
 const authFile = 'playwright/.auth';
 mkdirSync(authFile, { recursive: true });
