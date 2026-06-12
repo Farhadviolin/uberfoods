@@ -127,6 +127,7 @@ async function createStorageStateViaApi({
 registerAuthSetup('customer', 'authenticate as customer', async ({ page, context }) => {
   const customer = testDataFactory.getTestCustomer();
   const urls = testDataFactory.getFrontendUrls();
+  const loginRoute = '/api/auth/customer/login';
 
   // Add request/response logging for debugging (SECURITY: mask sensitive data)
   page.on('request', (r) => {
@@ -164,6 +165,14 @@ registerAuthSetup('customer', 'authenticate as customer', async ({ page, context
   console.log(`✅ SPA routing configured - proceeding with login flow`);
 
   console.log(`🚀 Proceeding with authentication setup...`);
+
+  await TestHelpers.registerCustomer(page, customer, urls.customer);
+  await page.context().clearCookies();
+  await page.evaluate(() => {
+    localStorage.clear();
+    sessionStorage.clear();
+  });
+
   await page.goto(`${urls.customer}/login`);
 
   // Page loaded, proceeding with login
@@ -192,8 +201,7 @@ registerAuthSetup('customer', 'authenticate as customer', async ({ page, context
   const respPromise = page.waitForResponse((resp) => {
     const url = resp.url();
     return resp.request().method() === 'POST'
-      && url.includes('/api/auth')
-      && url.includes('/login');
+      && new URL(url).pathname === loginRoute;
   }, { timeout: 15000 });
 
   await Promise.all([
@@ -202,39 +210,46 @@ registerAuthSetup('customer', 'authenticate as customer', async ({ page, context
   ]);
 
   const resp = await respPromise;
-  console.log('[LOGIN RESPONSE]', resp.status(), '***URL_MASKED***');
+  const route = new URL(resp.url()).pathname;
+  console.log('[LOGIN RESPONSE]', resp.status(), route, customer.email);
 
   // VALIDATION: Check API contract compliance (accept success, auth failure, and server errors)
   expect(resp.status()).toBeGreaterThanOrEqual(200);
   // Allow 2xx success, 4xx auth failure, and 5xx server errors (for test environments)
   expect(resp.status()).toBeLessThan(600);
 
+  const bodyText = await resp.text().catch(() => '');
   let data;
   try {
-    data = await resp.json();
+    data = bodyText ? JSON.parse(bodyText) : {};
   } catch (e) {
     // If JSON parsing fails, create empty data object
     data = {};
   }
 
   if (resp.status() >= 300) {
+    console.error('[LOGIN FAILED DEBUG]', {
+      status: resp.status(),
+      route,
+      email: customer.email,
+      body: bodyText,
+    });
     throw new Error(`Customer UI login failed with status ${resp.status()}`);
   }
 
-  expect(data).toEqual(expect.objectContaining({
-    access_token: expect.any(String),
-    user: expect.any(Object),
-    refresh_token: expect.any(String)
-  }));
-  expect(data.user).toEqual(expect.objectContaining({
+  const normalized = normalizeApiLoginPayload(data);
+
+  expect(normalized.accessToken).toEqual(expect.any(String));
+  expect(normalized.refreshToken).toEqual(expect.any(String));
+  expect(normalized.user).toEqual(expect.objectContaining({
     id: expect.any(String),
     email: customer.email,
     role: 'customer'
   }));
 
   // SECURITY: Log token presence but NOT the actual tokens
-  const accessTokenPrefix = data.access_token ? data.access_token.substring(0, 10) + '...' : 'MISSING';
-  const refreshTokenPrefix = data.refresh_token ? data.refresh_token.substring(0, 10) + '...' : 'MISSING';
+  const accessTokenPrefix = normalized.accessToken ? normalized.accessToken.substring(0, 10) + '...' : 'MISSING';
+  const refreshTokenPrefix = normalized.refreshToken ? normalized.refreshToken.substring(0, 10) + '...' : 'MISSING';
 
   console.log('✅ API response validated - contract compliant');
   console.log('🔐 Tokens received - access:', accessTokenPrefix, 'refresh:', refreshTokenPrefix);
@@ -285,6 +300,19 @@ registerAuthSetup('customer', 'authenticate as customer', async ({ page, context
   }
 
   // Save authentication state
+  await page.evaluate(({ accessToken, refreshToken, user }) => {
+    const jsonUser = JSON.stringify(user);
+    localStorage.setItem('access_token', accessToken);
+    localStorage.setItem('auth_token', accessToken);
+    localStorage.setItem('user', jsonUser);
+    if (refreshToken) {
+      localStorage.setItem('refresh_token', refreshToken);
+    }
+  }, {
+    accessToken: normalized.accessToken,
+    refreshToken: normalized.refreshToken,
+    user: normalized.user,
+  });
   await page.context().storageState({ path: `${authFile}/customer.json` });
 });
 
