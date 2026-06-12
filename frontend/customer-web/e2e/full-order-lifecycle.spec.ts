@@ -83,7 +83,8 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
 
       // Add items to cart and checkout
       const addToCartButtons = customerPage.locator('button[data-testid*="add-to-cart"], .add-to-cart');
-      await expect(addToCartButtons).toHaveCountGreaterThan(0);
+      const addToCartButtonCount = await addToCartButtons.count();
+      expect(addToCartButtonCount).toBeGreaterThan(0);
 
       // Add first 3 items
       for (let i = 0; i < Math.min(3, await addToCartButtons.count()); i++) {
@@ -101,7 +102,8 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
 
       // Verify cart has items
       const cartItems = customerPage.locator('[data-testid="cart-item"], .cart-item');
-      await expect(cartItems).toHaveCountGreaterThan(0);
+      const cartItemCount = await cartItems.count();
+      expect(cartItemCount).toBeGreaterThan(0);
 
       // Proceed to checkout
       const checkoutBtn = customerPage.locator('button[data-testid="checkout-btn"], .checkout, button:has-text("Checkout")');
