@@ -409,12 +409,38 @@ jobs:
 
     - name: Run admin panel E2E tests
       working-directory: ./frontend/admin-panel
+      env:
+        E2E_ORCHESTRATED: 1
       run: |
         npm ci
         npm run build
-        npm run preview &
-        sleep 10
-        npx playwright test
+        mkdir -p ../logs
+        npm run preview:e2e > ../logs/admin-panel.log 2>&1 &
+        for i in {1..60}; do
+          if curl -fsS http://127.0.0.1:3002 >/dev/null; then
+            echo "admin-panel is ready on 3002"
+            break
+          fi
+          echo "waiting for admin-panel on 3002..."
+          sleep 2
+        done
+        if ! curl -fsS http://127.0.0.1:3002 >/dev/null; then
+          echo "Admin panel failed"
+          cat ../logs/admin-panel.log || true
+          exit 1
+        fi
+        npx playwright test --reporter=list
+
+    - name: Upload admin panel E2E test results
+      if: failure()
+      uses: actions/upload-artifact@v4
+      with:
+        name: admin-panel-e2e-results
+        path: |
+          frontend/admin-panel/playwright-report/
+          frontend/admin-panel/test-results/
+          frontend/logs/admin-panel.log
+        retention-days: 30
 
     - name: Run driver app E2E tests
       working-directory: ./frontend/driver-app

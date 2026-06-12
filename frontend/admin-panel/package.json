@@ -11,6 +11,7 @@
     "start": "./start-localhost.sh",
     "build": "vite build",
     "preview": "vite preview",
+    "preview:e2e": "vite preview --host 127.0.0.1 --port 3002 --strictPort",
     "lint": "eslint src --ext .ts,.tsx --fix",
     "format": "prettier --write \"src/**/*.{ts,tsx,css}\"",
     "type-check": "npm run typecheck",
