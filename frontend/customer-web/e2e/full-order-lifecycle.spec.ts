@@ -104,7 +104,11 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
         await customerPage.goto(`${testUrls.customer}/cart`);
       }
 
-      // Verify cart has items
+      // Proceed to checkout once the cart badge/summary has updated
+      await customerPage.locator('[data-testid="checkout-button"]').click();
+      await customerPage.waitForURL(/\/checkout$/);
+
+      // Verify cart has items on the checkout page
       const cartItems = customerPage.locator('[data-testid="cart-item"], .cart-item');
       const cartItemCount = await cartItems.count();
       expect(cartItemCount).toBeGreaterThan(0);

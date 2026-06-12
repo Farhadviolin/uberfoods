@@ -52,13 +52,13 @@ export function Login() {
     <div className="login-container">
       <div className="login-card" aria-labelledby="login-title">
         <div className="login-header">
-          <h1 id="login-title">{t('login.title')}</h1>
-          <p>{t('login.subtitle')}</p>
+          <h1 id="login-title" data-testid="login-title">{t('login.title')}</h1>
+          <p data-testid="login-subtitle">{t('login.subtitle')}</p>
         </div>
         
         {error && <div className="error-message">{error}</div>}
         
-        <form onSubmit={handleSubmit} className="login-form">
+        <form onSubmit={handleSubmit} className="login-form" data-testid="login-form">
           <div className="form-group">
             <label htmlFor="email">{t('login.email')}</label>
             <input

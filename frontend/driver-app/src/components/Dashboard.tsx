@@ -651,7 +651,7 @@ export function Dashboard() {
   const locale = i18n.language || 'de-DE';
 
   return (
-    <div className="app-layout">
+    <div className="app-layout" data-testid="driver-dashboard">
       <Sidebar
         activeView={activeView}
         onViewChange={setActiveView}
@@ -683,7 +683,7 @@ export function Dashboard() {
               ⚠️ {wsError}
             </div>
           )}
-          <div className="header-content">
+          <div className="header-content" data-testid="dashboard-header">
             <h1>{t('dashboard.title')}</h1>
             <p>{t('dashboard.welcome', { name: driver?.name || '' })}</p>
             {subscription && (

@@ -15,10 +15,10 @@ test.describe('Offline-Funktionalität', () => {
   });
 
   test('zeigt Offline-Indikator bei Netzwerkausfall', async ({ page }) => {
-    // Simuliere Offline-Status
-    await page.context().setOffline(true);
-
     await page.goto('/');
+    // Simuliere Offline-Status erst nach erfolgreichem Laden der App
+    await page.context().setOffline(true);
+    await page.reload();
     
     // Warte auf Offline-Indikator
     await expect(page.getByText(/offline|keine verbindung/i)).toBeVisible({ timeout: 5000 });
@@ -31,8 +31,6 @@ test.describe('Offline-Funktionalität', () => {
     });
 
     await page.goto('/');
-    
-    // Setze Offline
     await page.context().setOffline(true);
 
     // Versuche Bestellung zu akzeptieren (wird gequeued)
@@ -46,9 +44,9 @@ test.describe('Offline-Funktionalität', () => {
   });
 
   test('synchronisiert Requests bei Wiederverbindung', async ({ page }) => {
-    // Starte offline
-    await page.context().setOffline(true);
     await page.goto('/');
+    await page.context().setOffline(true);
+    await page.reload();
 
     // Setze wieder online
     await page.context().setOffline(false);

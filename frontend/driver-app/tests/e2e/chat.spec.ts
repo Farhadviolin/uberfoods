@@ -45,6 +45,7 @@ test.describe('Chat-Funktionalität', () => {
     });
 
     await page.goto('/');
+    await expect(page.getByTestId('driver-dashboard')).toBeVisible();
     await page.waitForSelector('text=Test Restaurant', { timeout: 5000 });
 
     const chatButton = page.getByRole('button', { name: /chat/i }).first();
@@ -91,6 +92,7 @@ test.describe('Chat-Funktionalität', () => {
     });
 
     await page.goto('/');
+    await expect(page.getByTestId('driver-dashboard')).toBeVisible();
     await page.waitForSelector('text=Test Restaurant', { timeout: 5000 });
 
     const chatButton = page.getByRole('button', { name: /chat/i }).first();

@@ -37,7 +37,7 @@ test.describe('Bestellungsverwaltung', () => {
     });
 
     await page.goto('/');
-    await expect(page.getByText(/dashboard/i)).toBeVisible();
+    await expect(page.getByTestId('driver-dashboard')).toBeVisible();
     await expect(page.getByText(/test restaurant/i)).toBeVisible({ timeout: 5000 });
   });
 
@@ -72,6 +72,7 @@ test.describe('Bestellungsverwaltung', () => {
     });
 
     await page.goto('/');
+    await expect(page.getByTestId('driver-dashboard')).toBeVisible();
     await page.waitForSelector('text=Test Restaurant', { timeout: 5000 });
     
     const acceptButton = page.getByRole('button', { name: /annehmen|accept/i }).first();
@@ -113,6 +114,7 @@ test.describe('Bestellungsverwaltung', () => {
     });
 
     await page.goto('/');
+    await expect(page.getByTestId('driver-dashboard')).toBeVisible();
     await page.waitForSelector('text=Test Restaurant', { timeout: 5000 });
     
     const statusButton = page.getByRole('button', { name: /abgeholt|picked up/i }).first();

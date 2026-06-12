@@ -4,7 +4,8 @@ test.describe('Login-Seite', () => {
   test('zeigt Formular und Validierungen', async ({ page }) => {
     await page.goto('/login');
 
-    await expect(page.getByRole('heading', { name: /fahrer login/i })).toBeVisible();
+    await expect(page.getByTestId('login-title')).toBeVisible();
+    await expect(page.getByTestId('login-subtitle')).toHaveText(/fahrer login/i);
     await expect(page.getByLabel(/e-mail/i)).toBeVisible();
     await expect(page.getByLabel(/passwort/i)).toBeVisible();
 
