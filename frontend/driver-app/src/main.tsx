@@ -1,5 +1,6 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import App from './App';
 import { ThemeProvider } from './contexts/ThemeContext';
 import './index.css';
@@ -179,16 +180,31 @@ if ('serviceWorker' in navigator && import.meta.env.PROD) {
 
 // ✅ WICHTIG: React.StrictMode in Development deaktivieren
 // StrictMode führt zu doppelten useEffect-Aufrufen, was WebSocket-Reconnection-Loops verursacht
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: false,
+    },
+    mutations: {
+      retry: false,
+    },
+  },
+});
+
 ReactDOM.createRoot(document.getElementById('root')!).render(
   (globalThis as any).importMetaEnv?.DEV ? (
-    <ThemeProvider>
-      <App />
-    </ThemeProvider>
-  ) : (
-    <React.StrictMode>
+    <QueryClientProvider client={queryClient}>
       <ThemeProvider>
         <App />
       </ThemeProvider>
+    </QueryClientProvider>
+  ) : (
+    <React.StrictMode>
+      <QueryClientProvider client={queryClient}>
+        <ThemeProvider>
+          <App />
+        </ThemeProvider>
+      </QueryClientProvider>
     </React.StrictMode>
   ),
 );

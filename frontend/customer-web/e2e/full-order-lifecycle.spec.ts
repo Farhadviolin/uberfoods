@@ -99,17 +99,10 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
 
       await expect(customerPage.locator('[data-testid="cart-placeholder"]')).toContainText(/Cart: [1-9]/i);
 
-      // Go to cart and checkout
-      const cartButton = customerPage.locator('[data-testid="cart-btn"], .cart-btn, a[href*="cart"], [data-testid="cart-button"]');
-      if (await cartButton.isVisible()) {
-        await cartButton.click();
-      } else {
-        await customerPage.goto(`${testUrls.customer}/cart`);
-      }
-
-      // Proceed to checkout once the cart badge/summary has updated
-      await customerPage.locator('[data-testid="checkout-button"]').click();
-      await customerPage.waitForURL(/\/checkout$/);
+      // Der Checkout wird in der echten App direkt über /checkout gerendert.
+      // Ein /cart-Fallback wäre hier falsch, da diese Route nicht existiert.
+      await customerPage.goto(`${testUrls.customer}/checkout`);
+      await customerPage.waitForURL(/\/checkout(?:\?.*)?$/);
 
       // Verify cart has items on the checkout page
       const cartItems = customerPage.locator('[data-testid="cart-item"], .cart-item');
@@ -117,7 +110,8 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
       expect(cartItemCount).toBeGreaterThan(0);
 
       // Proceed to checkout
-      const checkoutBtn = customerPage.locator('button[data-testid="checkout-btn"], .checkout, button:has-text("Checkout")');
+      const checkoutBtn = customerPage.locator('button[data-testid="checkout-button"], button:has-text("Place Order"), button:has-text("Checkout")').first();
+      await expect(checkoutBtn).toBeVisible();
       await checkoutBtn.click();
 
       // Fill delivery address
