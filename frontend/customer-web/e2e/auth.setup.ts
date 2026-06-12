@@ -126,9 +126,9 @@ async function createStorageStateViaApi({
 
 // Setup authentication state for each role
 registerAuthSetup('customer', 'authenticate as customer', async ({ page, context }) => {
-  const customer = testDataFactory.getTestCustomer();
   const urls = testDataFactory.getFrontendUrls();
   const loginRoute = '/api/auth/customer/login';
+  const customer = TestHelpers.createCustomerCredentials();
 
   // Add request/response logging for debugging (SECURITY: mask sensitive data)
   page.on('request', (r) => {
@@ -166,6 +166,7 @@ registerAuthSetup('customer', 'authenticate as customer', async ({ page, context
   console.log(`✅ SPA routing configured - proceeding with login flow`);
 
   console.log(`🚀 Proceeding with authentication setup...`);
+  console.log(`🧪 Lifecycle customer credential email: ${customer.email}`);
 
   await TestHelpers.registerCustomer(page, customer, urls.customer);
   await page.context().clearCookies();
