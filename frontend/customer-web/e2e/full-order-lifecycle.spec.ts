@@ -488,11 +488,17 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
 
         const ensureProfileAddress = async () => {
           const checkoutErrorsBeforeProfileCheck = await visibleCheckoutErrors();
-          const profileAddressWarningVisible = checkoutErrorsBeforeProfileCheck.some((text) => /delivery address in your profile|addressRequired/i.test(text));
+          const checkoutWarningTextsBeforeProfileCheck = await customerPage.locator(
+            'text=/Please provide a delivery address in your profile|delivery address in your profile|addressRequired/i'
+          ).allTextContents().catch(() => []);
+          const profileAddressWarningVisible =
+            checkoutErrorsBeforeProfileCheck.some((text) => /delivery address in your profile|addressRequired/i.test(text))
+            || checkoutWarningTextsBeforeProfileCheck.some((text) => /delivery address in your profile|addressRequired/i.test(text));
 
           console.log('➡️ lifecycle: checking profile address before final submit', {
             currentUrl: customerPage.url(),
             checkoutErrorsBeforeProfileCheck,
+            checkoutWarningTextsBeforeProfileCheck,
             profileAddressWarningVisible,
           });
 
@@ -500,6 +506,8 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
             console.log('ℹ️ lifecycle: profile address warning not visible, continuing with final submit');
             return false;
           }
+
+          console.log('ℹ️ lifecycle: missing profile address warning visible before final submit');
 
           await customerPage.goto('/profile', { waitUntil: 'domcontentloaded' });
           await customerPage.waitForLoadState('networkidle').catch(() => null);
@@ -559,9 +567,20 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
           await saveButton.click();
           await customerPage.waitForLoadState('networkidle').catch(() => null);
           await customerPage.waitForURL(/\/profile(?:\?.*)?$/, { timeout: 15000 }).catch(() => null);
+          await customerPage.getByText(/updated|success/i).first().waitFor({ state: 'visible', timeout: 15000 }).catch(() => null);
           console.log('✅ lifecycle: profile address updated');
           await customerPage.goto('/checkout', { waitUntil: 'domcontentloaded' });
           await customerPage.waitForLoadState('networkidle').catch(() => null);
+          const checkoutWarningTextsAfterProfileUpdate = await customerPage.locator(
+            'text=/Please provide a delivery address in your profile|delivery address in your profile|addressRequired/i'
+          ).allTextContents().catch(() => []);
+          const checkoutAddressTextsAfterProfileUpdate = await customerPage.locator(
+            'text=/delivery address|address/i'
+          ).allTextContents().catch(() => []);
+          console.log('ℹ️ lifecycle: checkout address state after profile update', {
+            checkoutWarningTextsAfterProfileUpdate,
+            checkoutAddressTextsAfterProfileUpdate,
+          });
           console.log('✅ lifecycle: returned to checkout after profile update');
           return true;
         };
