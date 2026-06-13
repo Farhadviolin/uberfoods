@@ -632,17 +632,51 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
             throw new Error('Profile address recovery failed before checkout retry');
           }
 
+          const profileSaveResponsePromise = customerPage.waitForResponse((response) => {
+            const request = response.request();
+            return request.method() === 'PUT' && new URL(response.url()).pathname.includes('/customers/');
+          }, { timeout: 20000 });
+
           await saveButton.click();
+          const profileSaveResponse = await profileSaveResponsePromise.catch(() => null);
+          if (!profileSaveResponse) {
+            throw new Error('Profile address save did not produce a response before checkout retry');
+          }
+
+          console.log('✅ lifecycle: profile save response received', {
+            status: profileSaveResponse.status(),
+            url: profileSaveResponse.url(),
+          });
+
           await customerPage.waitForLoadState('networkidle').catch(() => null);
           await customerPage.getByTestId('profile-save-button').waitFor({ state: 'visible', timeout: 15000 }).catch(() => null);
           await customerPage.getByText(/updated|success/i).first().waitFor({ state: 'visible', timeout: 15000 }).catch(() => null);
-          const savedAddressVisible = await customerPage.locator('text=/Teststraße 10|Teststrasse 10|1010 Wien|Wien|Austria/i').first().isVisible().catch(() => false);
+          const savedAddressVisible = await customerPage.evaluate((expected) => {
+            try {
+              const stored = localStorage.getItem('customer_user');
+              if (!stored) return false;
+              const parsed = JSON.parse(stored) as { address?: string } | null;
+              return Boolean(parsed?.address && parsed.address.trim() === expected.trim());
+            } catch {
+              return false;
+            }
+          }, expectedAddress);
           console.log('✅ lifecycle: profile address updated', {
             successfulAddressLocatorStrategy,
             savedAddressVisible,
           });
           await customerPage.goto('/checkout', { waitUntil: 'domcontentloaded' });
           await customerPage.waitForLoadState('networkidle').catch(() => null);
+          const checkoutStoredUserAddress = await customerPage.evaluate(() => {
+            try {
+              const stored = localStorage.getItem('customer_user');
+              if (!stored) return null;
+              const parsed = JSON.parse(stored) as { address?: string } | null;
+              return parsed?.address || null;
+            } catch {
+              return null;
+            }
+          });
           const checkoutWarningTextsAfterProfileUpdate = await customerPage.locator(
             'text=/Please provide a delivery address in your profile|delivery address in your profile|addressRequired/i',
           ).allTextContents().catch(() => []);
@@ -650,6 +684,7 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
             'text=/Please provide a delivery address in your profile|delivery address in your profile|addressRequired|missing-user-address|delivery address|address/i',
           ).allTextContents().catch(() => []);
           console.log('ℹ️ lifecycle: checkout address state after profile update', {
+            checkoutStoredUserAddress,
             checkoutWarningTextsAfterProfileUpdate,
             checkoutAddressTextsAfterProfileUpdate,
           });

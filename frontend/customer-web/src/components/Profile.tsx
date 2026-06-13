@@ -7,7 +7,7 @@ import './Profile.css';
 
 export function Profile() {
   const { t } = useTranslation();
-  const { user, logout } = useAuth();
+  const { user, logout, updateUser } = useAuth();
   const [formData, setFormData] = useState({
     name: user?.name || '',
     phone: user?.phone || '',
@@ -34,10 +34,9 @@ export function Profile() {
     setLoading(true);
 
     try {
-      await api.put(`/customers/${user?.id}`, formData);
+      const response = await api.put(`/customers/${user?.id}`, formData);
+      updateUser(response.data as Partial<{ name: string; phone: string; address?: string }>);
       setSuccess(t('profile.updateSuccess'));
-      // Reload user data
-      window.location.reload();
     } catch (err: unknown) {
       const axiosError = err as { response?: { data?: { message?: string } } };
       setError(axiosError.response?.data?.message || t('profile.updateError'));
