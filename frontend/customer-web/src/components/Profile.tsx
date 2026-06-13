@@ -38,7 +38,44 @@ export function Profile() {
         ...formData,
         userId: user?.id,
       });
-      updateUser(response.data as Partial<{ name: string; phone: string; address?: string }>);
+
+      const savedCustomer = response.data as Partial<{
+        id: string;
+        email: string;
+        name: string;
+        phone: string;
+        address?: string | null;
+        role?: string;
+        token?: string;
+        accessToken?: string;
+        refreshToken?: string;
+      }>;
+
+      let storedCustomer: Record<string, unknown> = {};
+      try {
+        const storedCustomerRaw = window.localStorage.getItem('customer_user');
+        storedCustomer = storedCustomerRaw ? JSON.parse(storedCustomerRaw) as Record<string, unknown> : {};
+      } catch {
+        storedCustomer = {};
+      }
+
+      const normalizedSavedAddress =
+        typeof savedCustomer.address === 'string' && savedCustomer.address.trim().length > 0
+          ? savedCustomer.address.trim()
+          : typeof formData.address === 'string' && formData.address.trim().length > 0
+            ? formData.address.trim()
+            : typeof storedCustomer.address === 'string'
+              ? storedCustomer.address.trim()
+              : '';
+
+      const nextCustomerUser = {
+        ...storedCustomer,
+        ...savedCustomer,
+        address: normalizedSavedAddress,
+      };
+
+      window.localStorage.setItem('customer_user', JSON.stringify(nextCustomerUser));
+      updateUser(nextCustomerUser as Partial<{ name: string; phone: string; address?: string }>);
       setSuccess(t('profile.updateSuccess'));
     } catch (err: unknown) {
       const axiosError = err as { response?: { data?: { message?: string } } };

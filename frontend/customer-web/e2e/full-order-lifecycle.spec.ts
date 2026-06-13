@@ -666,6 +666,8 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
             successfulAddressLocatorStrategy,
             savedAddressVisible,
           });
+          const customerUserAfterProfileSave = await customerPage.evaluate(() => window.localStorage.getItem('customer_user'));
+          console.log('ℹ️ lifecycle: customerUserAfterProfileSave', customerUserAfterProfileSave);
           await customerPage.goto('/checkout', { waitUntil: 'domcontentloaded' });
           await customerPage.waitForLoadState('networkidle').catch(() => null);
           const checkoutStoredUserAddress = await customerPage.evaluate(() => {
