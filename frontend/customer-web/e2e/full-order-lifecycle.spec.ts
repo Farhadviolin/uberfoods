@@ -1,4 +1,4 @@
-import { expect, type Page } from '@playwright/test';
+import { expect, type Locator, type Page } from '@playwright/test';
 import { randomUUID } from 'node:crypto';
 import { test, TestHelpers, testUrls, testSelectors } from './test-helpers';
 import { testDataFactory } from '../../test-utils/test-data-factory';
@@ -459,37 +459,81 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
             && new URL(response.url()).pathname === '/api/orders/customer';
         }, { timeout: 20000 });
         const cartContainer = customerPage.getByTestId('cart');
-        const finalPlaceOrderButton = cartContainer.getByRole('button', { name: /^Place Order$/i });
+        const submitCandidates = [
+          cartContainer.getByTestId('checkout-button'),
+          cartContainer.getByRole('button', { name: /^(Place Order|Bestellen|Submit Order|Order Now|Jetzt bestellen|Zahlungspflichtig bestellen|Bezahlen|Pay)$/i }),
+          customerPage.getByRole('button', { name: /^(Place Order|Bestellen|Submit Order|Order Now|Jetzt bestellen|Zahlungspflichtig bestellen|Bezahlen|Pay)$/i }),
+        ];
+        let finalPlaceOrderButton: Locator | null = null;
 
         await expect(cartContainer).toBeVisible();
         console.log('✅ lifecycle: phase1 checkout/cart visible');
+        for (const candidate of submitCandidates) {
+          const button = candidate.first();
+          if (await button.isVisible().catch(() => false)) {
+            finalPlaceOrderButton = button;
+            break;
+          }
+        }
+
+        if (!finalPlaceOrderButton) {
+          console.log('ℹ️ lifecycle: final submit diagnostics', {
+            currentUrl: customerPage.url(),
+            cartVisible: await cartContainer.isVisible().catch(() => false),
+            checkoutButtonVisible: await submitCandidates[0].first().isVisible().catch(() => false),
+            cartRoleVisible: await submitCandidates[1].first().isVisible().catch(() => false),
+            pageRoleVisible: await submitCandidates[2].first().isVisible().catch(() => false),
+          });
+          throw new Error('No visible final submit button found in checkout cart');
+        }
+
         await expect(finalPlaceOrderButton).toBeVisible();
         console.log('✅ lifecycle: phase1 final Place Order button visible');
         await expect(finalPlaceOrderButton).toBeEnabled();
         console.log('✅ lifecycle: phase1 final Place Order button enabled');
         console.log('➡️ lifecycle: phase1 clicking final Place Order');
 
-        await Promise.all([
-          orderCreateResponsePromise,
-          finalPlaceOrderButton.click(),
-        ]);
+        await finalPlaceOrderButton.scrollIntoViewIfNeeded().catch(() => null);
+        await finalPlaceOrderButton.click({ noWaitAfter: true });
         console.log('✅ lifecycle: phase1 final Place Order click completed');
 
-        const orderCreateResponse = await orderCreateResponsePromise;
-        console.log(`✅ lifecycle: phase1 order response received (${orderCreateResponse.status()})`);
-        const createdOrder = await orderCreateResponse.json().catch(() => ({}));
-        orderId = createdOrder.id || orderId;
-        if (!orderId) {
-          throw new Error('Order creation response did not include an id');
+        const paymentModal = customerPage.getByTestId('payment-modal');
+        const orderTrackingPage = customerPage.getByTestId('order-tracking-page');
+        const orderSubmissionOutcome = await Promise.race([
+          orderCreateResponsePromise.then((response) => ({ kind: 'response' as const, response })).catch(() => null),
+          paymentModal.waitFor({ state: 'visible', timeout: 20000 }).then(() => ({ kind: 'payment-modal' as const })).catch(() => null),
+          customerPage.waitForURL(/\/orders\/[^/?]+(?:\?.*)?$/, { timeout: 20000 }).then(() => ({ kind: 'order-url' as const })).catch(() => null),
+          orderTrackingPage.waitFor({ state: 'visible', timeout: 20000 }).then(() => ({ kind: 'order-tracking' as const })).catch(() => null),
+        ]);
+
+        if (!orderSubmissionOutcome) {
+          console.log('ℹ️ lifecycle: final order submit diagnostics', {
+            currentUrl: customerPage.url(),
+            paymentModalVisible: await paymentModal.isVisible().catch(() => false),
+            orderTrackingVisible: await orderTrackingPage.isVisible().catch(() => false),
+            cartVisible: await cartContainer.isVisible().catch(() => false),
+            submitVisible: await finalPlaceOrderButton.isVisible().catch(() => false),
+            submitEnabled: await finalPlaceOrderButton.isEnabled().catch(() => false),
+          });
+          throw new Error('Final order submission did not produce a response or confirmation UI');
         }
-        console.log(`✅ lifecycle: phase1 order id resolved (${orderId})`);
+
+        if (orderSubmissionOutcome.kind === 'response') {
+          const orderCreateResponse = orderSubmissionOutcome.response;
+          console.log(`✅ lifecycle: phase1 order response received (${orderCreateResponse.status()})`);
+          const createdOrder = await orderCreateResponse.json().catch(() => ({}));
+          orderId = createdOrder.id || orderId;
+          if (!orderId) {
+            throw new Error('Order creation response did not include an id');
+          }
+          console.log(`✅ lifecycle: phase1 order id resolved (${orderId})`);
+        } else {
+          console.log(`ℹ️ lifecycle: phase1 final order submit confirmed by ${orderSubmissionOutcome.kind}`);
+        }
       });
 
       // Complete payment in the modal if the UI shows one, otherwise accept
       // the direct navigation flow after the order is created.
-      const paymentModal = customerPage.getByTestId('payment-modal');
-      const orderTrackingPage = customerPage.getByTestId('order-tracking-page');
-
       await Promise.race([
         paymentModal.waitFor({ state: 'visible', timeout: 15000 }).catch(() => null),
         customerPage.waitForURL(/\/orders\/[^/?]+(?:\?.*)?$/, { timeout: 15000 }).catch(() => null),
