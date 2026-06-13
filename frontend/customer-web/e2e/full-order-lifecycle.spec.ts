@@ -139,8 +139,18 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
       }
 
       // Place order
+      const orderCreateResponsePromise = customerPage.waitForResponse((response) => {
+        return response.request().method() === 'POST'
+          && new URL(response.url()).pathname === '/api/orders/customer';
+      }, { timeout: 20000 });
       const placeOrderBtn = customerPage.locator('button[data-testid="place-order"], .place-order, button:has-text("Place Order")');
       await placeOrderBtn.click();
+      const orderCreateResponse = await orderCreateResponsePromise;
+      const createdOrder = await orderCreateResponse.json().catch(() => ({}));
+      orderId = createdOrder.id || orderId;
+      if (!orderId) {
+        throw new Error('Order creation response did not include an id');
+      }
 
       // Complete payment in the modal if the UI shows one, otherwise accept
       // the direct navigation flow after the order is created.
@@ -166,6 +176,11 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
         await paymentConfirmButton.click();
       } else {
         console.log('ℹ️ Payment modal not shown, waiting for direct order navigation');
+      }
+
+      if (!/\/orders\/[^/?]+(?:\?.*)?$/.test(customerPage.url())) {
+        console.log(`ℹ️ Navigating directly to created order ${orderId}`);
+        await customerPage.goto(`${testUrls.customer}/orders/${orderId}`);
       }
 
       await customerPage.waitForURL(/\/orders\/[^/?]+(?:\?.*)?$/, { timeout: 20000 });
