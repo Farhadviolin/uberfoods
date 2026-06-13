@@ -83,7 +83,7 @@ export class TestHelpers {
     await page.waitForURL(/.*(dashboard|home)/i);
   }
 
-  static async registerCustomer(page: Page, user: Pick<TestUser, 'email' | 'password' | 'name' | 'phone'>, appUrl: string) {
+  static async registerCustomer(page: Page, user: CustomerCredentials, appUrl: string) {
     const registerUrl = `${appUrl}/register`;
     console.log('[customer-e2e] register navigation', { appUrl, registerUrl, apiBaseUrl: process.env.API_BASE_URL || process.env.VITE_API_BASE_URL || 'unset' });
     await page.goto(registerUrl, { waitUntil: 'domcontentloaded' });
@@ -99,6 +99,7 @@ export class TestHelpers {
       password: user.password,
       name: user.name ?? 'Test Customer',
       phone: user.phone ?? '+43 123 456 789',
+      address: user.address,
     };
 
     await page.locator('input[type="text"], input[name="name"]').first().fill(credentials.name);

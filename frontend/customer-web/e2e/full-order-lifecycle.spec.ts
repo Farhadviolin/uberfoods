@@ -16,6 +16,7 @@ function createLifecycleCustomerCredentials() {
     password: `customer.${token}`,
     name: `Full Order Lifecycle Customer ${token}`,
     phone: '+43 123 456 789',
+    address: `${testOrder.deliveryAddress.street}, ${testOrder.deliveryAddress.zipCode} ${testOrder.deliveryAddress.city}`,
   };
 }
 
