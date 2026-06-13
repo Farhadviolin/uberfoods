@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../contexts/AuthContext';
@@ -256,6 +256,11 @@ export function Cart({ cart, restaurant, updateQuantity, onClearCart }: CartProp
     setOrderId(null);
   }, []);
 
+  const handleCheckoutSubmit = useCallback((event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    void placeOrder();
+  }, [placeOrder]);
+
   return (
     <>
       {showPayment && orderId && (
@@ -409,7 +414,8 @@ export function Cart({ cart, restaurant, updateQuantity, onClearCart }: CartProp
             </div>
           </div>
 
-          {!user && (
+          <form onSubmit={handleCheckoutSubmit} className="checkout-submit-form">
+            {!user && (
             <div className="guest-checkout-form" style={{ marginTop: '20px', padding: '16px', background: 'var(--bg-secondary, #F0F2F5)', borderRadius: '8px' }}>
               <h4 style={{ marginBottom: '16px', fontSize: '16px', fontWeight: 600 }}>Gast-Bestellung</h4>
               <div className="form-group" style={{ marginBottom: '12px' }}>
@@ -460,13 +466,14 @@ export function Cart({ cart, restaurant, updateQuantity, onClearCart }: CartProp
           )}
 
           <button
-            onClick={placeOrder}
+            type="submit"
             className="order-button"
             disabled={loading}
             data-testid="checkout-button"
           >
             {loading ? t('cart.placingOrder') : t('cart.placeOrder')}
           </button>
+          </form>
 
           {!user && (
             <p className="login-hint" style={{ marginTop: '12px', fontSize: '14px', textAlign: 'center', color: '#65676B' }}>
