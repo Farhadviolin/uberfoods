@@ -634,18 +634,19 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
 
           const profileSaveResponsePromise = customerPage.waitForResponse((response) => {
             const request = response.request();
-            return request.method() === 'PUT' && new URL(response.url()).pathname.includes('/customers/');
+            return request.method() === 'PUT' && new URL(response.url()).pathname === '/api/customers/profile';
           }, { timeout: 20000 });
-
           await saveButton.click();
           const profileSaveResponse = await profileSaveResponsePromise.catch(() => null);
           if (!profileSaveResponse) {
             throw new Error('Profile address save did not produce a response before checkout retry');
           }
 
+          const profileSaveBody = await profileSaveResponse.text().catch(() => '');
           console.log('✅ lifecycle: profile save response received', {
             status: profileSaveResponse.status(),
             url: profileSaveResponse.url(),
+            body: profileSaveBody ? profileSaveBody.slice(0, 500) : null,
           });
 
           await customerPage.waitForLoadState('networkidle').catch(() => null);

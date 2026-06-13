@@ -34,7 +34,10 @@ export function Profile() {
     setLoading(true);
 
     try {
-      const response = await api.put(`/customers/${user?.id}`, formData);
+      const response = await api.put('/customers/profile', {
+        ...formData,
+        userId: user?.id,
+      });
       updateUser(response.data as Partial<{ name: string; phone: string; address?: string }>);
       setSuccess(t('profile.updateSuccess'));
     } catch (err: unknown) {
