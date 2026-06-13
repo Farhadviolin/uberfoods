@@ -8,6 +8,7 @@ const RUN_ID = process.env.GITHUB_RUN_ID
   || process.env.RUN_ID
   || `run_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 const RUN_ATTEMPT = process.env.GITHUB_RUN_ATTEMPT || '1';
+const LIFECYCLE_CUSTOMER_ADDRESS = 'Test Street 123, 1010 Vienna';
 
 function createLifecycleCustomerCredentials() {
   const token = `${RUN_ID}.${RUN_ATTEMPT}.${Date.now()}.${Math.random().toString(36).slice(2, 8)}.${randomUUID()}`;
@@ -16,7 +17,7 @@ function createLifecycleCustomerCredentials() {
     password: `customer.${token}`,
     name: `Full Order Lifecycle Customer ${token}`,
     phone: '+43 123 456 789',
-    address: `${testOrder.deliveryAddress.street}, ${testOrder.deliveryAddress.zipCode} ${testOrder.deliveryAddress.city}`,
+    address: LIFECYCLE_CUSTOMER_ADDRESS,
   };
 }
 
