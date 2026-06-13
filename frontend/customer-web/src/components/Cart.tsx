@@ -225,35 +225,65 @@ export function Cart({ cart, restaurant, updateQuantity, onClearCart }: CartProp
     setError(null);
 
     try {
+      const customerId = user?.id || '';
       const order = {
+        customerId,
         restaurantId: effectiveRestaurant.id,
         items: effectiveCart.map(item => ({
           dishId: item.dish.id,
           quantity: item.quantity,
-          price: item.dish.price,
+          modifications: item.modifications,
+          specialInstructions: item.specialInstructions,
         })),
-        totalAmount,
         address: user?.address || guestInfo.address,
+        deliveryAddress: user?.address || guestInfo.address,
         phone: user?.phone || guestInfo.phone,
-        email: user?.email || guestInfo.email,
-        name: user?.name || guestInfo.name,
         notes: '',
         promotionCode: promoCode || undefined,
-        isGuest: !user,
-        deliverySpeed: deliverySpeed, // Standard oder Priorität
-        estimatedDeliveryTime: estimatedDeliveryTime || null,
+        deliveryFee,
       };
+
+      logDebug('Checkout order payload summary', {
+        component: 'Cart',
+        action: 'placeOrder',
+        metadata: {
+          hasCustomerId: Boolean(customerId),
+          customerIdType: typeof customerId,
+          itemCount: order.items.length,
+          itemKeys: order.items[0] ? Object.keys(order.items[0]) : [],
+          hasAddress: Boolean(order.address),
+          hasPhone: Boolean(order.phone),
+          hasPromotionId: Boolean(order.promotionCode),
+          hasDeliveryFee: typeof order.deliveryFee === 'number',
+        },
+      });
 
       const response = await api.post('/orders/customer', order);
       markCheckoutProbe({ apiPostCalled: true });
       setOrderId(response.data.id);
       setShowPayment(true);
     } catch (err: unknown) {
+      const axiosError = err as {
+        response?: { status?: number; statusText?: string; data?: unknown };
+        config?: { url?: string };
+      };
+      logDebug('Checkout order request failed', {
+        component: 'Cart',
+        action: 'placeOrder',
+        metadata: {
+          status: axiosError.response?.status ?? null,
+          statusText: axiosError.response?.statusText ?? null,
+          url: axiosError.config?.url ?? null,
+          body: typeof axiosError.response?.data === 'string'
+            ? (axiosError.response.data as string).slice(0, 500)
+            : JSON.stringify(axiosError.response?.data ?? null).slice(0, 500),
+        },
+      });
       setError(extractErrorMessage(err) || t('cart.orderError'));
     } finally {
       setLoading(false);
     }
-  }, [effectiveCart, user, guestInfo, effectiveRestaurant.id, totalAmount, promoCode, minOrderMissing, minOrderAmount, deliverySpeed, estimatedDeliveryTime, t]);
+  }, [effectiveCart, user, guestInfo, effectiveRestaurant.id, promoCode, minOrderMissing, minOrderAmount, deliveryFee, logDebug, t]);
 
   const handlePaymentSuccess = useCallback(() => {
     // Warenkorb leeren
