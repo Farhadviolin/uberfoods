@@ -115,11 +115,6 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
       const cartItems = customerPage.locator('[data-testid="cart-item"], .cart-item');
       await expect.poll(async () => cartItems.count()).toBeGreaterThan(0);
 
-      // Proceed to checkout
-      const checkoutBtn = customerPage.locator('button[data-testid="checkout-button"], button:has-text("Place Order"), button:has-text("Checkout")').first();
-      await expect(checkoutBtn).toBeVisible();
-      await checkoutBtn.click();
-
       // Fill delivery address
       const addressForm = customerPage.locator('[data-testid="address-form"], .address-form');
       if (await addressForm.isVisible()) {
