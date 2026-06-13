@@ -189,6 +189,44 @@ export function Cart({ cart, restaurant, updateQuantity, onClearCart }: CartProp
     [subtotal, discountAmount, deliveryFee, serviceFee]
   );
 
+  const resolveCustomerId = useCallback(() => {
+    const candidateValues = [
+      user && typeof user === 'object' ? (user as { customerId?: unknown; customer?: { id?: unknown }; id?: unknown }).customerId : undefined,
+      user && typeof user === 'object' ? (user as { customerId?: unknown; customer?: { id?: unknown }; id?: unknown }).customer?.id : undefined,
+      user?.id,
+    ];
+
+    const runtimeCandidates = candidateValues
+      .filter((value): value is string => typeof value === 'string' && value.trim().length > 0);
+
+    if (runtimeCandidates.length > 0) {
+      return runtimeCandidates[0].trim();
+    }
+
+    try {
+      const storedUserRaw = localStorage.getItem('customer_user');
+      if (storedUserRaw) {
+        const storedUser = JSON.parse(storedUserRaw) as {
+          customerId?: unknown;
+          customer?: { id?: unknown };
+          id?: unknown;
+        };
+        const storedCandidate = [
+          storedUser.customerId,
+          storedUser.customer?.id,
+          storedUser.id,
+        ].find((value): value is string => typeof value === 'string' && value.trim().length > 0);
+        if (storedCandidate) {
+          return storedCandidate.trim();
+        }
+      }
+    } catch {
+      // ignore storage parse issues and fall through to error
+    }
+
+    return '';
+  }, [user]);
+
   const placeOrder = useCallback(async () => {
     markCheckoutProbe({ placeOrderCalled: true });
 
@@ -225,38 +263,53 @@ export function Cart({ cart, restaurant, updateQuantity, onClearCart }: CartProp
     setError(null);
 
     try {
-      const customerId = user?.id || '';
+      const customerId = resolveCustomerId();
+      const normalizedItems = effectiveCart.map(item => ({
+        dishId: item.dish.id,
+        quantity: item.quantity,
+        ...(item.modifications ? { modifications: item.modifications } : {}),
+        ...(item.specialInstructions ? { specialInstructions: item.specialInstructions } : {}),
+      }));
       const order = {
         customerId,
         restaurantId: effectiveRestaurant.id,
-        items: effectiveCart.map(item => ({
-          dishId: item.dish.id,
-          quantity: item.quantity,
-          modifications: item.modifications,
-          specialInstructions: item.specialInstructions,
-        })),
+        items: normalizedItems,
         address: user?.address || guestInfo.address,
         deliveryAddress: user?.address || guestInfo.address,
         phone: user?.phone || guestInfo.phone,
         notes: '',
-        promotionCode: promoCode || undefined,
+        promotionId: promoCode || undefined,
         deliveryFee,
       };
+
+      const forbiddenPayloadKeysPresent = [
+        'totalAmount',
+        'email',
+        'name',
+        'isGuest',
+        'deliverySpeed',
+        'estimatedDeliveryTime',
+      ].filter((key) => Object.prototype.hasOwnProperty.call(order, key));
 
       logDebug('Checkout order payload summary', {
         component: 'Cart',
         action: 'placeOrder',
         metadata: {
-          hasCustomerId: Boolean(customerId),
+          customerIdPresent: Boolean(customerId),
           customerIdType: typeof customerId,
           itemCount: order.items.length,
           itemKeys: order.items[0] ? Object.keys(order.items[0]) : [],
+          forbiddenPayloadKeysPresent,
           hasAddress: Boolean(order.address),
           hasPhone: Boolean(order.phone),
-          hasPromotionId: Boolean(order.promotionCode),
+          hasPromotionId: Boolean(order.promotionId),
           hasDeliveryFee: typeof order.deliveryFee === 'number',
         },
       });
+
+      if (!customerId || typeof customerId !== 'string') {
+        throw new Error('Cannot place order without customerId');
+      }
 
       const response = await api.post('/orders/customer', order);
       markCheckoutProbe({ apiPostCalled: true });
@@ -283,7 +336,7 @@ export function Cart({ cart, restaurant, updateQuantity, onClearCart }: CartProp
     } finally {
       setLoading(false);
     }
-  }, [effectiveCart, user, guestInfo, effectiveRestaurant.id, promoCode, minOrderMissing, minOrderAmount, deliveryFee, logDebug, t]);
+  }, [effectiveCart, user, guestInfo, effectiveRestaurant.id, promoCode, minOrderMissing, minOrderAmount, deliveryFee, logDebug, t, resolveCustomerId]);
 
   const handlePaymentSuccess = useCallback(() => {
     // Warenkorb leeren
