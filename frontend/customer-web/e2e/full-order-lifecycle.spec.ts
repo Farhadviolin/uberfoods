@@ -486,28 +486,44 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
           });
         };
 
+        const missingAddressPattern = /please provide a delivery address in your profile|delivery address in your profile|missing-user-address|addressrequired/i;
+        const profileAddressWarningLocator = customerPage.locator(
+          'text=/Please provide a delivery address in your profile|delivery address in your profile|addressRequired|missing-user-address/i',
+        );
+
+        const collectProfileAddressSignals = async () => {
+          const visibleCheckoutErrorTexts = await visibleCheckoutErrors();
+          const visibleAddressText = await customerPage.locator('text=/address|adresse|liefer|delivery|street|straße/i').allTextContents().catch(() => []);
+          const visiblePageText = await customerPage.locator('body').innerText({ timeout: 5000 }).catch(() => '');
+          const submitProbe = await customerPage.evaluate(() => (window as unknown as { __checkoutSubmitProbe?: unknown }).__checkoutSubmitProbe ?? null);
+          const combinedAddressSignal = [
+            visibleCheckoutErrorTexts.join('\n'),
+            visibleAddressText.join('\n'),
+            visiblePageText,
+            typeof submitProbe === 'object' && submitProbe ? JSON.stringify(submitProbe) : '',
+          ].filter(Boolean).join('\n');
+          const locatorVisible = await profileAddressWarningLocator.first().isVisible().catch(() => false);
+
+          return {
+            visibleCheckoutErrors: visibleCheckoutErrorTexts,
+            visibleAddressText,
+            visiblePageText,
+            submitProbe,
+            combinedAddressSignal,
+            missingAddressDetected: missingAddressPattern.test(combinedAddressSignal),
+            locatorVisible,
+          };
+        };
+
         const ensureProfileAddress = async () => {
-          const checkoutErrorsBeforeProfileCheck = await visibleCheckoutErrors();
-          const checkoutWarningTextsBeforeProfileCheck = await customerPage.locator(
-            'text=/Please provide a delivery address in your profile|delivery address in your profile|addressRequired/i'
-          ).allTextContents().catch(() => []);
-          const checkoutAddressTextsBeforeProfileCheck = await customerPage.locator(
-            'text=/Please provide a delivery address in your profile|delivery address in your profile|addressRequired|missing-user-address/i'
-          ).allTextContents().catch(() => []);
-          const profileAddressWarningVisible =
-            checkoutErrorsBeforeProfileCheck.some((text) => /please provide a delivery address in your profile|delivery address in your profile|addressrequired|missing-user-address/i.test(text))
-            || checkoutWarningTextsBeforeProfileCheck.some((text) => /please provide a delivery address in your profile|delivery address in your profile|addressrequired|missing-user-address/i.test(text))
-            || checkoutAddressTextsBeforeProfileCheck.some((text) => /please provide a delivery address in your profile|delivery address in your profile|addressrequired|missing-user-address/i.test(text));
+          const profileAddressSignals = await collectProfileAddressSignals();
 
           console.log('➡️ lifecycle: checking profile address before final submit', {
             currentUrl: customerPage.url(),
-            checkoutErrorsBeforeProfileCheck,
-            checkoutWarningTextsBeforeProfileCheck,
-            checkoutAddressTextsBeforeProfileCheck,
-            profileAddressWarningVisible,
+            ...profileAddressSignals,
           });
 
-          if (!profileAddressWarningVisible) {
+          if (!profileAddressSignals.missingAddressDetected && !profileAddressSignals.locatorVisible) {
             console.log('ℹ️ lifecycle: profile address warning not visible, continuing with final submit');
             return false;
           }
@@ -577,10 +593,10 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
           await customerPage.goto('/checkout', { waitUntil: 'domcontentloaded' });
           await customerPage.waitForLoadState('networkidle').catch(() => null);
           const checkoutWarningTextsAfterProfileUpdate = await customerPage.locator(
-            'text=/Please provide a delivery address in your profile|delivery address in your profile|addressRequired/i'
+            'text=/Please provide a delivery address in your profile|delivery address in your profile|addressRequired/i',
           ).allTextContents().catch(() => []);
           const checkoutAddressTextsAfterProfileUpdate = await customerPage.locator(
-            'text=/Please provide a delivery address in your profile|delivery address in your profile|addressRequired|missing-user-address|delivery address|address/i'
+            'text=/Please provide a delivery address in your profile|delivery address in your profile|addressRequired|missing-user-address|delivery address|address/i',
           ).allTextContents().catch(() => []);
           console.log('ℹ️ lifecycle: checkout address state after profile update', {
             checkoutWarningTextsAfterProfileUpdate,
@@ -702,20 +718,24 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
 
         const paymentModal = customerPage.getByTestId('payment-modal');
         const orderTrackingPage = customerPage.getByTestId('order-tracking-page');
-        const orderSubmissionOutcome = await Promise.race([
-          orderCreateResponsePromise.then((response) => ({ kind: 'response' as const, response })).catch(() => null),
-          paymentModal.waitFor({ state: 'visible', timeout: 20000 }).then(() => ({ kind: 'payment-modal' as const })).catch(() => null),
-          customerPage.waitForURL(/\/orders\/[^/?]+(?:\?.*)?$/, { timeout: 20000 }).then(() => ({ kind: 'order-url' as const })).catch(() => null),
-          orderTrackingPage.waitFor({ state: 'visible', timeout: 20000 }).then(() => ({ kind: 'order-tracking' as const })).catch(() => null),
-        ]);
+        const performFinalSubmitAttempt = async (attemptLabel: string) => {
+          const attemptOutcome = await Promise.race([
+            orderCreateResponsePromise.then((response) => ({ kind: 'response' as const, response })).catch(() => null),
+            paymentModal.waitFor({ state: 'visible', timeout: 20000 }).then(() => ({ kind: 'payment-modal' as const })).catch(() => null),
+            customerPage.waitForURL(/\/orders\/[^/?]+(?:\?.*)?$/, { timeout: 20000 }).then(() => ({ kind: 'order-url' as const })).catch(() => null),
+            orderTrackingPage.waitFor({ state: 'visible', timeout: 20000 }).then(() => ({ kind: 'order-tracking' as const })).catch(() => null),
+          ]);
 
-        if (!orderSubmissionOutcome) {
+          if (attemptOutcome) {
+            return attemptOutcome;
+          }
+
           const submitProbe = await customerPage.evaluate(() => (window as unknown as { __checkoutSubmitProbe?: unknown }).__checkoutSubmitProbe ?? null);
           const visibleTotalText = await cartContainer.locator('text=/€|Mindestbestellwert|Total|Gesamt/i').allTextContents().catch(() => []);
           const visibleAddressText = await customerPage.locator('text=/address|adresse|liefer|delivery|street|straße/i').allTextContents().catch(() => []);
           const visiblePhoneText = await customerPage.locator('text=/phone|telefon|mobile|handy/i').allTextContents().catch(() => []);
           const visiblePaymentText = await customerPage.locator('text=/payment|card|karte|pay|zahlung/i').allTextContents().catch(() => []);
-          console.log('ℹ️ lifecycle: final order submit diagnostics', {
+          console.log(`ℹ️ lifecycle: ${attemptLabel} final order submit diagnostics`, {
             currentUrl: customerPage.url(),
             paymentModalVisible: await paymentModal.isVisible().catch(() => false),
             orderTrackingVisible: await orderTrackingPage.isVisible().catch(() => false),
@@ -733,6 +753,27 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
             checkoutErrors: await customerPage.locator('.error, [role="alert"], [data-testid="checkout-error"]').allTextContents().catch(() => []),
             submitProbe,
           });
+          return null;
+        };
+
+        let orderSubmissionOutcome = await performFinalSubmitAttempt('initial');
+
+        if (!orderSubmissionOutcome) {
+          const retryProbe = await customerPage.evaluate(() => (window as unknown as { __checkoutSubmitProbe?: unknown }).__checkoutSubmitProbe ?? null);
+          const retryGuard = typeof retryProbe === 'object' && retryProbe
+            ? (retryProbe as { guard?: string | null }).guard
+            : null;
+
+          if (retryGuard === 'missing-user-address') {
+            console.log('ℹ️ lifecycle: missing-user-address recovery triggered', {
+              retryGuard,
+            });
+            await ensureProfileAddress();
+            orderSubmissionOutcome = await performFinalSubmitAttempt('retry after missing-user-address recovery');
+          }
+        }
+
+        if (!orderSubmissionOutcome) {
           throw new Error('Final order submission did not produce a response or confirmation UI');
         }
 
