@@ -604,6 +604,62 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
           throw new Error('No visible final submit button found in checkout cart');
         }
 
+        const finalSubmitDomProbe = await customerPage.evaluate(() => {
+          const button = document.querySelector('button[data-testid="checkout-button"]') as HTMLButtonElement | null;
+          const form = button?.closest('form') as HTMLFormElement | null;
+          return {
+            buttonText: button?.textContent?.trim() || null,
+            buttonType: button?.getAttribute('type') || null,
+            buttonDisabled: button?.disabled ?? null,
+            buttonHasForm: Boolean(form),
+            formAction: form?.getAttribute('action') || null,
+            formMethod: form?.getAttribute('method') || null,
+            buttonCount: document.querySelectorAll('button[data-testid="checkout-button"]').length,
+          };
+        });
+        console.log('ℹ️ lifecycle: final submit DOM probe', finalSubmitDomProbe);
+
+        await customerPage.evaluate(() => {
+          const probe = {
+            clickSeen: false,
+            submitSeen: false,
+            submitTarget: null as string | null,
+            clickedText: null as string | null,
+            networkUrls: [] as string[],
+          };
+
+          (window as unknown as { __checkoutSubmitProbe?: typeof probe }).__checkoutSubmitProbe = probe;
+
+          document.addEventListener('click', (event) => {
+            const target = event.target as HTMLElement | null;
+            const button = target?.closest?.('button[data-testid="checkout-button"]') as HTMLButtonElement | null;
+            if (button) {
+              probe.clickSeen = true;
+              probe.clickedText = button.textContent?.trim() ?? null;
+            }
+          }, true);
+
+          document.addEventListener('submit', (event) => {
+            const form = event.target as HTMLFormElement | null;
+            probe.submitSeen = true;
+            probe.submitTarget = form?.outerHTML?.slice(0, 500) ?? null;
+          }, true);
+
+          const originalFetch = window.fetch.bind(window);
+          window.fetch = async (...args) => {
+            const request = args[0];
+            const url = typeof request === 'string'
+              ? request
+              : request instanceof Request
+                ? request.url
+                : String(request);
+            if (/order|checkout|payment|cart/i.test(url)) {
+              probe.networkUrls.push(url);
+            }
+            return originalFetch(...args);
+          };
+        });
+
         finalPlaceOrderButton = customerPage
           .getByTestId('cart')
           .locator('button[data-testid="checkout-button"]')
@@ -630,6 +686,7 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
         ]);
 
         if (!orderSubmissionOutcome) {
+          const submitProbe = await customerPage.evaluate(() => (window as unknown as { __checkoutSubmitProbe?: unknown }).__checkoutSubmitProbe ?? null);
           console.log('ℹ️ lifecycle: final order submit diagnostics', {
             currentUrl: customerPage.url(),
             paymentModalVisible: await paymentModal.isVisible().catch(() => false),
@@ -639,6 +696,7 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
             submitEnabled: await finalPlaceOrderButton.isEnabled().catch(() => false),
             submitText: await finalPlaceOrderButton.textContent().catch(() => null),
             checkoutErrors: await customerPage.locator('.error, [role="alert"], [data-testid="checkout-error"]').allTextContents().catch(() => []),
+            submitProbe,
           });
           throw new Error('Final order submission did not produce a response or confirmation UI');
         }
