@@ -577,7 +577,7 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
         }, { timeout: 20000 });
         const cartContainer = customerPage.getByTestId('cart');
         const submitCandidates = [
-          cartContainer.getByTestId('checkout-button'),
+          cartContainer.locator('button[data-testid="checkout-button"]'),
           cartContainer.getByRole('button', { name: /^(Place Order|Bestellen|Submit Order|Order Now|Jetzt bestellen|Zahlungspflichtig bestellen|Bezahlen|Pay)$/i }),
           customerPage.getByRole('button', { name: /^(Place Order|Bestellen|Submit Order|Order Now|Jetzt bestellen|Zahlungspflichtig bestellen|Bezahlen|Pay)$/i }),
         ];
@@ -603,6 +603,12 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
           });
           throw new Error('No visible final submit button found in checkout cart');
         }
+
+        finalPlaceOrderButton = customerPage
+          .getByTestId('cart')
+          .locator('button[data-testid="checkout-button"]')
+          .filter({ hasText: /^(Place Order|Bestellen|Submit Order|Order Now|Jetzt bestellen|Zahlungspflichtig bestellen|Bezahlen|Pay)$/i })
+          .first();
 
         await expect(finalPlaceOrderButton).toBeVisible();
         console.log('✅ lifecycle: phase1 final Place Order button visible');
@@ -631,6 +637,8 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
             cartVisible: await cartContainer.isVisible().catch(() => false),
             submitVisible: await finalPlaceOrderButton.isVisible().catch(() => false),
             submitEnabled: await finalPlaceOrderButton.isEnabled().catch(() => false),
+            submitText: await finalPlaceOrderButton.textContent().catch(() => null),
+            checkoutErrors: await customerPage.locator('.error, [role="alert"], [data-testid="checkout-error"]').allTextContents().catch(() => []),
           });
           throw new Error('Final order submission did not produce a response or confirmation UI');
         }
