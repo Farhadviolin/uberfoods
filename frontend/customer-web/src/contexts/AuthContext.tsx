@@ -14,6 +14,29 @@ interface InitialAuthState {
   token: string | null;
 }
 
+function normalizeAuthPayload(payload: unknown) {
+  const data = (payload as { data?: unknown })?.data ?? payload ?? {};
+  const normalizedData = data as Record<string, unknown>;
+  const accessToken =
+    (normalizedData.access_token as string | undefined)
+    ?? (normalizedData.accessToken as string | undefined)
+    ?? (normalizedData.token as string | undefined)
+    ?? null;
+  const refreshToken =
+    (normalizedData.refresh_token as string | undefined)
+    ?? (normalizedData.refreshToken as string | undefined)
+    ?? null;
+  const user = (normalizedData.user as User | undefined) ?? {
+    id: normalizedData.id as string,
+    email: normalizedData.email as string,
+    name: normalizedData.name as string,
+    phone: normalizedData.phone as string,
+    address: normalizedData.address as string | undefined,
+  };
+
+  return { accessToken, refreshToken, user };
+}
+
 interface AuthContextType {
   user: User | null;
   token: string | null;
@@ -106,15 +129,15 @@ export function AuthProvider({ children, initialAuthState }: { children: ReactNo
         password,
       });
 
-      const { access_token, ...userData } = response.data;
+      const { accessToken, user } = normalizeAuthPayload(response.data);
       
-      localStorage.setItem('customer_token', access_token);
-      localStorage.setItem('customer_user', JSON.stringify(userData));
+      localStorage.setItem('customer_token', accessToken ?? '');
+      localStorage.setItem('customer_user', JSON.stringify(user));
       
-      setToken(access_token);
-      setUser(userData);
+      setToken(accessToken);
+      setUser(user);
       if (api?.defaults?.headers?.common) {
-        api.defaults.headers.common['Authorization'] = `Bearer ${access_token}`;
+        api.defaults.headers.common['Authorization'] = `Bearer ${accessToken}`;
       }
     } catch (error: unknown) {
       const axiosError = error as { response?: { data?: { message?: string } } };
@@ -132,15 +155,15 @@ export function AuthProvider({ children, initialAuthState }: { children: ReactNo
         address,
       });
 
-      const { access_token, ...userData } = response.data;
+      const { accessToken, user } = normalizeAuthPayload(response.data);
       
-      localStorage.setItem('customer_token', access_token);
-      localStorage.setItem('customer_user', JSON.stringify(userData));
+      localStorage.setItem('customer_token', accessToken ?? '');
+      localStorage.setItem('customer_user', JSON.stringify(user));
       
-      setToken(access_token);
-      setUser(userData);
+      setToken(accessToken);
+      setUser(user);
       if (api?.defaults?.headers?.common) {
-        api.defaults.headers.common['Authorization'] = `Bearer ${access_token}`;
+        api.defaults.headers.common['Authorization'] = `Bearer ${accessToken}`;
       }
     } catch (error: unknown) {
       const axiosError = error as { response?: { data?: { message?: string } } };

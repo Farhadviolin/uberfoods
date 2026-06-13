@@ -323,10 +323,13 @@ registerAuthSetup('customer', 'authenticate as customer', async ({ page, context
   // Save authentication state
   await page.evaluate(({ accessToken, refreshToken, user }) => {
     const jsonUser = JSON.stringify(user);
+    localStorage.setItem('customer_token', accessToken);
+    localStorage.setItem('customer_user', jsonUser);
     localStorage.setItem('access_token', accessToken);
     localStorage.setItem('auth_token', accessToken);
     localStorage.setItem('user', jsonUser);
     if (refreshToken) {
+      localStorage.setItem('customer_refresh_token', refreshToken);
       localStorage.setItem('refresh_token', refreshToken);
     }
   }, {
