@@ -273,7 +273,11 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
       await withStepTimeout('phase1 minimum order satisfaction', async () => {
         const minOrderSummary = customerPage.locator('.cart-summary-row.min-order');
         const getMissingMinOrderAmount = async () => {
-          const summaryText = (await minOrderSummary.textContent().catch(() => '')) || '';
+          if (await minOrderSummary.count().catch(() => 0) === 0) {
+            return 0;
+          }
+
+          const summaryText = (await minOrderSummary.first().textContent().catch(() => '')) || '';
           const match = summaryText.match(/Noch\s+([\d.,]+)\s*€\s*fehlen/i);
           if (!match) {
             return 0;
@@ -382,7 +386,11 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
         console.log('➡️ lifecycle: phase1 preparing final order submit');
         const minOrderSummary = customerPage.locator('.cart-summary-row.min-order');
         const getMissingMinOrderAmount = async () => {
-          const summaryText = (await minOrderSummary.textContent().catch(() => '')) || '';
+          if (await minOrderSummary.count().catch(() => 0) === 0) {
+            return 0;
+          }
+
+          const summaryText = (await minOrderSummary.first().textContent().catch(() => '')) || '';
           const match = summaryText.match(/Noch\s+([\d.,]+)\s*€\s*fehlen/i);
           if (!match) {
             return 0;
