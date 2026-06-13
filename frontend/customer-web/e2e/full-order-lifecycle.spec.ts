@@ -290,6 +290,7 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
 
           if (!missingAmount || Number.isNaN(missingAmount)) {
             console.log(`✅ lifecycle: minimum order satisfied after ${attempt - 1} extra attempts`);
+            console.log('✅ lifecycle: leaving phase1 minimum order satisfaction');
             return;
           }
 
@@ -301,6 +302,7 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
 
           if (!(await minimumWarningVisible())) {
             console.log(`✅ lifecycle: minimum order satisfied after ${attempt} extra attempts`);
+            console.log('✅ lifecycle: leaving phase1 minimum order satisfaction');
             return;
           }
         }
