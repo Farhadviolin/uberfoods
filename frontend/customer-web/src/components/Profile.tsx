@@ -81,6 +81,7 @@ export function Profile() {
             <label>{t('auth.name')}</label>
             <input
               type="text"
+              data-testid="profile-name-input"
               value={formData.name}
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
               required
@@ -102,6 +103,7 @@ export function Profile() {
             <label>{t('auth.phone')}</label>
             <input
               type="tel"
+              data-testid="profile-phone-input"
               value={formData.phone}
               onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
               required
@@ -112,13 +114,14 @@ export function Profile() {
             <label>{t('profile.address')}</label>
             <input
               type="text"
+              data-testid="profile-address-input"
               value={formData.address}
               onChange={(e) => setFormData({ ...formData, address: e.target.value })}
               placeholder={t('auth.addressPlaceholder')}
             />
           </div>
 
-          <button type="submit" disabled={loading} className="save-button">
+          <button type="submit" data-testid="profile-save-button" disabled={loading} className="save-button">
             {loading ? t('profile.saving') : t('profile.save')}
           </button>
         </form>

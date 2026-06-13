@@ -488,7 +488,7 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
 
         const missingAddressPattern = /please provide a delivery address in your profile|delivery address in your profile|missing-user-address|addressrequired/i;
         const profileAddressWarningLocator = customerPage.locator(
-          'text=/Please provide a delivery address in your profile|delivery address in your profile|addressRequired|missing-user-address/i',
+          '[data-testid="profile-address-warning"], text=/Please provide a delivery address in your profile|delivery address in your profile|addressRequired|missing-user-address/i',
         );
 
         const collectProfileAddressSignals = async () => {
@@ -548,33 +548,80 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
             .evaluateAll((nodes) => nodes.map((node) => (node.textContent || '').trim()).filter(Boolean))
             .catch(() => []);
 
-          const addressFieldLocator = customerPage.getByLabel(/address/i).last();
-          const addressFieldVisible = await addressFieldLocator.isVisible().catch(() => false);
+          const expectedAddress = testOrder.deliveryAddress.street.trim();
+          const profileAddressLocatorStrategies = [
+            { name: 'testid', locator: customerPage.getByTestId('profile-address-input') },
+            { name: 'label', locator: customerPage.getByLabel(/address|adresse/i).last() },
+            { name: 'placeholder', locator: customerPage.getByPlaceholder(/address|adresse|lieferadresse|delivery address/i).last() },
+            { name: 'name=address', locator: customerPage.locator('input[name="address"]').last() },
+            { name: 'name=street', locator: customerPage.locator('input[name="street"]').last() },
+            { name: 'textarea[address]', locator: customerPage.locator('textarea[name="address"], textarea[name="street"]').last() },
+          ];
 
-          if (!addressFieldVisible) {
+          let addressFieldLocator: Locator | null = null;
+          let successfulAddressLocatorStrategy: string | null = null;
+
+          for (const strategy of profileAddressLocatorStrategies) {
+            if (await strategy.locator.isVisible().catch(() => false)) {
+              addressFieldLocator = strategy.locator;
+              successfulAddressLocatorStrategy = strategy.name;
+              break;
+            }
+          }
+
+          if (!addressFieldLocator) {
+            const editButtons = [
+              customerPage.getByRole('button', { name: /edit profile|edit address|add address|edit/i }),
+              customerPage.locator('button.edit-btn, button.add-address-btn'),
+            ];
+            for (const editButtonLocator of editButtons) {
+              if (await editButtonLocator.first().isVisible().catch(() => false)) {
+                console.log('➡️ lifecycle: profile address edit/add button clicked', {
+                  currentUrl: customerPage.url(),
+                  buttonText: await editButtonLocator.first().textContent().catch(() => null),
+                });
+                await editButtonLocator.first().click();
+                await customerPage.waitForLoadState('networkidle').catch(() => null);
+                break;
+              }
+            }
+
+            for (const strategy of profileAddressLocatorStrategies) {
+              if (await strategy.locator.isVisible().catch(() => false)) {
+                addressFieldLocator = strategy.locator;
+                successfulAddressLocatorStrategy = strategy.name;
+                break;
+              }
+            }
+          }
+
+          if (!addressFieldLocator) {
             console.log('ℹ️ lifecycle: profile address field not visible', {
               currentUrl: customerPage.url(),
               visibleInputs,
               visibleButtons,
               visibleProfileErrors,
             });
-            return false;
+            throw new Error('Profile address recovery failed before checkout retry');
           }
 
           const currentAddress = (await addressFieldLocator.inputValue().catch(() => '')).trim();
-          const expectedAddress = testOrder.deliveryAddress.street.trim();
 
           if (currentAddress && currentAddress === expectedAddress) {
-            console.log('ℹ️ lifecycle: profile address already present');
+            console.log('ℹ️ lifecycle: profile address already present', {
+              successfulAddressLocatorStrategy,
+            });
             await customerPage.goto('/checkout', { waitUntil: 'domcontentloaded' });
             await customerPage.waitForLoadState('networkidle').catch(() => null);
             console.log('✅ lifecycle: returned to checkout after profile check');
             return false;
           }
 
-          console.log('➡️ lifecycle: profile address missing, updating profile before final submit');
+          console.log('➡️ lifecycle: profile address missing, updating profile before final submit', {
+            successfulAddressLocatorStrategy,
+          });
           await addressFieldLocator.fill(expectedAddress);
-          const saveButton = customerPage.getByRole('button', { name: /save|speichern/i }).first();
+          const saveButton = customerPage.getByTestId('profile-save-button').first();
           if (!(await saveButton.isVisible().catch(() => false))) {
             console.log('ℹ️ lifecycle: profile save button not visible', {
               currentUrl: customerPage.url(),
@@ -582,14 +629,18 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
               visibleButtons,
               visibleProfileErrors,
             });
-            return false;
+            throw new Error('Profile address recovery failed before checkout retry');
           }
 
           await saveButton.click();
           await customerPage.waitForLoadState('networkidle').catch(() => null);
-          await customerPage.waitForURL(/\/profile(?:\?.*)?$/, { timeout: 15000 }).catch(() => null);
+          await customerPage.getByTestId('profile-save-button').waitFor({ state: 'visible', timeout: 15000 }).catch(() => null);
           await customerPage.getByText(/updated|success/i).first().waitFor({ state: 'visible', timeout: 15000 }).catch(() => null);
-          console.log('✅ lifecycle: profile address updated');
+          const savedAddressVisible = await customerPage.locator('text=/Teststraße 10|Teststrasse 10|1010 Wien|Wien|Austria/i').first().isVisible().catch(() => false);
+          console.log('✅ lifecycle: profile address updated', {
+            successfulAddressLocatorStrategy,
+            savedAddressVisible,
+          });
           await customerPage.goto('/checkout', { waitUntil: 'domcontentloaded' });
           await customerPage.waitForLoadState('networkidle').catch(() => null);
           const checkoutWarningTextsAfterProfileUpdate = await customerPage.locator(
@@ -602,6 +653,9 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
             checkoutWarningTextsAfterProfileUpdate,
             checkoutAddressTextsAfterProfileUpdate,
           });
+          if (!checkoutWarningTextsAfterProfileUpdate.length && !checkoutAddressTextsAfterProfileUpdate.length) {
+            console.log('✅ lifecycle: checkout address warning cleared after profile update');
+          }
           console.log('✅ lifecycle: returned to checkout after profile update');
           return true;
         };
