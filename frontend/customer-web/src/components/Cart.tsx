@@ -67,6 +67,17 @@ export function Cart({ cart, restaurant, updateQuantity, onClearCart }: CartProp
   const { user } = useAuth();
   const cartContext = useCart();
   const navigate = useNavigate();
+
+  const markCheckoutProbe = useCallback((patch: Record<string, unknown>) => {
+    if (typeof window === 'undefined') return;
+    const probe = (window as unknown as { __checkoutSubmitProbe?: Record<string, unknown> }).__checkoutSubmitProbe;
+    if (!probe) return;
+    (window as unknown as { __checkoutSubmitProbe?: Record<string, unknown> }).__checkoutSubmitProbe = {
+      ...probe,
+      ...patch,
+    };
+  }, []);
+
   const effectiveCart = cart ?? cartContext.items.map(item => ({
     dish: {
       id: item.dishId,
@@ -179,7 +190,10 @@ export function Cart({ cart, restaurant, updateQuantity, onClearCart }: CartProp
   );
 
   const placeOrder = useCallback(async () => {
+    markCheckoutProbe({ placeOrderCalled: true });
+
     if (effectiveCart.length === 0) {
+      markCheckoutProbe({ guard: 'empty-cart' });
       setError(t('cart.emptyError'));
       return;
     }
@@ -187,11 +201,13 @@ export function Cart({ cart, restaurant, updateQuantity, onClearCart }: CartProp
     // Guest-Checkout Validierung
     if (!user) {
       if (!guestInfo.name || !guestInfo.email || !guestInfo.phone || !guestInfo.address) {
+        markCheckoutProbe({ guard: 'missing-guest-fields' });
         setError(t('cart.guestFieldsError'));
         return;
       }
     } else {
       if (!user.address) {
+        markCheckoutProbe({ guard: 'missing-user-address' });
         setError(t('cart.addressRequiredError'));
         return;
       }
@@ -199,10 +215,12 @@ export function Cart({ cart, restaurant, updateQuantity, onClearCart }: CartProp
 
     // Prüfe Mindestbestellwert
     if (minOrderMissing > 0) {
+      markCheckoutProbe({ guard: 'minimum-order-missing', minOrderMissing });
       setError(`Mindestbestellwert von ${minOrderAmount.toFixed(2)}€ nicht erreicht. Noch ${minOrderMissing.toFixed(2)}€ fehlen.`);
       return;
     }
 
+    markCheckoutProbe({ beforeApiPost: true, apiPostUrl: '/orders/customer' });
     setLoading(true);
     setError(null);
 
@@ -227,6 +245,7 @@ export function Cart({ cart, restaurant, updateQuantity, onClearCart }: CartProp
       };
 
       const response = await api.post('/orders/customer', order);
+      markCheckoutProbe({ apiPostCalled: true });
       setOrderId(response.data.id);
       setShowPayment(true);
     } catch (err: unknown) {
@@ -258,8 +277,9 @@ export function Cart({ cart, restaurant, updateQuantity, onClearCart }: CartProp
 
   const handleCheckoutSubmit = useCallback((event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    markCheckoutProbe({ handleCheckoutSubmitCalled: true });
     void placeOrder();
-  }, [placeOrder]);
+  }, [markCheckoutProbe, placeOrder]);
 
   return (
     <>

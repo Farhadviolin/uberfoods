@@ -687,13 +687,24 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
 
         if (!orderSubmissionOutcome) {
           const submitProbe = await customerPage.evaluate(() => (window as unknown as { __checkoutSubmitProbe?: unknown }).__checkoutSubmitProbe ?? null);
+          const visibleTotalText = await cartContainer.locator('text=/€|Mindestbestellwert|Total|Gesamt/i').allTextContents().catch(() => []);
+          const visibleAddressText = await customerPage.locator('text=/address|adresse|liefer|delivery|street|straße/i').allTextContents().catch(() => []);
+          const visiblePhoneText = await customerPage.locator('text=/phone|telefon|mobile|handy/i').allTextContents().catch(() => []);
+          const visiblePaymentText = await customerPage.locator('text=/payment|card|karte|pay|zahlung/i').allTextContents().catch(() => []);
           console.log('ℹ️ lifecycle: final order submit diagnostics', {
             currentUrl: customerPage.url(),
             paymentModalVisible: await paymentModal.isVisible().catch(() => false),
             orderTrackingVisible: await orderTrackingPage.isVisible().catch(() => false),
             cartVisible: await cartContainer.isVisible().catch(() => false),
+            cartItemCount: await cartContainer.locator('.cart-item').count().catch(() => 0),
+            visibleTotalText,
+            visibleAddressText,
+            visiblePhoneText,
+            visiblePaymentText,
             submitVisible: await finalPlaceOrderButton.isVisible().catch(() => false),
             submitEnabled: await finalPlaceOrderButton.isEnabled().catch(() => false),
+            submitType: await finalPlaceOrderButton.getAttribute('type').catch(() => null),
+            submitHasForm: await finalPlaceOrderButton.evaluate((button) => Boolean((button as HTMLButtonElement).form)).catch(() => false),
             submitText: await finalPlaceOrderButton.textContent().catch(() => null),
             checkoutErrors: await customerPage.locator('.error, [role="alert"], [data-testid="checkout-error"]').allTextContents().catch(() => []),
             submitProbe,
