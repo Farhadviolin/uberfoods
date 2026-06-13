@@ -749,46 +749,50 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
         });
         console.log('ℹ️ lifecycle: final submit DOM probe', finalSubmitDomProbe);
 
-        await customerPage.evaluate(() => {
-          const probe = {
-            clickSeen: false,
-            submitSeen: false,
-            submitTarget: null as string | null,
-            clickedText: null as string | null,
-            networkUrls: [] as string[],
-          };
+        const installCheckoutSubmitProbe = async () => {
+          await customerPage.evaluate(() => {
+            const probe = {
+              clickSeen: false,
+              submitSeen: false,
+              submitTarget: null as string | null,
+              clickedText: null as string | null,
+              networkUrls: [] as string[],
+            };
 
-          (window as unknown as { __checkoutSubmitProbe?: typeof probe }).__checkoutSubmitProbe = probe;
+            (window as unknown as { __checkoutSubmitProbe?: typeof probe }).__checkoutSubmitProbe = probe;
 
-          document.addEventListener('click', (event) => {
-            const target = event.target as HTMLElement | null;
-            const button = target?.closest?.('button[data-testid="checkout-button"]') as HTMLButtonElement | null;
-            if (button) {
-              probe.clickSeen = true;
-              probe.clickedText = button.textContent?.trim() ?? null;
-            }
-          }, true);
+            document.addEventListener('click', (event) => {
+              const target = event.target as HTMLElement | null;
+              const button = target?.closest?.('button[data-testid="checkout-button"]') as HTMLButtonElement | null;
+              if (button) {
+                probe.clickSeen = true;
+                probe.clickedText = button.textContent?.trim() ?? null;
+              }
+            }, true);
 
-          document.addEventListener('submit', (event) => {
-            const form = event.target as HTMLFormElement | null;
-            probe.submitSeen = true;
-            probe.submitTarget = form?.outerHTML?.slice(0, 500) ?? null;
-          }, true);
+            document.addEventListener('submit', (event) => {
+              const form = event.target as HTMLFormElement | null;
+              probe.submitSeen = true;
+              probe.submitTarget = form?.outerHTML?.slice(0, 500) ?? null;
+            }, true);
 
-          const originalFetch = window.fetch.bind(window);
-          window.fetch = async (...args) => {
-            const request = args[0];
-            const url = typeof request === 'string'
-              ? request
-              : request instanceof Request
-                ? request.url
-                : String(request);
-            if (/order|checkout|payment|cart/i.test(url)) {
-              probe.networkUrls.push(url);
-            }
-            return originalFetch(...args);
-          };
-        });
+            const originalFetch = window.fetch.bind(window);
+            window.fetch = async (...args) => {
+              const request = args[0];
+              const url = typeof request === 'string'
+                ? request
+                : request instanceof Request
+                  ? request.url
+                  : String(request);
+              if (/order|checkout|payment|cart/i.test(url)) {
+                probe.networkUrls.push(url);
+              }
+              return originalFetch(...args);
+            };
+          });
+        };
+
+        await installCheckoutSubmitProbe();
 
         finalPlaceOrderButton = customerPage
           .getByTestId('cart')
@@ -859,6 +863,10 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
               retryGuard,
             });
             await ensureProfileAddress();
+            await installCheckoutSubmitProbe();
+            await finalPlaceOrderButton.scrollIntoViewIfNeeded().catch(() => null);
+            await finalPlaceOrderButton.click({ noWaitAfter: true });
+            console.log('✅ lifecycle: phase1 final Place Order retry click completed');
             orderSubmissionOutcome = await performFinalSubmitAttempt('retry after missing-user-address recovery');
           }
         }
