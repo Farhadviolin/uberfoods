@@ -1,4 +1,4 @@
-import { expect } from '@playwright/test';
+import { expect, type Page } from '@playwright/test';
 import { randomUUID } from 'node:crypto';
 import { test, TestHelpers, testUrls, testSelectors } from './test-helpers';
 import { testDataFactory } from '../../test-utils/test-data-factory';
@@ -19,6 +19,149 @@ function createLifecycleCustomerCredentials() {
     phone: '+43 123 456 789',
     address: LIFECYCLE_CUSTOMER_ADDRESS,
   };
+}
+
+async function withStepTimeout<T>(
+  label: string,
+  action: () => Promise<T>,
+  timeoutMs = 30000,
+): Promise<T> {
+  console.log(`➡️ lifecycle step start: ${label}`);
+  let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
+
+  try {
+    const timeout = new Promise<never>((_, reject) => {
+      timeoutHandle = setTimeout(() => {
+        reject(new Error(`Lifecycle step timed out: ${label}`));
+      }, timeoutMs);
+    });
+
+    const result = await Promise.race([action(), timeout]);
+    console.log(`✅ lifecycle step done: ${label}`);
+    return result;
+  } finally {
+    if (timeoutHandle) {
+      clearTimeout(timeoutHandle);
+    }
+  }
+}
+
+type LifecycleCustomerCredentials = {
+  email: string;
+  password: string;
+  name: string;
+  phone: string;
+  address: string;
+};
+
+async function registerCustomerForLifecycleWithDiagnostics(
+  page: Page,
+  credentials: LifecycleCustomerCredentials,
+  appUrl: string,
+): Promise<LifecycleCustomerCredentials> {
+  const registerUrl = `${appUrl}/register`;
+  console.log('[customer-e2e] register navigation', {
+    appUrl,
+    registerUrl,
+    apiBaseUrl: process.env.API_BASE_URL || process.env.VITE_API_BASE_URL || 'unset',
+  });
+
+  await withStepTimeout('register: build register url', async () => {
+    expect(registerUrl).toContain('/register');
+    console.log('✅ register: register url built');
+  }, 5000);
+
+  await withStepTimeout('register: goto register page', async () => {
+    await page.goto(registerUrl, { waitUntil: 'domcontentloaded' });
+  }, 30000);
+
+  await withStepTimeout('register: wait for register form', async () => {
+    await expect(page.locator('input[type="email"]')).toBeVisible({ timeout: 15000 });
+    await expect(page.locator('input[type="password"]')).toBeVisible({ timeout: 15000 });
+    console.log('✅ register: register form visible');
+  }, 20000);
+
+  await withStepTimeout('register: fill name', async () => {
+    await page.locator('input[type="text"], input[name="name"]').first().fill(credentials.name);
+  }, 15000);
+
+  await withStepTimeout('register: fill email', async () => {
+    await page.locator('input[type="email"]').fill(credentials.email);
+  }, 15000);
+
+  await withStepTimeout('register: fill phone if present', async () => {
+    const phoneField = page.locator('input[type="tel"], input[name="phone"]').first();
+    if (await phoneField.isVisible().catch(() => false)) {
+      await phoneField.fill(credentials.phone);
+      console.log('✅ register: phone field filled');
+    } else {
+      console.log('ℹ️ register: phone field not visible');
+    }
+  }, 15000);
+
+  await withStepTimeout('register: fill password', async () => {
+    await page.locator('input[type="password"]').first().fill(credentials.password);
+  }, 15000);
+
+  await withStepTimeout('register: fill confirm password if present', async () => {
+    const passwordFields = page.locator('input[type="password"]');
+    if (await passwordFields.count() > 1) {
+      await passwordFields.nth(1).fill(credentials.password);
+      console.log('✅ register: confirm password field filled');
+    } else {
+      console.log('ℹ️ register: confirm password field not visible');
+    }
+  }, 15000);
+
+  const registerRoute = '/api/auth/customer/register';
+  const registerResponsePromise = page.waitForResponse(
+    response => response.request().method() === 'POST'
+      && new URL(response.url()).pathname === registerRoute,
+    { timeout: 15000 },
+  );
+
+  await withStepTimeout('register: submit form', async () => {
+    await page.locator('button[type="submit"], button:has-text("Register")').click();
+  }, 15000);
+
+  const registerResponse = await withStepTimeout('register: wait for register response', async () => {
+    const response = await registerResponsePromise;
+    console.log(`✅ register: response received (${response.status()})`);
+    return response;
+  }, 20000);
+
+  if (registerResponse.status() !== 201) {
+    const body = await registerResponse.text().catch(() => '');
+    const normalizedBody = body.toLowerCase();
+    const isAlreadyExists = (registerResponse.status() === 401 || registerResponse.status() === 409)
+      && normalizedBody.includes('already exists');
+
+    console.error('[REGISTER FAILED DEBUG]', {
+      status: registerResponse.status(),
+      route: registerUrl,
+      body,
+    });
+
+    if (isAlreadyExists) {
+      console.warn('[REGISTER FALLBACK] Customer already exists, attempting login with the same credentials');
+      await withStepTimeout('register: login fallback after already-exists', async () => {
+        await TestHelpers.loginCustomer(page, credentials, appUrl);
+      }, 30000);
+      return credentials;
+    }
+
+    throw new Error(`Customer register failed: ${registerResponse.status()} ${registerResponse.statusText()} ${body}`);
+  }
+
+  await withStepTimeout('register: wait for post-register app state', async () => {
+    await Promise.race([
+      page.waitForURL(/.*(login|dashboard|home|restaurants|menu|restaurant)/i, { timeout: 10000 }).catch(() => null),
+      page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => null),
+    ]);
+    console.log(`ℹ️ register: post-register URL is ${page.url()}`);
+  }, 15000);
+
+  return credentials;
 }
 
 test.describe('Full Order Lifecycle UI-E2E', () => {
@@ -69,115 +212,187 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
       // ============================================
       console.log('🚀 Phase 1: Customer creates order');
 
-      await customerPage.goto(testUrls.customer);
-      await TestHelpers.waitForStablePage(customerPage);
+      await withStepTimeout('phase1 customer initial navigation', async () => {
+        console.log(`➡️ lifecycle: phase1 opening customer home (${testUrls.customer})`);
+        await customerPage.goto(testUrls.customer);
+        await TestHelpers.waitForStablePage(customerPage);
+        console.log('✅ lifecycle: phase1 customer home ready');
+      });
 
-      // Customer registration (fresh session)
-      await TestHelpers.registerCustomer(customerPage, customerCredentials, testUrls.customer);
+      await withStepTimeout('phase1 customer registration', async () => {
+        console.log('➡️ lifecycle: phase1 registering customer');
+        await registerCustomerForLifecycleWithDiagnostics(customerPage, customerCredentials, testUrls.customer);
+        console.log('✅ lifecycle: phase1 customer registered');
+      });
 
-      // Take screenshot for debugging if needed
-      await TestHelpers.takeScreenshot(customerPage, 'customer_registered');
+      await withStepTimeout('phase1 customer registration screenshot', async () => {
+        await TestHelpers.takeScreenshot(customerPage, 'customer_registered');
+      });
 
-      // Browse restaurants
-      await customerPage.goto(`${testUrls.customer}/restaurants`);
-      await testDataFactory.waitForStablePage(customerPage);
+      await withStepTimeout('phase1 restaurant list navigation', async () => {
+        console.log('➡️ lifecycle: phase1 opening restaurant list');
+        await customerPage.goto(`${testUrls.customer}/restaurants`);
+        await testDataFactory.waitForStablePage(customerPage);
+        console.log('✅ lifecycle: phase1 restaurant list visible');
+      });
 
-      const restaurantCard = customerPage.locator('[data-testid="restaurant-card"], .restaurant-card').first();
-      await expect(restaurantCard).toBeVisible();
-      await restaurantCard.click();
-      await customerPage.waitForURL(/\/restaurant\/[^/]+$/);
-      await expect(customerPage.locator('[data-testid="menu-content"]')).toBeVisible();
+      await withStepTimeout('phase1 restaurant selection', async () => {
+        const restaurantCard = customerPage.locator('[data-testid="restaurant-card"], .restaurant-card').first();
+        await expect(restaurantCard).toBeVisible();
+        console.log('✅ lifecycle: phase1 restaurant card visible');
+        await restaurantCard.click();
+        await customerPage.waitForURL(/\/restaurant\/[^/]+$/);
+        await expect(customerPage.locator('[data-testid="menu-content"]')).toBeVisible();
+        console.log('✅ lifecycle: phase1 restaurant selected');
+        console.log('✅ lifecycle: phase1 menu content visible');
+      });
 
-      // Add items to cart and checkout
       const addToCartButtons = customerPage.locator('[data-testid="add-to-cart-button"]');
-      const addToCartButtonCount = await addToCartButtons.count();
-      expect(addToCartButtonCount).toBeGreaterThan(0);
 
-      // Add first 3 items
-      for (let i = 0; i < Math.min(3, await addToCartButtons.count()); i++) {
-        await addToCartButtons.nth(i).click();
+      await withStepTimeout('phase1 add first items to cart', async () => {
+        const addToCartButtonCount = await addToCartButtons.count();
+        expect(addToCartButtonCount).toBeGreaterThan(0);
+        console.log(`✅ lifecycle: phase1 add-to-cart buttons found (${addToCartButtonCount})`);
+
+        console.log('➡️ lifecycle: phase1 adding initial items to cart');
+        for (let i = 0; i < Math.min(3, addToCartButtonCount); i += 1) {
+          console.log(`➡️ lifecycle: phase1 clicking add-to-cart button ${i + 1}`);
+          await addToCartButtons.nth(i).click();
+          await customerPage.waitForTimeout(500);
+          console.log(`✅ lifecycle: phase1 add-to-cart button ${i + 1} clicked`);
+        }
+
+        await expect(customerPage.locator('[data-testid="cart-placeholder"]')).toContainText(/Cart: [1-9]/i);
+        await expect.poll(async () => {
+          return customerPage.evaluate(() => Object.keys(localStorage).filter((key) => key.startsWith('cart_')).length);
+        }).toBeGreaterThan(0);
+        console.log('✅ lifecycle: phase1 cart state contains items');
+      });
+
+      await withStepTimeout('phase1 minimum order satisfaction', async () => {
+        const minOrderSummary = customerPage.locator('.cart-summary-row.min-order');
+        const getMissingMinOrderAmount = async () => {
+          const summaryText = (await minOrderSummary.textContent().catch(() => '')) || '';
+          const match = summaryText.match(/Noch\s+([\d.,]+)\s*€\s*fehlen/i);
+          if (!match) {
+            return 0;
+          }
+
+          return Number(match[1].replace(',', '.'));
+        };
+
+        const minimumWarningVisible = async () => (await minOrderSummary.isVisible().catch(() => false))
+          && (await getMissingMinOrderAmount()) > 0;
+
+        for (let attempt = 1; attempt <= 10; attempt += 1) {
+          const missingAmount = await getMissingMinOrderAmount();
+
+          if (!missingAmount || Number.isNaN(missingAmount)) {
+            console.log(`✅ lifecycle: minimum order satisfied after ${attempt - 1} extra attempts`);
+            return;
+          }
+
+          console.log(`➡️ lifecycle: minimum order still open (${missingAmount.toFixed(2)}€ missing), adding item attempt ${attempt}`);
+          const count = await addToCartButtons.count();
+          expect(count).toBeGreaterThan(0);
+          await addToCartButtons.nth((attempt - 1) % count).click();
+          await customerPage.waitForTimeout(300);
+
+          if (!(await minimumWarningVisible())) {
+            console.log(`✅ lifecycle: minimum order satisfied after ${attempt} extra attempts`);
+            return;
+          }
+        }
+
+        throw new Error('Minimum order value was not satisfied after 10 add-to-cart attempts');
+      });
+
+      await withStepTimeout('phase1 navigate to checkout', async () => {
+        console.log('➡️ lifecycle: phase1 navigating to checkout');
+        const menuCheckoutButton = customerPage.getByTestId('checkout-button').first();
+        await expect(menuCheckoutButton).toBeVisible();
+        await menuCheckoutButton.click();
+        await customerPage.waitForURL(/\/checkout(?:\?.*)?$/);
         await customerPage.waitForTimeout(500);
-      }
+        console.log('✅ lifecycle: phase1 checkout reached');
+      });
 
-      await expect(customerPage.locator('[data-testid="cart-placeholder"]')).toContainText(/Cart: [1-9]/i);
-      await expect.poll(async () => {
-        return customerPage.evaluate(() => Object.keys(localStorage).filter((key) => key.startsWith('cart_')).length);
-      }).toBeGreaterThan(0);
+      await withStepTimeout('phase1 checkout state and delivery address', async () => {
+        const cartItems = customerPage.locator('[data-testid="cart-item"], .cart-item');
+        await expect(customerPage.getByTestId('cart')).toBeVisible();
+        await expect.poll(async () => cartItems.count()).toBeGreaterThan(0);
+        console.log('✅ lifecycle: phase1 checkout cart has items');
 
-      // Nutze den echten Checkout-Button im Menü, damit der Cart-State sicher erhalten bleibt.
-      const menuCheckoutButton = customerPage.getByTestId('checkout-button').first();
-      await expect(menuCheckoutButton).toBeVisible();
-      await menuCheckoutButton.click();
-      await customerPage.waitForURL(/\/checkout(?:\?.*)?$/);
-      await customerPage.waitForTimeout(500);
-
-      // Verify cart has items on the checkout page
-      const cartItems = customerPage.locator('[data-testid="cart-item"], .cart-item');
-      await expect.poll(async () => cartItems.count()).toBeGreaterThan(0);
-
-      // Fill delivery address
-      const addressForm = customerPage.locator('[data-testid="address-form"], .address-form');
-      if (await addressForm.isVisible()) {
-        await customerPage.locator('input[name="street"]').fill(testOrder.deliveryAddress.street);
-        await customerPage.locator('input[name="city"]').fill(testOrder.deliveryAddress.city);
-        await customerPage.locator('input[name="zipCode"]').fill(testOrder.deliveryAddress.zipCode);
-        await customerPage.locator('input[name="phone"]').fill(testOrder.deliveryAddress.phone);
-      }
-
-      // Select payment method (skip actual payment in E2E)
-      const paymentMethods = customerPage.locator('[data-testid="payment-methods"], .payment-methods');
-      if (await paymentMethods.isVisible()) {
-        const cardPayment = customerPage.locator('input[type="radio"][value="card"]');
-        if (await cardPayment.isVisible()) {
-          await cardPayment.check();
-        }
-      }
-
-      const minOrderSummary = customerPage.locator('.cart-summary-row.min-order');
-      const getMissingMinOrderAmount = async () => {
-        const summaryText = (await minOrderSummary.textContent().catch(() => '')) || '';
-        const match = summaryText.match(/Noch\s+([\d.,]+)\s*€\s*fehlen/i);
-        if (!match) {
-          return 0;
+        const addressForm = customerPage.locator('[data-testid="address-form"], .address-form');
+        if (await addressForm.isVisible()) {
+          console.log('➡️ lifecycle: phase1 filling delivery address');
+          await customerPage.locator('input[name="street"]').fill(testOrder.deliveryAddress.street);
+          await customerPage.locator('input[name="city"]').fill(testOrder.deliveryAddress.city);
+          await customerPage.locator('input[name="zipCode"]').fill(testOrder.deliveryAddress.zipCode);
+          await customerPage.locator('input[name="phone"]').fill(testOrder.deliveryAddress.phone);
+          console.log('✅ lifecycle: phase1 delivery address filled');
+        } else {
+          console.log('ℹ️ lifecycle: phase1 delivery address form not visible');
         }
 
-        return Number(match[1].replace(',', '.'));
-      };
-
-      const minOrderButtonsCount = await addToCartButtons.count();
-      for (let attempt = 0; attempt < Math.max(1, minOrderButtonsCount) * 4; attempt++) {
-        const missingAmount = await getMissingMinOrderAmount();
-        if (!missingAmount || Number.isNaN(missingAmount)) {
-          break;
+        const paymentMethods = customerPage.locator('[data-testid="payment-methods"], .payment-methods');
+        if (await paymentMethods.isVisible()) {
+          console.log('➡️ lifecycle: phase1 selecting payment method');
+          const cardPayment = customerPage.locator('input[type="radio"][value="card"]');
+          if (await cardPayment.isVisible()) {
+            await cardPayment.check();
+            console.log('✅ lifecycle: phase1 payment method selected');
+          }
         }
+      });
 
-        await addToCartButtons.nth(attempt % minOrderButtonsCount).click();
-        await customerPage.waitForTimeout(300);
-      }
+      await withStepTimeout('phase1 final order submit', async () => {
+        console.log('➡️ lifecycle: phase1 preparing final order submit');
+        const minOrderSummary = customerPage.locator('.cart-summary-row.min-order');
+        const getMissingMinOrderAmount = async () => {
+          const summaryText = (await minOrderSummary.textContent().catch(() => '')) || '';
+          const match = summaryText.match(/Noch\s+([\d.,]+)\s*€\s*fehlen/i);
+          if (!match) {
+            return 0;
+          }
 
-      await expect.poll(getMissingMinOrderAmount, { timeout: 10000 }).toBe(0);
+          return Number(match[1].replace(',', '.'));
+        };
 
-      // Place order
-      const orderCreateResponsePromise = customerPage.waitForResponse((response) => {
-        const request = response.request();
-        return request.method() === 'POST'
-          && new URL(response.url()).pathname === '/api/orders/customer';
-      }, { timeout: 20000 });
-      const cartContainer = customerPage.getByTestId('cart');
-      const finalPlaceOrderButton = cartContainer.getByRole('button', { name: /^Place Order$/i });
-      await expect(cartContainer).toBeVisible();
-      await expect(finalPlaceOrderButton).toBeVisible();
-      await expect(finalPlaceOrderButton).toBeEnabled();
-      await Promise.all([
-        orderCreateResponsePromise,
-        finalPlaceOrderButton.click(),
-      ]);
-      const orderCreateResponse = await orderCreateResponsePromise;
-      const createdOrder = await orderCreateResponse.json().catch(() => ({}));
-      orderId = createdOrder.id || orderId;
-      if (!orderId) {
-        throw new Error('Order creation response did not include an id');
-      }
+        await expect.poll(getMissingMinOrderAmount, { timeout: 10000 }).toBe(0);
+        console.log('✅ lifecycle: phase1 minimum order satisfied');
+
+        const orderCreateResponsePromise = customerPage.waitForResponse((response) => {
+          const request = response.request();
+          return request.method() === 'POST'
+            && new URL(response.url()).pathname === '/api/orders/customer';
+        }, { timeout: 20000 });
+        const cartContainer = customerPage.getByTestId('cart');
+        const finalPlaceOrderButton = cartContainer.getByRole('button', { name: /^Place Order$/i });
+
+        await expect(cartContainer).toBeVisible();
+        console.log('✅ lifecycle: phase1 checkout/cart visible');
+        await expect(finalPlaceOrderButton).toBeVisible();
+        console.log('✅ lifecycle: phase1 final Place Order button visible');
+        await expect(finalPlaceOrderButton).toBeEnabled();
+        console.log('✅ lifecycle: phase1 final Place Order button enabled');
+        console.log('➡️ lifecycle: phase1 clicking final Place Order');
+
+        await Promise.all([
+          orderCreateResponsePromise,
+          finalPlaceOrderButton.click(),
+        ]);
+        console.log('✅ lifecycle: phase1 final Place Order click completed');
+
+        const orderCreateResponse = await orderCreateResponsePromise;
+        console.log(`✅ lifecycle: phase1 order response received (${orderCreateResponse.status()})`);
+        const createdOrder = await orderCreateResponse.json().catch(() => ({}));
+        orderId = createdOrder.id || orderId;
+        if (!orderId) {
+          throw new Error('Order creation response did not include an id');
+        }
+        console.log(`✅ lifecycle: phase1 order id resolved (${orderId})`);
+      });
 
       // Complete payment in the modal if the UI shows one, otherwise accept
       // the direct navigation flow after the order is created.
