@@ -453,6 +453,67 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
         await expect.poll(getMissingMinOrderAmount, { timeout: 10000 }).toBe(0);
         console.log('✅ lifecycle: phase1 minimum order satisfied');
 
+        const visibleCheckoutErrors = async () => customerPage.locator('.error-message, [role="alert"], .warning-message')
+          .evaluateAll((nodes) => nodes
+            .map((node) => (node.textContent || '').trim())
+            .filter(Boolean))
+          .catch(() => []);
+
+        const logCheckoutDiagnostics = async (phase: string) => {
+          const visibleErrors = await visibleCheckoutErrors();
+          const visibleButtons = await customerPage.locator('button').evaluateAll((nodes) => nodes
+            .map((node) => {
+              const text = (node.textContent || '').trim().replace(/\s+/g, ' ');
+              const rect = (node as HTMLElement).getBoundingClientRect();
+              const style = window.getComputedStyle(node as HTMLElement);
+              return {
+                text,
+                testId: (node as HTMLElement).getAttribute('data-testid'),
+                disabled: (node as HTMLButtonElement).disabled,
+                visible: !!(rect.width && rect.height) && style.visibility !== 'hidden' && style.display !== 'none',
+              };
+            })
+            .filter((button) => button.visible))
+          .catch(() => []);
+          const visiblePaymentOptions = await customerPage.locator('[data-testid="payment-methods"], .payment-methods, [data-testid="payment-modal"], .payment-modal')
+            .evaluateAll((nodes) => nodes.map((node) => (node.textContent || '').trim()).filter(Boolean))
+            .catch(() => []);
+          console.log(`ℹ️ lifecycle: ${phase} checkout diagnostics`, {
+            currentUrl: customerPage.url(),
+            visibleErrors,
+            visibleButtons,
+            visiblePaymentOptions,
+          });
+        };
+
+        const ensureProfileAddress = async () => {
+          const checkoutErrors = await visibleCheckoutErrors();
+          if (!checkoutErrors.some((text) => /delivery address in your profile|addressRequired/i.test(text))) {
+            return false;
+          }
+
+          console.log('➡️ lifecycle: profile address missing, updating profile before final submit');
+          await customerPage.goto('/profile', { waitUntil: 'domcontentloaded' });
+          await expect(customerPage.getByRole('heading', { name: /my profile/i })).toBeVisible({ timeout: 15000 });
+          const addressField = customerPage.getByLabel(/address/i).last();
+          await expect(addressField).toBeVisible({ timeout: 15000 });
+          await addressField.fill(testOrder.deliveryAddress.street);
+          const saveButton = customerPage.getByRole('button', { name: /save|speichern/i }).first();
+          await expect(saveButton).toBeVisible({ timeout: 15000 });
+          await saveButton.click();
+          await customerPage.waitForLoadState('networkidle').catch(() => null);
+          await customerPage.waitForURL(/\/profile(?:\?.*)?$/, { timeout: 15000 }).catch(() => null);
+          console.log('✅ lifecycle: profile address updated');
+          await customerPage.goto('/checkout', { waitUntil: 'domcontentloaded' });
+          await expect(customerPage.getByTestId('cart')).toBeVisible({ timeout: 15000 });
+          console.log('✅ lifecycle: returned to checkout after profile update');
+          return true;
+        };
+
+        await logCheckoutDiagnostics('before final submit');
+        await ensureProfileAddress();
+        await logCheckoutDiagnostics('after profile verification');
+
         const orderCreateResponsePromise = customerPage.waitForResponse((response) => {
           const request = response.request();
           return request.method() === 'POST'
