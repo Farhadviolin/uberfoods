@@ -140,8 +140,24 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
       const placeOrderBtn = customerPage.locator('button[data-testid="place-order"], .place-order, button:has-text("Place Order")');
       await placeOrderBtn.click();
 
-      // Verify order confirmation
-      await expect(customerPage.locator('text=/order placed|order confirmed|bestellung erfolgreich/i')).toBeVisible();
+      // Complete payment in the modal and wait for the real order tracking page
+      const paymentModal = customerPage.getByTestId('payment-modal');
+      await expect(paymentModal).toBeVisible();
+
+      const cardForm = customerPage.locator('.card-form');
+      if (await cardForm.isVisible()) {
+        await customerPage.getByLabel(/karteninhaber/i).fill(testOrder.customer.name);
+        await customerPage.getByLabel(/kartennummer/i).fill('4242 4242 4242 4242');
+        await customerPage.getByLabel(/gültig bis/i).fill('12/34');
+        await customerPage.getByLabel(/cvc/i).fill('123');
+      }
+
+      const paymentConfirmButton = customerPage.getByTestId('payment-confirm-button');
+      await expect(paymentConfirmButton).toBeVisible();
+      await paymentConfirmButton.click();
+
+      await customerPage.waitForURL(/\/orders\/[^/?]+(?:\?.*)?$/);
+      await expect(customerPage.getByTestId('order-tracking-page')).toBeVisible();
 
       // Get order ID from URL or response
       const orderUrlMatch = customerPage.url().match(/orders\/([^/?]+)/);

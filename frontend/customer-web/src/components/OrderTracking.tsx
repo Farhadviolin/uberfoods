@@ -273,7 +273,7 @@ export function OrderTracking() {
   const isCancelled = order.status === 'CANCELLED';
 
   return (
-    <div>
+    <div data-testid="order-tracking-page">
       <Link to="/orders" className="fb-back-button">← {t('common.back')} {t('order.title')}</Link>
 
       {showCancelModal && (
