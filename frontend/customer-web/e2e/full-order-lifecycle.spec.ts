@@ -312,11 +312,18 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
 
       await withStepTimeout('phase1 navigate to checkout', async () => {
         console.log('➡️ lifecycle: phase1 navigating to checkout');
-        const menuCheckoutButton = customerPage.getByTestId('checkout-button').first();
-        await expect(menuCheckoutButton).toBeVisible();
-        await menuCheckoutButton.click();
-        await customerPage.waitForURL(/\/checkout(?:\?.*)?$/);
-        await customerPage.waitForTimeout(500);
+        const cartItems = customerPage.locator('[data-testid="cart-item"], .cart-item');
+        await expect.poll(async () => cartItems.count()).toBeGreaterThan(0);
+
+        const checkoutButton = customerPage.getByTestId('checkout-button').first();
+        await expect(checkoutButton).toBeVisible();
+        await expect(checkoutButton).toBeEnabled();
+        await checkoutButton.scrollIntoViewIfNeeded();
+
+        await Promise.all([
+          customerPage.waitForURL(/\/checkout(?:\?.*)?$/),
+          checkoutButton.click(),
+        ]);
         console.log('✅ lifecycle: phase1 checkout reached');
       });
 
