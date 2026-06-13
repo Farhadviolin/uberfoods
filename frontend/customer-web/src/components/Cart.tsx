@@ -227,26 +227,54 @@ export function Cart({ cart, restaurant, updateQuantity, onClearCart }: CartProp
     return '';
   }, [user]);
 
-  const resolveCustomerAddress = useCallback(() => {
-    const runtimeAddress = typeof user?.address === 'string' ? user.address.trim() : '';
+  const resolveEffectiveCustomerAddress = useCallback(() => {
+    const normalizeAddressValue = (value: unknown): string => {
+      if (typeof value === 'string') {
+        return value.trim();
+      }
+
+      if (value && typeof value === 'object') {
+        const addressRecord = value as Record<string, unknown>;
+        const nestedParts = [
+          addressRecord.street,
+          addressRecord.houseNumber || addressRecord.houseNo,
+          addressRecord.zip || addressRecord.zipCode || addressRecord.postalCode,
+          addressRecord.city,
+          addressRecord.state,
+          addressRecord.country,
+        ]
+          .filter((part): part is string => typeof part === 'string' && part.trim().length > 0)
+          .map((part) => part.trim());
+
+        if (nestedParts.length > 0) {
+          return nestedParts.join(' ');
+        }
+      }
+
+      return '';
+    };
+
+    const runtimeAddress = normalizeAddressValue(user?.address);
     if (runtimeAddress) {
       return runtimeAddress;
     }
 
-    try {
-      const storedUserRaw = localStorage.getItem('customer_user');
-      if (storedUserRaw) {
-        const storedUser = JSON.parse(storedUserRaw) as { address?: unknown };
-        if (typeof storedUser.address === 'string' && storedUser.address.trim().length > 0) {
-          return storedUser.address.trim();
-        }
-      }
-    } catch {
-      // ignore storage parse issues and fall through to guest address
+    if (typeof window === 'undefined') {
+      return '';
     }
 
-    return guestInfo.address.trim();
-  }, [guestInfo.address, user?.address]);
+    try {
+      const storedUserRaw = window.localStorage.getItem('customer_user');
+      if (!storedUserRaw) {
+        return '';
+      }
+
+      const storedUser = JSON.parse(storedUserRaw) as { address?: unknown };
+      return normalizeAddressValue(storedUser.address);
+    } catch {
+      return '';
+    }
+  }, [user?.address]);
 
   const placeOrder = useCallback(async () => {
     markCheckoutProbe({ placeOrderCalled: true });
@@ -265,8 +293,16 @@ export function Cart({ cart, restaurant, updateQuantity, onClearCart }: CartProp
         return;
       }
     } else {
-      if (!resolveCustomerAddress()) {
-        markCheckoutProbe({ guard: 'missing-user-address' });
+      const effectiveAddress = resolveEffectiveCustomerAddress();
+      if (!effectiveAddress) {
+        markCheckoutProbe({
+          guard: 'missing-user-address',
+          contextUserAddress: user?.address ?? null,
+          storedCustomerUserRaw: typeof window === 'undefined'
+            ? null
+            : window.localStorage.getItem('customer_user'),
+          resolvedEffectiveAddress: effectiveAddress,
+        });
         setError(t('cart.addressRequiredError'));
         return;
       }
@@ -285,6 +321,7 @@ export function Cart({ cart, restaurant, updateQuantity, onClearCart }: CartProp
 
     try {
       const customerId = resolveCustomerId();
+      const effectiveAddress = resolveEffectiveCustomerAddress();
       const normalizedItems = effectiveCart.map(item => ({
         dishId: item.dish.id,
         quantity: item.quantity,
@@ -295,8 +332,8 @@ export function Cart({ cart, restaurant, updateQuantity, onClearCart }: CartProp
         customerId,
         restaurantId: effectiveRestaurant.id,
         items: normalizedItems,
-        address: resolveCustomerAddress(),
-        deliveryAddress: resolveCustomerAddress(),
+        address: effectiveAddress,
+        deliveryAddress: effectiveAddress,
         phone: user?.phone || guestInfo.phone,
         notes: '',
         promotionId: promoCode || undefined,
