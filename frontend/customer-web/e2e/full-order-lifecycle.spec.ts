@@ -491,14 +491,19 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
           const checkoutWarningTextsBeforeProfileCheck = await customerPage.locator(
             'text=/Please provide a delivery address in your profile|delivery address in your profile|addressRequired/i'
           ).allTextContents().catch(() => []);
+          const checkoutAddressTextsBeforeProfileCheck = await customerPage.locator(
+            'text=/Please provide a delivery address in your profile|delivery address in your profile|addressRequired|missing-user-address/i'
+          ).allTextContents().catch(() => []);
           const profileAddressWarningVisible =
-            checkoutErrorsBeforeProfileCheck.some((text) => /delivery address in your profile|addressRequired/i.test(text))
-            || checkoutWarningTextsBeforeProfileCheck.some((text) => /delivery address in your profile|addressRequired/i.test(text));
+            checkoutErrorsBeforeProfileCheck.some((text) => /please provide a delivery address in your profile|delivery address in your profile|addressrequired|missing-user-address/i.test(text))
+            || checkoutWarningTextsBeforeProfileCheck.some((text) => /please provide a delivery address in your profile|delivery address in your profile|addressrequired|missing-user-address/i.test(text))
+            || checkoutAddressTextsBeforeProfileCheck.some((text) => /please provide a delivery address in your profile|delivery address in your profile|addressrequired|missing-user-address/i.test(text));
 
           console.log('➡️ lifecycle: checking profile address before final submit', {
             currentUrl: customerPage.url(),
             checkoutErrorsBeforeProfileCheck,
             checkoutWarningTextsBeforeProfileCheck,
+            checkoutAddressTextsBeforeProfileCheck,
             profileAddressWarningVisible,
           });
 
@@ -575,7 +580,7 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
             'text=/Please provide a delivery address in your profile|delivery address in your profile|addressRequired/i'
           ).allTextContents().catch(() => []);
           const checkoutAddressTextsAfterProfileUpdate = await customerPage.locator(
-            'text=/delivery address|address/i'
+            'text=/Please provide a delivery address in your profile|delivery address in your profile|addressRequired|missing-user-address|delivery address|address/i'
           ).allTextContents().catch(() => []);
           console.log('ℹ️ lifecycle: checkout address state after profile update', {
             checkoutWarningTextsAfterProfileUpdate,
