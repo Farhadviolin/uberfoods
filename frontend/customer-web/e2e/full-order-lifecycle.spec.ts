@@ -138,8 +138,13 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
         return response.request().method() === 'POST'
           && new URL(response.url()).pathname === '/api/orders/customer';
       }, { timeout: 20000 });
-      const placeOrderBtn = customerPage.locator('button[data-testid="place-order"], .place-order, button:has-text("Place Order")');
-      await placeOrderBtn.click();
+      const placeOrderBtn = customerPage.locator('[data-testid="cart"] [data-testid="checkout-button"], button[data-testid="place-order"], .place-order, button:has-text("Place Order")').first();
+      await expect(placeOrderBtn).toBeVisible();
+      await expect(placeOrderBtn).toBeEnabled();
+      await Promise.all([
+        orderCreateResponsePromise,
+        placeOrderBtn.click(),
+      ]);
       const orderCreateResponse = await orderCreateResponsePromise;
       const createdOrder = await orderCreateResponse.json().catch(() => ({}));
       orderId = createdOrder.id || orderId;

@@ -97,10 +97,18 @@ export function AuthProvider({ children, initialAuthState }: { children: ReactNo
             api.defaults.headers.common['Authorization'] = `Bearer ${storedToken}`;
           }
           const response = await api.get('/auth/customer/me');
+          const storedUserData = JSON.parse(storedUser) as Partial<User> | null;
+          const normalized = normalizeAuthPayload(response.data);
+          const mergedUser: User = {
+            ...(storedUserData ?? {}),
+            ...normalized.user,
+            address: normalized.user?.address ?? storedUserData?.address,
+          } as User;
           
           // Token ist gültig - setze User und Token
           setToken(storedToken);
-          setUser(response.data);
+          setUser(mergedUser);
+          localStorage.setItem('customer_user', JSON.stringify(mergedUser));
         } catch (error) {
           // Token ist ungültig oder abgelaufen - entferne ungültige Daten
           localStorage.removeItem('customer_token');
