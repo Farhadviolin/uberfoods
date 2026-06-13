@@ -227,6 +227,27 @@ export function Cart({ cart, restaurant, updateQuantity, onClearCart }: CartProp
     return '';
   }, [user]);
 
+  const resolveCustomerAddress = useCallback(() => {
+    const runtimeAddress = typeof user?.address === 'string' ? user.address.trim() : '';
+    if (runtimeAddress) {
+      return runtimeAddress;
+    }
+
+    try {
+      const storedUserRaw = localStorage.getItem('customer_user');
+      if (storedUserRaw) {
+        const storedUser = JSON.parse(storedUserRaw) as { address?: unknown };
+        if (typeof storedUser.address === 'string' && storedUser.address.trim().length > 0) {
+          return storedUser.address.trim();
+        }
+      }
+    } catch {
+      // ignore storage parse issues and fall through to guest address
+    }
+
+    return guestInfo.address.trim();
+  }, [guestInfo.address, user?.address]);
+
   const placeOrder = useCallback(async () => {
     markCheckoutProbe({ placeOrderCalled: true });
 
@@ -244,7 +265,7 @@ export function Cart({ cart, restaurant, updateQuantity, onClearCart }: CartProp
         return;
       }
     } else {
-      if (!user.address) {
+      if (!resolveCustomerAddress()) {
         markCheckoutProbe({ guard: 'missing-user-address' });
         setError(t('cart.addressRequiredError'));
         return;
@@ -274,8 +295,8 @@ export function Cart({ cart, restaurant, updateQuantity, onClearCart }: CartProp
         customerId,
         restaurantId: effectiveRestaurant.id,
         items: normalizedItems,
-        address: user?.address || guestInfo.address,
-        deliveryAddress: user?.address || guestInfo.address,
+        address: resolveCustomerAddress(),
+        deliveryAddress: resolveCustomerAddress(),
         phone: user?.phone || guestInfo.phone,
         notes: '',
         promotionId: promoCode || undefined,

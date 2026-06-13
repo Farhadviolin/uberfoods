@@ -794,6 +794,30 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
 
         await installCheckoutSubmitProbe();
 
+        const checkoutFormValidityBeforeFinalSubmit = await customerPage.locator('form').last().evaluate((form) => {
+          const htmlForm = form as HTMLFormElement;
+          return {
+            valid: htmlForm.checkValidity(),
+            invalidControls: Array.from(htmlForm.elements)
+              .filter((element) => element instanceof HTMLInputElement || element instanceof HTMLSelectElement || element instanceof HTMLTextAreaElement)
+              .map((element) => {
+                const control = element as HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement;
+                return {
+                  tag: control.tagName,
+                  name: control.name,
+                  type: 'type' in control ? control.type : undefined,
+                  value: control.value,
+                  required: control.required,
+                  disabled: control.disabled,
+                  valid: control.checkValidity(),
+                  validationMessage: control.validationMessage,
+                };
+              })
+              .filter((control) => !control.valid || control.required),
+          };
+        }).catch(() => null);
+        console.log('ℹ️ lifecycle: checkout form validity before final submit', checkoutFormValidityBeforeFinalSubmit);
+
         finalPlaceOrderButton = customerPage
           .getByTestId('cart')
           .locator('button[data-testid="checkout-button"]')
