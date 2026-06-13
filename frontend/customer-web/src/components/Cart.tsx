@@ -230,56 +230,85 @@ export function Cart({ cart, restaurant, updateQuantity, onClearCart }: CartProp
   const placeOrder = useCallback(async () => {
     markCheckoutProbe({ placeOrderCalled: true });
 
-    const resolveEffectiveCustomerAddress = (): string => {
-      const normalizeAddressValue = (value: unknown): string => {
-        if (typeof value === 'string') {
-          return value.trim();
-        }
+    const normalizeAddress = (value: unknown): string => {
+      if (typeof value === 'string') {
+        return value.trim();
+      }
 
-        if (value && typeof value === 'object') {
-          const addressRecord = value as Record<string, unknown>;
-          const nestedParts = [
-            addressRecord.street,
-            addressRecord.houseNumber,
-            addressRecord.houseNo,
-            addressRecord.zip,
-            addressRecord.zipCode,
-            addressRecord.postalCode,
-            addressRecord.city,
-            addressRecord.state,
-            addressRecord.country,
-          ]
-            .filter((part): part is string => typeof part === 'string' && part.trim().length > 0)
-            .map((part) => part.trim());
+      if (value && typeof value === 'object') {
+        const addressObject = value as Record<string, unknown>;
 
-          if (nestedParts.length > 0) {
-            return nestedParts.join(' ').trim();
+        return [
+          addressObject.street,
+          addressObject.houseNumber,
+          addressObject.zip,
+          addressObject.zipCode,
+          addressObject.postalCode,
+          addressObject.city,
+          addressObject.state,
+          addressObject.country,
+        ]
+          .filter((part): part is string => typeof part === 'string' && part.trim().length > 0)
+          .map((part) => part.trim())
+          .join(' ')
+          .trim();
+      }
+
+      return '';
+    };
+
+    const safeJsonParse = (raw: string | null): unknown => {
+      if (!raw) {
+        return null;
+      }
+
+      try {
+        const parsed = JSON.parse(raw);
+
+        if (typeof parsed === 'string') {
+          try {
+            return JSON.parse(parsed);
+          } catch {
+            return parsed;
           }
         }
 
-        return '';
-      };
+        return parsed;
+      } catch {
+        return null;
+      }
+    };
 
-      const runtimeAddress = normalizeAddressValue(user?.address);
-      if (runtimeAddress) {
-        return runtimeAddress;
+    const resolveEffectiveCustomerAddress = (): string => {
+      const contextAddress = normalizeAddress(user?.address);
+
+      if (contextAddress) {
+        return contextAddress;
       }
 
       if (typeof window === 'undefined') {
         return '';
       }
 
-      try {
-        const storedCustomerUserRaw = window.localStorage.getItem('customer_user');
-        if (!storedCustomerUserRaw) {
-          return '';
-        }
+      const storedCustomerUserRaw = window.localStorage.getItem('customer_user');
+      const storedCustomerUser = safeJsonParse(storedCustomerUserRaw) as Record<string, unknown> | null;
 
-        const storedCustomerUser = JSON.parse(storedCustomerUserRaw) as { address?: unknown };
-        return normalizeAddressValue(storedCustomerUser?.address);
-      } catch {
-        return '';
+      const candidateAddresses = [
+        storedCustomerUser?.address,
+        (storedCustomerUser?.user as Record<string, unknown> | undefined)?.address,
+        (storedCustomerUser?.customer as Record<string, unknown> | undefined)?.address,
+        (storedCustomerUser?.profile as Record<string, unknown> | undefined)?.address,
+        (storedCustomerUser?.data as Record<string, unknown> | undefined)?.address,
+      ];
+
+      for (const candidate of candidateAddresses) {
+        const resolved = normalizeAddress(candidate);
+        if (resolved) {
+          return resolved;
+        }
       }
+
+      return '';
     };
 
     if (effectiveCart.length === 0) {
