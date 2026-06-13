@@ -57,6 +57,7 @@ function createLifecycleCustomerCredentials() {
     password: `customer.${token}`,
     name: `Lifecycle Customer ${token}`,
     phone: '+43 123 456 789',
+    address: 'Test Street 123, 1010 Vienna',
   };
 }
 
@@ -252,6 +253,12 @@ registerAuthSetup('customer', 'authenticate as customer', async ({ page, context
   }
 
   const normalized = normalizeApiLoginPayload(data);
+  if (customer.address) {
+    normalized.user = {
+      ...normalized.user,
+      address: normalized.user?.address ?? customer.address,
+    };
+  }
 
   expect(normalized.accessToken).toEqual(expect.any(String));
   expect(normalized.refreshToken).toEqual(expect.any(String));
