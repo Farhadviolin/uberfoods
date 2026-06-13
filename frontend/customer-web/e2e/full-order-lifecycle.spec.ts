@@ -77,7 +77,8 @@ async function registerCustomerForLifecycleWithDiagnostics(
 
   await withStepTimeout('register: wait for register form', async () => {
     await expect(page.locator('input[type="email"]')).toBeVisible({ timeout: 15000 });
-    await expect(page.locator('input[type="password"]')).toBeVisible({ timeout: 15000 });
+    const passwordFields = page.locator('input[type="password"]');
+    await expect(passwordFields.first()).toBeVisible({ timeout: 15000 });
     console.log('✅ register: register form visible');
   }, 20000);
 
