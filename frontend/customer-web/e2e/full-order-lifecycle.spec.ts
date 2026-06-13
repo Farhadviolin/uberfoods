@@ -487,17 +487,26 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
         };
 
         const ensureProfileAddress = async () => {
-          const checkoutErrors = await visibleCheckoutErrors();
-          if (!checkoutErrors.some((text) => /delivery address in your profile|addressRequired/i.test(text))) {
+          console.log('➡️ lifecycle: checking profile address before final submit');
+          await customerPage.goto('/profile', { waitUntil: 'domcontentloaded' });
+          await expect(customerPage.getByRole('heading', { name: /my profile/i })).toBeVisible({ timeout: 15000 });
+
+          const addressField = customerPage.getByLabel(/address/i).last();
+          await expect(addressField).toBeVisible({ timeout: 15000 });
+
+          const currentAddress = (await addressField.inputValue().catch(() => '')).trim();
+          const expectedAddress = testOrder.deliveryAddress.street.trim();
+
+          if (currentAddress && currentAddress === expectedAddress) {
+            console.log('ℹ️ lifecycle: profile address already present');
+            await customerPage.goto('/checkout', { waitUntil: 'domcontentloaded' });
+            await expect(customerPage.getByTestId('cart')).toBeVisible({ timeout: 15000 });
+            console.log('✅ lifecycle: returned to checkout after profile check');
             return false;
           }
 
           console.log('➡️ lifecycle: profile address missing, updating profile before final submit');
-          await customerPage.goto('/profile', { waitUntil: 'domcontentloaded' });
-          await expect(customerPage.getByRole('heading', { name: /my profile/i })).toBeVisible({ timeout: 15000 });
-          const addressField = customerPage.getByLabel(/address/i).last();
-          await expect(addressField).toBeVisible({ timeout: 15000 });
-          await addressField.fill(testOrder.deliveryAddress.street);
+          await addressField.fill(expectedAddress);
           const saveButton = customerPage.getByRole('button', { name: /save|speichern/i }).first();
           await expect(saveButton).toBeVisible({ timeout: 15000 });
           await saveButton.click();
