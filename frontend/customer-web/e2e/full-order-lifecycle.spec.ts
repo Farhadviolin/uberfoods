@@ -133,17 +133,44 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
         }
       }
 
+      const minOrderSummary = customerPage.locator('.cart-summary-row.min-order');
+      const getMissingMinOrderAmount = async () => {
+        const summaryText = (await minOrderSummary.textContent().catch(() => '')) || '';
+        const match = summaryText.match(/Noch\s+([\d.,]+)\s*€\s*fehlen/i);
+        if (!match) {
+          return 0;
+        }
+
+        return Number(match[1].replace(',', '.'));
+      };
+
+      const minOrderButtonsCount = await addToCartButtons.count();
+      for (let attempt = 0; attempt < Math.max(1, minOrderButtonsCount) * 4; attempt++) {
+        const missingAmount = await getMissingMinOrderAmount();
+        if (!missingAmount || Number.isNaN(missingAmount)) {
+          break;
+        }
+
+        await addToCartButtons.nth(attempt % minOrderButtonsCount).click();
+        await customerPage.waitForTimeout(300);
+      }
+
+      await expect.poll(getMissingMinOrderAmount, { timeout: 10000 }).toBe(0);
+
       // Place order
       const orderCreateResponsePromise = customerPage.waitForResponse((response) => {
-        return response.request().method() === 'POST'
+        const request = response.request();
+        return request.method() === 'POST'
           && new URL(response.url()).pathname === '/api/orders/customer';
       }, { timeout: 20000 });
-      const placeOrderBtn = customerPage.locator('[data-testid="cart"] [data-testid="checkout-button"], button[data-testid="place-order"], .place-order, button:has-text("Place Order")').first();
-      await expect(placeOrderBtn).toBeVisible();
-      await expect(placeOrderBtn).toBeEnabled();
+      const cartContainer = customerPage.getByTestId('cart');
+      const finalPlaceOrderButton = cartContainer.getByRole('button', { name: /^Place Order$/i });
+      await expect(cartContainer).toBeVisible();
+      await expect(finalPlaceOrderButton).toBeVisible();
+      await expect(finalPlaceOrderButton).toBeEnabled();
       await Promise.all([
         orderCreateResponsePromise,
-        placeOrderBtn.click(),
+        finalPlaceOrderButton.click(),
       ]);
       const orderCreateResponse = await orderCreateResponsePromise;
       const createdOrder = await orderCreateResponse.json().catch(() => ({}));
