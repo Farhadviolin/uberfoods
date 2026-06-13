@@ -77,8 +77,8 @@ async function registerCustomerForLifecycleWithDiagnostics(
 
   await withStepTimeout('register: wait for register form', async () => {
     await expect(page.locator('input[type="email"]')).toBeVisible({ timeout: 15000 });
-    const passwordFields = page.locator('input[type="password"]');
-    await expect(passwordFields.first()).toBeVisible({ timeout: 15000 });
+    const registerPasswordInputs = page.locator('input[type="password"]');
+    await expect(registerPasswordInputs.first()).toBeVisible({ timeout: 15000 });
     console.log('✅ register: register form visible');
   }, 20000);
 
@@ -105,9 +105,9 @@ async function registerCustomerForLifecycleWithDiagnostics(
   }, 15000);
 
   await withStepTimeout('register: fill confirm password if present', async () => {
-    const passwordFields = page.locator('input[type="password"]');
-    if (await passwordFields.count() > 1) {
-      await passwordFields.nth(1).fill(credentials.password);
+    const registerPasswordInputs = page.locator('input[type="password"]');
+    if (await registerPasswordInputs.count() > 1) {
+      await registerPasswordInputs.nth(1).fill(credentials.password);
       console.log('✅ register: confirm password field filled');
     } else {
       console.log('ℹ️ register: confirm password field not visible');
