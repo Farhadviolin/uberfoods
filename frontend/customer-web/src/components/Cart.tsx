@@ -331,6 +331,8 @@ export function Cart({ cart, restaurant, updateQuantity, onClearCart }: CartProp
       return { address: '', source: 'none' };
     };
 
+    const checkoutSubmitResolution = resolveCheckoutAddress();
+
     if (effectiveCart.length === 0) {
       markCheckoutProbe({ guard: 'empty-cart' });
       setError(t('cart.emptyError'));
@@ -345,18 +347,19 @@ export function Cart({ cart, restaurant, updateQuantity, onClearCart }: CartProp
         return;
       }
     } else {
-      const resolvedCheckoutAddress = resolveCheckoutAddress();
-      const resolvedEffectiveAddress = resolvedCheckoutAddress.address;
-      console.log('checkoutResolvedAddressBeforeGuard', {
+      const resolvedEffectiveAddress = checkoutSubmitResolution.address;
+      const checkoutSubmitDiagnostics = {
         contextUserAddress: user?.address ?? null,
         storedCustomerUserRaw: typeof window !== 'undefined'
           ? window.localStorage.getItem('customer_user')
           : null,
         resolvedEffectiveAddress,
-        resolvedAddressSource: resolvedCheckoutAddress.source,
+        resolvedAddressSource: checkoutSubmitResolution.source,
         resolvedAddressPresent: Boolean(resolvedEffectiveAddress),
         resolvedAddressLength: resolvedEffectiveAddress.length,
-      });
+      };
+      console.log('checkoutResolvedAddressBeforeGuard', checkoutSubmitDiagnostics);
+      console.log('checkoutSubmitResolution', checkoutSubmitDiagnostics);
       if (!resolvedEffectiveAddress) {
         markCheckoutProbe({
           guard: 'missing-user-address',
@@ -365,7 +368,7 @@ export function Cart({ cart, restaurant, updateQuantity, onClearCart }: CartProp
             ? null
             : window.localStorage.getItem('customer_user'),
           resolvedEffectiveAddress,
-          resolvedAddressSource: resolvedCheckoutAddress.source,
+          resolvedAddressSource: checkoutSubmitResolution.source,
         });
         setError(t('cart.addressRequiredError'));
         return;
@@ -385,8 +388,7 @@ export function Cart({ cart, restaurant, updateQuantity, onClearCart }: CartProp
 
     try {
       const customerId = resolveCustomerId();
-      const resolvedCheckoutAddress = resolveCheckoutAddress();
-      const resolvedEffectiveAddress = resolvedCheckoutAddress.address;
+      const resolvedEffectiveAddress = checkoutSubmitResolution.address;
       const normalizedItems = effectiveCart.map(item => ({
         dishId: item.dish.id,
         quantity: item.quantity,
@@ -427,7 +429,7 @@ export function Cart({ cart, restaurant, updateQuantity, onClearCart }: CartProp
             hasPhone: Boolean(order.phone),
             hasPromotionId: Boolean(order.promotionId),
             hasDeliveryFee: typeof order.deliveryFee === 'number',
-            resolvedAddressSource: resolvedCheckoutAddress.source,
+            resolvedAddressSource: checkoutSubmitResolution.source,
             resolvedAddressPresent: Boolean(resolvedEffectiveAddress),
             resolvedAddressLength: resolvedEffectiveAddress.length,
           },

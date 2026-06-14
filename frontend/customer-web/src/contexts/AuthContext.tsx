@@ -58,10 +58,18 @@ function normalizeStoredAddress(value: unknown): string | undefined {
   return undefined;
 }
 
+function readStoredCustomerProfileAddress(): string | undefined {
+  return normalizeStoredAddress(localStorage.getItem('customer_profile_address'));
+}
+
 function persistCustomerProfileAddress(address: string | undefined) {
   if (typeof address === 'string' && address.trim().length > 0) {
     localStorage.setItem('customer_profile_address', address.trim());
-  } else {
+    return;
+  }
+
+  const existingProfileAddress = readStoredCustomerProfileAddress();
+  if (!existingProfileAddress) {
     localStorage.removeItem('customer_profile_address');
   }
 }
@@ -77,7 +85,7 @@ function mergeCustomerUserForStorage(previousUser: unknown, nextUser: unknown) {
 
   const previousAddress = normalizeStoredAddress(previous.address);
   const nextAddress = normalizeStoredAddress(next.address);
-  const profileAddress = normalizeStoredAddress(localStorage.getItem('customer_profile_address'));
+  const profileAddress = readStoredCustomerProfileAddress();
 
   return {
     ...previous,
