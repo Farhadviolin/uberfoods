@@ -636,7 +636,6 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
       const paymentModal = customerPage
         .locator('[data-testid="payment-modal"]')
         .or(customerPage.locator('.payment-modal'))
-        .or(customerPage.getByText(/payment methods|zahlung|zahlungsmethode wählen|kreditkarte|paypal|apple pay|karteninhaber|kartennummer/i))
         .first();
       const orderTrackingPage = customerPage
         .getByTestId('order-tracking-page')
@@ -1131,9 +1130,6 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
             lastOrderCreateResponse = response;
             return { kind: 'response' as const, response };
           });
-          const paymentModalPromise = paymentModal.waitFor({ state: 'visible', timeout: 20000 })
-            .then(() => ({ kind: 'payment-modal' as const }))
-            .catch(() => null);
           const orderUrlPromise = customerPage.waitForURL(/\/orders\/[^/?]+(?:\?.*)?$/, { timeout: 20000 })
             .then(() => ({ kind: 'order-url' as const }))
             .catch(() => null);
@@ -1148,7 +1144,6 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
 
           const attemptOutcome = await Promise.race([
             orderCreateOutcomePromise,
-            paymentModalPromise,
             orderUrlPromise,
             orderTrackingPromise,
           ]);
@@ -1253,7 +1248,7 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
             throw new Error('Order creation response did not include an id');
           }
           console.log(`✅ lifecycle: phase1 order id resolved (${orderId})`);
-        } else {
+        } else if (orderSubmissionOutcome.kind === 'order-url' || orderSubmissionOutcome.kind === 'order-tracking') {
           console.log(`ℹ️ lifecycle: phase1 final order submit confirmed by ${orderSubmissionOutcome.kind}`);
         }
       });
@@ -1266,9 +1261,14 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
       ]);
 
       if (await paymentModal.isVisible().catch(() => false)) {
+        console.log('➡️ lifecycle: payment modal visible, confirming payment');
         const orderCreateResponse = await pendingOrderCreateResponse;
         if (orderCreateResponse) {
           lastOrderCreateResponse = orderCreateResponse;
+          console.log('✅ lifecycle: order create response received', {
+            status: orderCreateResponse.status(),
+            url: orderCreateResponse.url(),
+          });
         }
 
         const cardForm = customerPage.locator('.card-form');
@@ -1279,9 +1279,9 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
           await customerPage.getByLabel(/cvc/i).fill('123');
         }
 
-        const paymentConfirmButton = customerPage
+        const paymentConfirmButton = paymentModal
           .getByTestId('payment-confirm-button')
-          .or(customerPage.getByRole('button', {
+          .or(paymentModal.getByRole('button', {
             name: /pay|bezahlen|zahlung bestätigen|zahlung abschließen|confirm|bestätigen|complete payment|place order|order/i,
           }))
           .or(paymentModal.locator('button').filter({
@@ -1303,6 +1303,7 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
         }
         await expect(paymentConfirmButton).toBeEnabled();
         await paymentConfirmButton.click();
+        console.log('✅ lifecycle: payment confirm button clicked');
 
         await Promise.race([
           customerPage.waitForURL(/\/orders\/[^/?]+(?:\?.*)?$/, { timeout: 20000 }).catch(() => null),
@@ -1372,6 +1373,13 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
       };
 
       orderId = await resolveOrderIdFromCurrentState();
+      if (!orderId) {
+        console.log('❌ lifecycle: orderId unresolved before Phase 2', {
+          currentUrl: customerPage.url(),
+          hasLastOrderCreateResponse: Boolean(lastOrderCreateResponse),
+          lastOrderCreateStatus: lastOrderCreateResponse?.status() ?? null,
+        });
+      }
       expect(orderId, 'orderId must be resolved before Phase 2 starts').toBeTruthy();
 
       if (!/\/orders\/[^/?]+(?:\?.*)?$/.test(customerPage.url())) {
