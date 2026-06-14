@@ -1324,25 +1324,25 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
           const domSubtotalDiagnostics = await resolveMinimumOrderSubtotal(customerPage);
           const domSubtotal = domSubtotalDiagnostics.subtotal ?? null;
           const storageSubtotal = storageDiagnostics.subtotal > 0 ? storageDiagnostics.subtotal : null;
-          const subtotal = domSubtotal !== null && domSubtotal >= 25
-            ? domSubtotal
-            : storageSubtotal !== null && storageSubtotal >= 25
-              ? storageSubtotal
-              : lastSafeMinimumOrderSubtotal !== null && lastSafeMinimumOrderSubtotal >= 25
-                ? lastSafeMinimumOrderSubtotal
-                : domSubtotal ?? storageSubtotal ?? 0;
-          const payloadMinimumSatisfied = subtotal >= 25;
+          const payloadItems = storageDiagnostics.cartItems
+            .filter((item) => typeof item.price === 'number' && Number.isFinite(item.price) && item.price > 0)
+            .map((item) => ({
+              dishId: item.dishId ?? item.name ?? 'unknown',
+              quantity: item.quantity,
+              price: item.price as number,
+            }));
+          const payloadSubtotal = payloadItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+          const subtotal = payloadSubtotal;
+          const payloadMinimumSatisfied = payloadSubtotal >= 25;
 
           return {
             ...storageDiagnostics,
             domSubtotal,
             storageSubtotal,
+            payloadItems,
+            payloadSubtotal,
             subtotal,
-            subtotalSource: domSubtotal !== null && domSubtotal >= 25
-              ? domSubtotalDiagnostics.source ?? 'visible-subtotal-dom'
-              : storageSubtotal !== null && storageSubtotal >= 25
-                ? storageDiagnostics.subtotalSource ?? 'localStorage-cart-state'
-                : lastSafeMinimumOrderSource ?? domSubtotalDiagnostics.source ?? storageDiagnostics.subtotalSource ?? 'unknown',
+            subtotalSource: storageDiagnostics.subtotalSource ?? domSubtotalDiagnostics.source ?? 'localStorage-cart-state',
             finalSubmitMinimumSatisfied: payloadMinimumSatisfied,
           };
         };
@@ -1352,6 +1352,11 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
           console.log('ℹ️ lifecycle: final submit cart diagnostics', {
             finalSubmitCartItems: diagnostics.cartItems,
             finalSubmitSubtotal: diagnostics.subtotal,
+            payloadItemsBeforeSubmit: diagnostics.payloadItems,
+            payloadSubtotalBeforeSubmit: diagnostics.payloadSubtotal,
+            visibleSubtotalBeforeSubmit: diagnostics.domSubtotal,
+            storageSubtotalBeforeSubmit: diagnostics.storageSubtotal,
+            safeSubtotalBeforeSubmit: lastSafeMinimumOrderSubtotal,
             finalSubmitItemCount: diagnostics.itemCount,
             finalSubmitQuantityCount: diagnostics.quantityCount,
             finalSubmitPayloadPreview: diagnostics.cartItems.slice(0, 5),
@@ -1366,6 +1371,8 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
           console.log('ℹ️ lifecycle: final submit cart below minimum, restoring items from restaurant menu', {
             currentUrl: customerPage.url(),
             finalSubmitSubtotal: diagnostics.subtotal,
+            payloadSubtotalBeforeSubmit: diagnostics.payloadSubtotal,
+            payloadItemsBeforeSubmit: diagnostics.payloadItems,
             finalSubmitItemCount: diagnostics.itemCount,
             finalSubmitQuantityCount: diagnostics.quantityCount,
           });
@@ -1433,7 +1440,7 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
               break;
             }
 
-            if (diagnostics.subtotal < 25) {
+            if (diagnostics.payloadSubtotal < 25) {
               addToCartButtons = await openRestaurantMenuForCartRepair();
               addButtonCount = await addToCartButtons.count().catch(() => 0);
             }
@@ -1441,6 +1448,9 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
             console.log('➡️ lifecycle: restoring final submit cart minimum', {
               attempt,
               finalSubmitSubtotal: diagnostics.subtotal,
+              payloadSubtotalAfterRepair: diagnostics.payloadSubtotal,
+              payloadItemsAfterRepair: diagnostics.payloadItems,
+              cartRepairAttempt: attempt,
               finalSubmitItemCount: diagnostics.itemCount,
               finalSubmitQuantityCount: diagnostics.quantityCount,
               finalSubmitPayloadPreview: diagnostics.cartItems.slice(0, 5),
@@ -1453,6 +1463,8 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
           console.log('ℹ️ lifecycle: final submit cart diagnostics after restore', {
             finalSubmitCartItems: diagnostics.cartItems,
             finalSubmitSubtotal: diagnostics.subtotal,
+            payloadSubtotalAfterRepair: diagnostics.payloadSubtotal,
+            payloadItemsAfterRepair: diagnostics.payloadItems,
             finalSubmitItemCount: diagnostics.itemCount,
             finalSubmitQuantityCount: diagnostics.quantityCount,
             finalSubmitPayloadPreview: diagnostics.cartItems.slice(0, 5),

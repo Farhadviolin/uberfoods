@@ -96,6 +96,15 @@ async function createStorageStateViaApi({
     throw new Error(`API login for ${role} returned no access token`);
   }
 
+  if (role === 'restaurant') {
+    payload.user = {
+      ...payload.user,
+      status: payload.user?.status ?? 'ACTIVE',
+      currentStatus: payload.user?.currentStatus ?? 'ACTIVE',
+      isActive: payload.user?.isActive ?? true,
+    };
+  }
+
   const context = await browser.newContext();
   const pageForOrigin = await context.newPage();
   await pageForOrigin.goto(`${appUrl.replace(/\/$/, '')}/`, { waitUntil: 'domcontentloaded' });
@@ -122,6 +131,11 @@ async function createStorageStateViaApi({
       writeLocal('auth_token', accessToken);
       if (refreshToken) writeLocal('refresh_token', refreshToken);
       writeLocal('user', jsonUser);
+      const restaurantId = user?.id || user?.restaurantId;
+      if (restaurantId) {
+        writeLocal('restaurant_id', restaurantId);
+        writeLocal(`restaurant_onboarding_done_${restaurantId}`, 'true');
+      }
     } else {
       writeLocal('driver_token', accessToken);
       writeLocal('driver_user', jsonUser);
