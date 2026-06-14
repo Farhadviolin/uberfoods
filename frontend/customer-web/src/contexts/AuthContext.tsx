@@ -2,6 +2,11 @@ import { createContext, useContext, useState, useEffect, ReactNode } from 'react
 import api from '../utils/api';
 import { extractAddressString, parseMaybeJson } from '../utils/address';
 
+const CUSTOMER_PROFILE_ADDRESS_KEYS = [
+  'customer_profile_address',
+  'customer_profile_address_backup',
+] as const;
+
 interface User {
   id: string;
   email: string;
@@ -45,18 +50,30 @@ function normalizeStoredAddress(value: unknown): string | undefined {
 }
 
 function readStoredCustomerProfileAddress(): string | undefined {
-  return normalizeStoredAddress(localStorage.getItem('customer_profile_address'));
+  for (const key of CUSTOMER_PROFILE_ADDRESS_KEYS) {
+    const storedAddress = normalizeStoredAddress(localStorage.getItem(key));
+    if (storedAddress) {
+      return storedAddress;
+    }
+  }
+
+  return undefined;
 }
 
 function persistCustomerProfileAddress(address: string | undefined) {
   if (typeof address === 'string' && address.trim().length > 0) {
-    localStorage.setItem('customer_profile_address', address.trim());
+    const normalized = address.trim();
+    for (const key of CUSTOMER_PROFILE_ADDRESS_KEYS) {
+      localStorage.setItem(key, normalized);
+    }
     return;
   }
 
   const existingProfileAddress = readStoredCustomerProfileAddress();
   if (!existingProfileAddress) {
-    localStorage.removeItem('customer_profile_address');
+    for (const key of CUSTOMER_PROFILE_ADDRESS_KEYS) {
+      localStorage.removeItem(key);
+    }
   }
 }
 
@@ -101,7 +118,9 @@ export function AuthProvider({ children, initialAuthState }: { children: ReactNo
   function logout() {
     localStorage.removeItem('customer_token');
     localStorage.removeItem('customer_user');
-    localStorage.removeItem('customer_profile_address');
+    for (const key of CUSTOMER_PROFILE_ADDRESS_KEYS) {
+      localStorage.removeItem(key);
+    }
     delete api.defaults.headers.common['Authorization'];
     setToken(null);
     setUser(null);

@@ -77,6 +77,7 @@ export function Profile() {
       updateUser(nextCustomerUser as Partial<{ name: string; phone: string; address?: string }>);
       window.localStorage.setItem('customer_user', JSON.stringify(nextCustomerUser));
       window.localStorage.setItem('customer_profile_address', normalizedSavedAddress);
+      window.localStorage.setItem('customer_profile_address_backup', normalizedSavedAddress);
       setSuccess(t('profile.updateSuccess'));
     } catch (err: unknown) {
       const axiosError = err as { response?: { data?: { message?: string } } };

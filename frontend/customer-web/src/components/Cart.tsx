@@ -13,6 +13,11 @@ import { handleKeyboardButton } from '../utils/accessibility';
 import { extractAddressString, parseMaybeJson } from '../utils/address';
 import './Cart.css';
 
+const CUSTOMER_PROFILE_ADDRESS_KEYS = [
+  'customer_profile_address',
+  'customer_profile_address_backup',
+] as const;
+
 interface Dish {
   id: string;
   name: string;
@@ -241,7 +246,13 @@ export function Cart({ cart, restaurant, updateQuantity, onClearCart }: CartProp
       customerUserAddressPresent: boolean;
     } => {
       const contextAddress = normalizeAddress(user?.address);
-      const profileAddressRaw = typeof window === 'undefined' ? null : window.localStorage.getItem('customer_profile_address');
+      const profileAddressRawEntries = typeof window === 'undefined'
+        ? []
+        : CUSTOMER_PROFILE_ADDRESS_KEYS
+          .map((key) => ({ key, raw: window.localStorage.getItem(key) }))
+          .filter((entry): entry is { key: string; raw: string } => entry.raw !== null);
+      const profileAddressRawEntry = profileAddressRawEntries.find((entry) => normalizeAddress(entry.raw));
+      const profileAddressRaw = profileAddressRawEntry?.raw ?? (typeof window === 'undefined' ? null : window.localStorage.getItem('customer_profile_address'));
       const storedCustomerUserRaw = typeof window === 'undefined' ? null : window.localStorage.getItem('customer_user');
       const storedCustomerUser = parseMaybeJson(storedCustomerUserRaw) as Record<string, unknown> | null;
       const storedProfileAddress = parseMaybeJson(profileAddressRaw);
@@ -292,6 +303,10 @@ export function Cart({ cart, restaurant, updateQuantity, onClearCart }: CartProp
         { source: 'customer_user', value: (storedCustomerUser?.data as Record<string, unknown> | undefined)?.address },
         { source: 'customer_profile_address', value: storedProfileAddress },
       ];
+
+      if (profileAddressRawEntry?.key === 'customer_profile_address_backup') {
+        candidateEntries.unshift({ source: 'customer_profile_address', value: storedProfileAddress });
+      }
 
       const checkoutStateAddress = [
         (storedCustomerUser?.checkout as Record<string, unknown> | undefined)?.address,
@@ -346,6 +361,9 @@ export function Cart({ cart, restaurant, updateQuantity, onClearCart }: CartProp
         storedCustomerUserRaw: typeof window !== 'undefined'
           ? window.localStorage.getItem('customer_user')
           : null,
+        storedCustomerProfileAddressRaw: typeof window !== 'undefined'
+          ? CUSTOMER_PROFILE_ADDRESS_KEYS.map((key) => window.localStorage.getItem(key)).filter((value): value is string => value !== null)
+          : [],
         resolvedEffectiveAddress,
         resolvedAddressSource: checkoutSubmitResolution.source,
         resolvedAddressPresent: Boolean(resolvedEffectiveAddress),
