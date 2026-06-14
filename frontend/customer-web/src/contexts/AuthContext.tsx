@@ -1,11 +1,12 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import api from '../utils/api';
-import { extractAddressString, parseMaybeJson } from '../utils/address';
-
-const CUSTOMER_PROFILE_ADDRESS_KEYS = [
-  'customer_profile_address',
-  'customer_profile_address_backup',
-] as const;
+import {
+  CUSTOMER_PROFILE_ADDRESS_KEYS,
+  extractAddressString,
+  mergeCustomerUserWithPreservedAddress,
+  parseMaybeJson,
+  readStoredCustomerProfileAddress as readStoredCustomerProfileAddressValue,
+} from '../utils/address';
 
 interface User {
   id: string;
@@ -50,14 +51,8 @@ function normalizeStoredAddress(value: unknown): string | undefined {
 }
 
 function readStoredCustomerProfileAddress(): string | undefined {
-  for (const key of CUSTOMER_PROFILE_ADDRESS_KEYS) {
-    const storedAddress = normalizeStoredAddress(localStorage.getItem(key));
-    if (storedAddress) {
-      return storedAddress;
-    }
-  }
-
-  return undefined;
+  const storedAddress = readStoredCustomerProfileAddressValue();
+  return storedAddress.length > 0 ? storedAddress : undefined;
 }
 
 function persistCustomerProfileAddress(address: string | undefined) {
@@ -78,23 +73,7 @@ function persistCustomerProfileAddress(address: string | undefined) {
 }
 
 function mergeCustomerUserForStorage(previousUser: unknown, nextUser: unknown) {
-  const previous = previousUser && typeof previousUser === 'object'
-    ? previousUser as Record<string, unknown>
-    : {};
-
-  const next = nextUser && typeof nextUser === 'object'
-    ? nextUser as Record<string, unknown>
-    : {};
-
-  const previousAddress = normalizeStoredAddress(previous.address);
-  const nextAddress = normalizeStoredAddress(next.address);
-  const profileAddress = readStoredCustomerProfileAddress();
-
-  return {
-    ...previous,
-    ...next,
-    address: nextAddress ?? previousAddress ?? profileAddress ?? '',
-  };
+  return mergeCustomerUserWithPreservedAddress(previousUser, nextUser);
 }
 
 interface AuthContextType {

@@ -10,13 +10,11 @@ import { PromoCodeInput } from './PromoCodeInput';
 import { extractErrorMessage } from '../utils/errorHandler';
 import { logDebug } from '../utils/errorReporting';
 import { handleKeyboardButton } from '../utils/accessibility';
-import { extractAddressString, parseMaybeJson } from '../utils/address';
+import {
+  CUSTOMER_PROFILE_ADDRESS_KEYS,
+  resolveCheckoutAddressFromStorage,
+} from '../utils/address';
 import './Cart.css';
-
-const CUSTOMER_PROFILE_ADDRESS_KEYS = [
-  'customer_profile_address',
-  'customer_profile_address_backup',
-] as const;
 
 interface Dish {
   id: string;
@@ -235,111 +233,13 @@ export function Cart({ cart, restaurant, updateQuantity, onClearCart }: CartProp
 
   const placeOrder = useCallback(async () => {
     markCheckoutProbe({ placeOrderCalled: true });
-
-    const normalizeAddress = (value: unknown): string => extractAddressString(parseMaybeJson(value));
-
-    const resolveCheckoutAddress = (): {
-      address: string;
-      source: 'auth' | 'customer_user' | 'customer_profile_address' | 'checkout_state' | 'none';
-      profileAddressRawType: string;
-      profileAddressKeys: string[];
-      customerUserAddressPresent: boolean;
-    } => {
-      const contextAddress = normalizeAddress(user?.address);
-      const profileAddressRawEntries = typeof window === 'undefined'
+    const checkoutSubmitResolution = resolveCheckoutAddressFromStorage({
+      authAddress: user?.address,
+      customerUserRaw: typeof window === 'undefined' ? null : window.localStorage.getItem('customer_user'),
+      customerProfileAddressRawEntries: typeof window === 'undefined'
         ? []
-        : CUSTOMER_PROFILE_ADDRESS_KEYS
-          .map((key) => ({ key, raw: window.localStorage.getItem(key) }))
-          .filter((entry): entry is { key: string; raw: string } => entry.raw !== null);
-      const profileAddressRawEntry = profileAddressRawEntries.find((entry) => normalizeAddress(entry.raw));
-      const profileAddressRaw = profileAddressRawEntry?.raw ?? (typeof window === 'undefined' ? null : window.localStorage.getItem('customer_profile_address'));
-      const storedCustomerUserRaw = typeof window === 'undefined' ? null : window.localStorage.getItem('customer_user');
-      const storedCustomerUser = parseMaybeJson(storedCustomerUserRaw) as Record<string, unknown> | null;
-      const storedProfileAddress = parseMaybeJson(profileAddressRaw);
-      const profileAddressRawType = profileAddressRaw === null
-        ? 'null'
-        : Array.isArray(storedProfileAddress)
-          ? 'array'
-          : typeof storedProfileAddress;
-      const profileAddressKeys = storedProfileAddress && typeof storedProfileAddress === 'object'
-        ? Object.keys(storedProfileAddress as Record<string, unknown>).slice(0, 12)
-        : [];
-      const customerUserAddressPresent = Boolean(
-        normalizeAddress(storedCustomerUser?.address)
-        || normalizeAddress((storedCustomerUser?.user as Record<string, unknown> | undefined)?.address)
-        || normalizeAddress((storedCustomerUser?.customer as Record<string, unknown> | undefined)?.address)
-        || normalizeAddress((storedCustomerUser?.profile as Record<string, unknown> | undefined)?.address)
-        || normalizeAddress((storedCustomerUser?.data as Record<string, unknown> | undefined)?.address)
-      );
-
-      if (contextAddress) {
-        return {
-          address: contextAddress,
-          source: 'auth',
-          profileAddressRawType,
-          profileAddressKeys,
-          customerUserAddressPresent,
-        };
-      }
-
-      if (typeof window === 'undefined') {
-        return {
-          address: '',
-          source: 'none',
-          profileAddressRawType,
-          profileAddressKeys,
-          customerUserAddressPresent,
-        };
-      }
-
-      const candidateEntries: Array<{
-        source: 'customer_user' | 'customer_profile_address' | 'checkout_state';
-        value: unknown;
-      }> = [
-        { source: 'customer_user', value: storedCustomerUser?.address },
-        { source: 'customer_user', value: (storedCustomerUser?.user as Record<string, unknown> | undefined)?.address },
-        { source: 'customer_user', value: (storedCustomerUser?.customer as Record<string, unknown> | undefined)?.address },
-        { source: 'customer_user', value: (storedCustomerUser?.profile as Record<string, unknown> | undefined)?.address },
-        { source: 'customer_user', value: (storedCustomerUser?.data as Record<string, unknown> | undefined)?.address },
-        { source: 'customer_profile_address', value: storedProfileAddress },
-      ];
-
-      if (profileAddressRawEntry?.key === 'customer_profile_address_backup') {
-        candidateEntries.unshift({ source: 'customer_profile_address', value: storedProfileAddress });
-      }
-
-      const checkoutStateAddress = [
-        (storedCustomerUser?.checkout as Record<string, unknown> | undefined)?.address,
-        (storedCustomerUser?.delivery as Record<string, unknown> | undefined)?.address,
-      ].find((candidate): candidate is unknown => candidate !== undefined);
-
-      if (checkoutStateAddress !== undefined) {
-        candidateEntries.push({ source: 'checkout_state', value: checkoutStateAddress });
-      }
-
-      for (const candidate of candidateEntries) {
-        const resolved = normalizeAddress(candidate.value);
-        if (resolved) {
-          return {
-            address: resolved,
-            source: candidate.source,
-            profileAddressRawType,
-            profileAddressKeys,
-            customerUserAddressPresent,
-          };
-        }
-      }
-
-      return {
-        address: '',
-        source: 'none',
-        profileAddressRawType,
-        profileAddressKeys,
-        customerUserAddressPresent,
-      };
-    };
-
-    const checkoutSubmitResolution = resolveCheckoutAddress();
+        : CUSTOMER_PROFILE_ADDRESS_KEYS.map((key) => ({ key, raw: window.localStorage.getItem(key) })),
+    });
 
     if (effectiveCart.length === 0) {
       markCheckoutProbe({ guard: 'empty-cart' });
