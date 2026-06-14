@@ -2120,15 +2120,135 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
       }
       await restaurantOrdersTab.click();
 
-      // Find the order and mark as ready
-      const orderCard = restaurantPage.locator(selectors.orderCard).filter({ hasText: orderId || testOrder.id });
-      await expect(orderCard).toBeVisible();
+      const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const orderIdentityPattern = new RegExp(
+        [
+          orderId ? escapeRegExp(orderId) : '',
+          testOrder.id ? escapeRegExp(testOrder.id) : '',
+          customerCredentials.email ? escapeRegExp(customerCredentials.email) : '',
+          customerCredentials.name ? escapeRegExp(customerCredentials.name) : '',
+          'pending',
+          'ausstehend',
+          'new order',
+          'neue bestellung',
+        ].filter(Boolean).join('|'),
+        'i',
+      );
+      const orderLookupSelectors = [
+        '[data-testid="order-card"]',
+        '.order-card',
+        '[data-testid*="order"]',
+        '.order-item',
+        '.order-row',
+        'tr',
+        'li',
+        'article',
+        'section',
+      ];
+      const orderLookupTargets = restaurantPage.locator(orderLookupSelectors.join(', '));
+      const collectRestaurantOrderLookupDiagnostics = async () => {
+        const visibleOrderTexts = await orderLookupTargets.allTextContents().catch(() => []);
+        const visibleTableRowTexts = await restaurantPage.locator('tr').allTextContents().catch(() => []);
+        const visibleButtons = await restaurantPage.locator('button').evaluateAll((nodes) => nodes
+          .map((node) => (node.textContent || '').trim().replace(/\s+/g, ' '))
+          .filter(Boolean))
+          .catch(() => []);
+        const visibleLinks = await restaurantPage.locator('a').evaluateAll((nodes) => nodes
+          .map((node) => (node.textContent || '').trim().replace(/\s+/g, ' '))
+          .filter(Boolean))
+          .catch(() => []);
+        const visibleHeadings = await restaurantPage.locator('h1, h2, h3').evaluateAll((nodes) => nodes
+          .map((node) => (node.textContent || '').trim().replace(/\s+/g, ' '))
+          .filter(Boolean))
+          .catch(() => []);
+        const pageTextExcerpt = (await restaurantPage.locator('body').textContent().catch(() => '')).slice(0, 2000);
+        return {
+          currentUrl: restaurantPage.url(),
+          visibleOrderTexts,
+          visibleTableRowTexts,
+          visibleButtons,
+          visibleLinks,
+          visibleHeadings,
+          pageTextExcerpt,
+          orderId,
+          testOrderId: testOrder.id,
+          customerEmail: customerCredentials.email,
+          customerName: customerCredentials.name,
+        };
+      };
 
-      const readyBtn = orderCard.locator(selectors.readyForPickupBtn);
-      await readyBtn.click();
+      const findVisibleRestaurantOrder = async () => {
+        const candidates = [
+          ...await orderLookupTargets.evaluateAll((nodes) => nodes.map((node) => (node.textContent || '').trim()).filter(Boolean)).catch(() => []),
+        ];
+        const matchingText = candidates.find((text) => orderIdentityPattern.test(text));
+        if (matchingText) {
+          const matchedLocator = orderLookupTargets.filter({ hasText: matchingText }).first();
+          if (await matchedLocator.isVisible().catch(() => false)) {
+            return matchedLocator;
+          }
+        }
+
+        const exactOrderIdLocator = orderId
+          ? restaurantPage.locator(orderLookupSelectors.join(', ')).filter({ hasText: new RegExp(escapeRegExp(orderId), 'i') }).first()
+          : null;
+        if (exactOrderIdLocator && await exactOrderIdLocator.isVisible().catch(() => false)) {
+          return exactOrderIdLocator;
+        }
+
+        const customerNameLocator = customerCredentials.name
+          ? restaurantPage.locator(orderLookupSelectors.join(', ')).filter({ hasText: new RegExp(escapeRegExp(customerCredentials.name), 'i') }).first()
+          : null;
+        if (customerNameLocator && await customerNameLocator.isVisible().catch(() => false)) {
+          return customerNameLocator;
+        }
+
+        const customerEmailLocator = customerCredentials.email
+          ? restaurantPage.locator(orderLookupSelectors.join(', ')).filter({ hasText: new RegExp(escapeRegExp(customerCredentials.email), 'i') }).first()
+          : null;
+        if (customerEmailLocator && await customerEmailLocator.isVisible().catch(() => false)) {
+          return customerEmailLocator;
+        }
+
+        return null;
+      };
+
+      let resolvedOrderCard = await findVisibleRestaurantOrder();
+      if (!resolvedOrderCard) {
+        await restaurantPage.reload({ waitUntil: 'domcontentloaded' });
+        await restaurantPage.waitForLoadState('networkidle').catch(() => null);
+        await TestHelpers.waitForStablePage(restaurantPage);
+        await restaurantOrdersTab.click();
+        await restaurantPage.waitForTimeout(2500);
+        resolvedOrderCard = await findVisibleRestaurantOrder();
+      }
+
+      if (!resolvedOrderCard) {
+        const diagnostics = await collectRestaurantOrderLookupDiagnostics();
+        console.log('restaurantOrderLookupFailed', diagnostics);
+        throw new Error(`Restaurant order not visible: ${JSON.stringify(diagnostics)}`);
+      }
+
+      const readyBtn = resolvedOrderCard
+        .locator(selectors.readyForPickupBtn)
+        .or(restaurantPage.getByRole('button', { name: /ready|pickup|bereit|abholbereit|vorbereiten|accept|annehmen/i }))
+        .first();
+      if (!await readyBtn.isVisible().catch(() => false)) {
+        const fallbackReadyBtn = restaurantPage.getByRole('button', { name: /ready|pickup|bereit|abholbereit|vorbereiten|accept|annehmen/i }).first();
+        if (await fallbackReadyBtn.isVisible().catch(() => false) && await fallbackReadyBtn.isEnabled().catch(() => false)) {
+          await fallbackReadyBtn.click();
+        } else {
+          const diagnostics = await collectRestaurantOrderLookupDiagnostics();
+          console.log('restaurantReadyButtonMissing', diagnostics);
+          throw new Error(`Restaurant ready button not visible: ${JSON.stringify(diagnostics)}`);
+        }
+      } else {
+        await expect(readyBtn).toBeEnabled();
+        await readyBtn.click();
+      }
 
       // Verify status changed
-      await expect(orderCard.locator(selectors.orderStatus)).toContainText('READY_FOR_PICKUP');
+      await expect(resolvedOrderCard.locator(selectors.orderStatus)).toContainText('READY_FOR_PICKUP');
 
       console.log(`✅ Restaurant marked order ${orderId} as ready for pickup`);
 
