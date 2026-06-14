@@ -10,6 +10,7 @@ import { PromoCodeInput } from './PromoCodeInput';
 import { extractErrorMessage } from '../utils/errorHandler';
 import { logDebug } from '../utils/errorReporting';
 import { handleKeyboardButton } from '../utils/accessibility';
+import { extractAddressString, parseMaybeJson } from '../utils/address';
 import './Cart.css';
 
 interface Dish {
@@ -76,26 +77,6 @@ export function Cart({ cart, restaurant, updateQuantity, onClearCart }: CartProp
       ...probe,
       ...patch,
     };
-  }, []);
-
-  const parseStoredJson = useCallback((raw: string | null): unknown => {
-    if (!raw) {
-      return null;
-    }
-
-    try {
-      const parsed = JSON.parse(raw);
-      if (typeof parsed === 'string') {
-        try {
-          return JSON.parse(parsed);
-        } catch {
-          return parsed;
-        }
-      }
-      return parsed;
-    } catch {
-      return raw;
-    }
   }, []);
 
   const effectiveCart = cart ?? cartContext.items.map(item => ({
@@ -250,55 +231,55 @@ export function Cart({ cart, restaurant, updateQuantity, onClearCart }: CartProp
   const placeOrder = useCallback(async () => {
     markCheckoutProbe({ placeOrderCalled: true });
 
-    const normalizeAddress = (value: unknown): string => {
-      if (typeof value === 'string') {
-        return value.trim();
-      }
-
-      if (value && typeof value === 'object') {
-        const addressObject = value as Record<string, unknown>;
-        const directAddress = normalizeAddress(addressObject.address);
-        if (directAddress) {
-          return directAddress;
-        }
-
-        return [
-          addressObject.street,
-          addressObject.houseNumber,
-          addressObject.zip,
-          addressObject.zipCode,
-          addressObject.postalCode,
-          addressObject.city,
-          addressObject.state,
-          addressObject.country,
-        ]
-          .filter((part): part is string => typeof part === 'string' && part.trim().length > 0)
-          .map((part) => part.trim())
-          .join(' ')
-          .trim();
-      }
-
-      return '';
-    };
+    const normalizeAddress = (value: unknown): string => extractAddressString(parseMaybeJson(value));
 
     const resolveCheckoutAddress = (): {
       address: string;
       source: 'auth' | 'customer_user' | 'customer_profile_address' | 'checkout_state' | 'none';
+      profileAddressRawType: string;
+      profileAddressKeys: string[];
+      customerUserAddressPresent: boolean;
     } => {
       const contextAddress = normalizeAddress(user?.address);
+      const profileAddressRaw = typeof window === 'undefined' ? null : window.localStorage.getItem('customer_profile_address');
+      const storedCustomerUserRaw = typeof window === 'undefined' ? null : window.localStorage.getItem('customer_user');
+      const storedCustomerUser = parseMaybeJson(storedCustomerUserRaw) as Record<string, unknown> | null;
+      const storedProfileAddress = parseMaybeJson(profileAddressRaw);
+      const profileAddressRawType = profileAddressRaw === null
+        ? 'null'
+        : Array.isArray(storedProfileAddress)
+          ? 'array'
+          : typeof storedProfileAddress;
+      const profileAddressKeys = storedProfileAddress && typeof storedProfileAddress === 'object'
+        ? Object.keys(storedProfileAddress as Record<string, unknown>).slice(0, 12)
+        : [];
+      const customerUserAddressPresent = Boolean(
+        normalizeAddress(storedCustomerUser?.address)
+        || normalizeAddress((storedCustomerUser?.user as Record<string, unknown> | undefined)?.address)
+        || normalizeAddress((storedCustomerUser?.customer as Record<string, unknown> | undefined)?.address)
+        || normalizeAddress((storedCustomerUser?.profile as Record<string, unknown> | undefined)?.address)
+        || normalizeAddress((storedCustomerUser?.data as Record<string, unknown> | undefined)?.address)
+      );
 
       if (contextAddress) {
-        return { address: contextAddress, source: 'auth' };
+        return {
+          address: contextAddress,
+          source: 'auth',
+          profileAddressRawType,
+          profileAddressKeys,
+          customerUserAddressPresent,
+        };
       }
 
       if (typeof window === 'undefined') {
-        return { address: '', source: 'none' };
+        return {
+          address: '',
+          source: 'none',
+          profileAddressRawType,
+          profileAddressKeys,
+          customerUserAddressPresent,
+        };
       }
-
-      const storedCustomerUserRaw = window.localStorage.getItem('customer_user');
-      const storedCustomerUser = parseStoredJson(storedCustomerUserRaw) as Record<string, unknown> | null;
-      const storedProfileAddressRaw = window.localStorage.getItem('customer_profile_address');
-      const storedProfileAddress = parseStoredJson(storedProfileAddressRaw);
 
       const candidateEntries: Array<{
         source: 'customer_user' | 'customer_profile_address' | 'checkout_state';
@@ -324,11 +305,23 @@ export function Cart({ cart, restaurant, updateQuantity, onClearCart }: CartProp
       for (const candidate of candidateEntries) {
         const resolved = normalizeAddress(candidate.value);
         if (resolved) {
-          return { address: resolved, source: candidate.source };
+          return {
+            address: resolved,
+            source: candidate.source,
+            profileAddressRawType,
+            profileAddressKeys,
+            customerUserAddressPresent,
+          };
         }
       }
 
-      return { address: '', source: 'none' };
+      return {
+        address: '',
+        source: 'none',
+        profileAddressRawType,
+        profileAddressKeys,
+        customerUserAddressPresent,
+      };
     };
 
     const checkoutSubmitResolution = resolveCheckoutAddress();
@@ -357,6 +350,9 @@ export function Cart({ cart, restaurant, updateQuantity, onClearCart }: CartProp
         resolvedAddressSource: checkoutSubmitResolution.source,
         resolvedAddressPresent: Boolean(resolvedEffectiveAddress),
         resolvedAddressLength: resolvedEffectiveAddress.length,
+        profileAddressRawType: checkoutSubmitResolution.profileAddressRawType,
+        profileAddressKeys: checkoutSubmitResolution.profileAddressKeys,
+        customerUserAddressPresent: checkoutSubmitResolution.customerUserAddressPresent,
       };
       console.log('checkoutResolvedAddressBeforeGuard', checkoutSubmitDiagnostics);
       console.log('checkoutSubmitResolution', checkoutSubmitDiagnostics);
@@ -464,7 +460,7 @@ export function Cart({ cart, restaurant, updateQuantity, onClearCart }: CartProp
     } finally {
       setLoading(false);
     }
-  }, [effectiveCart, user, guestInfo, effectiveRestaurant.id, promoCode, minOrderMissing, minOrderAmount, deliveryFee, logDebug, t, resolveCustomerId, parseStoredJson]);
+  }, [effectiveCart, user, guestInfo, effectiveRestaurant.id, promoCode, minOrderMissing, minOrderAmount, deliveryFee, logDebug, t, resolveCustomerId]);
 
   const handlePaymentSuccess = useCallback(() => {
     // Warenkorb leeren

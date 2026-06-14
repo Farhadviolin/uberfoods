@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import api from '../utils/api';
+import { extractAddressString, parseMaybeJson } from '../utils/address';
 
 interface User {
   id: string;
@@ -38,24 +39,9 @@ function normalizeAuthPayload(payload: unknown) {
 }
 
 function normalizeStoredAddress(value: unknown): string | undefined {
-  if (typeof value === 'string') {
-    const trimmed = value.trim();
-    return trimmed.length > 0 ? trimmed : undefined;
-  }
-
-  if (value && typeof value === 'object') {
-    const addressObject = value as Record<string, unknown>;
-    const candidate = [
-      addressObject.address,
-      addressObject.street,
-      addressObject.city,
-    ].find((item): item is string => typeof item === 'string' && item.trim().length > 0);
-    if (candidate) {
-      return candidate.trim();
-    }
-  }
-
-  return undefined;
+  const parsed = parseMaybeJson(value);
+  const extracted = extractAddressString(parsed);
+  return extracted.length > 0 ? extracted : undefined;
 }
 
 function readStoredCustomerProfileAddress(): string | undefined {
