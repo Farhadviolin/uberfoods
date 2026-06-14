@@ -37,6 +37,34 @@ function normalizeAuthPayload(payload: unknown) {
   return { accessToken, refreshToken, user };
 }
 
+function normalizeStoredAddress(value: unknown): string | undefined {
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    return trimmed.length > 0 ? trimmed : undefined;
+  }
+
+  return undefined;
+}
+
+function mergeCustomerUserForStorage(previousUser: unknown, nextUser: unknown) {
+  const previous = previousUser && typeof previousUser === 'object'
+    ? previousUser as Record<string, unknown>
+    : {};
+
+  const next = nextUser && typeof nextUser === 'object'
+    ? nextUser as Record<string, unknown>
+    : {};
+
+  const previousAddress = normalizeStoredAddress(previous.address);
+  const nextAddress = normalizeStoredAddress(next.address);
+
+  return {
+    ...previous,
+    ...next,
+    address: nextAddress ?? previousAddress ?? '',
+  };
+}
+
 interface AuthContextType {
   user: User | null;
   token: string | null;
@@ -65,7 +93,7 @@ export function AuthProvider({ children, initialAuthState }: { children: ReactNo
 
   function updateUser(updates: Partial<User>) {
     setUser((current) => {
-      const nextUser = current ? { ...current, ...updates } : (updates as User);
+      const nextUser = mergeCustomerUserForStorage(current, updates) as User;
       localStorage.setItem('customer_user', JSON.stringify(nextUser));
       return nextUser;
     });
@@ -99,11 +127,7 @@ export function AuthProvider({ children, initialAuthState }: { children: ReactNo
           const response = await api.get('/auth/customer/me');
           const storedUserData = JSON.parse(storedUser) as Partial<User> | null;
           const normalized = normalizeAuthPayload(response.data);
-          const mergedUser: User = {
-            ...(storedUserData ?? {}),
-            ...normalized.user,
-            address: normalized.user?.address ?? storedUserData?.address,
-          } as User;
+          const mergedUser = mergeCustomerUserForStorage(storedUserData, normalized.user) as User;
           
           // Token ist gültig - setze User und Token
           setToken(storedToken);
@@ -138,12 +162,13 @@ export function AuthProvider({ children, initialAuthState }: { children: ReactNo
       });
 
       const { accessToken, user } = normalizeAuthPayload(response.data);
+      const mergedUser = mergeCustomerUserForStorage(localStorage.getItem('customer_user'), user) as User;
       
       localStorage.setItem('customer_token', accessToken ?? '');
-      localStorage.setItem('customer_user', JSON.stringify(user));
+      localStorage.setItem('customer_user', JSON.stringify(mergedUser));
       
       setToken(accessToken);
-      setUser(user);
+      setUser(mergedUser);
       if (api?.defaults?.headers?.common) {
         api.defaults.headers.common['Authorization'] = `Bearer ${accessToken}`;
       }
@@ -164,12 +189,13 @@ export function AuthProvider({ children, initialAuthState }: { children: ReactNo
       });
 
       const { accessToken, user } = normalizeAuthPayload(response.data);
+      const mergedUser = mergeCustomerUserForStorage(localStorage.getItem('customer_user'), user) as User;
       
       localStorage.setItem('customer_token', accessToken ?? '');
-      localStorage.setItem('customer_user', JSON.stringify(user));
+      localStorage.setItem('customer_user', JSON.stringify(mergedUser));
       
       setToken(accessToken);
-      setUser(user);
+      setUser(mergedUser);
       if (api?.defaults?.headers?.common) {
         api.defaults.headers.common['Authorization'] = `Bearer ${accessToken}`;
       }
