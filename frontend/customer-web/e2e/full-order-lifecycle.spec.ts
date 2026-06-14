@@ -182,6 +182,60 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
     console.log(`🆔 Test Run ID: ${RUN_ID}`);
   });
 
+  async function logCustomerUserSnapshot(page: Page, label: string) {
+    const snapshot = await page.evaluate(() => {
+      const raw = window.localStorage.getItem('customer_user');
+      try {
+        return { raw, parsed: raw ? JSON.parse(raw) : null };
+      } catch {
+        return { raw, parsed: null };
+      }
+    });
+
+    console.log(label, snapshot);
+  }
+
+  async function installCustomerStorageDiagnostics(page: Page) {
+    await page.addInitScript(() => {
+      const originalSetItem = Storage.prototype.setItem;
+      const originalRemoveItem = Storage.prototype.removeItem;
+      const originalClear = Storage.prototype.clear;
+
+      Storage.prototype.setItem = function (key: string, value: string) {
+        if (key === 'customer_user') {
+          console.log('customerUserStorageMutation', {
+            type: 'setItem',
+            key,
+            value,
+            stack: new Error().stack,
+          });
+        }
+        return originalSetItem.call(this, key, value);
+      };
+
+      Storage.prototype.removeItem = function (key: string) {
+        if (key === 'customer_user') {
+          console.log('customerUserStorageMutation', {
+            type: 'removeItem',
+            key,
+            previousValue: window.localStorage.getItem(key),
+            stack: new Error().stack,
+          });
+        }
+        return originalRemoveItem.call(this, key);
+      };
+
+      Storage.prototype.clear = function () {
+        console.log('customerUserStorageMutation', {
+          type: 'clear',
+          previousValue: window.localStorage.getItem('customer_user'),
+          stack: new Error().stack,
+        });
+        return originalClear.call(this);
+      };
+    });
+  }
+
   test.setTimeout(300000); // 5 minutes for full lifecycle across four apps
 
   test('Complete Order Lifecycle: Customer → Restaurant → Driver → Admin', async ({ browser }) => {
@@ -208,6 +262,8 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
     const adminPage = await adminContext.newPage();
 
     try {
+      await installCustomerStorageDiagnostics(customerPage);
+
       // ============================================
       // PHASE 1: CUSTOMER CREATES ORDER
       // ============================================
@@ -620,6 +676,7 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
           console.log('➡️ lifecycle: profile address missing, updating profile before final submit', {
             successfulAddressLocatorStrategy,
           });
+          await logCustomerUserSnapshot(customerPage, 'snapshot: before profile save click');
           await addressFieldLocator.fill(expectedAddress);
           const saveButton = customerPage.getByTestId('profile-save-button').first();
           if (!(await saveButton.isVisible().catch(() => false))) {
@@ -668,8 +725,10 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
           });
           const customerUserAfterProfileSave = await customerPage.evaluate(() => window.localStorage.getItem('customer_user'));
           console.log('ℹ️ lifecycle: customerUserAfterProfileSave', customerUserAfterProfileSave);
+          await logCustomerUserSnapshot(customerPage, 'snapshot: after profile save response');
           await customerPage.goto('/checkout', { waitUntil: 'domcontentloaded' });
           await customerPage.waitForLoadState('networkidle').catch(() => null);
+          await logCustomerUserSnapshot(customerPage, 'snapshot: after checkout return');
           const checkoutStoredUserAddress = await customerPage.evaluate(() => {
             try {
               const stored = localStorage.getItem('customer_user');
@@ -699,7 +758,9 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
         };
 
         await logCheckoutDiagnostics('before final submit');
+        await logCustomerUserSnapshot(customerPage, 'snapshot: before final submit');
         await ensureProfileAddress();
+        await logCustomerUserSnapshot(customerPage, 'snapshot: after profile verification');
         await logCheckoutDiagnostics('after profile verification');
 
         const orderCreateResponsePromise = customerPage.waitForResponse((response) => {
