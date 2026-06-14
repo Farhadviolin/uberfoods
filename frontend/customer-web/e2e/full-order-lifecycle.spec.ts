@@ -335,6 +335,7 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
         const cartItemDetails = cartItems.locator('.cart-item-details');
         const cartPlaceholder = customerPage.getByTestId('cart-placeholder');
         const cartStateKeyPrefix = 'cart_';
+        const targetSubtotal = 25;
 
         const parseCartState = (value: unknown) => {
           const results = {
@@ -466,6 +467,11 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
           const quantityTexts = await cartQuantities.allTextContents().catch(() => []);
           const itemDetailTexts = await cartItemDetails.allTextContents().catch(() => []);
           const cartItemTexts = await cartItems.allTextContents().catch(() => []);
+          const cartText = (await customerPage.getByTestId('cart').textContent().catch(() => '')) || '';
+          const subtotalMatch = cartText.match(/(?:Subtotal|Zwischensumme)\s*:?\s*([\d.,]+)\s*€/i);
+          const visibleSubtotal = subtotalMatch
+            ? Number(subtotalMatch[1].replace(',', '.'))
+            : 0;
           const numericQuantities = quantityTexts
             .map((text) => Number((text || '').trim()))
             .filter((quantity) => Number.isFinite(quantity));
@@ -478,6 +484,7 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
             quantityCount,
             itemDetailTexts,
             cartItemTexts,
+            visibleSubtotal,
             minimumWarningVisible: (await minOrderSummary.isVisible().catch(() => false))
               && (await getMissingMinOrderAmount()) > 0,
           };
@@ -490,15 +497,18 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
           const hasSufficientQuantity = cartDiagnostics.quantityCount >= 2
             || storageDiagnostics.storageQuantityCount >= 2
             || storageDiagnostics.storageItemCount >= 2;
+          const hasSafeSubtotal = cartDiagnostics.visibleSubtotal >= targetSubtotal;
           const minimumWarningCleared = !missingAmount || Number.isNaN(missingAmount);
 
-          if (minimumWarningCleared && hasSufficientQuantity) {
+          if (minimumWarningCleared && hasSufficientQuantity && hasSafeSubtotal) {
             console.log(`✅ lifecycle: minimum order satisfied after ${attempt - 1} extra attempts`);
             console.log('ℹ️ lifecycle: minimum order cart diagnostics', {
               ...cartDiagnostics,
               ...storageDiagnostics,
               missingAmount,
               hasAtLeastTwoItemsOrQuantity: hasSufficientQuantity,
+              hasSafeSubtotal,
+              targetSubtotal,
               minimumWarningCleared,
             });
             console.log('✅ lifecycle: leaving phase1 minimum order satisfaction');
@@ -512,6 +522,8 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
             ...storageDiagnostics,
             missingAmount,
             hasAtLeastTwoItemsOrQuantity: hasSufficientQuantity,
+            hasSafeSubtotal,
+            targetSubtotal,
             minimumWarningCleared,
           });
           await addToCartButtons.nth((attempt - 1) % count).click();
@@ -523,6 +535,7 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
           const postClickHasSufficientQuantity = postClickDiagnostics.quantityCount >= 2
             || postClickStorageDiagnostics.storageQuantityCount >= 2
             || postClickStorageDiagnostics.storageItemCount >= 2;
+          const postClickHasSafeSubtotal = postClickDiagnostics.visibleSubtotal >= targetSubtotal;
           const postClickMinimumWarningCleared = !postClickMissingAmount || Number.isNaN(postClickMissingAmount);
 
           console.log('ℹ️ lifecycle: minimum order post-click cart diagnostics', {
@@ -530,10 +543,12 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
             ...postClickStorageDiagnostics,
             missingAmount: postClickMissingAmount,
             hasAtLeastTwoItemsOrQuantity: postClickHasSufficientQuantity,
+            hasSafeSubtotal: postClickHasSafeSubtotal,
+            targetSubtotal,
             minimumWarningCleared: postClickMinimumWarningCleared,
           });
 
-          if (postClickMinimumWarningCleared && postClickHasSufficientQuantity) {
+          if (postClickMinimumWarningCleared && postClickHasSufficientQuantity && postClickHasSafeSubtotal) {
             console.log(`✅ lifecycle: minimum order satisfied after ${attempt} extra attempts`);
             console.log('✅ lifecycle: leaving phase1 minimum order satisfaction');
             return;
@@ -676,6 +691,11 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
       await withStepTimeout('phase1 final order submit', async () => {
         console.log('➡️ lifecycle: phase1 preparing final order submit');
         const minOrderSummary = customerPage.locator('.cart-summary-row.min-order');
+        const getVisibleSubtotal = async () => {
+          const cartText = (await customerPage.getByTestId('cart').textContent().catch(() => '')) || '';
+          const subtotalMatch = cartText.match(/(?:Subtotal|Zwischensumme)\s*:?\s*([\d.,]+)\s*€/i);
+          return subtotalMatch ? Number(subtotalMatch[1].replace(',', '.')) : 0;
+        };
         const getMissingMinOrderAmount = async () => {
           if (await minOrderSummary.count().catch(() => 0) === 0) {
             return 0;
@@ -691,6 +711,10 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
         };
 
         await expect.poll(getMissingMinOrderAmount, { timeout: 10000 }).toBe(0);
+        await expect.poll(getVisibleSubtotal, {
+          message: 'cart subtotal must remain safely above the backend minimum before submit',
+          timeout: 10000,
+        }).toBeGreaterThanOrEqual(25);
         console.log('✅ lifecycle: phase1 minimum order satisfied');
 
         const visibleCheckoutErrors = async () => customerPage.locator('.error-message, [role="alert"], .warning-message')
@@ -1273,7 +1297,7 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
 
         const cardForm = customerPage.locator('.card-form');
         if (await cardForm.isVisible()) {
-          await customerPage.getByLabel(/karteninhaber/i).fill(testOrder.customer.name);
+          await customerPage.getByLabel(/karteninhaber/i).fill(customerCredentials.name);
           await customerPage.getByLabel(/kartennummer/i).fill('4242 4242 4242 4242');
           await customerPage.getByLabel(/gültig bis/i).fill('12/34');
           await customerPage.getByLabel(/cvc/i).fill('123');
