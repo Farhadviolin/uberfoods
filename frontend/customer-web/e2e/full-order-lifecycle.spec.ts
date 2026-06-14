@@ -328,6 +328,9 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
 
       await withStepTimeout('phase1 minimum order satisfaction', async () => {
         const minOrderSummary = customerPage.locator('.cart-summary-row.min-order');
+        const cartItems = customerPage.locator('[data-testid="cart-item"], .cart-item');
+        const cartQuantities = cartItems.locator('.quantity');
+        const cartItemDetails = cartItems.locator('.cart-item-details');
         const getMissingMinOrderAmount = async () => {
           if (await minOrderSummary.count().catch(() => 0) === 0) {
             return 0;
@@ -342,25 +345,65 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
           return Number(match[1].replace(',', '.'));
         };
 
-        const minimumWarningVisible = async () => (await minOrderSummary.isVisible().catch(() => false))
-          && (await getMissingMinOrderAmount()) > 0;
+        const getCartDiagnostics = async () => {
+          const cartItemCount = await cartItems.count().catch(() => 0);
+          const quantityTexts = await cartQuantities.allTextContents().catch(() => []);
+          const itemDetailTexts = await cartItemDetails.allTextContents().catch(() => []);
+          const cartItemTexts = await cartItems.allTextContents().catch(() => []);
+          const numericQuantities = quantityTexts
+            .map((text) => Number((text || '').trim()))
+            .filter((quantity) => Number.isFinite(quantity));
+          const quantityCount = numericQuantities.reduce((sum, quantity) => sum + quantity, 0);
+
+          return {
+            cartItemCount,
+            quantityTexts,
+            numericQuantities,
+            quantityCount,
+            itemDetailTexts,
+            cartItemTexts,
+            minimumWarningVisible: (await minOrderSummary.isVisible().catch(() => false))
+              && (await getMissingMinOrderAmount()) > 0,
+          };
+        };
 
         for (let attempt = 1; attempt <= 10; attempt += 1) {
+          const cartDiagnostics = await getCartDiagnostics();
           const missingAmount = await getMissingMinOrderAmount();
+          const hasSufficientQuantity = cartDiagnostics.quantityCount >= 2;
 
-          if (!missingAmount || Number.isNaN(missingAmount)) {
+          if ((!missingAmount || Number.isNaN(missingAmount)) && hasSufficientQuantity) {
             console.log(`✅ lifecycle: minimum order satisfied after ${attempt - 1} extra attempts`);
+            console.log('ℹ️ lifecycle: minimum order cart diagnostics', {
+              ...cartDiagnostics,
+              missingAmount,
+              hasAtLeastTwoItemsOrQuantity: hasSufficientQuantity,
+            });
             console.log('✅ lifecycle: leaving phase1 minimum order satisfaction');
             return;
           }
 
-          console.log(`➡️ lifecycle: minimum order still open (${missingAmount.toFixed(2)}€ missing), adding item attempt ${attempt}`);
           const count = await addToCartButtons.count();
           expect(count).toBeGreaterThan(0);
+          console.log(`➡️ lifecycle: minimum order still open (${missingAmount.toFixed(2)}€ missing), adding item attempt ${attempt}`, {
+            ...cartDiagnostics,
+            missingAmount,
+            hasAtLeastTwoItemsOrQuantity: hasSufficientQuantity,
+          });
           await addToCartButtons.nth((attempt - 1) % count).click();
           await customerPage.waitForTimeout(300);
 
-          if (!(await minimumWarningVisible())) {
+          const postClickDiagnostics = await getCartDiagnostics();
+          const postClickMissingAmount = await getMissingMinOrderAmount();
+          const postClickHasSufficientQuantity = postClickDiagnostics.quantityCount >= 2;
+
+          console.log('ℹ️ lifecycle: minimum order post-click cart diagnostics', {
+            ...postClickDiagnostics,
+            missingAmount: postClickMissingAmount,
+            hasAtLeastTwoItemsOrQuantity: postClickHasSufficientQuantity,
+          });
+
+          if ((!postClickMissingAmount || Number.isNaN(postClickMissingAmount)) && postClickHasSufficientQuantity) {
             console.log(`✅ lifecycle: minimum order satisfied after ${attempt} extra attempts`);
             console.log('✅ lifecycle: leaving phase1 minimum order satisfaction');
             return;
