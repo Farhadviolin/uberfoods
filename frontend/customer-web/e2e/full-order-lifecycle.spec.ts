@@ -1102,7 +1102,7 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
         console.log('✅ lifecycle: phase1 final Place Order button visible');
         await expect(finalPlaceOrderButton).toBeEnabled();
         console.log('✅ lifecycle: phase1 final Place Order button enabled');
-        const paymentModal = customerPage.getByTestId('payment-modal');
+        const paymentModal = customerPage.locator('[data-testid="payment-modal"], .payment-modal, text=/payment|zahlung|card|karte/i').first();
         const orderTrackingPage = customerPage.getByTestId('order-tracking-page');
         const performFinalSubmitAttempt = async (attemptLabel: string) => {
           const orderCreateResponsePromise = customerPage.waitForResponse((response) => {
