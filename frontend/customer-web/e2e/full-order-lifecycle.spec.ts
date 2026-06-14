@@ -882,21 +882,35 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
             return null;
           });
 
-          if (subtotalDiagnostics?.subtotal !== null && subtotalDiagnostics?.subtotal !== undefined) {
+          const storageSubtotalDiagnostics = await resolveMinimumOrderSubtotal(customerPage);
+          const domSubtotal = subtotalDiagnostics?.subtotal ?? null;
+          const storageSubtotal = storageSubtotalDiagnostics.subtotal ?? null;
+
+          const chosenSubtotal = storageSubtotal !== null && storageSubtotal !== undefined && storageSubtotal >= 25
+            ? storageSubtotal
+            : domSubtotal;
+
+          if (chosenSubtotal !== null && chosenSubtotal !== undefined) {
             console.log('ℹ️ lifecycle: pre-submit subtotal source', {
-              subtotalSource: subtotalDiagnostics.source,
-              subtotal: subtotalDiagnostics.subtotal,
+              subtotalSource: storageSubtotal !== null && storageSubtotal !== undefined && storageSubtotal >= 25
+                ? storageSubtotalDiagnostics.source ?? 'localStorage-cart-state'
+                : subtotalDiagnostics?.source ?? 'visible-subtotal-dom',
+              subtotal: chosenSubtotal,
+              domSubtotal,
+              storageSubtotal,
+              cartStatePresent: storageSubtotalDiagnostics.cartStatePresent,
             });
-            return subtotalDiagnostics.subtotal;
+            return chosenSubtotal;
           }
 
-          const fallbackSubtotalDiagnostics = await resolveMinimumOrderSubtotal(customerPage);
           console.log('ℹ️ lifecycle: pre-submit subtotal source', {
-            subtotalSource: fallbackSubtotalDiagnostics.source ?? 'localStorage-cart-state',
-            subtotal: fallbackSubtotalDiagnostics.subtotal ?? 0,
-            cartStatePresent: fallbackSubtotalDiagnostics.cartStatePresent,
+            subtotalSource: storageSubtotalDiagnostics.source ?? subtotalDiagnostics?.source ?? 'localStorage-cart-state',
+            subtotal: storageSubtotal ?? domSubtotal ?? 0,
+            domSubtotal,
+            storageSubtotal,
+            cartStatePresent: storageSubtotalDiagnostics.cartStatePresent,
           });
-          return fallbackSubtotalDiagnostics.subtotal ?? 0;
+          return storageSubtotal ?? domSubtotal ?? 0;
         };
         const getMissingMinOrderAmount = async () => {
           if (await minOrderSummary.count().catch(() => 0) === 0) {
@@ -1617,7 +1631,37 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
           return null;
         }
 
-        const responseOrder = await response.clone().json().catch(() => null) as
+        const parseResponsePayload = async () => {
+          if (typeof (response as { json?: () => Promise<unknown> }).json === 'function') {
+            return (await (response as { json: () => Promise<unknown> }).json().catch(() => null)) as unknown;
+          }
+          if (typeof (response as { text?: () => Promise<string> }).text === 'function') {
+            const text = await (response as { text: () => Promise<string> }).text().catch(() => '');
+            if (!text) {
+              return null;
+            }
+            try {
+              return JSON.parse(text) as unknown;
+            } catch {
+              return { text };
+            }
+          }
+          if (typeof (response as { body?: () => Promise<Uint8Array> }).body === 'function') {
+            const body = await (response as { body: () => Promise<Uint8Array> }).body().catch(() => null);
+            if (!body) {
+              return null;
+            }
+            try {
+              const text = new TextDecoder().decode(body);
+              return JSON.parse(text) as unknown;
+            } catch {
+              return null;
+            }
+          }
+          return response as unknown;
+        };
+
+        const responseOrder = await parseResponsePayload() as
           | { id?: string; orderId?: string; order?: { id?: string; orderId?: string }; data?: { id?: string; orderId?: string; order?: { id?: string; orderId?: string } } }
           | null;
 
