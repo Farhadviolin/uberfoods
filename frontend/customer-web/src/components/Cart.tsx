@@ -299,6 +299,7 @@ export function Cart({ cart, restaurant, updateQuantity, onClearCart }: CartProp
         (storedCustomerUser?.customer as Record<string, unknown> | undefined)?.address,
         (storedCustomerUser?.profile as Record<string, unknown> | undefined)?.address,
         (storedCustomerUser?.data as Record<string, unknown> | undefined)?.address,
+        window.localStorage.getItem('customer_profile_address'),
       ];
 
       for (const candidate of candidateAddresses) {

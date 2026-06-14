@@ -231,6 +231,7 @@ api.interceptors.response.use(
         localStorage.removeItem('customer_token');
         localStorage.removeItem('customer_refresh_token');
         localStorage.removeItem('customer_user');
+        localStorage.removeItem('customer_profile_address');
         delete api.defaults.headers.common['Authorization'];
         if (!window.location.pathname.startsWith('/login')) {
           window.location.href = '/login';

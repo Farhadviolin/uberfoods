@@ -46,6 +46,14 @@ function normalizeStoredAddress(value: unknown): string | undefined {
   return undefined;
 }
 
+function persistCustomerProfileAddress(address: string | undefined) {
+  if (typeof address === 'string' && address.trim().length > 0) {
+    localStorage.setItem('customer_profile_address', address.trim());
+  } else {
+    localStorage.removeItem('customer_profile_address');
+  }
+}
+
 function mergeCustomerUserForStorage(previousUser: unknown, nextUser: unknown) {
   const previous = previousUser && typeof previousUser === 'object'
     ? previousUser as Record<string, unknown>
@@ -86,6 +94,7 @@ export function AuthProvider({ children, initialAuthState }: { children: ReactNo
   function logout() {
     localStorage.removeItem('customer_token');
     localStorage.removeItem('customer_user');
+    localStorage.removeItem('customer_profile_address');
     delete api.defaults.headers.common['Authorization'];
     setToken(null);
     setUser(null);
@@ -95,6 +104,7 @@ export function AuthProvider({ children, initialAuthState }: { children: ReactNo
     setUser((current) => {
       const nextUser = mergeCustomerUserForStorage(current, updates) as User;
       localStorage.setItem('customer_user', JSON.stringify(nextUser));
+      persistCustomerProfileAddress(nextUser.address);
       return nextUser;
     });
   }
@@ -109,6 +119,7 @@ export function AuthProvider({ children, initialAuthState }: { children: ReactNo
       }
       if (initialAuthState.user) {
         localStorage.setItem('customer_user', JSON.stringify(initialAuthState.user));
+        persistCustomerProfileAddress(initialAuthState.user.address);
       }
       setLoading(false);
       return;
@@ -133,10 +144,12 @@ export function AuthProvider({ children, initialAuthState }: { children: ReactNo
           setToken(storedToken);
           setUser(mergedUser);
           localStorage.setItem('customer_user', JSON.stringify(mergedUser));
+          persistCustomerProfileAddress(mergedUser.address);
         } catch (error) {
           // Token ist ungültig oder abgelaufen - entferne ungültige Daten
           localStorage.removeItem('customer_token');
           localStorage.removeItem('customer_user');
+          localStorage.removeItem('customer_profile_address');
       if (api?.defaults?.headers?.common) {
         delete api.defaults.headers.common['Authorization'];
       }
@@ -166,6 +179,7 @@ export function AuthProvider({ children, initialAuthState }: { children: ReactNo
       
       localStorage.setItem('customer_token', accessToken ?? '');
       localStorage.setItem('customer_user', JSON.stringify(mergedUser));
+      persistCustomerProfileAddress(mergedUser.address);
       
       setToken(accessToken);
       setUser(mergedUser);
@@ -193,6 +207,7 @@ export function AuthProvider({ children, initialAuthState }: { children: ReactNo
       
       localStorage.setItem('customer_token', accessToken ?? '');
       localStorage.setItem('customer_user', JSON.stringify(mergedUser));
+      persistCustomerProfileAddress(mergedUser.address);
       
       setToken(accessToken);
       setUser(mergedUser);
