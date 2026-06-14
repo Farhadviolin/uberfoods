@@ -91,6 +91,10 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
           email: user.email ?? email,
           role,
           type: type ?? "CUSTOMER",
+          currentStatus:
+            role === "restaurant"
+              ? "ACTIVE"
+              : (user as { currentStatus?: string }).currentStatus,
         };
       } catch (error) {
         this.logger.warn(
