@@ -257,6 +257,10 @@ export function Cart({ cart, restaurant, updateQuantity, onClearCart }: CartProp
 
       if (value && typeof value === 'object') {
         const addressObject = value as Record<string, unknown>;
+        const directAddress = normalizeAddress(addressObject.address);
+        if (directAddress) {
+          return directAddress;
+        }
 
         return [
           addressObject.street,
@@ -277,38 +281,54 @@ export function Cart({ cart, restaurant, updateQuantity, onClearCart }: CartProp
       return '';
     };
 
-    const resolveEffectiveCustomerAddress = (): string => {
+    const resolveCheckoutAddress = (): {
+      address: string;
+      source: 'auth' | 'customer_user' | 'customer_profile_address' | 'checkout_state' | 'none';
+    } => {
       const contextAddress = normalizeAddress(user?.address);
 
       if (contextAddress) {
-        return contextAddress;
+        return { address: contextAddress, source: 'auth' };
       }
 
       if (typeof window === 'undefined') {
-        return '';
+        return { address: '', source: 'none' };
       }
 
       const storedCustomerUserRaw = window.localStorage.getItem('customer_user');
       const storedCustomerUser = parseStoredJson(storedCustomerUserRaw) as Record<string, unknown> | null;
-      const storedProfileAddress = parseStoredJson(window.localStorage.getItem('customer_profile_address'));
+      const storedProfileAddressRaw = window.localStorage.getItem('customer_profile_address');
+      const storedProfileAddress = parseStoredJson(storedProfileAddressRaw);
 
-      const candidateAddresses = [
-        storedCustomerUser?.address,
-        (storedCustomerUser?.user as Record<string, unknown> | undefined)?.address,
-        (storedCustomerUser?.customer as Record<string, unknown> | undefined)?.address,
-        (storedCustomerUser?.profile as Record<string, unknown> | undefined)?.address,
-        (storedCustomerUser?.data as Record<string, unknown> | undefined)?.address,
-        storedProfileAddress,
+      const candidateEntries: Array<{
+        source: 'customer_user' | 'customer_profile_address' | 'checkout_state';
+        value: unknown;
+      }> = [
+        { source: 'customer_user', value: storedCustomerUser?.address },
+        { source: 'customer_user', value: (storedCustomerUser?.user as Record<string, unknown> | undefined)?.address },
+        { source: 'customer_user', value: (storedCustomerUser?.customer as Record<string, unknown> | undefined)?.address },
+        { source: 'customer_user', value: (storedCustomerUser?.profile as Record<string, unknown> | undefined)?.address },
+        { source: 'customer_user', value: (storedCustomerUser?.data as Record<string, unknown> | undefined)?.address },
+        { source: 'customer_profile_address', value: storedProfileAddress },
       ];
 
-      for (const candidate of candidateAddresses) {
-        const resolved = normalizeAddress(candidate);
+      const checkoutStateAddress = [
+        (storedCustomerUser?.checkout as Record<string, unknown> | undefined)?.address,
+        (storedCustomerUser?.delivery as Record<string, unknown> | undefined)?.address,
+      ].find((candidate): candidate is unknown => candidate !== undefined);
+
+      if (checkoutStateAddress !== undefined) {
+        candidateEntries.push({ source: 'checkout_state', value: checkoutStateAddress });
+      }
+
+      for (const candidate of candidateEntries) {
+        const resolved = normalizeAddress(candidate.value);
         if (resolved) {
-          return resolved;
+          return { address: resolved, source: candidate.source };
         }
       }
 
-      return '';
+      return { address: '', source: 'none' };
     };
 
     if (effectiveCart.length === 0) {
@@ -325,13 +345,17 @@ export function Cart({ cart, restaurant, updateQuantity, onClearCart }: CartProp
         return;
       }
     } else {
-      const resolvedEffectiveAddress = resolveEffectiveCustomerAddress();
+      const resolvedCheckoutAddress = resolveCheckoutAddress();
+      const resolvedEffectiveAddress = resolvedCheckoutAddress.address;
       console.log('checkoutResolvedAddressBeforeGuard', {
         contextUserAddress: user?.address ?? null,
         storedCustomerUserRaw: typeof window !== 'undefined'
           ? window.localStorage.getItem('customer_user')
           : null,
         resolvedEffectiveAddress,
+        resolvedAddressSource: resolvedCheckoutAddress.source,
+        resolvedAddressPresent: Boolean(resolvedEffectiveAddress),
+        resolvedAddressLength: resolvedEffectiveAddress.length,
       });
       if (!resolvedEffectiveAddress) {
         markCheckoutProbe({
@@ -341,6 +365,7 @@ export function Cart({ cart, restaurant, updateQuantity, onClearCart }: CartProp
             ? null
             : window.localStorage.getItem('customer_user'),
           resolvedEffectiveAddress,
+          resolvedAddressSource: resolvedCheckoutAddress.source,
         });
         setError(t('cart.addressRequiredError'));
         return;
@@ -360,7 +385,8 @@ export function Cart({ cart, restaurant, updateQuantity, onClearCart }: CartProp
 
     try {
       const customerId = resolveCustomerId();
-      const resolvedEffectiveAddress = resolveEffectiveCustomerAddress();
+      const resolvedCheckoutAddress = resolveCheckoutAddress();
+      const resolvedEffectiveAddress = resolvedCheckoutAddress.address;
       const normalizedItems = effectiveCart.map(item => ({
         dishId: item.dish.id,
         quantity: item.quantity,
@@ -388,21 +414,24 @@ export function Cart({ cart, restaurant, updateQuantity, onClearCart }: CartProp
         'estimatedDeliveryTime',
       ].filter((key) => Object.prototype.hasOwnProperty.call(order, key));
 
-      logDebug('Checkout order payload summary', {
-        component: 'Cart',
-        action: 'placeOrder',
-        metadata: {
-          customerIdPresent: Boolean(customerId),
-          customerIdType: typeof customerId,
-          itemCount: order.items.length,
-          itemKeys: order.items[0] ? Object.keys(order.items[0]) : [],
-          forbiddenPayloadKeysPresent,
-          hasAddress: Boolean(order.address),
-          hasPhone: Boolean(order.phone),
-          hasPromotionId: Boolean(order.promotionId),
-          hasDeliveryFee: typeof order.deliveryFee === 'number',
-        },
-      });
+        logDebug('Checkout order payload summary', {
+          component: 'Cart',
+          action: 'placeOrder',
+          metadata: {
+            customerIdPresent: Boolean(customerId),
+            customerIdType: typeof customerId,
+            itemCount: order.items.length,
+            itemKeys: order.items[0] ? Object.keys(order.items[0]) : [],
+            forbiddenPayloadKeysPresent,
+            hasAddress: Boolean(order.address),
+            hasPhone: Boolean(order.phone),
+            hasPromotionId: Boolean(order.promotionId),
+            hasDeliveryFee: typeof order.deliveryFee === 'number',
+            resolvedAddressSource: resolvedCheckoutAddress.source,
+            resolvedAddressPresent: Boolean(resolvedEffectiveAddress),
+            resolvedAddressLength: resolvedEffectiveAddress.length,
+          },
+        });
 
       if (!customerId || typeof customerId !== 'string') {
         throw new Error('Cannot place order without customerId');
