@@ -1018,7 +1018,46 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
 
         if (orderSubmissionOutcome.kind === 'response') {
           const orderCreateResponse = orderSubmissionOutcome.response;
-          console.log(`✅ lifecycle: phase1 order response received (${orderCreateResponse.status()})`);
+          const responseStatus = orderCreateResponse.status();
+          const responseRequest = orderCreateResponse.request();
+          let responseBody: string | null = null;
+          try {
+            responseBody = await orderCreateResponse.text();
+          } catch {
+            responseBody = null;
+          }
+          let requestPostData: string | null = null;
+          try {
+            requestPostData = responseRequest.postData();
+          } catch {
+            requestPostData = null;
+          }
+          const visibleCartTexts = await cartContainer.allTextContents().catch(() => []);
+          const visibleCartItems = await cartContainer.locator('.cart-item').allTextContents().catch(() => []);
+          const checkoutErrors = await customerPage.locator('.error, [role="alert"], [data-testid="checkout-error"]').allTextContents().catch(() => []);
+          console.log(`ℹ️ lifecycle: phase1 order response received (${responseStatus})`, {
+            url: orderCreateResponse.url(),
+            requestUrl: responseRequest.url(),
+            method: responseRequest.method(),
+            responseBody,
+            requestPostData,
+            currentUrl: customerPage.url(),
+            paymentModalVisible: await paymentModal.isVisible().catch(() => false),
+            orderTrackingVisible: await orderTrackingPage.isVisible().catch(() => false),
+            cartVisible: await cartContainer.isVisible().catch(() => false),
+            cartItemCount: await cartContainer.locator('.cart-item').count().catch(() => 0),
+            visibleTotalText: await cartContainer.locator('text=/€|Mindestbestellwert|Total|Gesamt/i').allTextContents().catch(() => []),
+            visibleAddressText: await customerPage.locator('text=/address|adresse|liefer|delivery|street|straße/i').allTextContents().catch(() => []),
+            visiblePhoneText: await customerPage.locator('text=/phone|telefon|mobile|handy/i').allTextContents().catch(() => []),
+            visiblePaymentText: await customerPage.locator('text=/payment|card|karte|pay|zahlung/i').allTextContents().catch(() => []),
+            visibleCartTexts,
+            visibleCartItems,
+            checkoutErrors,
+            submitProbe: await customerPage.evaluate(() => (window as unknown as { __checkoutSubmitProbe?: unknown }).__checkoutSubmitProbe ?? null),
+          });
+          if (!orderCreateResponse.ok()) {
+            throw new Error(`Order create failed with ${responseStatus}: ${responseBody ?? 'no response body'}`);
+          }
           const createdOrder = await orderCreateResponse.json().catch(() => ({}));
           orderId = createdOrder.id || orderId;
           if (!orderId) {
