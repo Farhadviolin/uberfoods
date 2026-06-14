@@ -808,11 +808,6 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
         console.log('checkoutAddressSnapshotAfterProfileVerification', await collectCheckoutAddressSnapshot());
         await logCheckoutDiagnostics('after profile verification');
 
-        const orderCreateResponsePromise = customerPage.waitForResponse((response) => {
-          const request = response.request();
-          return request.method() === 'POST'
-            && new URL(response.url()).pathname === '/api/orders/customer';
-        }, { timeout: 20000 });
         const cartContainer = customerPage.getByTestId('cart');
         const submitCandidates = [
           cartContainer.locator('button[data-testid="checkout-button"]'),
@@ -936,20 +931,37 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
         console.log('✅ lifecycle: phase1 final Place Order button visible');
         await expect(finalPlaceOrderButton).toBeEnabled();
         console.log('✅ lifecycle: phase1 final Place Order button enabled');
-        console.log('➡️ lifecycle: phase1 clicking final Place Order');
-
-        await finalPlaceOrderButton.scrollIntoViewIfNeeded().catch(() => null);
-        await finalPlaceOrderButton.click({ noWaitAfter: true });
-        console.log('✅ lifecycle: phase1 final Place Order click completed');
-
         const paymentModal = customerPage.getByTestId('payment-modal');
         const orderTrackingPage = customerPage.getByTestId('order-tracking-page');
         const performFinalSubmitAttempt = async (attemptLabel: string) => {
+          const orderCreateResponsePromise = customerPage.waitForResponse((response) => {
+            const request = response.request();
+            const url = new URL(response.url());
+            return request.method() === 'POST'
+              && url.pathname.endsWith('/api/orders/customer');
+          }, { timeout: 20000 })
+            .then((response) => ({ kind: 'response' as const, response }))
+            .catch(() => null);
+          const paymentModalPromise = paymentModal.waitFor({ state: 'visible', timeout: 20000 })
+            .then(() => ({ kind: 'payment-modal' as const }))
+            .catch(() => null);
+          const orderUrlPromise = customerPage.waitForURL(/\/orders\/[^/?]+(?:\?.*)?$/, { timeout: 20000 })
+            .then(() => ({ kind: 'order-url' as const }))
+            .catch(() => null);
+          const orderTrackingPromise = orderTrackingPage.waitFor({ state: 'visible', timeout: 20000 })
+            .then(() => ({ kind: 'order-tracking' as const }))
+            .catch(() => null);
+
+          console.log('➡️ lifecycle: phase1 clicking final Place Order', { attemptLabel });
+          await finalPlaceOrderButton.scrollIntoViewIfNeeded().catch(() => null);
+          await finalPlaceOrderButton.click({ noWaitAfter: true });
+          console.log('✅ lifecycle: phase1 final Place Order click completed', { attemptLabel });
+
           const attemptOutcome = await Promise.race([
-            orderCreateResponsePromise.then((response) => ({ kind: 'response' as const, response })).catch(() => null),
-            paymentModal.waitFor({ state: 'visible', timeout: 20000 }).then(() => ({ kind: 'payment-modal' as const })).catch(() => null),
-            customerPage.waitForURL(/\/orders\/[^/?]+(?:\?.*)?$/, { timeout: 20000 }).then(() => ({ kind: 'order-url' as const })).catch(() => null),
-            orderTrackingPage.waitFor({ state: 'visible', timeout: 20000 }).then(() => ({ kind: 'order-tracking' as const })).catch(() => null),
+            orderCreateResponsePromise,
+            paymentModalPromise,
+            orderUrlPromise,
+            orderTrackingPromise,
           ]);
 
           if (attemptOutcome) {
@@ -996,9 +1008,6 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
             });
             await ensureProfileAddress();
             await installCheckoutSubmitProbe();
-            await finalPlaceOrderButton.scrollIntoViewIfNeeded().catch(() => null);
-            await finalPlaceOrderButton.click({ noWaitAfter: true });
-            console.log('✅ lifecycle: phase1 final Place Order retry click completed');
             orderSubmissionOutcome = await performFinalSubmitAttempt('retry after missing-user-address recovery');
           }
         }
