@@ -186,6 +186,22 @@ export function OrderCard({ order }: OrderCardProps) {
           </div>
           {isActive && (
             <div style={{ display: "flex", gap: "8px" }}>
+              {order.status === "PENDING" && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleStatusChange("READY");
+                  }}
+                  className="fb-button"
+                  data-testid="restaurant-order-ready-button"
+                  style={{
+                    fontSize: "var(--fb-font-size-sm)",
+                    padding: "6px 12px",
+                  }}
+                >
+                  Bereit
+                </button>
+              )}
               {order.status === "CONFIRMED" && (
                 <button
                   onClick={(e) => {
