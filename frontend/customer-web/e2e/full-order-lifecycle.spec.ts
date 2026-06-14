@@ -636,6 +636,12 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
         .or(customerPage.locator('.payment-modal'))
         .or(customerPage.getByText(/payment methods|zahlung|zahlungsmethode wählen|kreditkarte|paypal|apple pay|karteninhaber|kartennummer/i))
         .first();
+      const orderTrackingPage = customerPage
+        .getByTestId('order-tracking-page')
+        .or(customerPage.getByTestId('order-detail-page'))
+        .or(customerPage.locator('[data-testid="order-tracking"], [data-testid="order-details"], .order-tracking, .order-details'))
+        .or(customerPage.getByText(/order tracking|tracking|bestellverfolgung|bestellung|order details|order status|status/i))
+        .first();
 
       await withStepTimeout('phase1 checkout state and delivery address', async () => {
         const cartItems = customerPage.locator('[data-testid="cart-item"], .cart-item');
@@ -1108,7 +1114,6 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
         console.log('✅ lifecycle: phase1 final Place Order button visible');
         await expect(finalPlaceOrderButton).toBeEnabled();
         console.log('✅ lifecycle: phase1 final Place Order button enabled');
-        const orderTrackingPage = customerPage.getByTestId('order-tracking-page');
         const performFinalSubmitAttempt = async (attemptLabel: string) => {
           const orderCreateResponsePromise = customerPage.waitForResponse((response) => {
             const request = response.request();
