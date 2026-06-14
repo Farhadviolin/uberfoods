@@ -1436,10 +1436,83 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
 
         const cardForm = customerPage.locator('.card-form');
         if (await cardForm.isVisible()) {
-          await customerPage.getByLabel(/karteninhaber/i).fill(customerCredentials.name);
-          await customerPage.getByLabel(/kartennummer/i).fill('4242 4242 4242 4242');
-          await customerPage.getByLabel(/gültig bis/i).fill('12/34');
-          await customerPage.getByLabel(/cvc/i).fill('123');
+          const resolvePaymentInput = async (candidates: Locator[]) => {
+            for (const candidate of candidates) {
+              const count = await candidate.count().catch(() => 0);
+              if (count === 0) {
+                continue;
+              }
+
+              const visibleCandidate = candidate.first();
+              if (await visibleCandidate.isVisible({ timeout: 1000 }).catch(() => false)) {
+                return visibleCandidate;
+              }
+            }
+            return null;
+          };
+
+          const cardholderInput = await resolvePaymentInput([
+            cardForm.getByLabel(/karteninhaber|cardholder|name/i),
+            cardForm.locator('input[name*="card" i]'),
+            cardForm.locator('input[name*="holder" i]'),
+            cardForm.locator('input[placeholder*="Karteninhaber" i]'),
+            cardForm.locator('input[placeholder*="Cardholder" i]'),
+            cardForm.locator('input').first(),
+          ]);
+          if (!cardholderInput) {
+            const paymentTexts = await paymentModal.textContent().catch(() => '');
+            const inputDiagnostics = await cardForm.locator('input').evaluateAll((inputs) => inputs.map((input) => ({
+              tag: input.tagName,
+              type: input.getAttribute('type'),
+              name: input.getAttribute('name'),
+              placeholder: input.getAttribute('placeholder'),
+              testId: input.getAttribute('data-testid'),
+            })));
+            throw new Error(`Payment cardholder input could not be resolved: ${JSON.stringify({
+              currentUrl: customerPage.url(),
+              paymentTexts: (paymentTexts || '').slice(0, 500),
+              cardInputCount: inputDiagnostics.length,
+              inputDiagnostics,
+            })}`);
+          }
+          await cardholderInput.fill(customerCredentials.name);
+
+          const cardNumberInput = await resolvePaymentInput([
+            cardForm.getByLabel(/kartennummer|card number|number/i),
+            cardForm.locator('input[name*="number" i]'),
+            cardForm.locator('input[placeholder*="1234" i]'),
+            cardForm.locator('input').nth(1),
+          ]);
+          const expiryInput = await resolvePaymentInput([
+            cardForm.getByLabel(/gültig bis|expiry|expires/i),
+            cardForm.locator('input[name*="exp" i]'),
+            cardForm.locator('input[placeholder*="MM" i]'),
+            cardForm.locator('input').nth(2),
+          ]);
+          const cvcInput = await resolvePaymentInput([
+            cardForm.getByLabel(/cvc|cvv|security code/i),
+            cardForm.locator('input[name*="cvc" i]'),
+            cardForm.locator('input[placeholder*="123" i]'),
+            cardForm.locator('input').nth(3),
+          ]);
+
+          if (!cardNumberInput || !expiryInput || !cvcInput) {
+            const inputDiagnostics = await cardForm.locator('input').evaluateAll((inputs) => inputs.map((input) => ({
+              tag: input.tagName,
+              type: input.getAttribute('type'),
+              name: input.getAttribute('name'),
+              placeholder: input.getAttribute('placeholder'),
+              testId: input.getAttribute('data-testid'),
+            })));
+            throw new Error(`Payment card inputs could not be resolved: ${JSON.stringify({
+              currentUrl: customerPage.url(),
+              inputDiagnostics,
+            })}`);
+          }
+
+          await cardNumberInput.fill('4242 4242 4242 4242');
+          await expiryInput.fill('12/34');
+          await cvcInput.fill('123');
         }
 
         const paymentConfirmButton = paymentModal
