@@ -167,7 +167,18 @@ async function registerCustomerForLifecycleWithDiagnostics(
 
 async function resolveMinimumOrderSubtotal(page: Page, cartPrefix = 'cart_') {
   return page.evaluate(({ prefix }) => {
-    const parseAmount = (value: string) => Number(value.replace(/\s/g, '').replace(',', '.'));
+    const parseAmount = (value: unknown) => {
+      if (typeof value === 'number') {
+        return Number.isFinite(value) ? value : null;
+      }
+      if (typeof value !== 'string') {
+        return null;
+      }
+
+      const normalized = value.replace(/[^\d,.-]/g, '').replace(',', '.');
+      const amount = Number(normalized);
+      return Number.isFinite(amount) ? amount : null;
+    };
     const texts = Array.from(document.querySelectorAll(
       '[data-testid="cart"], .cart, [data-testid*="subtotal"], .cart-summary, .order-summary',
     ))
@@ -185,11 +196,18 @@ async function resolveMinimumOrderSubtotal(page: Page, cartPrefix = 'cart_') {
         subtotal: parseAmount(labeledSubtotal),
         source: 'visible-cart',
         cartStatePresent: true,
+        itemDiagnostics: [],
       };
     }
 
     let storageSubtotal = 0;
     let cartStatePresent = false;
+    const itemDiagnostics: Array<{
+      itemKeys: string[];
+      nestedKeys: Record<string, string[]>;
+      priceField: string | null;
+      quantityField: string | null;
+    }> = [];
     for (let index = 0; index < localStorage.length; index += 1) {
       const key = localStorage.key(index);
       if (!key?.startsWith(prefix)) continue;
@@ -206,10 +224,55 @@ async function resolveMinimumOrderSubtotal(page: Page, cartPrefix = 'cart_') {
             : Array.isArray(parsed?.cart)
               ? parsed.cart
               : [];
-        storageSubtotal += items.reduce((sum: number, item: { price?: unknown; quantity?: unknown }) => {
-          const price = Number(item?.price);
-          const quantity = Number(item?.quantity);
-          return sum + (Number.isFinite(price) ? price : 0) * (Number.isFinite(quantity) && quantity > 0 ? quantity : 1);
+        storageSubtotal += items.reduce((sum: number, item: Record<string, unknown>) => {
+          const nestedRecords = ['dish', 'menuItem', 'item', 'product'].reduce<Record<string, Record<string, unknown>>>((records, key) => {
+            const value = item?.[key];
+            if (value && typeof value === 'object' && !Array.isArray(value)) {
+              records[key] = value as Record<string, unknown>;
+            }
+            return records;
+          }, {});
+          const directTotal = [
+            ['totalPrice', item?.totalPrice],
+            ['subtotal', item?.subtotal],
+          ] as const;
+          const unitPrices = [
+            ['price', item?.price],
+            ['unitPrice', item?.unitPrice],
+            ...Object.entries(nestedRecords).flatMap(([key, record]) => [
+              [`${key}.price`, record.price] as const,
+              [`${key}.unitPrice`, record.unitPrice] as const,
+            ]),
+          ] as const;
+          const quantities = [
+            ['quantity', item?.quantity],
+            ['qty', item?.qty],
+            ['count', item?.count],
+          ] as const;
+          const resolvedTotal = directTotal
+            .map(([field, value]) => ({ field, value: parseAmount(value) }))
+            .find((candidate) => candidate.value !== null);
+          const resolvedUnitPrice = unitPrices
+            .map(([field, value]) => ({ field, value: parseAmount(value) }))
+            .find((candidate) => candidate.value !== null);
+          const resolvedQuantity = quantities
+            .map(([field, value]) => ({ field, value: parseAmount(value) }))
+            .find((candidate) => candidate.value !== null && candidate.value > 0);
+
+          itemDiagnostics.push({
+            itemKeys: Object.keys(item || {}),
+            nestedKeys: Object.fromEntries(Object.entries(nestedRecords).map(([key, record]) => [key, Object.keys(record)])),
+            priceField: resolvedTotal?.field ?? resolvedUnitPrice?.field ?? null,
+            quantityField: resolvedQuantity?.field ?? null,
+          });
+
+          if (resolvedTotal?.value !== null && resolvedTotal?.value !== undefined) {
+            return sum + resolvedTotal.value;
+          }
+          if (resolvedUnitPrice?.value !== null && resolvedUnitPrice?.value !== undefined) {
+            return sum + resolvedUnitPrice.value * (resolvedQuantity?.value ?? 1);
+          }
+          return sum;
         }, 0);
       } catch {
         // The caller reports that cart state existed but could not produce a subtotal.
@@ -218,8 +281,9 @@ async function resolveMinimumOrderSubtotal(page: Page, cartPrefix = 'cart_') {
 
     return {
       subtotal: storageSubtotal > 0 ? storageSubtotal : null,
-      source: storageSubtotal > 0 ? 'local-storage' : null,
+      source: storageSubtotal > 0 ? 'localStorage-cart-state' : null,
       cartStatePresent,
+      itemDiagnostics,
     };
   }, { prefix: cartPrefix });
 }
@@ -543,6 +607,7 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
             subtotal: subtotalDiagnostics.subtotal,
             subtotalSource: subtotalDiagnostics.source,
             cartStatePresent: subtotalDiagnostics.cartStatePresent,
+            subtotalItemDiagnostics: subtotalDiagnostics.itemDiagnostics,
             minimumWarningVisible: (await minOrderSummary.isVisible().catch(() => false))
               && (await getMissingMinOrderAmount()) > 0,
           };
@@ -621,6 +686,7 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
             addButtonCount: finalButtonCount,
             cartStatePresent: finalDiagnostics.cartStatePresent,
             subtotalSource: finalDiagnostics.subtotalSource,
+            itemDiagnostics: finalDiagnostics.subtotalItemDiagnostics,
           })}`);
         }
         throw new Error(`Minimum order value was not satisfied: ${JSON.stringify({
