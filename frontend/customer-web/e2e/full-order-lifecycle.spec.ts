@@ -168,6 +168,7 @@ async function registerCustomerForLifecycleWithDiagnostics(
 test.describe('Full Order Lifecycle UI-E2E', () => {
   let orderId: string;
   let lastOrderCreateResponse: Response | null = null;
+  let pendingOrderCreateResponse: Promise<Response | null> | null = null;
   let customerCredentials = createLifecycleCustomerCredentials();
   const selectors = testSelectors;
   const testOrder = testDataFactory.getTestOrder();
@@ -1121,12 +1122,15 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
             const url = new URL(response.url());
             return request.method() === 'POST'
               && url.pathname.endsWith('/api/orders/customer');
-          }, { timeout: 20000 })
-            .then((response) => {
-              lastOrderCreateResponse = response;
-              return { kind: 'response' as const, response };
-            })
-            .catch(() => null);
+          }, { timeout: 20000 }).catch(() => null);
+          pendingOrderCreateResponse = orderCreateResponsePromise;
+          const orderCreateOutcomePromise = orderCreateResponsePromise.then((response) => {
+            if (!response) {
+              return null;
+            }
+            lastOrderCreateResponse = response;
+            return { kind: 'response' as const, response };
+          });
           const paymentModalPromise = paymentModal.waitFor({ state: 'visible', timeout: 20000 })
             .then(() => ({ kind: 'payment-modal' as const }))
             .catch(() => null);
@@ -1143,7 +1147,7 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
           console.log('✅ lifecycle: phase1 final Place Order click completed', { attemptLabel });
 
           const attemptOutcome = await Promise.race([
-            orderCreateResponsePromise,
+            orderCreateOutcomePromise,
             paymentModalPromise,
             orderUrlPromise,
             orderTrackingPromise,
@@ -1262,6 +1266,11 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
       ]);
 
       if (await paymentModal.isVisible().catch(() => false)) {
+        const orderCreateResponse = await pendingOrderCreateResponse;
+        if (orderCreateResponse) {
+          lastOrderCreateResponse = orderCreateResponse;
+        }
+
         const cardForm = customerPage.locator('.card-form');
         if (await cardForm.isVisible()) {
           await customerPage.getByLabel(/karteninhaber/i).fill(testOrder.customer.name);
@@ -1279,18 +1288,23 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
             hasText: /pay|bezahlen|zahlung bestätigen|zahlung abschließen|confirm|bestätigen|complete payment|place order|order/i,
           }))
           .first();
-        await expect(paymentConfirmButton).toBeVisible({ timeout: 10000 });
+        if (!await paymentConfirmButton.isVisible({ timeout: 10000 }).catch(() => false)) {
+          const modalButtons = await paymentModal.locator('button').evaluateAll((buttons) => buttons.map((button) => ({
+            text: button.textContent?.trim() || '',
+            testId: button.getAttribute('data-testid'),
+            disabled: (button as HTMLButtonElement).disabled,
+          })));
+          throw new Error(`Payment confirmation button not found: ${JSON.stringify({
+            currentUrl: customerPage.url(),
+            modalText: (await paymentModal.textContent().catch(() => ''))?.trim(),
+            modalButtons,
+            orderCreateResponseReceived: Boolean(lastOrderCreateResponse),
+          })}`);
+        }
         await expect(paymentConfirmButton).toBeEnabled();
         await paymentConfirmButton.click();
 
         await Promise.race([
-          customerPage.waitForResponse((response) => {
-            const request = response.request();
-            const url = new URL(response.url());
-            return request.method() === 'POST'
-              && url.pathname.endsWith('/api/orders/customer')
-              && response.ok();
-          }, { timeout: 20000 }).catch(() => null),
           customerPage.waitForURL(/\/orders\/[^/?]+(?:\?.*)?$/, { timeout: 20000 }).catch(() => null),
           orderTrackingPage.waitFor({ state: 'visible', timeout: 20000 }).catch(() => null),
         ]);
