@@ -26,7 +26,11 @@ async function main() {
   const hashedRestaurantPassword = await bcrypt.hash(restaurantPassword, 10);
   const restaurant1 = await prisma.restaurant.upsert({
     where: { email: 'restaurant@uberfoods.local' },
-    update: {},
+    update: {
+      isActive: true,
+      status: 'OPEN',
+      currentStatus: 'ACTIVE',
+    },
     create: {
       name: 'Pizza Palace',
       description: 'Die beste Pizza der Stadt! Frische Zutaten und traditionelle Rezepte.',
@@ -37,12 +41,17 @@ async function main() {
       mustChangePassword: false,
       isActive: true,
       status: 'OPEN', // Explicitly set status for /restaurants/public endpoint
+      currentStatus: 'ACTIVE',
     },
   });
 
   const restaurant2 = await prisma.restaurant.upsert({
     where: { email: 'burger-kingdom@example.com' },
-    update: {},
+    update: {
+      isActive: true,
+      status: 'OPEN',
+      currentStatus: 'ACTIVE',
+    },
     create: {
       name: 'Burger Kingdom',
       description: 'Saftige Burger und frische Pommes. Perfekt für den großen Hunger!',
@@ -52,12 +61,17 @@ async function main() {
       imageUrl: null,
       isActive: true,
       status: 'OPEN', // Explicitly set status for /restaurants/public endpoint
+      currentStatus: 'ACTIVE',
     },
   });
 
   const restaurant3 = await prisma.restaurant.upsert({
     where: { email: 'sushi-master@example.com' },
-    update: {},
+    update: {
+      isActive: true,
+      status: 'OPEN',
+      currentStatus: 'ACTIVE',
+    },
     create: {
       name: 'Sushi Master',
       description: 'Frisches Sushi und japanische Küche. Authentisch und lecker!',
@@ -67,6 +81,7 @@ async function main() {
       imageUrl: null,
       isActive: true,
       status: 'OPEN', // Explicitly set status for /restaurants/public endpoint
+      currentStatus: 'ACTIVE',
     },
   });
 
