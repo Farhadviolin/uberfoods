@@ -290,6 +290,7 @@ async function resolveMinimumOrderSubtotal(page: Page, cartPrefix = 'cart_') {
 
 test.describe('Full Order Lifecycle UI-E2E', () => {
   let orderId: string;
+  let orderRestaurantId: string | null = null;
   let lastOrderCreateResponse: Response | null = null;
   let pendingOrderCreateResponse: Promise<Response | null> | null = null;
   let customerCredentials = createLifecycleCustomerCredentials();
@@ -1750,6 +1751,11 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
           }
           const createdOrder = await orderCreateResponse.json().catch(() => ({}));
           orderId = createdOrder.id || orderId;
+          orderRestaurantId = createdOrder.restaurantId
+            || createdOrder.restaurant?.id
+            || createdOrder.data?.restaurantId
+            || createdOrder.data?.restaurant?.id
+            || orderRestaurantId;
           if (!orderId) {
             throw new Error('Order creation response did not include an id');
           }
@@ -2015,6 +2021,80 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
       await restaurantPage.goto(testUrls.restaurant);
       await TestHelpers.waitForStablePage(restaurantPage);
 
+      if (orderRestaurantId) {
+        await restaurantPage.evaluate((targetRestaurantId) => {
+          const currentRestaurantId = localStorage.getItem('restaurant_id');
+          if (currentRestaurantId !== targetRestaurantId) {
+            localStorage.setItem('restaurant_id', targetRestaurantId);
+          }
+
+          const rawUser = localStorage.getItem('restaurant_user');
+          if (rawUser) {
+            try {
+              const parsedUser = JSON.parse(rawUser);
+              if (parsedUser && typeof parsedUser === 'object') {
+                const nextUser = {
+                  ...parsedUser,
+                  restaurantId: targetRestaurantId,
+                };
+                localStorage.setItem('restaurant_user', JSON.stringify(nextUser));
+              }
+            } catch {
+              // Keep the existing auth payload if it cannot be parsed.
+            }
+          }
+
+          localStorage.setItem(`restaurant_onboarding_done_${targetRestaurantId}`, 'true');
+        }, orderRestaurantId);
+        await restaurantPage.reload({ waitUntil: 'domcontentloaded' });
+        await restaurantPage.waitForLoadState('networkidle').catch(() => null);
+        await TestHelpers.waitForStablePage(restaurantPage);
+      }
+
+      const collectRestaurantAuthSnapshot = async () => restaurantPage.evaluate(() => {
+        const rawUser = localStorage.getItem('restaurant_user');
+        const rawRestaurantId = localStorage.getItem('restaurant_id');
+        let user: { id?: string; restaurantId?: string; email?: string; name?: string } | null = null;
+        try {
+          user = rawUser ? JSON.parse(rawUser) : null;
+        } catch {
+          user = null;
+        }
+        return {
+          currentUrl: window.location.href,
+          restaurantStorageUserId: user?.id ?? null,
+          restaurantStorageRestaurantId: rawRestaurantId || user?.restaurantId || null,
+          restaurantStorageEmail: user?.email ?? null,
+          restaurantStorageName: user?.name ?? null,
+          offlineModeVisible: Boolean(document.body.innerText.match(/Offline-Modus/i)),
+        };
+      });
+
+      const restaurantApiRequestUrls: string[] = [];
+      const restaurantApiResponseStatuses: Array<{ url: string; status: number }> = [];
+      const restaurantApiResponseBodies: Array<{ url: string; status: number; body: string }> = [];
+      const restaurantOrdersApiPattern = /\/api\/restaurants\/[^/?]+\/orders(?:[/?].*)?$/;
+      const recordRestaurantNetwork = (response: { url: () => string; status: () => number; text: () => Promise<string> }) => {
+        const responseUrl = response.url();
+        if (!restaurantOrdersApiPattern.test(responseUrl)) {
+          return;
+        }
+        restaurantApiResponseStatuses.push({ url: responseUrl, status: response.status() });
+        response.text().then((body) => {
+          restaurantApiResponseBodies.push({
+            url: responseUrl,
+            status: response.status(),
+            body: body.slice(0, 500),
+          });
+        }).catch(() => null);
+      };
+      restaurantPage.on('request', (request) => {
+        if (restaurantOrdersApiPattern.test(request.url())) {
+          restaurantApiRequestUrls.push(request.url());
+        }
+      });
+      restaurantPage.on('response', recordRestaurantNetwork);
+
       const restaurantVisibleSignals = async () => {
         const visibleButtons = await restaurantPage.locator('button').evaluateAll((nodes) => nodes
           .map((node) => (node.textContent || '').trim().replace(/\s+/g, ' '))
@@ -2118,7 +2198,14 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
         console.log('ℹ️ lifecycle: restaurant orders tab not directly visible, using restaurant UI diagnostics', diagnostics);
         throw new Error(`Restaurant orders tab not found: ${JSON.stringify(diagnostics)}`);
       }
-      await restaurantOrdersTab.click();
+      const openRestaurantOrdersTab = async () => {
+        await restaurantOrdersTab.click();
+        await restaurantPage.waitForLoadState('networkidle').catch(() => null);
+        await TestHelpers.waitForStablePage(restaurantPage);
+        await restaurantPage.waitForTimeout(2500);
+      };
+
+      await openRestaurantOrdersTab();
 
       const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       const orderIdentityPattern = new RegExp(
@@ -2213,19 +2300,47 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
         return null;
       };
 
+      const restaurantAuthSnapshot = await collectRestaurantAuthSnapshot();
+      console.log('ℹ️ lifecycle: restaurant phase2 diagnostics', {
+        createdOrderId: orderId,
+        createdOrderRestaurantId: orderRestaurantId,
+        restaurantStorageUserId: restaurantAuthSnapshot.restaurantStorageUserId,
+        restaurantStorageRestaurantId: restaurantAuthSnapshot.restaurantStorageRestaurantId,
+        restaurantStorageEmail: restaurantAuthSnapshot.restaurantStorageEmail,
+        restaurantStorageName: restaurantAuthSnapshot.restaurantStorageName,
+        offlineModeVisible: restaurantAuthSnapshot.offlineModeVisible,
+        restaurantApiRequests: restaurantApiRequestUrls,
+        restaurantApiResponses: restaurantApiResponseStatuses,
+      });
+
       let resolvedOrderCard = await findVisibleRestaurantOrder();
       if (!resolvedOrderCard) {
-        await restaurantPage.reload({ waitUntil: 'domcontentloaded' });
-        await restaurantPage.waitForLoadState('networkidle').catch(() => null);
-        await TestHelpers.waitForStablePage(restaurantPage);
-        await restaurantOrdersTab.click();
-        await restaurantPage.waitForTimeout(2500);
-        resolvedOrderCard = await findVisibleRestaurantOrder();
+        for (let attempt = 1; attempt <= 2 && !resolvedOrderCard; attempt += 1) {
+          console.log('ℹ️ lifecycle: retrying restaurant order lookup', {
+            attempt,
+            orderId,
+            createdOrderRestaurantId: orderRestaurantId,
+            restaurantStorageRestaurantId: restaurantAuthSnapshot.restaurantStorageRestaurantId,
+          });
+          await restaurantPage.reload({ waitUntil: 'domcontentloaded' });
+          await restaurantPage.waitForLoadState('networkidle').catch(() => null);
+          await TestHelpers.waitForStablePage(restaurantPage);
+          await openRestaurantOrdersTab();
+          resolvedOrderCard = await findVisibleRestaurantOrder();
+        }
       }
 
       if (!resolvedOrderCard) {
         const diagnostics = await collectRestaurantOrderLookupDiagnostics();
-        console.log('restaurantOrderLookupFailed', diagnostics);
+        console.log('restaurantOrderLookupFailed', {
+          ...diagnostics,
+          createdOrderRestaurantId: orderRestaurantId,
+          restaurantStorageUserId: restaurantAuthSnapshot.restaurantStorageUserId,
+          restaurantStorageRestaurantId: restaurantAuthSnapshot.restaurantStorageRestaurantId,
+          restaurantApiRequests: restaurantApiRequestUrls,
+          restaurantApiResponses: restaurantApiResponseStatuses,
+          restaurantApiResponseBodies,
+        });
         throw new Error(`Restaurant order not visible: ${JSON.stringify(diagnostics)}`);
       }
 
