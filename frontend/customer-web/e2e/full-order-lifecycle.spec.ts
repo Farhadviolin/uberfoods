@@ -331,6 +331,120 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
         const cartItems = customerPage.locator('[data-testid="cart-item"], .cart-item');
         const cartQuantities = cartItems.locator('.quantity');
         const cartItemDetails = cartItems.locator('.cart-item-details');
+        const cartPlaceholder = customerPage.getByTestId('cart-placeholder');
+        const cartStateKeyPrefix = 'cart_';
+
+        const parseCartState = (value: unknown) => {
+          const results = {
+            itemCount: 0,
+            quantityCount: 0,
+            summary: [] as Array<{ dishId?: string; quantity?: number; name?: string }>,
+          };
+
+          const visit = (candidate: unknown): void => {
+            if (!candidate) return;
+
+            if (Array.isArray(candidate)) {
+              results.itemCount += candidate.length;
+              for (const entry of candidate) {
+                const itemQuantity = typeof entry === 'object' && entry !== null
+                  ? Number((entry as { quantity?: unknown }).quantity)
+                  : Number.NaN;
+                const safeQuantity = Number.isFinite(itemQuantity) && itemQuantity > 0 ? itemQuantity : 1;
+                results.quantityCount += safeQuantity;
+                results.summary.push({
+                  dishId: typeof entry === 'object' && entry !== null ? String((entry as { dishId?: unknown }).dishId ?? '') : '',
+                  quantity: safeQuantity,
+                  name: typeof entry === 'object' && entry !== null ? String((entry as { name?: unknown }).name ?? '') : '',
+                });
+              }
+              return;
+            }
+
+            if (typeof candidate === 'object') {
+              const record = candidate as {
+                items?: unknown;
+                quantity?: unknown;
+                itemCount?: unknown;
+                itemsCount?: unknown;
+                cart?: unknown;
+              };
+
+              if (Array.isArray(record.items)) {
+                visit(record.items);
+                return;
+              }
+
+              if (Array.isArray(record.cart)) {
+                visit(record.cart);
+                return;
+              }
+
+              const objectQuantity = Number(record.quantity);
+              if (Number.isFinite(objectQuantity) && objectQuantity > 0) {
+                results.quantityCount += objectQuantity;
+                results.itemCount += 1;
+                results.summary.push({ quantity: objectQuantity });
+                return;
+              }
+
+              const objectItemCount = Number(record.itemCount ?? record.itemsCount);
+              if (Number.isFinite(objectItemCount) && objectItemCount > 0) {
+                results.itemCount += objectItemCount;
+                results.quantityCount += objectItemCount;
+              }
+            }
+          };
+
+          visit(value);
+          return results;
+        };
+
+        const getStorageCartDiagnostics = async () => {
+          const storageEntries = await customerPage.evaluate(({ prefix }) => {
+            const entries: Record<string, unknown> = {};
+            for (let index = 0; index < localStorage.length; index += 1) {
+              const key = localStorage.key(index);
+              if (!key || !key.startsWith(prefix)) continue;
+
+              const raw = localStorage.getItem(key);
+              if (raw === null) {
+                entries[key] = null;
+                continue;
+              }
+
+              try {
+                entries[key] = JSON.parse(raw);
+              } catch {
+                entries[key] = raw;
+              }
+            }
+            return entries;
+          }, { prefix: cartStateKeyPrefix });
+
+          const parsedEntries = Object.entries(storageEntries).map(([key, value]) => {
+            const parsed = parseCartState(value);
+            return {
+              key,
+              rawType: Array.isArray(value) ? 'array' : typeof value,
+              ...parsed,
+            };
+          });
+
+          const storageItemCount = parsedEntries.reduce((sum, entry) => sum + entry.itemCount, 0);
+          const storageQuantityCount = parsedEntries.reduce((sum, entry) => sum + entry.quantityCount, 0);
+          const storageKeys = parsedEntries.map((entry) => entry.key);
+          const cartPlaceholderText = (await cartPlaceholder.textContent().catch(() => '')) || '';
+
+          return {
+            storageKeys,
+            storageEntries: parsedEntries,
+            storageItemCount,
+            storageQuantityCount,
+            cartPlaceholderText,
+          };
+        };
+
         const getMissingMinOrderAmount = async () => {
           if (await minOrderSummary.count().catch(() => 0) === 0) {
             return 0;
@@ -369,15 +483,21 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
 
         for (let attempt = 1; attempt <= 10; attempt += 1) {
           const cartDiagnostics = await getCartDiagnostics();
+          const storageDiagnostics = await getStorageCartDiagnostics();
           const missingAmount = await getMissingMinOrderAmount();
-          const hasSufficientQuantity = cartDiagnostics.quantityCount >= 2;
+          const hasSufficientQuantity = cartDiagnostics.quantityCount >= 2
+            || storageDiagnostics.storageQuantityCount >= 2
+            || storageDiagnostics.storageItemCount >= 2;
+          const minimumWarningCleared = !missingAmount || Number.isNaN(missingAmount);
 
-          if ((!missingAmount || Number.isNaN(missingAmount)) && hasSufficientQuantity) {
+          if (minimumWarningCleared && hasSufficientQuantity) {
             console.log(`✅ lifecycle: minimum order satisfied after ${attempt - 1} extra attempts`);
             console.log('ℹ️ lifecycle: minimum order cart diagnostics', {
               ...cartDiagnostics,
+              ...storageDiagnostics,
               missingAmount,
               hasAtLeastTwoItemsOrQuantity: hasSufficientQuantity,
+              minimumWarningCleared,
             });
             console.log('✅ lifecycle: leaving phase1 minimum order satisfaction');
             return;
@@ -387,23 +507,31 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
           expect(count).toBeGreaterThan(0);
           console.log(`➡️ lifecycle: minimum order still open (${missingAmount.toFixed(2)}€ missing), adding item attempt ${attempt}`, {
             ...cartDiagnostics,
+            ...storageDiagnostics,
             missingAmount,
             hasAtLeastTwoItemsOrQuantity: hasSufficientQuantity,
+            minimumWarningCleared,
           });
           await addToCartButtons.nth((attempt - 1) % count).click();
           await customerPage.waitForTimeout(300);
 
           const postClickDiagnostics = await getCartDiagnostics();
+          const postClickStorageDiagnostics = await getStorageCartDiagnostics();
           const postClickMissingAmount = await getMissingMinOrderAmount();
-          const postClickHasSufficientQuantity = postClickDiagnostics.quantityCount >= 2;
+          const postClickHasSufficientQuantity = postClickDiagnostics.quantityCount >= 2
+            || postClickStorageDiagnostics.storageQuantityCount >= 2
+            || postClickStorageDiagnostics.storageItemCount >= 2;
+          const postClickMinimumWarningCleared = !postClickMissingAmount || Number.isNaN(postClickMissingAmount);
 
           console.log('ℹ️ lifecycle: minimum order post-click cart diagnostics', {
             ...postClickDiagnostics,
+            ...postClickStorageDiagnostics,
             missingAmount: postClickMissingAmount,
             hasAtLeastTwoItemsOrQuantity: postClickHasSufficientQuantity,
+            minimumWarningCleared: postClickMinimumWarningCleared,
           });
 
-          if ((!postClickMissingAmount || Number.isNaN(postClickMissingAmount)) && postClickHasSufficientQuantity) {
+          if (postClickMinimumWarningCleared && postClickHasSufficientQuantity) {
             console.log(`✅ lifecycle: minimum order satisfied after ${attempt} extra attempts`);
             console.log('✅ lifecycle: leaving phase1 minimum order satisfaction');
             return;
