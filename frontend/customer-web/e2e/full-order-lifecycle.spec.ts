@@ -165,6 +165,65 @@ async function registerCustomerForLifecycleWithDiagnostics(
   return credentials;
 }
 
+async function resolveMinimumOrderSubtotal(page: Page, cartPrefix = 'cart_') {
+  return page.evaluate(({ prefix }) => {
+    const parseAmount = (value: string) => Number(value.replace(/\s/g, '').replace(',', '.'));
+    const texts = Array.from(document.querySelectorAll(
+      '[data-testid="cart"], .cart, [data-testid*="subtotal"], .cart-summary, .order-summary',
+    ))
+      .filter((element) => {
+        const style = window.getComputedStyle(element);
+        return style.display !== 'none' && style.visibility !== 'hidden';
+      })
+      .map((element) => element.textContent || '');
+    const labeledSubtotal = texts
+      .map((text) => text.match(/(?:Subtotal|Zwischensumme)\s*:?\s*(?:€\s*)?([\d.,]+)\s*€?/i)?.[1])
+      .find(Boolean);
+
+    if (labeledSubtotal) {
+      return {
+        subtotal: parseAmount(labeledSubtotal),
+        source: 'visible-cart',
+        cartStatePresent: true,
+      };
+    }
+
+    let storageSubtotal = 0;
+    let cartStatePresent = false;
+    for (let index = 0; index < localStorage.length; index += 1) {
+      const key = localStorage.key(index);
+      if (!key?.startsWith(prefix)) continue;
+      const raw = localStorage.getItem(key);
+      if (!raw) continue;
+      cartStatePresent = true;
+
+      try {
+        const parsed = JSON.parse(raw);
+        const items = Array.isArray(parsed)
+          ? parsed
+          : Array.isArray(parsed?.items)
+            ? parsed.items
+            : Array.isArray(parsed?.cart)
+              ? parsed.cart
+              : [];
+        storageSubtotal += items.reduce((sum: number, item: { price?: unknown; quantity?: unknown }) => {
+          const price = Number(item?.price);
+          const quantity = Number(item?.quantity);
+          return sum + (Number.isFinite(price) ? price : 0) * (Number.isFinite(quantity) && quantity > 0 ? quantity : 1);
+        }, 0);
+      } catch {
+        // The caller reports that cart state existed but could not produce a subtotal.
+      }
+    }
+
+    return {
+      subtotal: storageSubtotal > 0 ? storageSubtotal : null,
+      source: storageSubtotal > 0 ? 'local-storage' : null,
+      cartStatePresent,
+    };
+  }, { prefix: cartPrefix });
+}
+
 test.describe('Full Order Lifecycle UI-E2E', () => {
   let orderId: string;
   let lastOrderCreateResponse: Response | null = null;
@@ -336,6 +395,7 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
         const cartPlaceholder = customerPage.getByTestId('cart-placeholder');
         const cartStateKeyPrefix = 'cart_';
         const targetSubtotal = 25;
+        const maxMinimumOrderAttempts = 10;
 
         const parseCartState = (value: unknown) => {
           const results = {
@@ -467,11 +527,7 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
           const quantityTexts = await cartQuantities.allTextContents().catch(() => []);
           const itemDetailTexts = await cartItemDetails.allTextContents().catch(() => []);
           const cartItemTexts = await cartItems.allTextContents().catch(() => []);
-          const cartText = (await customerPage.getByTestId('cart').textContent().catch(() => '')) || '';
-          const subtotalMatch = cartText.match(/(?:Subtotal|Zwischensumme)\s*:?\s*([\d.,]+)\s*€/i);
-          const visibleSubtotal = subtotalMatch
-            ? Number(subtotalMatch[1].replace(',', '.'))
-            : 0;
+          const subtotalDiagnostics = await resolveMinimumOrderSubtotal(customerPage, cartStateKeyPrefix);
           const numericQuantities = quantityTexts
             .map((text) => Number((text || '').trim()))
             .filter((quantity) => Number.isFinite(quantity));
@@ -484,20 +540,22 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
             quantityCount,
             itemDetailTexts,
             cartItemTexts,
-            visibleSubtotal,
+            subtotal: subtotalDiagnostics.subtotal,
+            subtotalSource: subtotalDiagnostics.source,
+            cartStatePresent: subtotalDiagnostics.cartStatePresent,
             minimumWarningVisible: (await minOrderSummary.isVisible().catch(() => false))
               && (await getMissingMinOrderAmount()) > 0,
           };
         };
 
-        for (let attempt = 1; attempt <= 10; attempt += 1) {
+        for (let attempt = 1; attempt <= maxMinimumOrderAttempts; attempt += 1) {
           const cartDiagnostics = await getCartDiagnostics();
           const storageDiagnostics = await getStorageCartDiagnostics();
           const missingAmount = await getMissingMinOrderAmount();
           const hasSufficientQuantity = cartDiagnostics.quantityCount >= 2
             || storageDiagnostics.storageQuantityCount >= 2
             || storageDiagnostics.storageItemCount >= 2;
-          const hasSafeSubtotal = cartDiagnostics.visibleSubtotal >= targetSubtotal;
+          const hasSafeSubtotal = (cartDiagnostics.subtotal ?? 0) >= targetSubtotal;
           const minimumWarningCleared = !missingAmount || Number.isNaN(missingAmount);
 
           if (minimumWarningCleared && hasSufficientQuantity && hasSafeSubtotal) {
@@ -535,7 +593,7 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
           const postClickHasSufficientQuantity = postClickDiagnostics.quantityCount >= 2
             || postClickStorageDiagnostics.storageQuantityCount >= 2
             || postClickStorageDiagnostics.storageItemCount >= 2;
-          const postClickHasSafeSubtotal = postClickDiagnostics.visibleSubtotal >= targetSubtotal;
+          const postClickHasSafeSubtotal = (postClickDiagnostics.subtotal ?? 0) >= targetSubtotal;
           const postClickMinimumWarningCleared = !postClickMissingAmount || Number.isNaN(postClickMissingAmount);
 
           console.log('ℹ️ lifecycle: minimum order post-click cart diagnostics', {
@@ -555,7 +613,23 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
           }
         }
 
-        throw new Error('Minimum order value was not satisfied after 10 add-to-cart attempts');
+        const finalDiagnostics = await getCartDiagnostics();
+        const finalButtonCount = await addToCartButtons.count().catch(() => 0);
+        if (finalDiagnostics.subtotal === null) {
+          throw new Error(`Minimum order subtotal could not be resolved: ${JSON.stringify({
+            addAttempts: maxMinimumOrderAttempts,
+            addButtonCount: finalButtonCount,
+            cartStatePresent: finalDiagnostics.cartStatePresent,
+            subtotalSource: finalDiagnostics.subtotalSource,
+          })}`);
+        }
+        throw new Error(`Minimum order value was not satisfied: ${JSON.stringify({
+          subtotal: finalDiagnostics.subtotal,
+          targetSubtotal,
+          addAttempts: maxMinimumOrderAttempts,
+          addButtonCount: finalButtonCount,
+          cartStatePresent: finalDiagnostics.cartStatePresent,
+        })}`);
       });
 
       await withStepTimeout('phase1 navigate to checkout', async () => {
@@ -692,9 +766,8 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
         console.log('➡️ lifecycle: phase1 preparing final order submit');
         const minOrderSummary = customerPage.locator('.cart-summary-row.min-order');
         const getVisibleSubtotal = async () => {
-          const cartText = (await customerPage.getByTestId('cart').textContent().catch(() => '')) || '';
-          const subtotalMatch = cartText.match(/(?:Subtotal|Zwischensumme)\s*:?\s*([\d.,]+)\s*€/i);
-          return subtotalMatch ? Number(subtotalMatch[1].replace(',', '.')) : 0;
+          const subtotalDiagnostics = await resolveMinimumOrderSubtotal(customerPage);
+          return subtotalDiagnostics.subtotal ?? 0;
         };
         const getMissingMinOrderAmount = async () => {
           if (await minOrderSummary.count().catch(() => 0) === 0) {
