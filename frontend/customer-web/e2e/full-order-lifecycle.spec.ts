@@ -1251,6 +1251,188 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
         console.log('checkoutAddressSnapshotAfterProfileVerification', await collectCheckoutAddressSnapshot());
         await logCheckoutDiagnostics('after profile verification');
 
+        const collectFinalSubmitCartDiagnostics = async () => {
+          const storageDiagnostics = await customerPage.evaluate(({ prefix }) => {
+            const parseAmount = (value: unknown) => {
+              if (typeof value === 'number') {
+                return Number.isFinite(value) ? value : null;
+              }
+              if (typeof value !== 'string') {
+                return null;
+              }
+
+              const normalized = value.replace(/[^\d,.-]/g, '').replace(',', '.');
+              const amount = Number(normalized);
+              return Number.isFinite(amount) ? amount : null;
+            };
+
+            const summary = {
+              itemCount: 0,
+              quantityCount: 0,
+              subtotal: 0,
+              subtotalSource: null as string | null,
+              cartItems: [] as Array<{ dishId?: string; quantity: number; price?: number; name?: string }>,
+            };
+
+            for (let index = 0; index < localStorage.length; index += 1) {
+              const key = localStorage.key(index);
+              if (!key || !key.startsWith(prefix)) continue;
+              const raw = localStorage.getItem(key);
+              if (!raw) continue;
+
+              try {
+                const parsed = JSON.parse(raw);
+                const items = Array.isArray(parsed)
+                  ? parsed
+                  : Array.isArray(parsed?.items)
+                    ? parsed.items
+                    : Array.isArray(parsed?.cart)
+                      ? parsed.cart
+                      : [];
+
+                summary.itemCount += items.length;
+
+                for (const item of items as Array<Record<string, unknown>>) {
+                  const nestedDish = item?.dish && typeof item.dish === 'object' ? item.dish as Record<string, unknown> : null;
+                  const quantity = Number(item?.quantity ?? item?.qty ?? item?.count ?? 1);
+                  const safeQuantity = Number.isFinite(quantity) && quantity > 0 ? quantity : 1;
+                  const directTotal = parseAmount(item?.totalPrice ?? item?.subtotal);
+                  const nestedPrice = parseAmount(item?.price ?? item?.unitPrice ?? nestedDish?.price ?? nestedDish?.unitPrice);
+                  summary.quantityCount += safeQuantity;
+                  summary.cartItems.push({
+                    dishId: typeof item?.dishId === 'string' ? item.dishId : typeof nestedDish?.id === 'string' ? String(nestedDish.id) : undefined,
+                    quantity: safeQuantity,
+                    price: directTotal ?? nestedPrice ?? undefined,
+                    name: typeof item?.name === 'string' ? item.name : typeof nestedDish?.name === 'string' ? String(nestedDish.name) : undefined,
+                  });
+                  if (directTotal !== null && directTotal !== undefined) {
+                    summary.subtotal += directTotal;
+                    summary.subtotalSource = summary.subtotalSource ?? 'item.totalPrice';
+                  } else if (nestedPrice !== null && nestedPrice !== undefined) {
+                    summary.subtotal += nestedPrice * safeQuantity;
+                    summary.subtotalSource = summary.subtotalSource ?? 'item.price';
+                  }
+                }
+              } catch {
+                // Ignore malformed cart storage and fall back to DOM/restore logic below.
+              }
+            }
+
+            return summary;
+          }, { prefix: 'cart_' });
+
+          const domSubtotalDiagnostics = await resolveMinimumOrderSubtotal(customerPage);
+          const domSubtotal = domSubtotalDiagnostics.subtotal ?? null;
+          const storageSubtotal = storageDiagnostics.subtotal > 0 ? storageDiagnostics.subtotal : null;
+          const subtotal = domSubtotal !== null && domSubtotal >= 25
+            ? domSubtotal
+            : storageSubtotal !== null && storageSubtotal >= 25
+              ? storageSubtotal
+              : lastSafeMinimumOrderSubtotal !== null && lastSafeMinimumOrderSubtotal >= 25
+                ? lastSafeMinimumOrderSubtotal
+                : domSubtotal ?? storageSubtotal ?? 0;
+
+          return {
+            ...storageDiagnostics,
+            domSubtotal,
+            storageSubtotal,
+            subtotal,
+            subtotalSource: domSubtotal !== null && domSubtotal >= 25
+              ? domSubtotalDiagnostics.source ?? 'visible-subtotal-dom'
+              : storageSubtotal !== null && storageSubtotal >= 25
+                ? storageDiagnostics.subtotalSource ?? 'localStorage-cart-state'
+                : lastSafeMinimumOrderSource ?? domSubtotalDiagnostics.source ?? storageDiagnostics.subtotalSource ?? 'unknown',
+            finalSubmitMinimumSatisfied: subtotal >= 25,
+          };
+        };
+
+        const ensureFinalSubmitMinimumCart = async () => {
+          let diagnostics = await collectFinalSubmitCartDiagnostics();
+          console.log('ℹ️ lifecycle: final submit cart diagnostics', {
+            finalSubmitCartItems: diagnostics.cartItems,
+            finalSubmitSubtotal: diagnostics.subtotal,
+            finalSubmitItemCount: diagnostics.itemCount,
+            finalSubmitQuantityCount: diagnostics.quantityCount,
+            finalSubmitPayloadPreview: diagnostics.cartItems.slice(0, 5),
+            finalSubmitMinimumSatisfied: diagnostics.finalSubmitMinimumSatisfied,
+            subtotalSource: diagnostics.subtotalSource,
+          });
+
+          if (diagnostics.finalSubmitMinimumSatisfied && diagnostics.itemCount >= 2) {
+            return diagnostics;
+          }
+
+          console.log('ℹ️ lifecycle: final submit cart below minimum, restoring items from restaurant menu', {
+            currentUrl: customerPage.url(),
+            finalSubmitSubtotal: diagnostics.subtotal,
+            finalSubmitItemCount: diagnostics.itemCount,
+            finalSubmitQuantityCount: diagnostics.quantityCount,
+          });
+
+          await customerPage.goto(`${testUrls.customer}/restaurants`, { waitUntil: 'domcontentloaded' });
+          await customerPage.waitForLoadState('networkidle').catch(() => null);
+          await TestHelpers.waitForStablePage(customerPage);
+
+          const addToCartButtons = customerPage.locator('[data-testid="add-to-cart-button"]');
+          const addButtonCount = await addToCartButtons.count().catch(() => 0);
+          if (addButtonCount === 0) {
+            throw new Error('Cannot restore final submit cart minimum because no add-to-cart buttons are visible');
+          }
+
+          for (let attempt = 1; attempt <= 10; attempt += 1) {
+            diagnostics = await collectFinalSubmitCartDiagnostics();
+            if (diagnostics.finalSubmitMinimumSatisfied && diagnostics.itemCount >= 2) {
+              break;
+            }
+
+            console.log('➡️ lifecycle: restoring final submit cart minimum', {
+              attempt,
+              finalSubmitSubtotal: diagnostics.subtotal,
+              finalSubmitItemCount: diagnostics.itemCount,
+              finalSubmitQuantityCount: diagnostics.quantityCount,
+              finalSubmitPayloadPreview: diagnostics.cartItems.slice(0, 5),
+            });
+            await addToCartButtons.nth((attempt - 1) % addButtonCount).click();
+            await customerPage.waitForTimeout(300);
+          }
+
+          diagnostics = await collectFinalSubmitCartDiagnostics();
+          console.log('ℹ️ lifecycle: final submit cart diagnostics after restore', {
+            finalSubmitCartItems: diagnostics.cartItems,
+            finalSubmitSubtotal: diagnostics.subtotal,
+            finalSubmitItemCount: diagnostics.itemCount,
+            finalSubmitQuantityCount: diagnostics.quantityCount,
+            finalSubmitPayloadPreview: diagnostics.cartItems.slice(0, 5),
+            finalSubmitMinimumSatisfied: diagnostics.finalSubmitMinimumSatisfied,
+            subtotalSource: diagnostics.subtotalSource,
+          });
+
+          if (!(diagnostics.finalSubmitMinimumSatisfied && diagnostics.itemCount >= 2)) {
+            throw new Error(`Final submit cart could not be restored above minimum: ${JSON.stringify({
+              finalSubmitSubtotal: diagnostics.subtotal,
+              finalSubmitItemCount: diagnostics.itemCount,
+              finalSubmitQuantityCount: diagnostics.quantityCount,
+              finalSubmitPayloadPreview: diagnostics.cartItems.slice(0, 5),
+            })}`);
+          }
+
+          await customerPage.goto('/checkout', { waitUntil: 'domcontentloaded' });
+          await customerPage.waitForLoadState('networkidle').catch(() => null);
+          await TestHelpers.waitForStablePage(customerPage);
+
+          return collectFinalSubmitCartDiagnostics();
+        };
+
+        const finalSubmitCartDiagnostics = await ensureFinalSubmitMinimumCart();
+        console.log('ℹ️ lifecycle: final submit cart diagnostics ready', {
+          finalSubmitCartItems: finalSubmitCartDiagnostics.cartItems,
+          finalSubmitSubtotal: finalSubmitCartDiagnostics.subtotal,
+          finalSubmitItemCount: finalSubmitCartDiagnostics.itemCount,
+          finalSubmitQuantityCount: finalSubmitCartDiagnostics.quantityCount,
+          finalSubmitPayloadPreview: finalSubmitCartDiagnostics.cartItems.slice(0, 5),
+          finalSubmitMinimumSatisfied: finalSubmitCartDiagnostics.finalSubmitMinimumSatisfied,
+        });
+
         const cartContainer = customerPage.getByTestId('cart');
         const submitCandidates = [
           cartContainer.locator('button[data-testid="checkout-button"]'),
