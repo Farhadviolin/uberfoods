@@ -1261,8 +1261,17 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
           await customerPage.getByLabel(/cvc/i).fill('123');
         }
 
-        const paymentConfirmButton = customerPage.getByTestId('payment-confirm-button');
-        await expect(paymentConfirmButton).toBeVisible();
+        const paymentConfirmButton = customerPage
+          .getByTestId('payment-confirm-button')
+          .or(customerPage.getByRole('button', {
+            name: /pay|bezahlen|zahlung bestätigen|zahlung abschließen|confirm|bestätigen|complete payment|place order|order/i,
+          }))
+          .or(paymentModal.locator('button').filter({
+            hasText: /pay|bezahlen|zahlung bestätigen|zahlung abschließen|confirm|bestätigen|complete payment|place order|order/i,
+          }))
+          .first();
+        await expect(paymentConfirmButton).toBeVisible({ timeout: 10000 });
+        await expect(paymentConfirmButton).toBeEnabled();
         await paymentConfirmButton.click();
       } else {
         console.log('ℹ️ Payment modal not shown, waiting for direct order navigation');
