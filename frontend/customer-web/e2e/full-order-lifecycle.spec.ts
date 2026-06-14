@@ -832,8 +832,71 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
         console.log('➡️ lifecycle: phase1 preparing final order submit');
         const minOrderSummary = customerPage.locator('.cart-summary-row.min-order');
         const getVisibleSubtotal = async () => {
-          const subtotalDiagnostics = await resolveMinimumOrderSubtotal(customerPage);
-          return subtotalDiagnostics.subtotal ?? 0;
+          const subtotalDiagnostics = await customerPage.evaluate(() => {
+            const parseAmount = (value: unknown) => {
+              if (typeof value === 'number') {
+                return Number.isFinite(value) ? value : null;
+              }
+              if (typeof value !== 'string') {
+                return null;
+              }
+
+              const normalized = value.replace(/[^\d,.-]/g, '').replace(',', '.');
+              const amount = Number(normalized);
+              return Number.isFinite(amount) ? amount : null;
+            };
+
+            const summarySelectors = [
+              '.cart-summary-row',
+              '.cart-summary',
+              '.order-summary',
+              '[data-testid="subtotal"]',
+              '[data-testid*="subtotal"]',
+            ];
+            const summaryTexts = Array.from(document.querySelectorAll(summarySelectors.join(',')))
+              .filter((element) => {
+                const style = window.getComputedStyle(element);
+                return style.display !== 'none' && style.visibility !== 'hidden';
+              })
+              .map((element) => (element.textContent || '').trim())
+              .filter(Boolean);
+
+            const visibleSubtotalText = summaryTexts
+              .map((text) => {
+                const subtotalMatch = text.match(/(?:Subtotal|Zwischensumme)\s*:?\s*(?:€\s*)?([\d.,]+)\s*€?/i);
+                if (subtotalMatch?.[1]) {
+                  return parseAmount(subtotalMatch[1]);
+                }
+                const amountMatches = Array.from(text.matchAll(/€\s*([\d.,]+)/g)).map((match) => parseAmount(match[1])).filter((amount): amount is number => amount !== null);
+                return amountMatches.length === 1 ? amountMatches[0] : null;
+              })
+              .find((value): value is number => value !== null);
+
+            if (visibleSubtotalText !== undefined && visibleSubtotalText !== null) {
+              return {
+                subtotal: visibleSubtotalText,
+                source: 'visible-subtotal-dom',
+              };
+            }
+
+            return null;
+          });
+
+          if (subtotalDiagnostics?.subtotal !== null && subtotalDiagnostics?.subtotal !== undefined) {
+            console.log('ℹ️ lifecycle: pre-submit subtotal source', {
+              subtotalSource: subtotalDiagnostics.source,
+              subtotal: subtotalDiagnostics.subtotal,
+            });
+            return subtotalDiagnostics.subtotal;
+          }
+
+          const fallbackSubtotalDiagnostics = await resolveMinimumOrderSubtotal(customerPage);
+          console.log('ℹ️ lifecycle: pre-submit subtotal source', {
+            subtotalSource: fallbackSubtotalDiagnostics.source ?? 'localStorage-cart-state',
+            subtotal: fallbackSubtotalDiagnostics.subtotal ?? 0,
+            cartStatePresent: fallbackSubtotalDiagnostics.cartStatePresent,
+          });
+          return fallbackSubtotalDiagnostics.subtotal ?? 0;
         };
         const getMissingMinOrderAmount = async () => {
           if (await minOrderSummary.count().catch(() => 0) === 0) {
