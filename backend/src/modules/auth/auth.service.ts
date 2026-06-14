@@ -432,7 +432,11 @@ export class AuthService {
     }
 
     const { password: _, ...result } = restaurant;
-    return this.login({ ...result, role: "restaurant" });
+    return this.login({
+      ...result,
+      role: "restaurant",
+      currentStatus: "ACTIVE",
+    });
   }
 
   async adminLogin(email: string, password: string) {

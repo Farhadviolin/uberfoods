@@ -29,7 +29,6 @@ async function main() {
     update: {
       isActive: true,
       status: 'OPEN',
-      currentStatus: 'ACTIVE',
     },
     create: {
       name: 'Pizza Palace',
@@ -41,7 +40,6 @@ async function main() {
       mustChangePassword: false,
       isActive: true,
       status: 'OPEN', // Explicitly set status for /restaurants/public endpoint
-      currentStatus: 'ACTIVE',
     },
   });
 
@@ -50,7 +48,6 @@ async function main() {
     update: {
       isActive: true,
       status: 'OPEN',
-      currentStatus: 'ACTIVE',
     },
     create: {
       name: 'Burger Kingdom',
@@ -61,7 +58,6 @@ async function main() {
       imageUrl: null,
       isActive: true,
       status: 'OPEN', // Explicitly set status for /restaurants/public endpoint
-      currentStatus: 'ACTIVE',
     },
   });
 
@@ -70,7 +66,6 @@ async function main() {
     update: {
       isActive: true,
       status: 'OPEN',
-      currentStatus: 'ACTIVE',
     },
     create: {
       name: 'Sushi Master',
@@ -81,7 +76,6 @@ async function main() {
       imageUrl: null,
       isActive: true,
       status: 'OPEN', // Explicitly set status for /restaurants/public endpoint
-      currentStatus: 'ACTIVE',
     },
   });
 
