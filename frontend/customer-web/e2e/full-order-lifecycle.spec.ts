@@ -1374,9 +1374,47 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
           await TestHelpers.waitForStablePage(customerPage);
 
           const addToCartButtons = customerPage.locator('[data-testid="add-to-cart-button"]');
-          const addButtonCount = await addToCartButtons.count().catch(() => 0);
+          let addButtonCount = await addToCartButtons.count().catch(() => 0);
           if (addButtonCount === 0) {
-            throw new Error('Cannot restore final submit cart minimum because no add-to-cart buttons are visible');
+            const restaurantCards = customerPage.getByTestId('restaurant-card');
+            const restaurantCardCount = await restaurantCards.count().catch(() => 0);
+            console.log('ℹ️ lifecycle: no add-to-cart buttons on restaurants index, trying restaurant card detail fallback', {
+              currentUrl: customerPage.url(),
+              restaurantCardCount,
+              visibleButtons: await customerPage.locator('button').evaluateAll((nodes) => nodes
+                .map((node) => (node.textContent || '').trim().replace(/\s+/g, ' '))
+                .filter(Boolean))
+                .catch(() => []),
+              visibleLinks: await customerPage.locator('a').evaluateAll((nodes) => nodes
+                .map((node) => (node.textContent || '').trim().replace(/\s+/g, ' '))
+                .filter(Boolean))
+                .catch(() => []),
+              bodyText: (await customerPage.locator('body').textContent().catch(() => '')).slice(0, 1000),
+              cartState: diagnostics,
+            });
+
+            if (restaurantCardCount > 0) {
+              await restaurantCards.first().click();
+              await customerPage.waitForLoadState('networkidle').catch(() => null);
+              await TestHelpers.waitForStablePage(customerPage);
+              addButtonCount = await addToCartButtons.count().catch(() => 0);
+            }
+          }
+
+          if (addButtonCount === 0) {
+            throw new Error(`Cannot restore final submit cart minimum because no add-to-cart buttons are visible: ${JSON.stringify({
+              currentUrl: customerPage.url(),
+              visibleButtons: await customerPage.locator('button').evaluateAll((nodes) => nodes
+                .map((node) => (node.textContent || '').trim().replace(/\s+/g, ' '))
+                .filter(Boolean))
+                .catch(() => []),
+              visibleLinks: await customerPage.locator('a').evaluateAll((nodes) => nodes
+                .map((node) => (node.textContent || '').trim().replace(/\s+/g, ' '))
+                .filter(Boolean))
+                .catch(() => []),
+              bodyText: (await customerPage.locator('body').textContent().catch(() => '')).slice(0, 1000),
+              cartState: diagnostics,
+            })}`);
           }
 
           for (let attempt = 1; attempt <= 10; attempt += 1) {
@@ -1950,8 +1988,74 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
       await restaurantPage.goto(testUrls.restaurant);
       await TestHelpers.waitForStablePage(restaurantPage);
 
+      const restaurantVisibleSignals = async () => {
+        const visibleButtons = await restaurantPage.locator('button').evaluateAll((nodes) => nodes
+          .map((node) => (node.textContent || '').trim().replace(/\s+/g, ' '))
+          .filter(Boolean))
+          .catch(() => []);
+        const visibleLinks = await restaurantPage.locator('a').evaluateAll((nodes) => nodes
+          .map((node) => (node.textContent || '').trim().replace(/\s+/g, ' '))
+          .filter(Boolean))
+          .catch(() => []);
+        const visibleHeadings = await restaurantPage.locator('h1, h2, h3').evaluateAll((nodes) => nodes
+          .map((node) => (node.textContent || '').trim().replace(/\s+/g, ' '))
+          .filter(Boolean))
+          .catch(() => []);
+        const bodyText = (await restaurantPage.locator('body').textContent().catch(() => '')).slice(0, 1000);
+        return {
+          currentUrl: restaurantPage.url(),
+          visibleButtons,
+          visibleLinks,
+          visibleHeadings,
+          bodyText,
+        };
+      };
+
+      const completeRestaurantOnboardingIfNeeded = async () => {
+        for (let attempt = 1; attempt <= 3; attempt += 1) {
+          const onboardingWrapper = restaurantPage.locator('.onboarding-wrapper');
+          const onboardingVisible = await onboardingWrapper.isVisible().catch(() => false);
+          if (!onboardingVisible) {
+            return;
+          }
+
+          console.log('ℹ️ lifecycle: restaurant onboarding visible', await restaurantVisibleSignals());
+
+          const primaryButtons = [
+            restaurantPage.getByRole('button', { name: /öffnungszeiten speichern & weiter/i }),
+            restaurantPage.getByRole('button', { name: /lieferzone speichern & weiter/i }),
+            restaurantPage.getByRole('button', { name: /zum dashboard/i }),
+            restaurantPage.getByRole('button', { name: /schritt überspringen/i }),
+          ];
+
+          let clicked = false;
+          for (const candidate of primaryButtons) {
+            const button = candidate.first();
+            if (await button.isVisible().catch(() => false) && await button.isEnabled().catch(() => false)) {
+              console.log('➡️ lifecycle: completing restaurant onboarding', {
+                buttonText: await button.textContent().catch(() => null),
+                currentUrl: restaurantPage.url(),
+              });
+              await button.click();
+              await restaurantPage.waitForLoadState('networkidle').catch(() => null);
+              await TestHelpers.waitForStablePage(restaurantPage);
+              clicked = true;
+              break;
+            }
+          }
+
+          if (!clicked) {
+            break;
+          }
+        }
+      };
+
+      await completeRestaurantOnboardingIfNeeded();
+
       const restaurantLoggedInSignal = restaurantPage
-        .getByRole('button', { name: /dashboard|bestellungen|orders|küche|menü|profil|einstellungen/i })
+        .locator('button.sidebar-item')
+        .filter({ hasText: /dashboard|bestellungen|orders|küche|menü|profil|einstellungen/i })
+        .or(restaurantPage.getByRole('button', { name: /dashboard|bestellungen|orders|küche|menü|profil|einstellungen/i }))
         .or(restaurantPage.getByRole('link', { name: /dashboard|bestellungen|orders|logout|abmelden/i }))
         .or(restaurantPage.getByText(/dashboard|bestellungen|orders|restaurant/i))
         .first();
@@ -1966,12 +2070,17 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
 
       // Navigate to orders
       const restaurantOrdersTab = restaurantPage
-        .getByRole('button', { name: /bestellungen|orders/i })
+        .locator('button.sidebar-item')
+        .filter({ hasText: /bestellungen|orders/i })
+        .or(restaurantPage.getByRole('button', { name: /bestellungen|orders/i }))
         .or(restaurantPage.getByRole('link', { name: /bestellungen|orders/i }))
         .or(restaurantPage.locator(selectors.navOrders))
         .first();
 
-      await expect(restaurantOrdersTab).toBeVisible({ timeout: 10000 });
+      if (!await restaurantOrdersTab.isVisible().catch(() => false)) {
+        console.log('ℹ️ lifecycle: restaurant orders tab not directly visible, using restaurant UI diagnostics', await restaurantVisibleSignals());
+        throw new Error(`Restaurant orders tab not found: ${JSON.stringify(await restaurantVisibleSignals())}`);
+      }
       await restaurantOrdersTab.click();
 
       // Find the order and mark as ready
