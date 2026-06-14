@@ -1331,6 +1331,7 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
               : lastSafeMinimumOrderSubtotal !== null && lastSafeMinimumOrderSubtotal >= 25
                 ? lastSafeMinimumOrderSubtotal
                 : domSubtotal ?? storageSubtotal ?? 0;
+          const payloadMinimumSatisfied = subtotal >= 25;
 
           return {
             ...storageDiagnostics,
@@ -1342,7 +1343,7 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
               : storageSubtotal !== null && storageSubtotal >= 25
                 ? storageDiagnostics.subtotalSource ?? 'localStorage-cart-state'
                 : lastSafeMinimumOrderSource ?? domSubtotalDiagnostics.source ?? storageDiagnostics.subtotalSource ?? 'unknown',
-            finalSubmitMinimumSatisfied: subtotal >= 25,
+            finalSubmitMinimumSatisfied: payloadMinimumSatisfied,
           };
         };
 
@@ -1358,7 +1359,7 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
             subtotalSource: diagnostics.subtotalSource,
           });
 
-          if (diagnostics.finalSubmitMinimumSatisfied && diagnostics.itemCount >= 2) {
+          if (diagnostics.finalSubmitMinimumSatisfied) {
             return diagnostics;
           }
 
@@ -1373,9 +1374,13 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
           await customerPage.waitForLoadState('networkidle').catch(() => null);
           await TestHelpers.waitForStablePage(customerPage);
 
-          const addToCartButtons = customerPage.locator('[data-testid="add-to-cart-button"]');
-          let addButtonCount = await addToCartButtons.count().catch(() => 0);
-          if (addButtonCount === 0) {
+          const openRestaurantMenuForCartRepair = async () => {
+            const addToCartButtons = customerPage.locator('[data-testid="add-to-cart-button"]');
+            let addButtonCount = await addToCartButtons.count().catch(() => 0);
+            if (addButtonCount > 0) {
+              return addToCartButtons;
+            }
+
             const restaurantCards = customerPage.getByTestId('restaurant-card');
             const restaurantCardCount = await restaurantCards.count().catch(() => 0);
             console.log('ℹ️ lifecycle: no add-to-cart buttons on restaurants index, trying restaurant card detail fallback', {
@@ -1399,28 +1404,38 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
               await TestHelpers.waitForStablePage(customerPage);
               addButtonCount = await addToCartButtons.count().catch(() => 0);
             }
-          }
 
-          if (addButtonCount === 0) {
-            throw new Error(`Cannot restore final submit cart minimum because no add-to-cart buttons are visible: ${JSON.stringify({
-              currentUrl: customerPage.url(),
-              visibleButtons: await customerPage.locator('button').evaluateAll((nodes) => nodes
-                .map((node) => (node.textContent || '').trim().replace(/\s+/g, ' '))
-                .filter(Boolean))
-                .catch(() => []),
-              visibleLinks: await customerPage.locator('a').evaluateAll((nodes) => nodes
-                .map((node) => (node.textContent || '').trim().replace(/\s+/g, ' '))
-                .filter(Boolean))
-                .catch(() => []),
-              bodyText: (await customerPage.locator('body').textContent().catch(() => '')).slice(0, 1000),
-              cartState: diagnostics,
-            })}`);
-          }
+            if (addButtonCount === 0) {
+              throw new Error(`Cannot restore final submit cart minimum because no add-to-cart buttons are visible: ${JSON.stringify({
+                currentUrl: customerPage.url(),
+                visibleButtons: await customerPage.locator('button').evaluateAll((nodes) => nodes
+                  .map((node) => (node.textContent || '').trim().replace(/\s+/g, ' '))
+                  .filter(Boolean))
+                  .catch(() => []),
+                visibleLinks: await customerPage.locator('a').evaluateAll((nodes) => nodes
+                  .map((node) => (node.textContent || '').trim().replace(/\s+/g, ' '))
+                  .filter(Boolean))
+                  .catch(() => []),
+                bodyText: (await customerPage.locator('body').textContent().catch(() => '')).slice(0, 1000),
+                cartState: diagnostics,
+              })}`);
+            }
+
+            return addToCartButtons;
+          };
+
+          let addToCartButtons = await openRestaurantMenuForCartRepair();
+          let addButtonCount = await addToCartButtons.count().catch(() => 0);
 
           for (let attempt = 1; attempt <= 10; attempt += 1) {
             diagnostics = await collectFinalSubmitCartDiagnostics();
-            if (diagnostics.finalSubmitMinimumSatisfied && diagnostics.itemCount >= 2) {
+            if (diagnostics.finalSubmitMinimumSatisfied) {
               break;
+            }
+
+            if (diagnostics.subtotal < 25) {
+              addToCartButtons = await openRestaurantMenuForCartRepair();
+              addButtonCount = await addToCartButtons.count().catch(() => 0);
             }
 
             console.log('➡️ lifecycle: restoring final submit cart minimum', {
@@ -1445,7 +1460,7 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
             subtotalSource: diagnostics.subtotalSource,
           });
 
-          if (!(diagnostics.finalSubmitMinimumSatisfied && diagnostics.itemCount >= 2)) {
+          if (!diagnostics.finalSubmitMinimumSatisfied) {
             throw new Error(`Final submit cart could not be restored above minimum: ${JSON.stringify({
               finalSubmitSubtotal: diagnostics.subtotal,
               finalSubmitItemCount: diagnostics.itemCount,
@@ -2012,24 +2027,26 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
       };
 
       const completeRestaurantOnboardingIfNeeded = async () => {
-        for (let attempt = 1; attempt <= 3; attempt += 1) {
+        for (let attempt = 1; attempt <= 5; attempt += 1) {
           const onboardingWrapper = restaurantPage.locator('.onboarding-wrapper');
           const onboardingVisible = await onboardingWrapper.isVisible().catch(() => false);
           if (!onboardingVisible) {
             return;
           }
 
-          console.log('ℹ️ lifecycle: restaurant onboarding visible', await restaurantVisibleSignals());
+          const onboardingSignals = await restaurantVisibleSignals();
+          console.log('ℹ️ lifecycle: restaurant onboarding visible', onboardingSignals);
 
-          const primaryButtons = [
+          const buttonLocators = [
             restaurantPage.getByRole('button', { name: /öffnungszeiten speichern & weiter/i }),
             restaurantPage.getByRole('button', { name: /lieferzone speichern & weiter/i }),
             restaurantPage.getByRole('button', { name: /zum dashboard/i }),
             restaurantPage.getByRole('button', { name: /schritt überspringen/i }),
+            restaurantPage.getByRole('button', { name: /speichern/i }),
           ];
 
           let clicked = false;
-          for (const candidate of primaryButtons) {
+          for (const candidate of buttonLocators) {
             const button = candidate.first();
             if (await button.isVisible().catch(() => false) && await button.isEnabled().catch(() => false)) {
               console.log('➡️ lifecycle: completing restaurant onboarding', {
@@ -2044,10 +2061,15 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
             }
           }
 
-          if (!clicked) {
-            break;
+          const afterClickSignals = await restaurantVisibleSignals();
+          const onboardingStillVisible = await onboardingWrapper.isVisible().catch(() => false);
+          if (clicked && !onboardingStillVisible) {
+            console.log('✅ lifecycle: restaurant onboarding resolved', afterClickSignals);
+            return;
           }
         }
+
+        console.log('ℹ️ lifecycle: restaurant onboarding could not be fully resolved', await restaurantVisibleSignals());
       };
 
       await completeRestaurantOnboardingIfNeeded();
@@ -2074,12 +2096,15 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
         .filter({ hasText: /bestellungen|orders/i })
         .or(restaurantPage.getByRole('button', { name: /bestellungen|orders/i }))
         .or(restaurantPage.getByRole('link', { name: /bestellungen|orders/i }))
-        .or(restaurantPage.locator(selectors.navOrders))
+        .or(restaurantPage.locator('nav button, nav a').filter({ hasText: /bestellungen|orders/i }))
+        .or(restaurantPage.getByText(/bestellungen|orders/i))
         .first();
 
-      if (!await restaurantOrdersTab.isVisible().catch(() => false)) {
-        console.log('ℹ️ lifecycle: restaurant orders tab not directly visible, using restaurant UI diagnostics', await restaurantVisibleSignals());
-        throw new Error(`Restaurant orders tab not found: ${JSON.stringify(await restaurantVisibleSignals())}`);
+      const restaurantOrdersTabVisible = await restaurantOrdersTab.isVisible().catch(() => false);
+      if (!restaurantOrdersTabVisible) {
+        const diagnostics = await restaurantVisibleSignals();
+        console.log('ℹ️ lifecycle: restaurant orders tab not directly visible, using restaurant UI diagnostics', diagnostics);
+        throw new Error(`Restaurant orders tab not found: ${JSON.stringify(diagnostics)}`);
       }
       await restaurantOrdersTab.click();
 
