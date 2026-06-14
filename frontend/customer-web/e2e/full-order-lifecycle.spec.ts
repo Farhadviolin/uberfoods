@@ -1282,6 +1282,40 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
         console.log('ℹ️ Payment modal not shown, waiting for direct order navigation');
       }
 
+      const resolveOrderIdFromCurrentState = async () => {
+        const responseOrderId = typeof orderId === 'string' && orderId.trim() ? orderId.trim() : null;
+        if (responseOrderId) {
+          return responseOrderId;
+        }
+
+        const currentUrl = customerPage.url();
+        const currentUrlMatch = currentUrl.match(/\/orders\/([^/?]+)(?:\?.*)?$/);
+        if (currentUrlMatch?.[1]) {
+          return currentUrlMatch[1];
+        }
+
+        const visibleOrderLinks = await customerPage.locator('a[href*="/orders/"], button[href*="/orders/"], [data-testid*="order"]').evaluateAll((nodes) => nodes
+          .map((node) => {
+            const element = node as HTMLAnchorElement | HTMLButtonElement & { href?: string };
+            return element.getAttribute?.('href')
+              || (typeof element.href === 'string' ? element.href : null)
+              || null;
+          })
+          .filter((href): href is string => Boolean(href)))
+          .catch(() => []);
+        const linkedOrderId = visibleOrderLinks
+          .map((href) => href.match(/\/orders\/([^/?]+)(?:\?.*)?$/)?.[1] || null)
+          .find((value): value is string => Boolean(value));
+        if (linkedOrderId) {
+          return linkedOrderId;
+        }
+
+        return null;
+      };
+
+      orderId = await resolveOrderIdFromCurrentState();
+      expect(orderId, 'orderId must be resolved before Phase 2 starts').toBeTruthy();
+
       if (!/\/orders\/[^/?]+(?:\?.*)?$/.test(customerPage.url())) {
         console.log(`ℹ️ Navigating directly to created order ${orderId}`);
         await customerPage.goto(`${testUrls.customer}/orders/${orderId}`);
@@ -1294,8 +1328,8 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
       const orderUrlMatch = customerPage.url().match(/orders\/([^/?]+)/);
       if (orderUrlMatch) {
         orderId = orderUrlMatch[1];
-        console.log(`📦 Order created: ${orderId}`);
       }
+      console.log(`📦 Order created: ${orderId}`);
 
       // ============================================
       // PHASE 2: RESTAURANT SETS READY FOR PICKUP
