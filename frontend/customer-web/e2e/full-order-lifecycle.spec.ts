@@ -631,6 +631,8 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
         console.log('✅ lifecycle: phase1 checkout reached');
       });
 
+      const paymentModal = customerPage.locator('[data-testid="payment-modal"], .payment-modal, text=/payment|zahlung|card|karte/i').first();
+
       await withStepTimeout('phase1 checkout state and delivery address', async () => {
         const cartItems = customerPage.locator('[data-testid="cart-item"], .cart-item');
         await expect(customerPage.getByTestId('cart')).toBeVisible();
@@ -1102,7 +1104,6 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
         console.log('✅ lifecycle: phase1 final Place Order button visible');
         await expect(finalPlaceOrderButton).toBeEnabled();
         console.log('✅ lifecycle: phase1 final Place Order button enabled');
-        const paymentModal = customerPage.locator('[data-testid="payment-modal"], .payment-modal, text=/payment|zahlung|card|karte/i').first();
         const orderTrackingPage = customerPage.getByTestId('order-tracking-page');
         const performFinalSubmitAttempt = async (attemptLabel: string) => {
           const orderCreateResponsePromise = customerPage.waitForResponse((response) => {
