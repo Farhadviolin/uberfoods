@@ -631,7 +631,11 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
         console.log('✅ lifecycle: phase1 checkout reached');
       });
 
-      const paymentModal = customerPage.locator('[data-testid="payment-modal"], .payment-modal, text=/payment|zahlung|card|karte/i').first();
+      const paymentModal = customerPage
+        .locator('[data-testid="payment-modal"]')
+        .or(customerPage.locator('.payment-modal'))
+        .or(customerPage.getByText(/payment methods|zahlung|zahlungsmethode wählen|kreditkarte|paypal|apple pay|karteninhaber|kartennummer/i))
+        .first();
 
       await withStepTimeout('phase1 checkout state and delivery address', async () => {
         const cartItems = customerPage.locator('[data-testid="cart-item"], .cart-item');
