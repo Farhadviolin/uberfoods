@@ -78,6 +78,26 @@ export function Cart({ cart, restaurant, updateQuantity, onClearCart }: CartProp
     };
   }, []);
 
+  const parseStoredJson = useCallback((raw: string | null): unknown => {
+    if (!raw) {
+      return null;
+    }
+
+    try {
+      const parsed = JSON.parse(raw);
+      if (typeof parsed === 'string') {
+        try {
+          return JSON.parse(parsed);
+        } catch {
+          return parsed;
+        }
+      }
+      return parsed;
+    } catch {
+      return raw;
+    }
+  }, []);
+
   const effectiveCart = cart ?? cartContext.items.map(item => ({
     dish: {
       id: item.dishId,
@@ -257,28 +277,6 @@ export function Cart({ cart, restaurant, updateQuantity, onClearCart }: CartProp
       return '';
     };
 
-    const safeJsonParse = (raw: string | null): unknown => {
-      if (!raw) {
-        return null;
-      }
-
-      try {
-        const parsed = JSON.parse(raw);
-
-        if (typeof parsed === 'string') {
-          try {
-            return JSON.parse(parsed);
-          } catch {
-            return parsed;
-          }
-        }
-
-        return parsed;
-      } catch {
-        return null;
-      }
-    };
-
     const resolveEffectiveCustomerAddress = (): string => {
       const contextAddress = normalizeAddress(user?.address);
 
@@ -291,7 +289,8 @@ export function Cart({ cart, restaurant, updateQuantity, onClearCart }: CartProp
       }
 
       const storedCustomerUserRaw = window.localStorage.getItem('customer_user');
-      const storedCustomerUser = safeJsonParse(storedCustomerUserRaw) as Record<string, unknown> | null;
+      const storedCustomerUser = parseStoredJson(storedCustomerUserRaw) as Record<string, unknown> | null;
+      const storedProfileAddress = parseStoredJson(window.localStorage.getItem('customer_profile_address'));
 
       const candidateAddresses = [
         storedCustomerUser?.address,
@@ -299,7 +298,7 @@ export function Cart({ cart, restaurant, updateQuantity, onClearCart }: CartProp
         (storedCustomerUser?.customer as Record<string, unknown> | undefined)?.address,
         (storedCustomerUser?.profile as Record<string, unknown> | undefined)?.address,
         (storedCustomerUser?.data as Record<string, unknown> | undefined)?.address,
-        window.localStorage.getItem('customer_profile_address'),
+        storedProfileAddress,
       ];
 
       for (const candidate of candidateAddresses) {
@@ -434,7 +433,7 @@ export function Cart({ cart, restaurant, updateQuantity, onClearCart }: CartProp
     } finally {
       setLoading(false);
     }
-  }, [effectiveCart, user, guestInfo, effectiveRestaurant.id, promoCode, minOrderMissing, minOrderAmount, deliveryFee, logDebug, t, resolveCustomerId]);
+  }, [effectiveCart, user, guestInfo, effectiveRestaurant.id, promoCode, minOrderMissing, minOrderAmount, deliveryFee, logDebug, t, resolveCustomerId, parseStoredJson]);
 
   const handlePaymentSuccess = useCallback(() => {
     // Warenkorb leeren

@@ -43,6 +43,18 @@ function normalizeStoredAddress(value: unknown): string | undefined {
     return trimmed.length > 0 ? trimmed : undefined;
   }
 
+  if (value && typeof value === 'object') {
+    const addressObject = value as Record<string, unknown>;
+    const candidate = [
+      addressObject.address,
+      addressObject.street,
+      addressObject.city,
+    ].find((item): item is string => typeof item === 'string' && item.trim().length > 0);
+    if (candidate) {
+      return candidate.trim();
+    }
+  }
+
   return undefined;
 }
 
@@ -65,11 +77,12 @@ function mergeCustomerUserForStorage(previousUser: unknown, nextUser: unknown) {
 
   const previousAddress = normalizeStoredAddress(previous.address);
   const nextAddress = normalizeStoredAddress(next.address);
+  const profileAddress = normalizeStoredAddress(localStorage.getItem('customer_profile_address'));
 
   return {
     ...previous,
     ...next,
-    address: nextAddress ?? previousAddress ?? '',
+    address: nextAddress ?? previousAddress ?? profileAddress ?? '',
   };
 }
 

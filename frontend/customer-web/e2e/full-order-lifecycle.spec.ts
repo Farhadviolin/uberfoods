@@ -571,6 +571,49 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
           };
         };
 
+        const collectCheckoutAddressSnapshot = async () => customerPage.evaluate(() => {
+          const rawUser = window.localStorage.getItem('customer_user');
+          const rawProfileAddress = window.localStorage.getItem('customer_profile_address');
+
+          let userAddress = '';
+          try {
+            userAddress = JSON.parse(rawUser || '{}')?.address || '';
+          } catch {
+            userAddress = 'PARSE_ERROR';
+          }
+
+          let profileAddressValue: string | null = null;
+          try {
+            const parsedProfileAddress = JSON.parse(rawProfileAddress || 'null');
+            if (typeof parsedProfileAddress === 'string') {
+              profileAddressValue = parsedProfileAddress;
+            } else if (parsedProfileAddress && typeof parsedProfileAddress === 'object') {
+              profileAddressValue = (parsedProfileAddress as { address?: string }).address || null;
+            } else {
+              profileAddressValue = null;
+            }
+          } catch {
+            profileAddressValue = rawProfileAddress;
+          }
+
+          const submitButton = document.querySelector('button[data-testid="checkout-button"]') as HTMLButtonElement | null;
+          const form = submitButton?.closest('form') as HTMLFormElement | null;
+          const checkoutWarningVisible = Boolean(document.body.innerText.match(/missing-user-address|please provide a delivery address in your profile|delivery address in your profile/i));
+
+          return {
+            hasCustomerUser: Boolean(rawUser),
+            customerUserAddressPresent: Boolean(userAddress && userAddress !== 'PARSE_ERROR'),
+            customerUserAddressLength: typeof userAddress === 'string' ? userAddress.length : 0,
+            hasCustomerProfileAddress: Boolean(rawProfileAddress),
+            customerProfileAddressLength: rawProfileAddress ? rawProfileAddress.length : 0,
+            customerProfileAddressValueLength: typeof profileAddressValue === 'string' ? profileAddressValue.length : 0,
+            checkoutWarningVisible,
+            submitButtonDisabled: submitButton?.disabled ?? null,
+            formPresent: Boolean(form),
+            formValid: form ? form.checkValidity() : null,
+          };
+        });
+
         const ensureProfileAddress = async () => {
           const profileAddressSignals = await collectProfileAddressSignals();
 
@@ -759,8 +802,10 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
 
         await logCheckoutDiagnostics('before final submit');
         await logCustomerUserSnapshot(customerPage, 'snapshot: before final submit');
+        console.log('checkoutAddressSnapshot', await collectCheckoutAddressSnapshot());
         await ensureProfileAddress();
         await logCustomerUserSnapshot(customerPage, 'snapshot: after profile verification');
+        console.log('checkoutAddressSnapshotAfterProfileVerification', await collectCheckoutAddressSnapshot());
         await logCheckoutDiagnostics('after profile verification');
 
         const orderCreateResponsePromise = customerPage.waitForResponse((response) => {
