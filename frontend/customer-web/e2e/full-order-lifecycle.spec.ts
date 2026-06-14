@@ -1,4 +1,4 @@
-import { expect, type Locator, type Page } from '@playwright/test';
+import { expect, type Locator, type Page, type Response } from '@playwright/test';
 import { randomUUID } from 'node:crypto';
 import { test, TestHelpers, testUrls, testSelectors } from './test-helpers';
 import { testDataFactory } from '../../test-utils/test-data-factory';
@@ -167,6 +167,7 @@ async function registerCustomerForLifecycleWithDiagnostics(
 
 test.describe('Full Order Lifecycle UI-E2E', () => {
   let orderId: string;
+  let lastOrderCreateResponse: Response | null = null;
   let customerCredentials = createLifecycleCustomerCredentials();
   const selectors = testSelectors;
   const testOrder = testDataFactory.getTestOrder();
@@ -1114,8 +1115,6 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
         console.log('✅ lifecycle: phase1 final Place Order button visible');
         await expect(finalPlaceOrderButton).toBeEnabled();
         console.log('✅ lifecycle: phase1 final Place Order button enabled');
-        let lastOrderCreateResponse: Response | null = null;
-
         const performFinalSubmitAttempt = async (attemptLabel: string) => {
           const orderCreateResponsePromise = customerPage.waitForResponse((response) => {
             const request = response.request();
