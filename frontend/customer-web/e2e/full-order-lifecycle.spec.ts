@@ -1114,6 +1114,8 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
         console.log('✅ lifecycle: phase1 final Place Order button visible');
         await expect(finalPlaceOrderButton).toBeEnabled();
         console.log('✅ lifecycle: phase1 final Place Order button enabled');
+        let lastOrderCreateResponse: Response | null = null;
+
         const performFinalSubmitAttempt = async (attemptLabel: string) => {
           const orderCreateResponsePromise = customerPage.waitForResponse((response) => {
             const request = response.request();
@@ -1121,7 +1123,10 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
             return request.method() === 'POST'
               && url.pathname.endsWith('/api/orders/customer');
           }, { timeout: 20000 })
-            .then((response) => ({ kind: 'response' as const, response }))
+            .then((response) => {
+              lastOrderCreateResponse = response;
+              return { kind: 'response' as const, response };
+            })
             .catch(() => null);
           const paymentModalPromise = paymentModal.waitFor({ state: 'visible', timeout: 20000 })
             .then(() => ({ kind: 'payment-modal' as const }))
@@ -1278,14 +1283,54 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
         await expect(paymentConfirmButton).toBeVisible({ timeout: 10000 });
         await expect(paymentConfirmButton).toBeEnabled();
         await paymentConfirmButton.click();
+
+        await Promise.race([
+          customerPage.waitForResponse((response) => {
+            const request = response.request();
+            const url = new URL(response.url());
+            return request.method() === 'POST'
+              && url.pathname.endsWith('/api/orders/customer')
+              && response.ok();
+          }, { timeout: 20000 }).catch(() => null),
+          customerPage.waitForURL(/\/orders\/[^/?]+(?:\?.*)?$/, { timeout: 20000 }).catch(() => null),
+          orderTrackingPage.waitFor({ state: 'visible', timeout: 20000 }).catch(() => null),
+        ]);
       } else {
         console.log('ℹ️ Payment modal not shown, waiting for direct order navigation');
       }
 
+      const extractOrderIdFromResponse = async (response: Response | null) => {
+        if (!response) {
+          return null;
+        }
+
+        const responseOrder = await response.clone().json().catch(() => null) as
+          | { id?: string; orderId?: string; order?: { id?: string; orderId?: string }; data?: { id?: string; orderId?: string; order?: { id?: string; orderId?: string } } }
+          | null;
+
+        const candidateIds = [
+          responseOrder?.id,
+          responseOrder?.orderId,
+          responseOrder?.order?.id,
+          responseOrder?.order?.orderId,
+          responseOrder?.data?.id,
+          responseOrder?.data?.orderId,
+          responseOrder?.data?.order?.id,
+          responseOrder?.data?.order?.orderId,
+        ];
+
+        return candidateIds.find((value): value is string => Boolean(typeof value === 'string' && value.trim()))?.trim() ?? null;
+      };
+
       const resolveOrderIdFromCurrentState = async () => {
-        const responseOrderId = typeof orderId === 'string' && orderId.trim() ? orderId.trim() : null;
+        const responseOrderId = await extractOrderIdFromResponse(lastOrderCreateResponse);
         if (responseOrderId) {
           return responseOrderId;
+        }
+
+        const directOrderId = typeof orderId === 'string' && orderId.trim() ? orderId.trim() : null;
+        if (directOrderId) {
+          return directOrderId;
         }
 
         const currentUrl = customerPage.url();
