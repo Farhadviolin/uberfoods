@@ -21,7 +21,17 @@ export function OrderCard({ order }: OrderCardProps) {
   const updateStatus = useUpdateOrderStatus();
 
   useEffect(() => {
-    setVisibleStatus(order.status);
+    setVisibleStatus((currentStatus) => {
+      if (order.status === currentStatus) {
+        return currentStatus;
+      }
+
+      if (order.status === "PENDING" && currentStatus === "READY_FOR_PICKUP") {
+        return currentStatus;
+      }
+
+      return order.status;
+    });
   }, [order.status]);
 
   // Retry-Logik für Status-Updates
