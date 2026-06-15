@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import { Order, useUpdateOrderStatus } from "../../hooks/useOrders";
-import { useRetry } from "../../hooks/useRetry";
 import {
   formatCurrency,
   formatDateTime,
@@ -25,14 +24,6 @@ export function OrderCard({ order }: OrderCardProps) {
     setVisibleStatus(order.status);
   }, [order.status]);
 
-  // Retry-Logik für Status-Updates
-  const retryUpdateStatus = useRetry(
-    async ({ id, status }: { id: string; status: string }) => {
-      return await updateStatus.mutateAsync({ id, status });
-    },
-    { maxRetries: 3, retryDelay: 1000, exponentialBackoff: true },
-  );
-
   const statusColors: Record<string, string> = {
     PENDING: "var(--fb-warning)",
     CONFIRMED: "var(--fb-primary)",
@@ -54,7 +45,11 @@ export function OrderCard({ order }: OrderCardProps) {
       } catch {
         // ignore storage failures in tests/non-browser environments
       }
-      await retryUpdateStatus.execute({ id: order.id, status: newStatus });
+      await updateStatus.mutateAsync({
+        orderId: order.id,
+        status: newStatus,
+        version: order.version,
+      });
       showToast(
         `Status auf ${formatOrderStatus(newStatus)} geändert`,
         "success",
