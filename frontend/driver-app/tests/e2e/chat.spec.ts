@@ -3,8 +3,7 @@ import { test, expect } from '@playwright/test';
 test.describe('Chat-Funktionalität', () => {
   test.beforeEach(async ({ page }) => {
     // Mock Login
-    await page.goto('/');
-    await page.evaluate(() => {
+    await page.addInitScript(() => {
       localStorage.setItem('driver_token', 'mock-token');
       localStorage.setItem('driver_user', JSON.stringify({
         id: 'driver-123',
@@ -12,19 +11,18 @@ test.describe('Chat-Funktionalität', () => {
         email: 'driver@test.com',
       }));
     });
-    await page.reload();
   });
 
   test('öffnet Chat für Bestellung', async ({ page }) => {
-    await page.route('**/api/orders/driver/driver-123', async (route) => {
+    await page.route('**/api/drivers/driver-123/orders/available', async (route) => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify([
           {
             id: 'order-1',
-            status: 'IN_TRANSIT',
-            driverId: 'driver-123',
+            status: 'READY_FOR_PICKUP',
+            driverId: null,
             totalAmount: 25.50,
             restaurant: { name: 'Test Restaurant', address: 'Test St. 1' },
             customer: { name: 'Test Customer', phone: '+49123456789' },
@@ -55,15 +53,15 @@ test.describe('Chat-Funktionalität', () => {
   });
 
   test('sendet Chat-Nachricht', async ({ page }) => {
-    await page.route('**/api/orders/driver/driver-123', async (route) => {
+    await page.route('**/api/drivers/driver-123/orders/available', async (route) => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify([
           {
             id: 'order-1',
-            status: 'IN_TRANSIT',
-            driverId: 'driver-123',
+            status: 'READY_FOR_PICKUP',
+            driverId: null,
             totalAmount: 25.50,
             restaurant: { name: 'Test Restaurant', address: 'Test St. 1' },
             customer: { name: 'Test Customer', phone: '+49123456789' },

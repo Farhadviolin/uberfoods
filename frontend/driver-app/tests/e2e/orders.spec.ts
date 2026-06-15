@@ -3,8 +3,7 @@ import { test, expect } from '@playwright/test';
 test.describe('Bestellungsverwaltung', () => {
   test.beforeEach(async ({ page }) => {
     // Mock Login - setze Token direkt
-    await page.goto('/');
-    await page.evaluate(() => {
+    await page.addInitScript(() => {
       localStorage.setItem('driver_token', 'mock-token');
       localStorage.setItem('driver_user', JSON.stringify({
         id: 'driver-123',
@@ -12,19 +11,18 @@ test.describe('Bestellungsverwaltung', () => {
         email: 'driver@test.com',
       }));
     });
-    await page.reload();
   });
 
   test('zeigt Dashboard mit Bestellungen', async ({ page }) => {
     // Mock API Response
-    await page.route('**/api/orders/driver/driver-123', async (route) => {
+    await page.route('**/api/drivers/driver-123/orders/available', async (route) => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify([
           {
             id: 'order-1',
-            status: 'ACCEPTED',
+            status: 'READY_FOR_PICKUP',
             totalAmount: 25.50,
             restaurant: { name: 'Test Restaurant', address: 'Test St. 1' },
             customer: { name: 'Test Customer', phone: '+49123456789' },
@@ -42,14 +40,14 @@ test.describe('Bestellungsverwaltung', () => {
   });
 
   test('akzeptiert Bestellung', async ({ page }) => {
-    await page.route('**/api/orders/driver/driver-123', async (route) => {
+    await page.route('**/api/drivers/driver-123/orders/available', async (route) => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify([
           {
             id: 'order-1',
-            status: 'ACCEPTED',
+            status: 'READY_FOR_PICKUP',
             totalAmount: 25.50,
             restaurant: { name: 'Test Restaurant', address: 'Test St. 1' },
             customer: { name: 'Test Customer', phone: '+49123456789' },
@@ -83,7 +81,7 @@ test.describe('Bestellungsverwaltung', () => {
   });
 
   test('aktualisiert Bestellungsstatus', async ({ page }) => {
-    await page.route('**/api/orders/driver/driver-123', async (route) => {
+    await page.route('**/api/drivers/driver-123/orders/available', async (route) => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
