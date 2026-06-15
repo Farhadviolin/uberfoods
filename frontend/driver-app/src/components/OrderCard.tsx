@@ -100,6 +100,7 @@ export const OrderCard = memo(function OrderCard({
         </div>
         <div
           className="status-badge"
+          data-testid={`driver-order-status-${order.id}`}
           style={{ backgroundColor: getStatusColor(order.status) }}
         >
           {getStatusText(order.status)}

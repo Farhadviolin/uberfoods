@@ -2471,18 +2471,39 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
         .or(availableOrder.locator(selectors.acceptOrderBtn))
         .first();
       await expect(acceptButton).toBeVisible({ timeout: 10000 });
+
+      const acceptResponsePromise = driverPage.waitForResponse((response) => {
+        const url = response.url();
+        return (
+          response.request().method() === 'POST' &&
+          url.includes(`/orders/${orderId}/accept`)
+        );
+      });
       await acceptButton.click();
 
-      // Verify accepted status
-      await expect(availableOrder.locator(selectors.orderStatus)).toContainText('IN_TRANSIT');
+      const acceptResponse = await acceptResponsePromise;
+      expect(
+        acceptResponse.ok(),
+        `Driver accept response failed: ${acceptResponse.status()} ${acceptResponse.url()} ${await acceptResponse.text().catch(() => '')}`,
+      ).toBeTruthy();
+
+      // Re-resolve the card because accepting can move it between order lists.
+      const acceptedOrderCard = driverPage
+        .getByTestId(`driver-order-card-${orderId}`)
+        .or(driverPage.locator(`[data-order-id="${orderId}"]`))
+        .first();
+      await expect(acceptedOrderCard).toBeVisible({ timeout: 15000 });
+      await expect(acceptedOrderCard).toHaveAttribute('data-status', 'IN_TRANSIT', {
+        timeout: 10000,
+      });
 
       console.log(`✅ Driver accepted order ${orderId}`);
 
       // Mark as delivered
-      await availableOrder.locator(selectors.markDeliveredBtn).click();
+      await acceptedOrderCard.locator(selectors.markDeliveredBtn).click();
 
       // Verify delivered status
-      await expect(availableOrder.locator(selectors.orderStatus)).toContainText('DELIVERED');
+      await expect(acceptedOrderCard).toHaveAttribute('data-status', 'DELIVERED');
 
       console.log(`✅ Driver marked order ${orderId} as delivered`);
 
