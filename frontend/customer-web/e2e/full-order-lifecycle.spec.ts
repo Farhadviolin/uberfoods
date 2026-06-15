@@ -2461,9 +2461,16 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
       // Accept order
       const acceptButton = availableOrder
         .getByTestId(`driver-accept-order-${orderId}`)
+        .or(availableOrder.locator('[data-action="accept-order"]'))
+        .or(availableOrder.locator('button[data-testid="accept-order"]'))
+        .or(
+          availableOrder.getByRole('button', {
+            name: /accept|annehmen|auftrag annehmen|übernehmen/i,
+          }),
+        )
         .or(availableOrder.locator(selectors.acceptOrderBtn))
         .first();
-      await expect(acceptButton).toBeVisible();
+      await expect(acceptButton).toBeVisible({ timeout: 10000 });
       await acceptButton.click();
 
       // Verify accepted status

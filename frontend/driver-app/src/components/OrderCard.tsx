@@ -43,7 +43,8 @@ export const OrderCard = memo(function OrderCard({
   const [aiScore, setAiScore] = useState<AcceptanceScore | null>(null);
 
   // Smart Acceptance Hook - nur für verfügbare Bestellungen
-  const isAssignableOrder = order.status === 'ACCEPTED' && !order.driverId;
+  const isAssignableOrder =
+    order.status === 'READY_FOR_PICKUP' && !order.driverId;
   const { analyzeOrder: analyzeWithAI, getScore } = useSmartAcceptance(
     driver,
     [order],
@@ -297,7 +298,7 @@ export const OrderCard = memo(function OrderCard({
         </button>
         
         {/* Bestellungs-Akzeptierung/Ablehnung */}
-        {order.status === 'ACCEPTED' && !order.driverId && onAccept && onReject && (
+        {isAssignableOrder && onAccept && onReject && (
           <div className="order-accept-reject">
             <button
               onClick={async () => {
@@ -312,6 +313,7 @@ export const OrderCard = memo(function OrderCard({
               }}
               className="accept-button"
               data-testid={`driver-accept-order-${order.id}`}
+              data-action="accept-order"
               disabled={processing || !onAccept}
             >
               <CheckIcon size={20} className="button-icon" />
