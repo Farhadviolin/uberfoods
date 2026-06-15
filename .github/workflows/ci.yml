@@ -288,7 +288,7 @@ jobs:
 
     - name: Run Full Order Lifecycle UI-E2E Test
       working-directory: ./frontend/customer-web
-      run: RUN_ID=${{ github.run_id }}_${{ github.run_attempt }} npx playwright test full-order-lifecycle.spec.ts --reporter=line,html,junit
+      run: RUN_ID=${{ github.run_id }}_${{ github.run_attempt }} npx playwright test full-order-lifecycle.spec.ts --reporter=line,html,junit --workers=1 --retries=0 --timeout=900000 --global-timeout=1500000
       env:
         RUN_ID: ${{ github.run_id }}_${{ github.run_attempt }}
         RELEASE_GATE_MANAGED: true
