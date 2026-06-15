@@ -62,6 +62,7 @@ export function OrderCard({ order }: OrderCardProps) {
     <>
       <div
         className={`order-card ${isActive ? "active" : ""}`}
+        data-testid="order-card"
         onClick={() => setShowDetails(true)}
         onKeyDown={(e) => {
           if (e.key === "Enter" || e.key === " ") {
