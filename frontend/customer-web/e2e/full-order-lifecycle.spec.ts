@@ -2368,51 +2368,58 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
         restaurantApiResponses: restaurantApiResponseStatuses,
       });
 
-      let resolvedOrderCard = await findVisibleRestaurantOrder();
-      if (!resolvedOrderCard) {
-        for (let attempt = 1; attempt <= 2 && !resolvedOrderCard; attempt += 1) {
-          console.log('ℹ️ lifecycle: retrying restaurant order lookup', {
-            attempt,
-            orderId,
-            createdOrderRestaurantId: orderRestaurantId,
-            restaurantStorageRestaurantId: restaurantAuthSnapshot.restaurantStorageRestaurantId,
-          });
-          await restaurantPage.reload({ waitUntil: 'domcontentloaded' });
-          await restaurantPage.waitForLoadState('networkidle').catch(() => null);
-          await TestHelpers.waitForStablePage(restaurantPage);
-          await openRestaurantOrdersTab();
-          resolvedOrderCard = await findVisibleRestaurantOrder();
+      let resolvedOrderCard = await withStepTimeout('phase2 restaurant order visible', async () => {
+        let card = await findVisibleRestaurantOrder();
+        if (!card) {
+          for (let attempt = 1; attempt <= 2 && !card; attempt += 1) {
+            console.log('ℹ️ lifecycle: retrying restaurant order lookup', {
+              attempt,
+              orderId,
+              createdOrderRestaurantId: orderRestaurantId,
+              restaurantStorageRestaurantId: restaurantAuthSnapshot.restaurantStorageRestaurantId,
+            });
+            await restaurantPage.reload({ waitUntil: 'domcontentloaded' });
+            await restaurantPage.waitForLoadState('networkidle').catch(() => null);
+            await TestHelpers.waitForStablePage(restaurantPage);
+            await openRestaurantOrdersTab();
+            card = await findVisibleRestaurantOrder();
+          }
         }
-      }
 
-      if (!resolvedOrderCard) {
-        const diagnostics = await collectRestaurantOrderLookupDiagnostics();
-        console.log('restaurantOrderLookupFailed', {
-          ...diagnostics,
-          createdOrderRestaurantId: orderRestaurantId,
-          restaurantStorageUserId: restaurantAuthSnapshot.restaurantStorageUserId,
-          restaurantStorageRestaurantId: restaurantAuthSnapshot.restaurantStorageRestaurantId,
-          restaurantApiRequests: restaurantApiRequestUrls,
-          restaurantApiResponses: restaurantApiResponseStatuses,
-          restaurantApiResponseBodies,
-        });
-        throw new Error(`Restaurant order not visible: ${JSON.stringify(diagnostics)}`);
-      }
+        if (!card) {
+          const diagnostics = await collectRestaurantOrderLookupDiagnostics();
+          console.log('restaurantOrderLookupFailed', {
+            ...diagnostics,
+            createdOrderRestaurantId: orderRestaurantId,
+            restaurantStorageUserId: restaurantAuthSnapshot.restaurantStorageUserId,
+            restaurantStorageRestaurantId: restaurantAuthSnapshot.restaurantStorageRestaurantId,
+            restaurantApiRequests: restaurantApiRequestUrls,
+            restaurantApiResponses: restaurantApiResponseStatuses,
+            restaurantApiResponseBodies,
+          });
+          throw new Error(`Restaurant order not visible: ${JSON.stringify(diagnostics)}`);
+        }
 
-      const readyBtn = resolvedOrderCard
-        .locator('button[data-testid="restaurant-order-ready-button"]')
-        .or(resolvedOrderCard.locator(selectors.readyForPickupBtn))
-        .first();
-      if (!await readyBtn.isVisible().catch(() => false)) {
-        const fallbackReadyBtn = resolvedOrderCard.getByRole('button', { name: /ready|pickup|bereit|abholbereit|vorbereiten|accept|annehmen/i }).first();
-        if (await fallbackReadyBtn.isVisible().catch(() => false) && await fallbackReadyBtn.isEnabled().catch(() => false)) {
-          await fallbackReadyBtn.click();
-        } else {
+        return card;
+      });
+
+      await withStepTimeout('phase2 restaurant ready button click', async () => {
+        const readyBtn = resolvedOrderCard
+          .locator('button[data-testid="restaurant-order-ready-button"]')
+          .or(resolvedOrderCard.locator(selectors.readyForPickupBtn))
+          .first();
+        if (!await readyBtn.isVisible().catch(() => false)) {
+          const fallbackReadyBtn = resolvedOrderCard.getByRole('button', { name: /ready|pickup|bereit|abholbereit|vorbereiten|accept|annehmen/i }).first();
+          if (await fallbackReadyBtn.isVisible().catch(() => false) && await fallbackReadyBtn.isEnabled().catch(() => false)) {
+            await fallbackReadyBtn.click();
+            return;
+          }
+
           const diagnostics = await collectRestaurantOrderLookupDiagnostics();
           console.log('restaurantReadyButtonMissing', diagnostics);
           throw new Error(`Restaurant ready button not visible: ${JSON.stringify(diagnostics)}`);
         }
-      } else {
+
         await expect(readyBtn).toBeEnabled();
         const readyPatch = restaurantPage.waitForResponse(
           (response) =>
@@ -2446,18 +2453,19 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
           });
         }
         expect(readyPatchResponse.ok()).toBeTruthy();
-      }
+      });
 
-      // Verify status changed
-      const updatedOrderCard = restaurantPage
-        .locator(`[data-testid="restaurant-order-card-${orderId}"]`)
-        .or(restaurantPage.locator(`[data-order-id="${orderId}"]`))
-        .first();
-      const updatedOrderStatus = updatedOrderCard
-        .locator(`[data-testid="restaurant-order-status-${orderId}"]`)
-        .or(updatedOrderCard.locator(selectors.orderStatus))
-        .first();
-      await expect(updatedOrderStatus).toContainText(/READY_FOR_PICKUP|Bereit|Ready/i);
+      await withStepTimeout('phase2 restaurant status visible', async () => {
+        const updatedOrderCard = restaurantPage
+          .locator(`[data-testid="restaurant-order-card-${orderId}"]`)
+          .or(restaurantPage.locator(`[data-order-id="${orderId}"]`))
+          .first();
+        const updatedOrderStatus = updatedOrderCard
+          .locator(`[data-testid="restaurant-order-status-${orderId}"]`)
+          .or(updatedOrderCard.locator(selectors.orderStatus))
+          .first();
+        await expect(updatedOrderStatus).toContainText(/READY_FOR_PICKUP|Bereit|Ready/i);
+      });
 
       console.log(`✅ Restaurant marked order ${orderId} as ready for pickup`);
 
