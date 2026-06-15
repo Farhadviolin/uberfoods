@@ -62,8 +62,11 @@ export function useRestaurantOrders(restaurantId: string | null) {
     },
     enabled: !!rid,
     staleTime: 30 * 1000,
+    refetchOnMount: "always",
+    refetchOnReconnect: "always",
+    refetchOnWindowFocus: "always",
     refetchInterval: 30 * 1000,
-    placeholderData: [],
+    placeholderData: [], 
     retry: false,
   });
 }
@@ -281,7 +284,7 @@ export function useUpdateOrderStatus() {
             : order,
         ),
       );
-      queryClient.invalidateQueries({ queryKey: ["orders"] });
+      queryClient.invalidateQueries({ queryKey: ["orders", rid] });
       if (targetId) {
         queryClient.invalidateQueries({ queryKey: ["order", targetId] });
         queryClient.invalidateQueries({
