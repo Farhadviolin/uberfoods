@@ -77,7 +77,9 @@ export function OrderCard({ order }: OrderCardProps) {
     <>
       <div
         className={`order-card ${isActive ? "active" : ""}`}
-        data-testid="order-card"
+        data-testid={`restaurant-order-card-${order.id}`}
+        data-order-id={order.id}
+        data-status={displayStatus}
         onClick={() => setShowDetails(true)}
         onKeyDown={(e) => {
           if (e.key === "Enter" || e.key === " ") {
@@ -111,7 +113,7 @@ export function OrderCard({ order }: OrderCardProps) {
           </div>
           <div
             className="order-status-badge order-status"
-            data-testid="order-status"
+            data-testid={`restaurant-order-status-${order.id}`}
             style={{
               backgroundColor:
                 statusColors[displayStatus] || "var(--fb-text-secondary)",

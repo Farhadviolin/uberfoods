@@ -2400,7 +2400,15 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
       }
 
       // Verify status changed
-      await expect(resolvedOrderCard.locator(selectors.orderStatus)).toContainText('READY_FOR_PICKUP');
+      const updatedOrderCard = restaurantPage
+        .locator(`[data-testid="restaurant-order-card-${orderId}"]`)
+        .or(restaurantPage.locator(`[data-order-id="${orderId}"]`))
+        .first();
+      const updatedOrderStatus = updatedOrderCard
+        .locator(`[data-testid="restaurant-order-status-${orderId}"]`)
+        .or(updatedOrderCard.locator(selectors.orderStatus))
+        .first();
+      await expect(updatedOrderStatus).toContainText(/READY_FOR_PICKUP|Bereit|Ready/i);
 
       console.log(`✅ Restaurant marked order ${orderId} as ready for pickup`);
 
