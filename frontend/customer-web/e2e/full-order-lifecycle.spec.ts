@@ -2493,17 +2493,61 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
         .or(driverPage.locator(`[data-order-id="${orderId}"]`))
         .first();
       await expect(acceptedOrderCard).toBeVisible({ timeout: 15000 });
-      await expect(acceptedOrderCard).toHaveAttribute('data-status', 'IN_TRANSIT', {
-        timeout: 10000,
-      });
+      await expect(acceptedOrderCard).toHaveAttribute(
+        'data-status',
+        /CONFIRMED|ACCEPTED|ASSIGNED|IN_TRANSIT/i,
+        { timeout: 10000 },
+      );
 
       console.log(`✅ Driver accepted order ${orderId}`);
 
+      const pickedUpButton = acceptedOrderCard
+        .getByTestId(`driver-picked-up-order-${orderId}`)
+        .or(acceptedOrderCard.locator('[data-action="pickup-order"]'))
+        .or(
+          acceptedOrderCard.getByRole('button', {
+            name: /picked up|abgeholt|pickup/i,
+          }),
+        )
+        .first();
+      await expect(pickedUpButton).toBeVisible({ timeout: 10000 });
+      await pickedUpButton.click();
+
+      const pickedUpOrderCard = driverPage
+        .getByTestId(`driver-order-card-${orderId}`)
+        .or(driverPage.locator(`[data-order-id="${orderId}"]`))
+        .first();
+      await expect(pickedUpOrderCard).toBeVisible({ timeout: 15000 });
+      await expect(pickedUpOrderCard).toHaveAttribute('data-status', 'PICKED_UP', {
+        timeout: 10000,
+      });
+
+      const startTransitButton = pickedUpOrderCard
+        .getByTestId(`driver-in-transit-order-${orderId}`)
+        .or(pickedUpOrderCard.locator('[data-action="start-delivery"]'))
+        .or(
+          pickedUpOrderCard.getByRole('button', {
+            name: /in transit|unterwegs|lieferung starten|start delivery/i,
+          }),
+        )
+        .first();
+      await expect(startTransitButton).toBeVisible({ timeout: 10000 });
+      await startTransitButton.click();
+
+      const inTransitOrderCard = driverPage
+        .getByTestId(`driver-order-card-${orderId}`)
+        .or(driverPage.locator(`[data-order-id="${orderId}"]`))
+        .first();
+      await expect(inTransitOrderCard).toBeVisible({ timeout: 15000 });
+      await expect(inTransitOrderCard).toHaveAttribute('data-status', 'IN_TRANSIT', {
+        timeout: 10000,
+      });
+
       // Mark as delivered
-      await acceptedOrderCard.locator(selectors.markDeliveredBtn).click();
+      await inTransitOrderCard.locator(selectors.markDeliveredBtn).click();
 
       // Verify delivered status
-      await expect(acceptedOrderCard).toHaveAttribute('data-status', 'DELIVERED');
+      await expect(inTransitOrderCard).toHaveAttribute('data-status', 'DELIVERED');
 
       console.log(`✅ Driver marked order ${orderId} as delivered`);
 

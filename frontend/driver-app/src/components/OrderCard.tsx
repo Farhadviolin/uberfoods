@@ -379,7 +379,7 @@ export const OrderCard = memo(function OrderCard({
         )}
 
         {/* Status Update Buttons */}
-        {order.status === 'ACCEPTED' && order.driverId && (
+        {(order.status === 'ACCEPTED' || order.status === 'CONFIRMED') && order.driverId && (
           <button 
             onClick={() => onStatusUpdate(order.id, 'PICKED_UP')}
             className="status-update-button"
