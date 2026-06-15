@@ -84,7 +84,12 @@ export const OrderCard = memo(function OrderCard({
   const getStatusText = (status: string) => t(`order.status.${status}`, { defaultValue: status });
 
   return (
-    <div className="order-card">
+    <div
+      className="order-card"
+      data-testid={`driver-order-card-${order.id}`}
+      data-order-id={order.id}
+      data-status={order.status}
+    >
       <div className="order-header">
         <div>
           <h3>{t('order.title', { id: order.id.slice(-8) })}</h3>
@@ -306,6 +311,7 @@ export const OrderCard = memo(function OrderCard({
                 }
               }}
               className="accept-button"
+              data-testid={`driver-accept-order-${order.id}`}
               disabled={processing || !onAccept}
             >
               <CheckIcon size={20} className="button-icon" />
@@ -314,6 +320,7 @@ export const OrderCard = memo(function OrderCard({
             <button
               onClick={() => setShowRejectDialog(true)}
               className="reject-button"
+              data-testid={`driver-reject-order-${order.id}`}
               disabled={processing}
             >
               <XIcon size={20} className="button-icon" />
@@ -373,6 +380,7 @@ export const OrderCard = memo(function OrderCard({
           <button 
             onClick={() => onStatusUpdate(order.id, 'PICKED_UP')}
             className="status-update-button"
+            data-testid={`driver-picked-up-order-${order.id}`}
           >
             <CheckIcon size={18} className="button-icon" />
             {t('order.status.PICKED_UP')}
@@ -382,6 +390,7 @@ export const OrderCard = memo(function OrderCard({
           <button 
             onClick={() => onStatusUpdate(order.id, 'IN_TRANSIT')}
             className="status-update-button"
+            data-testid={`driver-in-transit-order-${order.id}`}
           >
             <NavigationIcon size={18} className="button-icon" />
             {t('order.status.IN_TRANSIT')}
@@ -406,6 +415,7 @@ export const OrderCard = memo(function OrderCard({
             <button 
               onClick={() => onStatusUpdate(order.id, 'DELIVERED')}
               className="status-update-button"
+              data-testid={`driver-delivered-order-${order.id}`}
             >
               <CheckIcon size={18} className="button-icon" />
               {t('order.status.DELIVERED')}

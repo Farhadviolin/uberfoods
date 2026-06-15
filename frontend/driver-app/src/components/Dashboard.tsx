@@ -97,7 +97,7 @@ export function Dashboard() {
     try {
       setLoading(true);
       setError(null);
-      const response = await api.get(`/orders/driver/${driver.id}`);
+      const response = await api.get(`/drivers/${driver.id}/orders/available`);
       const fetchedOrders = Array.isArray(response.data) ? response.data : [];
       setOrders(fetchedOrders);
       

@@ -2444,12 +2444,27 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
       }
       await driverPage.waitForLoadState('networkidle').catch(() => undefined);
 
+      console.log('ℹ️ lifecycle: driver orders diagnostics', {
+        currentUrl: driverPage.url(),
+        orderId,
+        visibleOrderCards: await driverPage.locator('[data-testid*="order"], .order-card, [data-order-id]').count(),
+      });
+
       // Find available order
-      const availableOrder = driverPage.locator(selectors.orderCard).first();
-      await expect(availableOrder).toBeVisible();
+      const availableOrder = driverPage
+        .getByTestId(`driver-order-card-${orderId}`)
+        .or(driverPage.locator(`[data-order-id="${orderId}"]`))
+        .or(driverPage.locator(selectors.orderCard))
+        .first();
+      await expect(availableOrder).toBeVisible({ timeout: 15000 });
 
       // Accept order
-      await availableOrder.locator(selectors.acceptOrderBtn).click();
+      const acceptButton = availableOrder
+        .getByTestId(`driver-accept-order-${orderId}`)
+        .or(availableOrder.locator(selectors.acceptOrderBtn))
+        .first();
+      await expect(acceptButton).toBeVisible();
+      await acceptButton.click();
 
       // Verify accepted status
       await expect(availableOrder.locator(selectors.orderStatus)).toContainText('IN_TRANSIT');
