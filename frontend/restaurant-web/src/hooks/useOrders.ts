@@ -227,14 +227,10 @@ export function useUpdateOrderStatus() {
       orderId,
       id,
       status,
-      version,
-      estimatedReadyTime,
     }: {
       orderId?: string;
       id?: string;
       status: string;
-      version?: number;
-      estimatedReadyTime?: string;
     }) => {
       if (!rid) {
         throw new Error("Kein Restaurant ausgewählt");
@@ -245,17 +241,9 @@ export function useUpdateOrderStatus() {
       }
       const body: {
         status: string;
-        version?: number;
-        estimatedReadyTime?: string;
       } = {
         status,
       };
-      if (version !== undefined) {
-        body.version = version;
-      }
-      if (estimatedReadyTime) {
-        body.estimatedReadyTime = estimatedReadyTime;
-      }
       return api
         .patch(`/orders/${targetId}/status`, body)
         .then((res) => res.data);

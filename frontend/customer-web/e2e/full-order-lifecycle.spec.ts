@@ -2373,6 +2373,29 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
         );
         await readyBtn.click();
         const readyPatchResponse = await readyPatch;
+        if (!readyPatchResponse.ok()) {
+          const readyPatchStatus = readyPatchResponse.status();
+          const readyPatchUrl = readyPatchResponse.url();
+          const readyPatchRequest = readyPatchResponse.request();
+          const readyPatchMethod = readyPatchRequest.method();
+          const readyPatchPostData = readyPatchRequest.postData();
+
+          let readyPatchBody = '';
+          try {
+            readyPatchBody = await readyPatchResponse.text();
+          } catch (error) {
+            readyPatchBody = `failed to read response body: ${String(error)}`;
+          }
+
+          console.log('❌ lifecycle: restaurant ready PATCH failed', {
+            status: readyPatchStatus,
+            url: readyPatchUrl,
+            method: readyPatchMethod,
+            postData: readyPatchPostData,
+            body: readyPatchBody,
+            orderId,
+          });
+        }
         expect(readyPatchResponse.ok()).toBeTruthy();
       }
 
