@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Order, useUpdateOrderStatus } from "../../hooks/useOrders";
 import { useRetry } from "../../hooks/useRetry";
 import {
@@ -17,7 +17,12 @@ interface OrderCardProps {
 export function OrderCard({ order }: OrderCardProps) {
   const { showToast } = useToast();
   const [showDetails, setShowDetails] = useState(false);
+  const [visibleStatus, setVisibleStatus] = useState(order.status);
   const updateStatus = useUpdateOrderStatus();
+
+  useEffect(() => {
+    setVisibleStatus(order.status);
+  }, [order.status]);
 
   // Retry-Logik für Status-Updates
   const retryUpdateStatus = useRetry(
@@ -41,6 +46,7 @@ export function OrderCard({ order }: OrderCardProps) {
 
   const handleStatusChange = async (newStatus: string) => {
     try {
+      setVisibleStatus(newStatus);
       await retryUpdateStatus.execute({ id: order.id, status: newStatus });
       showToast(
         `Status auf ${formatOrderStatus(newStatus)} geändert`,
@@ -55,8 +61,9 @@ export function OrderCard({ order }: OrderCardProps) {
     }
   };
 
-  const isActive = !["DELIVERED", "CANCELLED"].includes(order.status);
+  const isActive = !["DELIVERED", "CANCELLED"].includes(displayStatus);
   const totalItems = order.items.reduce((sum, item) => sum + item.quantity, 0);
+  const displayStatus = visibleStatus || order.status;
 
   return (
     <>
@@ -99,10 +106,10 @@ export function OrderCard({ order }: OrderCardProps) {
             data-testid="order-status"
             style={{
               backgroundColor:
-                statusColors[order.status] || "var(--fb-text-secondary)",
+                statusColors[displayStatus] || "var(--fb-text-secondary)",
             }}
           >
-            {formatOrderStatus(order.status)} ({order.status})
+            {formatOrderStatus(displayStatus)} ({displayStatus})
           </div>
         </div>
 
@@ -188,7 +195,7 @@ export function OrderCard({ order }: OrderCardProps) {
           </div>
           {isActive && (
             <div style={{ display: "flex", gap: "8px" }}>
-              {order.status === "PENDING" && (
+              {displayStatus === "PENDING" && (
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
@@ -204,7 +211,7 @@ export function OrderCard({ order }: OrderCardProps) {
                   Bereit
                 </button>
               )}
-              {order.status === "CONFIRMED" && (
+              {displayStatus === "CONFIRMED" && (
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
@@ -219,7 +226,7 @@ export function OrderCard({ order }: OrderCardProps) {
                   Zubereiten
                 </button>
               )}
-              {order.status === "PREPARING" && (
+              {displayStatus === "PREPARING" && (
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
