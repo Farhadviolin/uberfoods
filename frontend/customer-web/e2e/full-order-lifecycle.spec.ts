@@ -1492,7 +1492,56 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
           await customerPage.waitForLoadState('networkidle').catch(() => null);
           await TestHelpers.waitForStablePage(customerPage);
 
-          return collectFinalSubmitCartDiagnostics();
+          const checkoutCart = customerPage.getByTestId('cart');
+          const checkoutIncreaseButtons = checkoutCart
+            .locator('button[aria-label*="increase" i], button[aria-label*="erhö" i], button[aria-label*="mehr" i], .quantity-btn')
+            .filter({ hasText: /\+/ });
+
+          const repairCheckoutCartToMinimum = async () => {
+            for (let attempt = 1; attempt <= 8; attempt += 1) {
+              diagnostics = await collectFinalSubmitCartDiagnostics();
+              if (diagnostics.payloadSubtotal >= 25) {
+                return diagnostics;
+              }
+
+              const increaseButtonCount = await checkoutIncreaseButtons.count().catch(() => 0);
+              if (increaseButtonCount === 0) {
+                break;
+              }
+
+              const increaseButton = checkoutIncreaseButtons.nth((attempt - 1) % increaseButtonCount);
+              if (!(await increaseButton.isVisible().catch(() => false))) {
+                break;
+              }
+
+              console.log('➡️ lifecycle: repairing checkout cart minimum via visible + button', {
+                attempt,
+                payloadSubtotalBeforeRepair: diagnostics.payloadSubtotal,
+                visibleSubtotalBeforeRepair: diagnostics.domSubtotal,
+                itemCountBeforeRepair: diagnostics.itemCount,
+                quantityCountBeforeRepair: diagnostics.quantityCount,
+              });
+              await increaseButton.click();
+              await customerPage.waitForTimeout(300);
+            }
+
+            diagnostics = await collectFinalSubmitCartDiagnostics();
+            return diagnostics;
+          };
+
+          diagnostics = await repairCheckoutCartToMinimum();
+          if (diagnostics.payloadSubtotal < 25) {
+            throw new Error(`Final submit cart still below minimum after repair: ${JSON.stringify({
+              payloadSubtotalAfterRepair: diagnostics.payloadSubtotal,
+              visibleSubtotalAfterRepair: diagnostics.domSubtotal,
+              storageSubtotalAfterRepair: diagnostics.storageSubtotal,
+              finalSubmitItemCount: diagnostics.itemCount,
+              finalSubmitQuantityCount: diagnostics.quantityCount,
+              finalSubmitPayloadPreview: diagnostics.cartItems.slice(0, 5),
+            })}`);
+          }
+
+          return diagnostics;
         };
 
         const finalSubmitCartDiagnostics = await ensureFinalSubmitMinimumCart();
