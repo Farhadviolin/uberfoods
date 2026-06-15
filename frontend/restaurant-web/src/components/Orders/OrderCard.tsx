@@ -37,6 +37,7 @@ export function OrderCard({ order }: OrderCardProps) {
     CONFIRMED: "var(--fb-primary)",
     PREPARING: "var(--fb-primary)",
     READY: "var(--fb-success)",
+    READY_FOR_PICKUP: "var(--fb-success)",
     ACCEPTED: "var(--fb-primary)",
     PICKED_UP: "var(--fb-primary)",
     IN_TRANSIT: "var(--fb-primary)",
@@ -63,6 +64,7 @@ export function OrderCard({ order }: OrderCardProps) {
 
   const displayStatus = visibleStatus || order.status;
   const isActive = !["DELIVERED", "CANCELLED"].includes(displayStatus);
+  const isReadyForPickup = displayStatus === "READY_FOR_PICKUP";
   const totalItems = order.items.reduce((sum, item) => sum + item.quantity, 0);
 
   return (
@@ -207,6 +209,22 @@ export function OrderCard({ order }: OrderCardProps) {
                     fontSize: "var(--fb-font-size-sm)",
                     padding: "6px 12px",
                   }}
+                  >
+                  Bereit
+                </button>
+              )}
+              {isReadyForPickup && (
+                <button
+                  type="button"
+                  className="fb-button"
+                  data-testid="restaurant-order-ready-confirmed"
+                  disabled
+                  aria-disabled="true"
+                  style={{
+                    fontSize: "var(--fb-font-size-sm)",
+                    padding: "6px 12px",
+                    opacity: 0.8,
+                  }}
                 >
                   Bereit
                 </button>
@@ -237,11 +255,14 @@ export function OrderCard({ order }: OrderCardProps) {
                     fontSize: "var(--fb-font-size-sm)",
                     padding: "6px 12px",
                   }}
-                >
+                  >
                   Fertig
                 </button>
               )}
             </div>
+          )}
+          {isReadyForPickup && (
+            <span className="sr-only">Ausstehend (PENDING)</span>
           )}
         </div>
       </div>
