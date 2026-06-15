@@ -1436,6 +1436,7 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
           let addButtonCount = await addToCartButtons.count().catch(() => 0);
 
           for (let attempt = 1; attempt <= 10; attempt += 1) {
+            const diagnosticsBeforeRepair = diagnostics;
             diagnostics = await collectFinalSubmitCartDiagnostics();
             if (diagnostics.finalSubmitMinimumSatisfied) {
               break;
@@ -1458,6 +1459,11 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
             });
             await addToCartButtons.nth((attempt - 1) % addButtonCount).click();
             await customerPage.waitForTimeout(300);
+            diagnostics = await collectFinalSubmitCartDiagnostics();
+            if (diagnostics.payloadSubtotal <= diagnosticsBeforeRepair.payloadSubtotal) {
+              addToCartButtons = await openRestaurantMenuForCartRepair();
+              addButtonCount = await addToCartButtons.count().catch(() => 0);
+            }
           }
 
           diagnostics = await collectFinalSubmitCartDiagnostics();

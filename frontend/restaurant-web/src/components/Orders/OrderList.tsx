@@ -193,7 +193,7 @@ export function OrderList() {
               ? "Live-Updates"
               : !isOnline
                 ? "Offline"
-                : "Offline-Modus"}
+                : "Verbindung getrennt"}
           </div>
           {!isOnline && (
             <div
