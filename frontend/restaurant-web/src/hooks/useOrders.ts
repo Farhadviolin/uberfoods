@@ -259,9 +259,16 @@ export function useUpdateOrderStatus() {
     },
     onSuccess: (updatedOrder: Order, variables) => {
       const targetId = (variables as any).orderId || (variables as any).id;
+      const requestedStatus = (variables as any).status;
       queryClient.setQueryData<Order[]>(["orders", rid], (orders = []) =>
         orders.map((order) =>
-          order.id === targetId ? { ...order, ...updatedOrder } : order,
+          order.id === targetId
+            ? {
+                ...order,
+                ...updatedOrder,
+                ...(requestedStatus ? { status: requestedStatus } : {}),
+              }
+            : order,
         ),
       );
       queryClient.invalidateQueries({ queryKey: ["orders"] });
