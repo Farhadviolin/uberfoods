@@ -171,9 +171,11 @@ export function OrderDetails({
     handleDriverOrderEvent,
   ]);
 
+  const displayStatus = order.status || "PENDING";
   const statusOptions = [
     { value: "CONFIRMED", label: "Bestätigt" },
     { value: "PREPARING", label: "In Zubereitung" },
+    { value: "READY_FOR_PICKUP", label: "Bereit zur Abholung" },
     { value: "READY", label: "Fertig" },
     { value: "CANCELLED", label: "Storniert" },
   ];
@@ -354,8 +356,24 @@ export function OrderDetails({
             <>
               <div className="order-details-section">
                 <h3>Status</h3>
+                <div
+                  className="order-status-badge order-status"
+                  data-testid="order-status"
+                  style={{
+                    display: "inline-flex",
+                    marginBottom: "12px",
+                    padding: "6px 12px",
+                    borderRadius: "999px",
+                    backgroundColor: "var(--fb-success)",
+                    color: "white",
+                    fontWeight: 700,
+                    fontSize: "var(--fb-font-size-sm)",
+                  }}
+                >
+                  {formatOrderStatus(displayStatus)} ({displayStatus})
+                </div>
                 <select
-                  value={order.status}
+                  value={displayStatus}
                   onChange={(e) => onStatusChange(e.target.value)}
                   className="fb-input"
                   style={{ width: "100%", marginBottom: "16px" }}
