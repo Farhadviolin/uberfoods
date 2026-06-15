@@ -61,9 +61,9 @@ export function OrderCard({ order }: OrderCardProps) {
     }
   };
 
+  const displayStatus = visibleStatus || order.status;
   const isActive = !["DELIVERED", "CANCELLED"].includes(displayStatus);
   const totalItems = order.items.reduce((sum, item) => sum + item.quantity, 0);
-  const displayStatus = visibleStatus || order.status;
 
   return (
     <>
