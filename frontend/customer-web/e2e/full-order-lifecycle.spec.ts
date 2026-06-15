@@ -364,7 +364,7 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
     });
   }
 
-  test.setTimeout(300000); // 5 minutes for full lifecycle across four apps
+  test.setTimeout(25 * 60 * 1000); // 25 minutes, stays below the 35-minute CI job timeout
 
   test('Complete Order Lifecycle: Customer → Restaurant → Driver → Admin', async ({ browser }) => {
     console.log(`🆔 Starting Full Order Lifecycle Test (Run: ${RUN_ID})`);
