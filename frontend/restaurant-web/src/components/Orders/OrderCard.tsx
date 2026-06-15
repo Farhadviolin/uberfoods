@@ -18,27 +18,11 @@ export function OrderCard({ order }: OrderCardProps) {
   const { showToast } = useToast();
   const [showDetails, setShowDetails] = useState(false);
   const storageKey = `restaurant_order_status_${order.id}`;
-  const [visibleStatus, setVisibleStatus] = useState(() => {
-    try {
-      return localStorage.getItem(storageKey) || order.status;
-    } catch {
-      return order.status;
-    }
-  });
+  const [visibleStatus, setVisibleStatus] = useState(order.status);
   const updateStatus = useUpdateOrderStatus();
 
   useEffect(() => {
-    setVisibleStatus((currentStatus) => {
-      if (order.status === currentStatus) {
-        return currentStatus;
-      }
-
-      if (order.status === "PENDING" && currentStatus === "READY_FOR_PICKUP") {
-        return currentStatus;
-      }
-
-      return order.status;
-    });
+    setVisibleStatus(order.status);
   }, [order.status]);
 
   // Retry-Logik für Status-Updates

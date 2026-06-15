@@ -45,25 +45,6 @@ function resolveRestaurantId(contextRestaurantId?: string | null) {
   return contextRestaurantId || localStorage.getItem("restaurant_id");
 }
 
-function getPersistedOrderStatus(orderId: string) {
-  try {
-    return localStorage.getItem(`restaurant_order_status_${orderId}`);
-  } catch {
-    return null;
-  }
-}
-
-function applyPersistedOrderStatus(order: Order): Order {
-  const persistedStatus = getPersistedOrderStatus(order.id);
-  if (!persistedStatus) {
-    return order;
-  }
-  return {
-    ...order,
-    status: persistedStatus,
-  };
-}
-
 export function useRestaurantOrders(restaurantId: string | null) {
   const rid = resolveRestaurantId(restaurantId);
   return useQuery({
@@ -72,7 +53,7 @@ export function useRestaurantOrders(restaurantId: string | null) {
       if (!rid) return [];
       try {
         const response = await api.get<Order[]>(`/restaurants/${rid}/orders`);
-        return (response.data || []).map(applyPersistedOrderStatus);
+        return response.data || [];
       } catch (error) {
         const appError = handleApiError(error);
         logError(appError, "useRestaurantOrders");
