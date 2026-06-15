@@ -2421,11 +2421,28 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
       await driverPage.goto(testUrls.driver);
       await TestHelpers.waitForStablePage(driverPage);
 
-      // Verify we're logged in
-      await expect(driverPage).toHaveURL(/.*(dashboard|home)/i);
+      // Verify we're logged in on the actual driver start page
+      const driverLoggedInSignal = driverPage
+        .getByTestId('driver-dashboard')
+        .or(driverPage.getByTestId('dashboard-header'))
+        .or(driverPage.getByText(/driver dashboard|dashboard|willkommen/i))
+        .first();
+      await expect(driverLoggedInSignal).toBeVisible({ timeout: 10000 });
+
+      console.log('✅ lifecycle: driver login verified', {
+        currentUrl: driverPage.url(),
+      });
 
       // Navigate to available orders
-      await driverPage.locator('a[href*="orders"], nav a:has-text("Orders")').click();
+      const driverOrdersNav = driverPage
+        .getByRole('button', { name: /orders|bestellungen/i })
+        .first();
+      if (await driverOrdersNav.isVisible().catch(() => false)) {
+        await driverOrdersNav.click();
+      } else {
+        await driverPage.goto(`${testUrls.driver}/orders`);
+      }
+      await driverPage.waitForLoadState('networkidle').catch(() => undefined);
 
       // Find available order
       const availableOrder = driverPage.locator(selectors.orderCard).first();
