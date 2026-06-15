@@ -254,11 +254,16 @@ export function useUpdateOrderStatus() {
         body.estimatedReadyTime = estimatedReadyTime;
       }
       return api
-        .put(`/restaurants/${rid}/orders/${targetId}/status`, body)
+        .patch(`/orders/${targetId}/status`, body)
         .then((res) => res.data);
     },
-    onSuccess: (_, variables) => {
+    onSuccess: (updatedOrder: Order, variables) => {
       const targetId = (variables as any).orderId || (variables as any).id;
+      queryClient.setQueryData<Order[]>(["orders", rid], (orders = []) =>
+        orders.map((order) =>
+          order.id === targetId ? { ...order, ...updatedOrder } : order,
+        ),
+      );
       queryClient.invalidateQueries({ queryKey: ["orders"] });
       if (targetId) {
         queryClient.invalidateQueries({ queryKey: ["order", targetId] });

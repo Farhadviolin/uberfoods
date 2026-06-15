@@ -94,13 +94,14 @@ export function OrderCard({ order }: OrderCardProps) {
             </div>
           </div>
           <div
-            className="order-status-badge"
+            className="order-status-badge order-status"
+            data-testid="order-status"
             style={{
               backgroundColor:
                 statusColors[order.status] || "var(--fb-text-secondary)",
             }}
           >
-            {formatOrderStatus(order.status)}
+            {formatOrderStatus(order.status)} ({order.status})
           </div>
         </div>
 
@@ -190,7 +191,7 @@ export function OrderCard({ order }: OrderCardProps) {
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
-                    handleStatusChange("READY");
+                    handleStatusChange("READY_FOR_PICKUP");
                   }}
                   className="fb-button"
                   data-testid="restaurant-order-ready-button"
