@@ -17,7 +17,14 @@ interface OrderCardProps {
 export function OrderCard({ order }: OrderCardProps) {
   const { showToast } = useToast();
   const [showDetails, setShowDetails] = useState(false);
-  const [visibleStatus, setVisibleStatus] = useState(order.status);
+  const storageKey = `restaurant_order_status_${order.id}`;
+  const [visibleStatus, setVisibleStatus] = useState(() => {
+    try {
+      return localStorage.getItem(storageKey) || order.status;
+    } catch {
+      return order.status;
+    }
+  });
   const updateStatus = useUpdateOrderStatus();
 
   useEffect(() => {
@@ -58,12 +65,22 @@ export function OrderCard({ order }: OrderCardProps) {
   const handleStatusChange = async (newStatus: string) => {
     try {
       setVisibleStatus(newStatus);
+      try {
+        localStorage.setItem(storageKey, newStatus);
+      } catch {
+        // ignore storage failures in tests/non-browser environments
+      }
       await retryUpdateStatus.execute({ id: order.id, status: newStatus });
       showToast(
         `Status auf ${formatOrderStatus(newStatus)} geändert`,
         "success",
       );
     } catch (error: unknown) {
+      try {
+        localStorage.setItem(storageKey, order.status);
+      } catch {
+        // ignore storage failures in tests/non-browser environments
+      }
       const errorMessage =
         error instanceof Error
           ? error.message

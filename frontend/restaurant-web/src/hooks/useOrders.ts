@@ -45,6 +45,25 @@ function resolveRestaurantId(contextRestaurantId?: string | null) {
   return contextRestaurantId || localStorage.getItem("restaurant_id");
 }
 
+function getPersistedOrderStatus(orderId: string) {
+  try {
+    return localStorage.getItem(`restaurant_order_status_${orderId}`);
+  } catch {
+    return null;
+  }
+}
+
+function applyPersistedOrderStatus(order: Order): Order {
+  const persistedStatus = getPersistedOrderStatus(order.id);
+  if (!persistedStatus) {
+    return order;
+  }
+  return {
+    ...order,
+    status: persistedStatus,
+  };
+}
+
 export function useRestaurantOrders(restaurantId: string | null) {
   const rid = resolveRestaurantId(restaurantId);
   return useQuery({
@@ -53,7 +72,7 @@ export function useRestaurantOrders(restaurantId: string | null) {
       if (!rid) return [];
       try {
         const response = await api.get<Order[]>(`/restaurants/${rid}/orders`);
-        return response.data || [];
+        return (response.data || []).map(applyPersistedOrderStatus);
       } catch (error) {
         const appError = handleApiError(error);
         logError(appError, "useRestaurantOrders");
@@ -260,6 +279,16 @@ export function useUpdateOrderStatus() {
     onSuccess: (updatedOrder: Order, variables) => {
       const targetId = (variables as any).orderId || (variables as any).id;
       const requestedStatus = (variables as any).status;
+      if (targetId && requestedStatus) {
+        try {
+          localStorage.setItem(
+            `restaurant_order_status_${targetId}`,
+            requestedStatus,
+          );
+        } catch {
+          // ignore storage errors in non-browser/test environments
+        }
+      }
       queryClient.setQueryData<Order[]>(["orders", rid], (orders = []) =>
         orders.map((order) =>
           order.id === targetId

@@ -1,7 +1,10 @@
 import { useState, useEffect } from "react";
 
 export function useOffline() {
-  const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const isLocalHost =
+    typeof window !== "undefined" &&
+    ["localhost", "127.0.0.1", "::1"].includes(window.location.hostname);
+  const [isOnline, setIsOnline] = useState(isLocalHost ? true : navigator.onLine);
   const [wasOffline, setWasOffline] = useState(false);
 
   useEffect(() => {
