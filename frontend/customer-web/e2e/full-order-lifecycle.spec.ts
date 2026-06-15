@@ -2558,53 +2558,145 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
 
       console.log(`✅ Driver accepted order ${orderId}`);
 
-      const pickedUpButton = acceptedOrderCard
-        .getByTestId(`driver-picked-up-order-${orderId}`)
-        .or(acceptedOrderCard.locator('[data-action="pickup-order"]'))
-        .or(
-          acceptedOrderCard.getByRole('button', {
-            name: /picked up|abgeholt|pickup/i,
-          }),
-        )
-        .first();
-      await expect(pickedUpButton).toBeVisible({ timeout: 10000 });
-      await pickedUpButton.click();
+      await withStepTimeout('phase3 driver pickup button visible', async () => {
+        const pickedUpButton = acceptedOrderCard
+          .getByTestId(`driver-picked-up-order-${orderId}`)
+          .or(acceptedOrderCard.locator('[data-action="pickup-order"]'))
+          .or(
+            acceptedOrderCard.getByRole('button', {
+              name: /picked up|abgeholt|pickup/i,
+            }),
+          )
+          .first();
+        if (!await pickedUpButton.isVisible().catch(() => false)) {
+          const visibleButtons = await driverPage.locator('button').evaluateAll((nodes) => nodes
+            .map((node) => (node.textContent || '').trim().replace(/\s+/g, ' '))
+            .filter(Boolean))
+            .catch(() => []);
+          const visibleCards = await driverPage.locator('[data-testid*="order"], .order-card, [data-order-id]').evaluateAll((nodes) => nodes
+            .map((node) => (node.textContent || '').trim().replace(/\s+/g, ' '))
+            .filter(Boolean))
+            .catch(() => []);
+          throw new Error(`phase3 driver pickup button not visible after accept: ${JSON.stringify({
+            orderId,
+            currentUrl: driverPage.url(),
+            visibleButtons,
+            visibleCards: visibleCards.slice(0, 10),
+          })}`);
+        }
+      });
+
+      await withStepTimeout('phase3 driver pickup click', async () => {
+        const pickedUpButton = acceptedOrderCard
+          .getByTestId(`driver-picked-up-order-${orderId}`)
+          .or(acceptedOrderCard.locator('[data-action="pickup-order"]'))
+          .or(
+            acceptedOrderCard.getByRole('button', {
+              name: /picked up|abgeholt|pickup/i,
+            }),
+          )
+          .first();
+        await expect(pickedUpButton).toBeVisible({ timeout: 10000 });
+        await pickedUpButton.click();
+      });
 
       const pickedUpOrderCard = driverPage
         .getByTestId(`driver-order-card-${orderId}`)
         .or(driverPage.locator(`[data-order-id="${orderId}"]`))
         .first();
-      await expect(pickedUpOrderCard).toBeVisible({ timeout: 15000 });
-      await expect(pickedUpOrderCard).toHaveAttribute('data-status', 'PICKED_UP', {
-        timeout: 10000,
+      await withStepTimeout('phase3 driver in-transit status visible', async () => {
+        await expect(pickedUpOrderCard).toBeVisible({ timeout: 15000 });
+        await expect(pickedUpOrderCard).toHaveAttribute('data-status', 'PICKED_UP', {
+          timeout: 10000,
+        });
       });
 
-      const startTransitButton = pickedUpOrderCard
-        .getByTestId(`driver-in-transit-order-${orderId}`)
-        .or(pickedUpOrderCard.locator('[data-action="start-delivery"]'))
-        .or(
-          pickedUpOrderCard.getByRole('button', {
-            name: /in transit|unterwegs|lieferung starten|start delivery/i,
-          }),
-        )
-        .first();
-      await expect(startTransitButton).toBeVisible({ timeout: 10000 });
-      await startTransitButton.click();
-
-      const inTransitOrderCard = driverPage
-        .getByTestId(`driver-order-card-${orderId}`)
-        .or(driverPage.locator(`[data-order-id="${orderId}"]`))
-        .first();
-      await expect(inTransitOrderCard).toBeVisible({ timeout: 15000 });
-      await expect(inTransitOrderCard).toHaveAttribute('data-status', 'IN_TRANSIT', {
-        timeout: 10000,
+      await withStepTimeout('phase3 driver delivered button visible', async () => {
+        const startTransitButton = pickedUpOrderCard
+          .getByTestId(`driver-in-transit-order-${orderId}`)
+          .or(pickedUpOrderCard.locator('[data-action="start-delivery"]'))
+          .or(
+            pickedUpOrderCard.getByRole('button', {
+              name: /in transit|unterwegs|lieferung starten|start delivery/i,
+            }),
+          )
+          .first();
+        if (!await startTransitButton.isVisible().catch(() => false)) {
+          const visibleButtons = await driverPage.locator('button').evaluateAll((nodes) => nodes
+            .map((node) => (node.textContent || '').trim().replace(/\s+/g, ' '))
+            .filter(Boolean))
+            .catch(() => []);
+          const visibleCards = await driverPage.locator('[data-testid*="order"], .order-card, [data-order-id]').evaluateAll((nodes) => nodes
+            .map((node) => (node.textContent || '').trim().replace(/\s+/g, ' '))
+            .filter(Boolean))
+            .catch(() => []);
+          throw new Error(`phase3 driver delivered button not visible after pickup: ${JSON.stringify({
+            orderId,
+            currentUrl: driverPage.url(),
+            visibleButtons,
+            visibleCards: visibleCards.slice(0, 10),
+          })}`);
+        }
       });
 
-      // Mark as delivered
-      await inTransitOrderCard.locator(selectors.markDeliveredBtn).click();
+      await withStepTimeout('phase3 driver delivered click', async () => {
+        const startTransitButton = pickedUpOrderCard
+          .getByTestId(`driver-in-transit-order-${orderId}`)
+          .or(pickedUpOrderCard.locator('[data-action="start-delivery"]'))
+          .or(
+            pickedUpOrderCard.getByRole('button', {
+              name: /in transit|unterwegs|lieferung starten|start delivery/i,
+            }),
+          )
+          .first();
+        await expect(startTransitButton).toBeVisible({ timeout: 10000 });
+        await startTransitButton.click();
 
-      // Verify delivered status
-      await expect(inTransitOrderCard).toHaveAttribute('data-status', 'DELIVERED');
+        const inTransitOrderCard = driverPage
+          .getByTestId(`driver-order-card-${orderId}`)
+          .or(driverPage.locator(`[data-order-id="${orderId}"]`))
+          .first();
+        await expect(inTransitOrderCard).toBeVisible({ timeout: 15000 });
+        await expect(inTransitOrderCard).toHaveAttribute('data-status', 'IN_TRANSIT', {
+          timeout: 10000,
+        });
+
+        const deliveredButton = inTransitOrderCard
+          .locator(selectors.markDeliveredBtn)
+          .or(inTransitOrderCard.getByRole('button', {
+            name: /delivered|zugestellt|liefern|abschließen|complete/i,
+          }))
+          .first();
+        if (!await deliveredButton.isVisible().catch(() => false)) {
+          const visibleButtons = await driverPage.locator('button').evaluateAll((nodes) => nodes
+            .map((node) => (node.textContent || '').trim().replace(/\s+/g, ' '))
+            .filter(Boolean))
+            .catch(() => []);
+          const visibleCards = await driverPage.locator('[data-testid*="order"], .order-card, [data-order-id]').evaluateAll((nodes) => nodes
+            .map((node) => (node.textContent || '').trim().replace(/\s+/g, ' '))
+            .filter(Boolean))
+            .catch(() => []);
+          throw new Error(`phase3 driver delivered action not visible after in-transit: ${JSON.stringify({
+            orderId,
+            currentUrl: driverPage.url(),
+            visibleButtons,
+            visibleCards: visibleCards.slice(0, 10),
+          })}`);
+        }
+
+        await deliveredButton.click();
+      });
+
+      await withStepTimeout('phase3 driver delivered status visible', async () => {
+        const deliveredOrderCard = driverPage
+          .getByTestId(`driver-order-card-${orderId}`)
+          .or(driverPage.locator(`[data-order-id="${orderId}"]`))
+          .first();
+        await expect(deliveredOrderCard).toBeVisible({ timeout: 15000 });
+        await expect(deliveredOrderCard).toHaveAttribute('data-status', 'DELIVERED', {
+          timeout: 10000,
+        });
+      });
 
       console.log(`✅ Driver marked order ${orderId} as delivered`);
 
