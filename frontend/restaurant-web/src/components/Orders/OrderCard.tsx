@@ -205,6 +205,7 @@ export function OrderCard({ order }: OrderCardProps) {
             <div style={{ display: "flex", gap: "8px" }}>
               {displayStatus === "PENDING" && (
                 <button
+                  type="button"
                   onClick={(e) => {
                     e.stopPropagation();
                     handleStatusChange("READY_FOR_PICKUP");
@@ -237,6 +238,7 @@ export function OrderCard({ order }: OrderCardProps) {
               )}
               {displayStatus === "CONFIRMED" && (
                 <button
+                  type="button"
                   onClick={(e) => {
                     e.stopPropagation();
                     handleStatusChange("PREPARING");
@@ -252,6 +254,7 @@ export function OrderCard({ order }: OrderCardProps) {
               )}
               {displayStatus === "PREPARING" && (
                 <button
+                  type="button"
                   onClick={(e) => {
                     e.stopPropagation();
                     handleStatusChange("READY");

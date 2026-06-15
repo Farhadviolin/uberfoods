@@ -2351,11 +2351,11 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
       }
 
       const readyBtn = resolvedOrderCard
-        .locator(selectors.readyForPickupBtn)
-        .or(restaurantPage.getByRole('button', { name: /ready|pickup|bereit|abholbereit|vorbereiten|accept|annehmen/i }))
+        .locator('button[data-testid="restaurant-order-ready-button"]')
+        .or(resolvedOrderCard.locator(selectors.readyForPickupBtn))
         .first();
       if (!await readyBtn.isVisible().catch(() => false)) {
-        const fallbackReadyBtn = restaurantPage.getByRole('button', { name: /ready|pickup|bereit|abholbereit|vorbereiten|accept|annehmen/i }).first();
+        const fallbackReadyBtn = resolvedOrderCard.getByRole('button', { name: /ready|pickup|bereit|abholbereit|vorbereiten|accept|annehmen/i }).first();
         if (await fallbackReadyBtn.isVisible().catch(() => false) && await fallbackReadyBtn.isEnabled().catch(() => false)) {
           await fallbackReadyBtn.click();
         } else {
@@ -2365,7 +2365,15 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
         }
       } else {
         await expect(readyBtn).toBeEnabled();
+        const readyPatch = restaurantPage.waitForResponse(
+          (response) =>
+            response.request().method() === 'PATCH'
+            && new URL(response.url()).pathname.endsWith(`/api/orders/${orderId}/status`),
+          { timeout: 15000 },
+        );
         await readyBtn.click();
+        const readyPatchResponse = await readyPatch;
+        expect(readyPatchResponse.ok()).toBeTruthy();
       }
 
       // Verify status changed
