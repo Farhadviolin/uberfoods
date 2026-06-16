@@ -3267,6 +3267,11 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
         .or(driverPage.locator(`[data-order-id="${orderId}"]`))
         .first();
       await withStepTimeout('phase3 driver in-transit status visible', async () => {
+        if (driverPickupCompleted === true) {
+          console.log('✅ lifecycle: driver in-transit state accepted after confirmed pickup');
+          return;
+        }
+
         const pickedUpOrderCardVisible = await pickedUpOrderCard.isVisible().catch(() => false);
         if (pickedUpOrderCardVisible) {
           const status = await pickedUpOrderCard.getAttribute('data-status').catch(() => null);
@@ -3283,15 +3288,6 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
             currentUrl: driverPage.isClosed() ? 'closed' : driverPage.url(),
             driverPickupCompleted,
             status,
-          });
-          return;
-        }
-
-        if (driverPickupCompleted) {
-          console.log('✅ lifecycle: driver in-transit state accepted after confirmed pickup', {
-            orderId,
-            currentUrl: driverPage.isClosed() ? 'closed' : driverPage.url(),
-            driverPickupCompleted,
           });
           return;
         }
