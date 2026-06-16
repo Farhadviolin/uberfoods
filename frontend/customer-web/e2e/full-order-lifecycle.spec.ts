@@ -2850,19 +2850,20 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
         { timeout: 10000 },
       );
 
+      const pickupButton = acceptedOrderCard
+        .getByTestId(`driver-picked-up-order-${orderId}`)
+        .or(acceptedOrderCard.locator('[data-action="pickup-order"]'))
+        .or(
+          acceptedOrderCard.getByRole('button', {
+            name: /picked up|abgeholt|pickup/i,
+          }),
+        )
+        .first();
+
       console.log(`✅ Driver accepted order ${orderId}`);
 
       await withStepTimeout('phase3 driver pickup button visible', async () => {
-        const pickedUpButton = acceptedOrderCard
-          .getByTestId(`driver-picked-up-order-${orderId}`)
-          .or(acceptedOrderCard.locator('[data-action="pickup-order"]'))
-          .or(
-            acceptedOrderCard.getByRole('button', {
-              name: /picked up|abgeholt|pickup/i,
-            }),
-          )
-          .first();
-        if (!await pickedUpButton.isVisible().catch(() => false)) {
+        if (!await pickupButton.isVisible().catch(() => false)) {
           const visibleButtons = await driverPage.locator('button').evaluateAll((nodes) => nodes
             .map((node) => (node.textContent || '').trim().replace(/\s+/g, ' '))
             .filter(Boolean))
@@ -2881,38 +2882,13 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
       });
 
       await withStepTimeout('phase3 driver pickup click', async () => {
-        const resolvePickupButton = () => driverPage
-          .getByTestId(`driver-order-card-${orderId}`)
-          .or(driverPage.locator(`[data-order-id="${orderId}"]`))
-          .first()
-          .getByTestId(`driver-picked-up-order-${orderId}`)
-          .or(
-            driverPage
-              .getByTestId(`driver-order-card-${orderId}`)
-              .or(driverPage.locator(`[data-order-id="${orderId}"]`))
-              .first()
-              .locator('[data-action="pickup-order"]'),
-          )
-          .or(
-            driverPage
-              .getByTestId(`driver-order-card-${orderId}`)
-              .or(driverPage.locator(`[data-order-id="${orderId}"]`))
-              .first()
-              .getByRole('button', {
-              name: /picked up|abgeholt|pickup/i,
-            }),
-          )
-          .first();
         const ensureDriverPageOpen = () => {
           if (driverPage.isClosed()) {
             throw new Error(`Driver page closed before pickup operation for order ${orderId}`);
           }
         };
 
-        const pickupCard = driverPage
-          .getByTestId(`driver-order-card-${orderId}`)
-          .or(driverPage.locator(`[data-order-id="${orderId}"]`))
-          .first();
+        const pickupCard = acceptedOrderCard;
         const pickupStatusLocator = pickupCard.locator('[data-testid="order-status"], .order-status');
         const nextActionButton = pickupCard
           .getByTestId(`driver-in-transit-order-${orderId}`)
@@ -2965,7 +2941,6 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
         driverPage.on('pageerror', onPickupPageError);
         driverPage.on('console', onPickupConsole);
 
-        const pickupButton = resolvePickupButton();
         ensureDriverPageOpen();
         const pickupClickStartedAt = Date.now();
         console.log('ℹ️ lifecycle: phase3 driver page state before pickup click', {
