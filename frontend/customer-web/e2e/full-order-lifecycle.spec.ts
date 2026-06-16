@@ -2903,6 +2903,11 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
             }),
           )
           .first();
+        const ensureDriverPageOpen = () => {
+          if (driverPage.isClosed()) {
+            throw new Error(`Driver page closed before pickup operation for order ${orderId}`);
+          }
+        };
 
         const pickupCard = driverPage
           .getByTestId(`driver-order-card-${orderId}`)
@@ -2961,6 +2966,7 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
         driverPage.on('console', onPickupConsole);
 
         const pickupButton = resolvePickupButton();
+        ensureDriverPageOpen();
         await pickupButton.scrollIntoViewIfNeeded();
         await expect(pickupButton).toBeVisible({ timeout: 10000 });
         await expect(pickupButton).toBeEnabled({ timeout: 10000 });
@@ -2977,23 +2983,39 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
         const pickupResponsePromise = driverPage.waitForResponse((response) => {
           const url = response.url();
           const method = response.request().method();
-          return (method === 'PATCH' || method === 'PUT')
+          return (method === 'PATCH' || method === 'PUT' || method === 'POST')
+            && response.status() >= 200
+            && response.status() < 300
             && (
               /\/(?:api\/)?orders\/[^/?]+\/status(?:[/?#]|$)/i.test(url)
+              || /\/(?:api\/)?orders\/[^/?]+\/pickup(?:[/?#]|$)/i.test(url)
               || (/\/(?:api\/)?orders\/[^/?]+(?:[/?#]|$)/i.test(url) && /status|pickup|driver/i.test(url))
-            )
-            && response.status() < 500;
-        }, { timeout: 10000 }).catch(() => null);
-        const pickupUiPromise = Promise.race([
-          expect(pickupStatusLocator).toContainText(/PICKED_UP|IN_TRANSIT|OUT_FOR_DELIVERY|abgeholt|unterwegs|in delivery|delivered/i, { timeout: 10000 }).then(() => true).catch(() => false),
-          expect(nextActionButton).toBeVisible({ timeout: 10000 }).then(() => true).catch(() => false),
-        ]);
+            );
+        }, { timeout: 8000 }).catch(() => null);
 
-        let clickSucceeded = false;
+        const pickupUiSuccessPromise = Promise.race([
+          driverPage.getByText(/PICKED_UP|IN_TRANSIT|OUT_FOR_DELIVERY|abgeholt|unterwegs|in delivery|delivered/i)
+            .first()
+            .waitFor({ state: 'visible', timeout: 8000 })
+            .then(() => true)
+            .catch(() => false),
+          nextActionButton.waitFor({ state: 'visible', timeout: 8000 })
+            .then(() => true)
+            .catch(() => false),
+        ]).catch(() => false);
+
         let clickError: string | null = null;
         try {
-          await pickupButton.click({ timeout: 6000 });
-          clickSucceeded = true;
+          ensureDriverPageOpen();
+          await pickupButton.evaluate((element) => {
+            const htmlElement = element as HTMLElement;
+            htmlElement.scrollIntoView({ block: 'center', inline: 'center' });
+            htmlElement.dispatchEvent(new MouseEvent('click', {
+              bubbles: true,
+              cancelable: true,
+              view: window,
+            }));
+          });
         } catch (error) {
           clickError = error instanceof Error ? error.message : String(error);
           console.log('ℹ️ lifecycle: pickup click failed', {
@@ -3004,10 +3026,41 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
           });
         }
 
-        const [pickupResponse, pickupUiSuccess] = await Promise.all([
+        if (clickError && !driverPage.isClosed()) {
+          try {
+            ensureDriverPageOpen();
+            await pickupButton.dispatchEvent('click');
+            clickError = null;
+          } catch (error) {
+            clickError = error instanceof Error ? error.message : String(error);
+          }
+        }
+
+        if (clickError && !driverPage.isClosed()) {
+          try {
+            ensureDriverPageOpen();
+            await pickupButton.click({ force: true, timeout: 1500 });
+            clickError = null;
+          } catch (error) {
+            clickError = error instanceof Error ? error.message : String(error);
+          }
+        }
+
+        if (driverPage.isClosed()) {
+          throw new Error(`Driver page closed during pickup click for order ${orderId}`);
+        }
+
+        if (clickError) {
+          throw new Error(`Driver pickup click failed for order ${orderId}: ${clickError}`);
+        }
+
+        const [pickupResponse, pickupUiSuccess] = await Promise.allSettled([
           pickupResponsePromise,
-          pickupUiPromise,
-        ]);
+          pickupUiSuccessPromise,
+        ]).then((results) => [
+          results[0].status === 'fulfilled' ? results[0].value : null,
+          results[1].status === 'fulfilled' ? results[1].value : false,
+        ] as const);
 
         const pickupStatusTextAfter = (await pickupStatusLocator.textContent().catch(() => '') || '').trim();
         const hasPickupUiSuccess = Boolean(pickupUiSuccess)
@@ -3017,7 +3070,6 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
           orderId,
           currentUrl: driverPage.url(),
           pickupButtonText,
-          clickSucceeded,
           clickError,
           pickupResponseStatus: pickupResponse?.status() ?? null,
           pickupResponseUrl: pickupResponse?.url() ?? null,
@@ -3034,7 +3086,6 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
             orderId,
             currentUrl: driverPage.url(),
             pickupButtonText,
-            clickSucceeded,
             clickError,
             pickupStatusText: pickupStatusTextAfter || null,
             requestUrls: pickupTraffic.requestUrls,
