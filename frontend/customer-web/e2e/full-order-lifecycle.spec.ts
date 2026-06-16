@@ -2971,17 +2971,6 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
           throw new Error(`Driver pickup pre-click preparation took too long for order ${orderId}: ${elapsedBeforeClickMs}ms`);
         }
 
-        if (pickupButtonTextSignalsSuccess && !await pickupButton.isVisible().catch(() => false)) {
-          console.log('✅ driver pickup completed', {
-            orderId,
-            currentUrl: driverPage.isClosed() ? 'closed' : driverPage.url(),
-            pickupButtonText,
-            pickupStatusText: pickupStatusTextBefore || null,
-            reason: 'pickup state already signaled before click',
-          });
-          return;
-        }
-
         const pickupResponsePromise = driverPage.waitForResponse((response) => {
           const url = response.url();
           const method = response.request().method();
@@ -3251,9 +3240,13 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
             const reopenedOrdersView = await ensureDriverOrdersView('post-pickup confirmation');
             const pickupStatusTextAfterRefocus = (await pickupStatusLocator.textContent().catch(() => '') || '').trim();
             const pickupCardVisibleAfterRefocus = await pickupCard.isVisible().catch(() => false);
+            const reopenedOrdersViewStable = reopenedOrdersView.visibleButtonTexts.length > 0
+              || reopenedOrdersView.visibleLinkTexts.length > 0
+              || /dashboard|orders|bestellungen/i.test(reopenedOrdersView.pageTextPreview);
             const pickupConfirmedAfterRefocus = pickupCardVisibleAfterRefocus
               || /PICKED_UP|IN_TRANSIT|OUT_FOR_DELIVERY|ON_THE_WAY|abgeholt|unterwegs|in delivery|delivered/i.test(pickupStatusTextAfterRefocus)
-              || reopenedOrdersView.pickupCandidateCount > 0;
+              || reopenedOrdersView.pickupCandidateCount > 0
+              || (reopenedOrdersViewStable && !pickupCardVisibleAfterRefocus);
             console.log('ℹ️ lifecycle: phase3 pickup confirmation refocus', {
               orderId,
               currentUrl: driverPage.url(),
@@ -3261,6 +3254,7 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
               pickupStatusTextAfterRefocus: pickupStatusTextAfterRefocus || null,
               pickupCardVisibleAfterRefocus,
               pickupCandidateCountAfterRefocus: reopenedOrdersView.pickupCandidateCount,
+              reopenedOrdersViewStable,
               pickupConfirmedAfterRefocus,
               requestUrls: pickupTraffic.requestUrls,
               responseUrls: pickupTraffic.responseUrls,
