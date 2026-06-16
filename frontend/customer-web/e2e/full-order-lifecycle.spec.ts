@@ -3097,6 +3097,12 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
             }
           }
 
+          if (!driverPage.url().includes('/orders')) {
+            await driverPage.goto(`${testUrls.driver}/orders`).catch(() => null);
+          }
+          await driverPage.waitForLoadState('domcontentloaded').catch(() => undefined);
+          await driverPage.waitForLoadState('networkidle').catch(() => undefined);
+
           const reopened = await Promise.race([
             inspectPickupDom().then((result) => result).catch(() => ({
               cardFound: false,
