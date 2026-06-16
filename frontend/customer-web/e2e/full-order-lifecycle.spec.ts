@@ -2967,6 +2967,11 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
 
         const pickupButton = resolvePickupButton();
         ensureDriverPageOpen();
+        console.log('ℹ️ lifecycle: phase3 driver page state before pickup click', {
+          orderId,
+          isClosed: driverPage.isClosed(),
+          currentUrl: driverPage.isClosed() ? 'closed' : driverPage.url(),
+        });
         await pickupButton.scrollIntoViewIfNeeded();
         await expect(pickupButton).toBeVisible({ timeout: 10000 });
         await expect(pickupButton).toBeEnabled({ timeout: 10000 });
@@ -3018,6 +3023,13 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
           });
         } catch (error) {
           clickError = error instanceof Error ? error.message : String(error);
+          if (
+            clickError.includes('Driver page closed')
+            || clickError.includes('Target page, context or browser has been closed')
+            || driverPage.isClosed()
+          ) {
+            throw new Error(`Driver page closed during pickup click for order ${orderId}: ${clickError}`);
+          }
           console.log('ℹ️ lifecycle: pickup click failed', {
             orderId,
             currentUrl: driverPage.url(),
@@ -3033,6 +3045,13 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
             clickError = null;
           } catch (error) {
             clickError = error instanceof Error ? error.message : String(error);
+            if (
+              clickError.includes('Driver page closed')
+              || clickError.includes('Target page, context or browser has been closed')
+              || driverPage.isClosed()
+            ) {
+              throw new Error(`Driver page closed during pickup click for order ${orderId}: ${clickError}`);
+            }
           }
         }
 
@@ -3043,11 +3062,18 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
             clickError = null;
           } catch (error) {
             clickError = error instanceof Error ? error.message : String(error);
+            if (
+              clickError.includes('Driver page closed')
+              || clickError.includes('Target page, context or browser has been closed')
+              || driverPage.isClosed()
+            ) {
+              throw new Error(`Driver page closed during pickup click for order ${orderId}: ${clickError}`);
+            }
           }
         }
 
         if (driverPage.isClosed()) {
-          throw new Error(`Driver page closed during pickup click for order ${orderId}`);
+          throw new Error(`Driver page unexpectedly closed before pickup click for order ${orderId}`);
         }
 
         if (clickError) {
