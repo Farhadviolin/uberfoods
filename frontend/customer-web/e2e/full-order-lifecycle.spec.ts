@@ -310,6 +310,15 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
     console.log(`🆔 Test Run ID: ${RUN_ID}`);
   });
 
+  const safeMinimumOrderSubtotalKey = `lifecycle_safe_minimum_order_subtotal_${RUN_ID}`;
+  let lastSafeMinimumOrderSnapshot: {
+    subtotal: number;
+    source: string | null;
+    storageKeys: string[];
+    storageEntries: Array<[string, string | null]>;
+    cartItemTexts: string[];
+  } | null = null;
+
   async function logCustomerUserSnapshot(page: Page, label: string) {
     const snapshot = await page.evaluate(() => {
       const raw = window.localStorage.getItem('customer_user');
@@ -461,7 +470,6 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
         const cartItemDetails = cartItems.locator('.cart-item-details');
         const cartPlaceholder = customerPage.getByTestId('cart-placeholder');
         const cartStateKeyPrefix = 'cart_';
-        const safeMinimumOrderSubtotalKey = `lifecycle_safe_minimum_order_subtotal_${RUN_ID}`;
         const targetSubtotal = 25;
         const maxMinimumOrderAttempts = 10;
 
@@ -617,13 +625,24 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
           };
         };
 
-        const persistSafeMinimumOrderSubtotal = async (subtotal: number, source: string | null) => {
+        const persistSafeMinimumOrderSubtotal = async (subtotal: number, source: string | null, snapshot: {
+          storageKeys: string[];
+          storageEntries: Array<[string, string | null]>;
+          cartItemTexts: string[];
+        }) => {
           if (!Number.isFinite(subtotal) || subtotal < targetSubtotal) {
             return;
           }
 
           lastSafeMinimumOrderSubtotal = subtotal;
           lastSafeMinimumOrderSource = source;
+          lastSafeMinimumOrderSnapshot = {
+            subtotal,
+            source,
+            storageKeys: snapshot.storageKeys,
+            storageEntries: snapshot.storageEntries,
+            cartItemTexts: snapshot.cartItemTexts,
+          };
 
           await customerPage.evaluate(({ storageKey, value, sourceLabel }) => {
             window.localStorage.setItem(storageKey, JSON.stringify({
@@ -659,7 +678,11 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
               targetSubtotal,
               minimumWarningCleared,
             });
-            await persistSafeMinimumOrderSubtotal(cartDiagnostics.subtotal ?? 0, cartDiagnostics.subtotalSource);
+            await persistSafeMinimumOrderSubtotal(cartDiagnostics.subtotal ?? 0, cartDiagnostics.subtotalSource, {
+              storageKeys: storageDiagnostics.storageKeys,
+              storageEntries: storageDiagnostics.storageEntries.map((entry) => [entry.key, JSON.stringify(entry)] as const),
+              cartItemTexts: cartDiagnostics.cartItemTexts,
+            });
             console.log('✅ lifecycle: leaving phase1 minimum order satisfaction');
             return;
           }
@@ -699,7 +722,11 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
 
           if (postClickMinimumWarningCleared && postClickHasSufficientQuantity && postClickHasSafeSubtotal) {
             console.log(`✅ lifecycle: minimum order satisfied after ${attempt} extra attempts`);
-            await persistSafeMinimumOrderSubtotal(postClickDiagnostics.subtotal ?? 0, postClickDiagnostics.subtotalSource);
+            await persistSafeMinimumOrderSubtotal(postClickDiagnostics.subtotal ?? 0, postClickDiagnostics.subtotalSource, {
+              storageKeys: postClickStorageDiagnostics.storageKeys,
+              storageEntries: postClickStorageDiagnostics.storageEntries.map((entry) => [entry.key, JSON.stringify(entry)] as const),
+              cartItemTexts: postClickDiagnostics.cartItemTexts,
+            });
             console.log('✅ lifecycle: leaving phase1 minimum order satisfaction');
             return;
           }
@@ -1414,6 +1441,7 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
             subtotal,
             subtotalSource: storageDiagnostics.subtotalSource ?? domSubtotalDiagnostics.source ?? 'localStorage-cart-state',
             finalSubmitMinimumSatisfied: payloadMinimumSatisfied,
+            safeMinimumOrderSnapshot: lastSafeMinimumOrderSnapshot,
           };
         };
 
