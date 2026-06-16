@@ -1383,12 +1383,6 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
           await TestHelpers.waitForStablePage(customerPage);
 
           const openRestaurantMenuForCartRepair = async () => {
-            const addToCartButtons = customerPage.locator('[data-testid="add-to-cart-button"]');
-            let addButtonCount = await addToCartButtons.count().catch(() => 0);
-            if (addButtonCount > 0) {
-              return addToCartButtons;
-            }
-
             const restaurantCards = customerPage.getByTestId('restaurant-card');
             const restaurantCardCount = await restaurantCards.count().catch(() => 0);
             console.log('ℹ️ lifecycle: no add-to-cart buttons on restaurants index, trying restaurant card detail fallback', {
@@ -1407,11 +1401,18 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
             });
 
             if (restaurantCardCount > 0) {
-              await restaurantCards.first().click();
+              const restaurantCard = restaurantCards.first();
+              await restaurantCard.scrollIntoViewIfNeeded().catch(() => null);
+              await restaurantCard.click().catch(async () => {
+                await restaurantCard.locator('a, button').first().click();
+              });
               await customerPage.waitForLoadState('networkidle').catch(() => null);
               await TestHelpers.waitForStablePage(customerPage);
-              addButtonCount = await addToCartButtons.count().catch(() => 0);
             }
+
+            const addToCartButtons = customerPage
+              .locator('[data-testid="menu-content"] [data-testid="add-to-cart-button"], [data-testid="add-to-cart-button"]');
+            const addButtonCount = await addToCartButtons.count().catch(() => 0);
 
             if (addButtonCount === 0) {
               throw new Error(`Cannot restore final submit cart minimum because no add-to-cart buttons are visible: ${JSON.stringify({
