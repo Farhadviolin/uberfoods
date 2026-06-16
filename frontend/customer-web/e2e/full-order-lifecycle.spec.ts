@@ -1722,6 +1722,15 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
               submitSeen: false,
               submitTarget: null as string | null,
               clickedText: null as string | null,
+              handleCheckoutSubmitCalled: false,
+              placeOrderCalled: false,
+              beforeApiPost: false,
+              apiPostUrl: null as string | null,
+              requestUrls: [] as string[],
+              responseUrls: [] as string[],
+              requestFailedEvents: [] as string[],
+              pageErrors: [] as string[],
+              consoleErrors: [] as string[],
               networkUrls: [] as string[],
             };
 
@@ -1760,6 +1769,47 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
 
         await installCheckoutSubmitProbe();
 
+        const submitTraffic = {
+          requestUrls: [] as string[],
+          responseUrls: [] as string[],
+          requestFailedEvents: [] as string[],
+          pageErrors: [] as string[],
+          consoleErrors: [] as string[],
+        };
+        const submitTrafficFilters = /\/api\/orders\/customer|\/orders\/customer|\/orders\/[^/?]+|\/api\/customers\/profile/i;
+        const onSubmitRequest = (request: Parameters<Parameters<typeof customerPage.on>[1]>[0]) => {
+          const url = request.url();
+          if (submitTrafficFilters.test(url)) {
+            submitTraffic.requestUrls.push(`${request.method()} ${url}`);
+          }
+        };
+        const onSubmitResponse = (response: Parameters<Parameters<typeof customerPage.on>[1]>[0]) => {
+          const url = response.url();
+          if (submitTrafficFilters.test(url)) {
+            submitTraffic.responseUrls.push(`${response.status()} ${url}`);
+          }
+        };
+        const onSubmitRequestFailed = (request: Parameters<Parameters<typeof customerPage.on>[1]>[0]) => {
+          const url = request.url();
+          if (submitTrafficFilters.test(url)) {
+            submitTraffic.requestFailedEvents.push(`${request.failure()?.errorText ?? 'requestfailed'} ${url}`);
+          }
+        };
+        const onSubmitPageError = (error: Error) => {
+          submitTraffic.pageErrors.push(error.message);
+        };
+        const onSubmitConsole = (message: Parameters<Parameters<typeof customerPage.on>[1]>[0]) => {
+          const type = message.type();
+          if (type === 'error' || type === 'warning') {
+            submitTraffic.consoleErrors.push(`[${type}] ${message.text()}`);
+          }
+        };
+        customerPage.on('request', onSubmitRequest);
+        customerPage.on('response', onSubmitResponse);
+        customerPage.on('requestfailed', onSubmitRequestFailed);
+        customerPage.on('pageerror', onSubmitPageError);
+        customerPage.on('console', onSubmitConsole);
+
         const checkoutFormValidityBeforeFinalSubmit = await customerPage.locator('form').last().evaluate((form) => {
           const htmlForm = form as HTMLFormElement;
           return {
@@ -1795,11 +1845,16 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
         await expect(finalPlaceOrderButton).toBeEnabled();
         console.log('✅ lifecycle: phase1 final Place Order button enabled');
         const performFinalSubmitAttempt = async (attemptLabel: string) => {
+          const isOrderCustomerUrl = (urlString: string) => {
+            const lower = urlString.toLowerCase();
+            return lower.endsWith('/orders/customer')
+              || lower.includes('/api/orders/customer')
+              || /\/orders\/customer(?:[/?#]|$)/i.test(urlString)
+              || /\/api\/orders\/customer(?:[/?#]|$)/i.test(urlString);
+          };
           const orderCreateResponsePromise = customerPage.waitForResponse((response) => {
             const request = response.request();
-            const url = new URL(response.url());
-            return request.method() === 'POST'
-              && url.pathname.endsWith('/api/orders/customer');
+            return request.method() === 'POST' && isOrderCustomerUrl(response.url());
           }, { timeout: 20000 }).catch(() => null);
           pendingOrderCreateResponse = orderCreateResponsePromise;
           const orderCreateOutcomePromise = orderCreateResponsePromise.then((response) => {
@@ -1809,7 +1864,10 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
             lastOrderCreateResponse = response;
             return { kind: 'response' as const, response };
           });
-          const orderUrlPromise = customerPage.waitForURL(/\/orders\/[^/?]+(?:\?.*)?$/, { timeout: 20000 })
+          const orderUrlPromise = customerPage.waitForURL((url) => {
+            const value = url.toString();
+            return /\/orders\/[^/?]+(?:\?.*)?$/i.test(value) || /\/orders\/customer(?:[/?#]|$)/i.test(value);
+          }, { timeout: 20000 })
             .then(() => ({ kind: 'order-url' as const }))
             .catch(() => null);
           const orderTrackingPromise = orderTrackingPage.waitFor({ state: 'visible', timeout: 20000 })
@@ -1840,6 +1898,15 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
           const visibleAddressText = await customerPage.locator('text=/address|adresse|liefer|delivery|street|straße/i').allTextContents().catch(() => []);
           const visiblePhoneText = await customerPage.locator('text=/phone|telefon|mobile|handy/i').allTextContents().catch(() => []);
           const visiblePaymentText = await customerPage.locator('text=/payment|card|karte|pay|zahlung/i').allTextContents().catch(() => []);
+          const currentCustomerUser = await customerPage.evaluate(() => window.localStorage.getItem('customer_user')).catch(() => null);
+          const currentCartPayload = await collectFinalSubmitCartDiagnostics().catch(() => null);
+          const capturedTraffic = {
+            requestUrls: [...submitTraffic.requestUrls],
+            responseUrls: [...submitTraffic.responseUrls],
+            requestFailedEvents: [...submitTraffic.requestFailedEvents],
+            pageErrors: [...submitTraffic.pageErrors],
+            consoleErrors: [...submitTraffic.consoleErrors],
+          };
           console.log(`ℹ️ lifecycle: ${attemptLabel} final order submit diagnostics`, {
             currentUrl: customerPage.url(),
             paymentModalVisible: await paymentModal.isVisible().catch(() => false),
@@ -1857,7 +1924,37 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
             submitText: await finalPlaceOrderButton.textContent().catch(() => null),
             checkoutErrors: await customerPage.locator('.error, [role="alert"], [data-testid="checkout-error"]').allTextContents().catch(() => []),
             submitProbe,
+            capturedTraffic,
+            currentCustomerUser,
+            currentCartPayload,
           });
+          const submitProbeObject = typeof submitProbe === 'object' && submitProbe
+            ? submitProbe as {
+                beforeApiPost?: boolean;
+                apiPostUrl?: string | null;
+                pageErrors?: string[];
+                consoleErrors?: string[];
+                requestUrls?: string[];
+                responseUrls?: string[];
+                requestFailedEvents?: string[];
+              }
+            : null;
+          const detectedSubmitError = submitProbeObject?.pageErrors?.[0]
+            || submitProbeObject?.consoleErrors?.find((text) => /error|failed|exception|unhandled/i.test(text))
+            || capturedTraffic.pageErrors[0]
+            || capturedTraffic.consoleErrors[0]
+            || capturedTraffic.requestFailedEvents[0]
+            || (submitProbeObject?.beforeApiPost && !capturedTraffic.requestUrls.length ? 'Checkout submit reached API preflight but no network request was observed' : null);
+          if (detectedSubmitError) {
+            throw new Error(`Final order submission failed before response/UI confirmation: ${JSON.stringify({
+              detectedSubmitError,
+              currentUrl: customerPage.url(),
+              submitProbe,
+              capturedTraffic,
+              currentCustomerUser,
+              currentCartPayload,
+            })}`);
+          }
           return null;
         };
 
