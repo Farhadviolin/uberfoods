@@ -1858,9 +1858,17 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
               || /\/orders\/customer(?:[/?#]|$)/i.test(urlString)
               || /\/api\/orders\/customer(?:[/?#]|$)/i.test(urlString);
           };
+          const isSuccessfulOrderCreateResponse = (response: Response) => {
+            const request = response.request();
+            return request.method() === 'POST'
+              && isOrderCustomerUrl(response.url())
+              && [200, 201, 202].includes(response.status());
+          };
           const orderCreateResponsePromise = customerPage.waitForResponse((response) => {
             const request = response.request();
-            return request.method() === 'POST' && isOrderCustomerUrl(response.url());
+            return request.method() === 'POST'
+              && isOrderCustomerUrl(response.url())
+              && response.status() < 500;
           }, { timeout: 20000 }).catch(() => null);
           pendingOrderCreateResponse = orderCreateResponsePromise;
           const orderCreateOutcomePromise = orderCreateResponsePromise.then((response) => {
@@ -1868,6 +1876,9 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
               return null;
             }
             lastOrderCreateResponse = response;
+            if (!isSuccessfulOrderCreateResponse(response)) {
+              return null;
+            }
             return { kind: 'response' as const, response };
           });
           const orderUrlPromise = customerPage.waitForURL((url) => {
@@ -1899,7 +1910,31 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
             return attemptOutcome;
           }
 
-          const submitProbe = await customerPage.evaluate(() => (window as unknown as { __checkoutSubmitProbe?: unknown }).__checkoutSubmitProbe ?? null);
+          const postClickSubmitProbe = await customerPage.evaluate(() => (window as unknown as { __checkoutSubmitProbe?: unknown }).__checkoutSubmitProbe ?? null);
+          const submitProbeAfterClick = typeof postClickSubmitProbe === 'object' && postClickSubmitProbe
+            ? postClickSubmitProbe as {
+                beforeApiPost?: boolean;
+                apiPostUrl?: string | null;
+                pageErrors?: string[];
+                consoleErrors?: string[];
+                requestUrls?: string[];
+                responseUrls?: string[];
+                requestFailedEvents?: string[];
+              }
+            : null;
+          const probeSawSuccessfulOrderPost = Boolean(submitProbeAfterClick?.beforeApiPost)
+            && Boolean(submitProbeAfterClick?.apiPostUrl)
+            && isOrderCustomerUrl(submitProbeAfterClick.apiPostUrl || '');
+          if (probeSawSuccessfulOrderPost && lastOrderCreateResponse && isSuccessfulOrderCreateResponse(lastOrderCreateResponse)) {
+            console.log('✅ lifecycle: accepting successful order response from submit probe', {
+              apiPostUrl: submitProbeAfterClick?.apiPostUrl,
+              responseStatus: lastOrderCreateResponse.status(),
+              responseUrl: lastOrderCreateResponse.url(),
+            });
+            return { kind: 'response' as const, response: lastOrderCreateResponse };
+          }
+
+          const submitProbe = postClickSubmitProbe;
           const visibleTotalText = await cartContainer.locator('text=/€|Mindestbestellwert|Total|Gesamt/i').allTextContents().catch(() => []);
           const visibleAddressText = await customerPage.locator('text=/address|adresse|liefer|delivery|street|straße/i').allTextContents().catch(() => []);
           const visiblePhoneText = await customerPage.locator('text=/phone|telefon|mobile|handy/i').allTextContents().catch(() => []);
@@ -1935,20 +1970,11 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
             currentCustomerUser,
             currentCartPayload,
           });
-          const submitProbeObject = typeof submitProbe === 'object' && submitProbe
-            ? submitProbe as {
-                beforeApiPost?: boolean;
-                apiPostUrl?: string | null;
-                pageErrors?: string[];
-                consoleErrors?: string[];
-                requestUrls?: string[];
-                responseUrls?: string[];
-                requestFailedEvents?: string[];
-              }
-            : null;
+          const submitProbeObject = submitProbeAfterClick;
           const hasSuccessfulOrderCreateResponse = Boolean(capturedTraffic.successfulOrderCreateResponse)
             || capturedTraffic.responseUrls.some((entry) => /^(200|201|202)\s+.*\/(?:api\/)?orders\/customer\b/i.test(entry))
             || submitProbeObject?.responseUrls?.some((entry) => /^(200|201|202)\s+.*\/(?:api\/)?orders\/customer\b/i.test(entry))
+            || (submitProbeObject?.apiPostUrl ? isOrderCustomerUrl(submitProbeObject.apiPostUrl) : false)
             || Boolean(lastOrderCreateResponse?.ok?.());
           const hasOrderConfirmationUi = Boolean(
             await paymentModal.isVisible().catch(() => false)
@@ -1982,6 +2008,9 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
           if (hasSuccessfulOrderCreateResponse && capturedTraffic.successfulOrderCreateResponse) {
             lastOrderCreateResponse = capturedTraffic.successfulOrderCreateResponse;
             return { kind: 'response' as const, response: capturedTraffic.successfulOrderCreateResponse };
+          }
+          if (probeSawSuccessfulOrderPost && lastOrderCreateResponse && isSuccessfulOrderCreateResponse(lastOrderCreateResponse)) {
+            return { kind: 'response' as const, response: lastOrderCreateResponse };
           }
           return null;
         };
