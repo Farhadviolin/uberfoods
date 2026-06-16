@@ -2870,98 +2870,158 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
               .or(driverPage.locator(`[data-order-id="${orderId}"]`))
               .first()
               .getByRole('button', {
-                name: /picked up|abgeholt|pickup/i,
-              }),
+              name: /picked up|abgeholt|pickup/i,
+            }),
           )
           .first();
 
-        const waitForPickupSuccess = async () => {
-          const statusLocator = driverPage
-            .getByTestId(`driver-order-card-${orderId}`)
-            .or(driverPage.locator(`[data-order-id="${orderId}"]`))
-            .first()
-            .locator('[data-testid="order-status"], .order-status');
-          const nextActionButton = driverPage
-            .getByTestId(`driver-order-card-${orderId}`)
-            .or(driverPage.locator(`[data-order-id="${orderId}"]`))
-            .first()
-            .getByTestId(`driver-in-transit-order-${orderId}`)
-            .or(
-              driverPage
-                .getByTestId(`driver-order-card-${orderId}`)
-                .or(driverPage.locator(`[data-order-id="${orderId}"]`))
-                .first()
-                .locator('[data-action="start-delivery"]'),
-            )
-            .or(
-              driverPage
-                .getByTestId(`driver-order-card-${orderId}`)
-                .or(driverPage.locator(`[data-order-id="${orderId}"]`))
-                .first()
-                .getByRole('button', {
-                  name: /in transit|unterwegs|lieferung starten|start delivery/i,
-                }),
-            )
-            .first();
-
-          const pickupResponse = await Promise.race([
-            driverPage.waitForResponse((response) => {
-              const path = new URL(response.url()).pathname;
-              return response.request().method() === 'PATCH'
-                && path.includes(`/api/orders/${orderId}`)
-                && path.includes('/status')
-                && response.status() < 500;
-            }, { timeout: 8000 }).catch(() => null),
-            expect(statusLocator).toContainText(/PICKED_UP|IN_TRANSIT|abgeholt|unterwegs/i, { timeout: 8000 }).then(() => null).catch(() => null),
-            expect(nextActionButton).toBeVisible({ timeout: 8000 }).then(() => null).catch(() => null),
-          ]);
-
-          return pickupResponse;
-        };
-
-        let pickupResponse: Response | null = null;
-        for (let attempt = 1; attempt <= 3; attempt += 1) {
-          const pickupButton = resolvePickupButton();
-          await pickupButton.scrollIntoViewIfNeeded();
-          await expect(pickupButton).toBeVisible({ timeout: 10000 });
-          await expect(pickupButton).toBeEnabled({ timeout: 10000 });
-
-          try {
-            if (attempt === 1) {
-              await pickupButton.click({ timeout: 6000 });
-            } else {
-              await pickupButton.click({ force: true, timeout: 6000 });
-            }
-          } catch (error) {
-            console.log('ℹ️ lifecycle: pickup click retrying', {
-              attempt,
-              orderId,
-              currentUrl: driverPage.url(),
-              error: error instanceof Error ? error.message : String(error),
-            });
-            continue;
-          }
-
-          pickupResponse = await waitForPickupSuccess();
-          if (pickupResponse || await resolvePickupButton().count().catch(() => 0) > 0) {
-            break;
-          }
-        }
-
-        const pickupStatusText = await driverPage
+        const pickupCard = driverPage
           .getByTestId(`driver-order-card-${orderId}`)
           .or(driverPage.locator(`[data-order-id="${orderId}"]`))
-          .first()
-          .locator('[data-testid="order-status"], .order-status')
-          .textContent()
-          .catch(() => '');
+          .first();
+        const pickupStatusLocator = pickupCard.locator('[data-testid="order-status"], .order-status');
+        const nextActionButton = pickupCard
+          .getByTestId(`driver-in-transit-order-${orderId}`)
+          .or(pickupCard.locator('[data-action="start-delivery"]'))
+          .or(
+            pickupCard.getByRole('button', {
+              name: /in transit|unterwegs|lieferung starten|start delivery/i,
+            }),
+          )
+          .first();
+
+        const pickupTraffic = {
+          requestUrls: [] as string[],
+          responseUrls: [] as string[],
+          requestFailedEvents: [] as string[],
+          pageErrors: [] as string[],
+          consoleErrors: [] as string[],
+        };
+        const pickupTrafficMatcher = /\/api\/orders\/|\/orders\/|\/status|\/pickup|\/driver/i;
+        const onPickupRequest = (request: Parameters<Parameters<typeof driverPage.on>[1]>[0]) => {
+          const url = request.url();
+          if (pickupTrafficMatcher.test(url)) {
+            pickupTraffic.requestUrls.push(`${request.method()} ${url}`);
+          }
+        };
+        const onPickupResponse = (response: Parameters<Parameters<typeof driverPage.on>[1]>[0]) => {
+          const url = response.url();
+          if (pickupTrafficMatcher.test(url)) {
+            pickupTraffic.responseUrls.push(`${response.status()} ${url}`);
+          }
+        };
+        const onPickupRequestFailed = (request: Parameters<Parameters<typeof driverPage.on>[1]>[0]) => {
+          const url = request.url();
+          if (pickupTrafficMatcher.test(url)) {
+            pickupTraffic.requestFailedEvents.push(`${request.failure()?.errorText ?? 'requestfailed'} ${url}`);
+          }
+        };
+        const onPickupPageError = (error: Error) => {
+          pickupTraffic.pageErrors.push(error.message);
+        };
+        const onPickupConsole = (message: Parameters<Parameters<typeof driverPage.on>[1]>[0]) => {
+          const type = message.type();
+          if (type === 'error' || type === 'warning') {
+            pickupTraffic.consoleErrors.push(`[${type}] ${message.text()}`);
+          }
+        };
+        driverPage.on('request', onPickupRequest);
+        driverPage.on('response', onPickupResponse);
+        driverPage.on('requestfailed', onPickupRequestFailed);
+        driverPage.on('pageerror', onPickupPageError);
+        driverPage.on('console', onPickupConsole);
+
+        await pickupButton.scrollIntoViewIfNeeded();
+        await expect(pickupButton).toBeVisible({ timeout: 10000 });
+        await expect(pickupButton).toBeEnabled({ timeout: 10000 });
+
+        const pickupButtonText = (await pickupButton.textContent().catch(() => '') || '').trim();
+        const pickupStatusTextBefore = (await pickupStatusLocator.textContent().catch(() => '') || '').trim();
+        console.log('ℹ️ lifecycle: phase3 pickup click before', {
+          orderId,
+          currentUrl: driverPage.url(),
+          pickupButtonText,
+          pickupStatusText: pickupStatusTextBefore || null,
+        });
+
+        const pickupResponsePromise = driverPage.waitForResponse((response) => {
+          const url = response.url();
+          const method = response.request().method();
+          return (method === 'PATCH' || method === 'PUT')
+            && (
+              /\/(?:api\/)?orders\/[^/?]+\/status(?:[/?#]|$)/i.test(url)
+              || (/\/(?:api\/)?orders\/[^/?]+(?:[/?#]|$)/i.test(url) && /status|pickup|driver/i.test(url))
+            )
+            && response.status() < 500;
+        }, { timeout: 10000 }).catch(() => null);
+        const pickupUiPromise = Promise.race([
+          expect(pickupStatusLocator).toContainText(/PICKED_UP|IN_TRANSIT|OUT_FOR_DELIVERY|abgeholt|unterwegs|in delivery|delivered/i, { timeout: 10000 }).then(() => true).catch(() => false),
+          expect(nextActionButton).toBeVisible({ timeout: 10000 }).then(() => true).catch(() => false),
+        ]);
+
+        let clickSucceeded = false;
+        try {
+          await pickupButton.click({ timeout: 6000 });
+          clickSucceeded = true;
+        } catch (error) {
+          console.log('ℹ️ lifecycle: pickup click failed', {
+            orderId,
+            currentUrl: driverPage.url(),
+            pickupButtonText,
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+
+        if (!clickSucceeded) {
+          throw new Error(`phase3 driver pickup click failed before follow-up checks: ${JSON.stringify({
+            orderId,
+            currentUrl: driverPage.url(),
+            pickupButtonText,
+            pickupStatusTextBefore: pickupStatusTextBefore || null,
+            requestUrls: pickupTraffic.requestUrls,
+            responseUrls: pickupTraffic.responseUrls,
+            requestFailedEvents: pickupTraffic.requestFailedEvents,
+            pageErrors: pickupTraffic.pageErrors,
+            consoleErrors: pickupTraffic.consoleErrors,
+          })}`);
+        }
+
+        const [pickupResponse, pickupUiSuccess] = await Promise.all([
+          pickupResponsePromise,
+          pickupUiPromise,
+        ]);
+
+        const pickupStatusTextAfter = (await pickupStatusLocator.textContent().catch(() => '') || '').trim();
+        const hasPickupUiSuccess = Boolean(pickupUiSuccess)
+          || /PICKED_UP|IN_TRANSIT|OUT_FOR_DELIVERY|abgeholt|unterwegs|in delivery|delivered/i.test(pickupStatusTextAfter);
 
         console.log('ℹ️ lifecycle: phase3 pickup click result', {
           orderId,
           currentUrl: driverPage.url(),
+          pickupButtonText,
           pickupResponseStatus: pickupResponse?.status() ?? null,
-          pickupStatusText: pickupStatusText?.trim() || null,
+          pickupResponseUrl: pickupResponse?.url() ?? null,
+          pickupStatusText: pickupStatusTextAfter || null,
+          requestUrls: pickupTraffic.requestUrls,
+          responseUrls: pickupTraffic.responseUrls,
+          requestFailedEvents: pickupTraffic.requestFailedEvents,
+          pageErrors: pickupTraffic.pageErrors,
+          consoleErrors: pickupTraffic.consoleErrors,
         });
+
+        if (!pickupResponse && !hasPickupUiSuccess) {
+          throw new Error(`phase3 driver pickup click did not produce a response or visible status change: ${JSON.stringify({
+            orderId,
+            currentUrl: driverPage.url(),
+            pickupButtonText,
+            pickupStatusText: pickupStatusTextAfter || null,
+            requestUrls: pickupTraffic.requestUrls,
+            responseUrls: pickupTraffic.responseUrls,
+            requestFailedEvents: pickupTraffic.requestFailedEvents,
+            pageErrors: pickupTraffic.pageErrors,
+            consoleErrors: pickupTraffic.consoleErrors,
+          })}`);
+        }
       });
 
       const pickedUpOrderCard = driverPage
