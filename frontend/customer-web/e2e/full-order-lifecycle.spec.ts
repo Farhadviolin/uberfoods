@@ -1816,8 +1816,10 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
             throw new Error('Order creation response did not include an id');
           }
           console.log(`✅ lifecycle: phase1 order id resolved (${orderId})`);
+          return;
         } else if (orderSubmissionOutcome.kind === 'order-url' || orderSubmissionOutcome.kind === 'order-tracking') {
           console.log(`ℹ️ lifecycle: phase1 final order submit confirmed by ${orderSubmissionOutcome.kind}`);
+          return;
         }
       });
 
