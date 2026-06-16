@@ -3147,89 +3147,45 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
         let clickError: string | null = null;
         try {
           ensureDriverPageOpen();
-          const clickAttemptResult = await Promise.race([
-            driverPage.evaluate(({ orderId: evalOrderId, pickupButtonText: evalPickupButtonText, pickupStatusTextBefore: evalPickupStatusTextBefore }) => {
-              const isVisible = (element: Element | null) => {
-                if (!element) return false;
-                const style = window.getComputedStyle(element as HTMLElement);
-                const rect = (element as HTMLElement).getBoundingClientRect();
-                return style.display !== 'none'
-                  && style.visibility !== 'hidden'
-                  && style.opacity !== '0'
-                  && rect.width > 0
-                  && rect.height > 0;
-              };
-              const getVisibleText = (element: Element | null) => (element?.textContent || '').trim().replace(/\s+/g, ' ');
-              const textMatches = (text: string) => /picked up|pickup|abgeholt|abholen/i.test(text);
-              const clickTarget = (target: HTMLElement) => {
-                target.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, cancelable: true }));
-                target.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
-                target.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true }));
-                target.click();
-                target.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
-              };
-              const findTargets = (root: ParentNode) => Array.from(root.querySelectorAll('button, [role="button"], [data-action="pickup-order"], [data-testid*="picked-up"], [data-testid*="pickup"]'))
-                .filter((node): node is HTMLElement => node instanceof HTMLElement)
-                .filter((node) => isVisible(node))
-                .filter((node) => !node.hasAttribute('disabled') && node.getAttribute('aria-disabled') !== 'true')
-                .filter((node) => textMatches(getVisibleText(node)) || /picked-up|pickup/i.test(node.getAttribute('data-testid') || '') || /pickup-order/i.test(node.getAttribute('data-action') || ''));
-              const orderCard = document.querySelector(`[data-testid="driver-order-card-${evalOrderId}"], [data-order-id="${evalOrderId}"]`);
-              const cardTargets = orderCard ? findTargets(orderCard) : [];
-              const docTargets = findTargets(document);
-              const targets = cardTargets.length ? cardTargets : docTargets;
-              const visibleButtonTexts = Array.from(document.querySelectorAll('button, [role="button"]'))
-                .map((node) => getVisibleText(node))
-                .filter(Boolean)
-                .slice(0, 25);
-              const target = targets.find((node) => textMatches(getVisibleText(node)));
-              if (!target) {
-                return {
-                  ok: false,
-                  reason: 'no-target-found',
-                  orderId: evalOrderId,
-                  cardFound: Boolean(orderCard),
-                  candidateCount: targets.length,
-                  visibleButtonTexts,
-                  pickupButtonText: evalPickupButtonText || null,
-                  pickupStatusTextBefore: evalPickupStatusTextBefore || null,
-                  currentUrl: location.href,
-                };
-              }
-              target.scrollIntoView({ block: 'center', inline: 'center' });
-              clickTarget(target);
-              return {
-                ok: true,
-                orderId: evalOrderId,
-                cardFound: Boolean(orderCard),
-                candidateCount: targets.length,
-                targetText: getVisibleText(target),
-                currentUrl: location.href,
-              };
-            }, {
+          const pickupCard = acceptedOrderCard
+            .or(driverPage.locator(`[data-order-id="${orderId}"]`))
+            .or(driverPage.getByTestId(`driver-order-card-${orderId}`))
+            .first();
+          const pickupButton = pickupCard
+            .getByTestId(`driver-picked-up-order-${orderId}`)
+            .or(pickupCard.locator('[data-action="pickup-order"]'))
+            .or(
+              pickupCard.getByRole('button', {
+                name: /picked up|abgeholt|pickup/i,
+              }),
+            )
+            .first();
+
+          const pickupButtonVisible = await pickupButton.isVisible().catch(() => false);
+          if (!pickupButtonVisible) {
+            const visibleButtons = await driverPage.locator('button').evaluateAll((nodes) => nodes
+              .map((node) => (node.textContent || '').trim().replace(/\s+/g, ' '))
+              .filter(Boolean))
+              .catch(() => []);
+            const visibleCards = await driverPage.locator('[data-testid*="order"], .order-card, [data-order-id]').evaluateAll((nodes) => nodes
+              .map((node) => (node.textContent || '').trim().replace(/\s+/g, ' '))
+              .filter(Boolean))
+              .catch(() => []);
+            throw new Error(`Driver pickup button not visible for order ${orderId}: ${JSON.stringify({
               orderId,
-              pickupButtonText,
-              pickupStatusTextBefore,
-            }),
-            new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Pickup DOM click timed out after 1500ms')), 1500)),
-          ]);
-          if (!clickAttemptResult || typeof clickAttemptResult !== 'object' || !(clickAttemptResult as { ok?: boolean }).ok) {
-            const diagnosis = clickAttemptResult && typeof clickAttemptResult === 'object'
-              ? clickAttemptResult
-              : {
-                  ok: false,
-                  reason: 'no-result',
-                  orderId,
-                  currentUrl: driverPage.isClosed() ? 'closed' : driverPage.url(),
-                  cardFound: false,
-                  candidateCount: 0,
-                  visibleButtonTexts: [],
-                  pickupButtonText: pickupButtonText || null,
-                  pickupStatusTextBefore: pickupStatusTextBefore || null,
-                  visibleLinkTexts: ordersViewBeforePickup.visibleLinkTexts,
-                  pageTextPreview: ordersViewBeforePickup.pageTextPreview,
-                };
-            throw new Error(`Driver pickup DOM click did not find or activate a button for order ${orderId}: ${JSON.stringify(diagnosis)}`);
+              currentUrl: driverPage.url(),
+              cardFound: await pickupCard.isVisible().catch(() => false),
+              pickupButtonText: pickupButtonText || null,
+              pickupStatusTextBefore: pickupStatusTextBefore || null,
+              visibleButtons: visibleButtons.slice(0, 25),
+              visibleCards: visibleCards.slice(0, 10),
+              visibleLinkTexts: ordersViewBeforePickup.visibleLinkTexts,
+              pageTextPreview: ordersViewBeforePickup.pageTextPreview,
+            })}`);
           }
+
+          await pickupButton.scrollIntoViewIfNeeded();
+          await pickupButton.click({ timeout: 1500 });
         } catch (error) {
           clickError = error instanceof Error ? error.message : String(error);
           if (
