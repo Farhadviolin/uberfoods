@@ -1334,7 +1334,7 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
             }));
           const payloadSubtotal = payloadItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
           const subtotal = payloadSubtotal;
-          const payloadMinimumSatisfied = payloadSubtotal >= 25;
+          const payloadMinimumSatisfied = payloadSubtotal >= 25 && (payloadItems.length >= 2 || storageDiagnostics.quantityCount >= 2);
 
           return {
             ...storageDiagnostics,
@@ -1349,6 +1349,39 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
         };
 
         const ensureFinalSubmitMinimumCart = async () => {
+          const getVisibleCartContext = async () => {
+            const storageSnapshot = await customerPage.evaluate(() => {
+              const keys = Object.keys(window.localStorage);
+              const entries = keys.map((key) => [key, window.localStorage.getItem(key)] as const);
+              return { keys, entries };
+            }).catch(() => ({ keys: [] as string[], entries: [] as Array<[string, string | null]> }));
+
+            const quickAddButtons = await customerPage.locator('button').evaluateAll((buttons) => buttons
+              .map((button, index) => {
+                const element = button as HTMLButtonElement;
+                const rect = element.getBoundingClientRect();
+                const style = window.getComputedStyle(element);
+                const text = (element.textContent || '').trim().replace(/\s+/g, ' ');
+                return {
+                  index,
+                  text,
+                  testId: element.getAttribute('data-testid'),
+                  disabled: element.disabled,
+                  visible: !!(rect.width && rect.height) && style.display !== 'none' && style.visibility !== 'hidden',
+                };
+              })
+              .filter((button) => button.visible && /quick add|add to cart|add|plus|\+/i.test(button.text || '') || button.testId === 'add-to-cart-button'))
+              .catch(() => []);
+
+            return {
+              currentUrl: customerPage.url(),
+              storageKeys: storageSnapshot.keys,
+              storageEntries: storageSnapshot.entries,
+              visibleCartText: (await customerPage.getByTestId('cart').textContent().catch(() => '')) || '',
+              visibleQuickAddButtons: quickAddButtons,
+            };
+          };
+
           let diagnostics = await collectFinalSubmitCartDiagnostics();
           console.log('ℹ️ lifecycle: final submit cart diagnostics', {
             finalSubmitCartItems: diagnostics.cartItems,
@@ -1378,11 +1411,13 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
             finalSubmitQuantityCount: diagnostics.quantityCount,
           });
 
-          await customerPage.goto(`${testUrls.customer}/restaurants`, { waitUntil: 'domcontentloaded' });
-          await customerPage.waitForLoadState('networkidle').catch(() => null);
-          await TestHelpers.waitForStablePage(customerPage);
-
           const openRestaurantMenuForCartRepair = async () => {
+            if (!/\/restaurants\/[^/?]+/.test(customerPage.url())) {
+              await customerPage.goto(`${testUrls.customer}/restaurants`, { waitUntil: 'domcontentloaded' });
+              await customerPage.waitForLoadState('networkidle').catch(() => null);
+              await TestHelpers.waitForStablePage(customerPage);
+            }
+
             const restaurantCards = customerPage.getByTestId('restaurant-card');
             const restaurantCardCount = await restaurantCards.count().catch(() => 0);
             console.log('ℹ️ lifecycle: no add-to-cart buttons on restaurants index, trying restaurant card detail fallback', {
@@ -1411,12 +1446,13 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
             }
 
             const addToCartButtons = customerPage
-              .locator('[data-testid="menu-content"] [data-testid="add-to-cart-button"], [data-testid="add-to-cart-button"]');
+              .locator('[data-testid="menu-content"] [data-testid="add-to-cart-button"], [data-testid="add-to-cart-button"], button')
+              .filter({ hasText: /Quick Add|Add to cart|Add|Hinzufügen|\+/i });
             const addButtonCount = await addToCartButtons.count().catch(() => 0);
 
             if (addButtonCount === 0) {
               throw new Error(`Cannot restore final submit cart minimum because no add-to-cart buttons are visible: ${JSON.stringify({
-                currentUrl: customerPage.url(),
+                ...(await getVisibleCartContext()),
                 visibleButtons: await customerPage.locator('button').evaluateAll((nodes) => nodes
                   .map((node) => (node.textContent || '').trim().replace(/\s+/g, ' '))
                   .filter(Boolean))
@@ -1435,6 +1471,7 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
 
           let addToCartButtons = await openRestaurantMenuForCartRepair();
           let addButtonCount = await addToCartButtons.count().catch(() => 0);
+          const attemptedAddButtonIndexes = new Set<number>();
 
           for (let attempt = 1; attempt <= 10; attempt += 1) {
             const diagnosticsBeforeRepair = diagnostics;
@@ -1443,10 +1480,8 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
               break;
             }
 
-            if (diagnostics.payloadSubtotal < 25) {
-              addToCartButtons = await openRestaurantMenuForCartRepair();
-              addButtonCount = await addToCartButtons.count().catch(() => 0);
-            }
+            addToCartButtons = await openRestaurantMenuForCartRepair();
+            addButtonCount = await addToCartButtons.count().catch(() => 0);
 
             console.log('➡️ lifecycle: restoring final submit cart minimum', {
               attempt,
@@ -1458,12 +1493,59 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
               finalSubmitQuantityCount: diagnostics.quantityCount,
               finalSubmitPayloadPreview: diagnostics.cartItems.slice(0, 5),
             });
-            await addToCartButtons.nth((attempt - 1) % addButtonCount).click();
+
+            let buttonClicked = false;
+            const buttonTexts = await addToCartButtons.evaluateAll((buttons) => buttons.map((button, index) => {
+              const element = button as HTMLButtonElement;
+              return {
+                index,
+                text: (element.textContent || '').trim().replace(/\s+/g, ' '),
+                testId: element.getAttribute('data-testid'),
+                disabled: element.disabled,
+              };
+            })).catch(() => []);
+            const preferredKeywords = ['Pizza Margherita', 'Pizza Pepperoni', 'Pizza Hawaii'];
+            const candidateIndexes = buttonTexts
+              .filter((button) => !button.disabled && !attemptedAddButtonIndexes.has(button.index))
+              .sort((a, b) => {
+                const aScore = preferredKeywords.findIndex((keyword) => a.text.includes(keyword));
+                const bScore = preferredKeywords.findIndex((keyword) => b.text.includes(keyword));
+                return (aScore === -1 ? 999 : aScore) - (bScore === -1 ? 999 : bScore);
+              })
+              .map((button) => button.index);
+
+            for (const buttonIndex of candidateIndexes) {
+              const button = addToCartButtons.nth(buttonIndex);
+              if (!(await button.isVisible().catch(() => false))) {
+                continue;
+              }
+
+              attemptedAddButtonIndexes.add(buttonIndex);
+              await button.scrollIntoViewIfNeeded().catch(() => null);
+              await button.click().catch(async () => {
+                await customerPage.mouse.click(0, 0).catch(() => null);
+              });
+              buttonClicked = true;
+              break;
+            }
+
+            if (!buttonClicked) {
+              const visibleContext = await getVisibleCartContext();
+              throw new Error(`Final submit cart could not be restored above minimum: ${JSON.stringify({
+                ...visibleContext,
+                finalSubmitSubtotal: diagnostics.subtotal,
+                finalSubmitItemCount: diagnostics.itemCount,
+                finalSubmitQuantityCount: diagnostics.quantityCount,
+                finalSubmitPayloadPreview: diagnostics.cartItems.slice(0, 5),
+              })}`);
+            }
+
             await customerPage.waitForTimeout(300);
             diagnostics = await collectFinalSubmitCartDiagnostics();
             if (diagnostics.payloadSubtotal <= diagnosticsBeforeRepair.payloadSubtotal) {
-              addToCartButtons = await openRestaurantMenuForCartRepair();
-              addButtonCount = await addToCartButtons.count().catch(() => 0);
+              await customerPage.goto(`${testUrls.customer}/restaurants`, { waitUntil: 'domcontentloaded' }).catch(() => null);
+              await customerPage.waitForLoadState('networkidle').catch(() => null);
+              await TestHelpers.waitForStablePage(customerPage);
             }
           }
 
@@ -1482,7 +1564,9 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
 
           if (!diagnostics.finalSubmitMinimumSatisfied) {
             throw new Error(`Final submit cart could not be restored above minimum: ${JSON.stringify({
+              ...(await getVisibleCartContext()),
               finalSubmitSubtotal: diagnostics.subtotal,
+              payloadSubtotalAfterRepair: diagnostics.payloadSubtotal,
               finalSubmitItemCount: diagnostics.itemCount,
               finalSubmitQuantityCount: diagnostics.quantityCount,
               finalSubmitPayloadPreview: diagnostics.cartItems.slice(0, 5),
