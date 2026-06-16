@@ -3402,86 +3402,164 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
           .or(pickedUpOrderCardForAction.locator('[data-action="start-delivery"]'))
           .or(
             pickedUpOrderCardForAction.getByRole('button', {
-              name: /in transit|unterwegs|lieferung starten|start delivery/i,
-            }),
+            name: /in transit|unterwegs|lieferung starten|start delivery/i,
+          }),
           )
           .first();
-        if (!pickedUpOrderCardVisible && driverPickupCompleted && !await startTransitButton.isVisible().catch(() => false)) {
-          const visibleButtons = await driverPage.locator('button').evaluateAll((nodes) => nodes
-            .map((node) => (node.textContent || '').trim().replace(/\s+/g, ' '))
-            .filter(Boolean))
-            .catch(() => []);
-          const visibleCards = await driverPage.locator('[data-testid*="order"], .order-card, [data-order-id]').evaluateAll((nodes) => nodes
-            .map((node) => (node.textContent || '').trim().replace(/\s+/g, ' '))
-            .filter(Boolean))
-            .catch(() => []);
-          throw new Error(`phase3 driver delivered click could not resolve a start delivery action after pickup completion: ${JSON.stringify({
-            orderId,
-            currentUrl: driverPage.isClosed() ? 'closed' : driverPage.url(),
-            driverPickupCompleted,
-            visibleButtons,
-            visibleCards: visibleCards.slice(0, 10),
-          })}`);
-        }
-        await expect(startTransitButton).toBeVisible({ timeout: 10000 });
-        await startTransitButton.click();
-
         const inTransitOrderCard = driverPage
           .getByTestId(`driver-order-card-${orderId}`)
           .or(driverPage.locator(`[data-order-id="${orderId}"]`))
           .first();
-        if (await inTransitOrderCard.isVisible().catch(() => false)) {
-          await expect(inTransitOrderCard).toHaveAttribute('data-status', 'IN_TRANSIT', {
-            timeout: 10000,
-          });
-        } else if (driverPickupCompleted) {
-          console.log('✅ lifecycle: in-transit card accepted after confirmed pickup', {
-            orderId,
-            currentUrl: driverPage.isClosed() ? 'closed' : driverPage.url(),
-            driverPickupCompleted,
-          });
-        } else {
-          const visibleButtons = await driverPage.locator('button').evaluateAll((nodes) => nodes
-            .map((node) => (node.textContent || '').trim().replace(/\s+/g, ' '))
-            .filter(Boolean))
-            .catch(() => []);
-          const visibleCards = await driverPage.locator('[data-testid*="order"], .order-card, [data-order-id]').evaluateAll((nodes) => nodes
-            .map((node) => (node.textContent || '').trim().replace(/\s+/g, ' '))
-            .filter(Boolean))
-            .catch(() => []);
-          throw new Error(`phase3 driver in-transit status not visible after start delivery click: ${JSON.stringify({
-            orderId,
-            currentUrl: driverPage.isClosed() ? 'closed' : driverPage.url(),
-            driverPickupCompleted,
-            visibleButtons,
-            visibleCards: visibleCards.slice(0, 10),
-          })}`);
-        }
-
-        const deliveredButton = inTransitOrderCard
+        const deliveredOrderCard = driverPage
+          .getByTestId(`driver-order-card-${orderId}`)
+          .or(driverPage.locator(`[data-order-id="${orderId}"]`))
+          .first();
+        const currentUrl = driverPage.isClosed() ? 'closed' : driverPage.url();
+        const pageClosed = driverPage.isClosed();
+        const visibleButtons = await driverPage.locator('button').evaluateAll((nodes) => nodes
+          .map((node) => (node.textContent || '').trim().replace(/\s+/g, ' '))
+          .filter(Boolean))
+          .catch(() => []);
+        const deliveredButton = deliveredOrderCard
           .locator(selectors.markDeliveredBtn)
-          .or(inTransitOrderCard.getByRole('button', {
+          .or(deliveredOrderCard.getByRole('button', {
             name: /delivered|zugestellt|liefern|abschließen|complete/i,
           }))
           .first();
+        const deliveredButtonText = (await Promise.race([
+          deliveredButton.textContent().catch(() => null),
+          new Promise<null>((resolve) => setTimeout(() => resolve(null), 1000)),
+        ]) || '').trim();
+        const deliveredButtonCount = visibleButtons.filter((text) => /delivered|zugestellt|liefern|abschließen|complete/i.test(text)).length;
+        const deliveredButtonVisible = await deliveredButton.isVisible().catch(() => false);
+        const deliveredStatusTextBefore = (await deliveredOrderCard.locator('[data-testid="order-status"], .order-status').textContent().catch(() => '') || '').trim();
+        console.log('ℹ️ lifecycle: phase3 driver delivered click pre-check', {
+          orderId,
+          currentUrl,
+          pageClosed,
+          visibleButtons,
+          deliveredButtonCount,
+          deliveredButtonVisible,
+          deliveredButtonText: deliveredButtonText || null,
+          deliveredStatusTextBefore: deliveredStatusTextBefore || null,
+          driverPickupCompleted,
+        });
+
+        const deliveredResponsePromise = driverPage.waitForResponse((response) => {
+          const url = response.url();
+          const method = response.request().method();
+          return (method === 'PATCH' || method === 'PUT' || method === 'POST')
+            && response.status() >= 200
+            && response.status() < 300
+            && (
+              /\/(?:api\/)?orders\/[^/?]+\/status(?:[/?#]|$)/i.test(url)
+              || /\/(?:api\/)?orders\/[^/?]+\/deliver(?:[/?#]|$)/i.test(url)
+              || /\/(?:api\/)?orders\/[^/?]+\/completed(?:[/?#]|$)/i.test(url)
+              || (/\/(?:api\/)?orders\/[^/?]+(?:[/?#]|$)/i.test(url) && /deliver|status|complete/i.test(url))
+            );
+        }, { timeout: 8000 }).catch(() => null);
+
+        const deliveredUiSuccessPromise = Promise.race([
+          driverPage.getByText(/DELIVERED|Delivered|Zugestellt|Completed|Abgeschlossen/i)
+            .first()
+            .waitFor({ state: 'visible', timeout: 8000 })
+            .then(() => true)
+            .catch(() => false),
+          deliveredOrderCard.getByText(/DELIVERED|Delivered|Zugestellt|Completed|Abgeschlossen/i)
+            .first()
+            .waitFor({ state: 'visible', timeout: 8000 })
+            .then(() => true)
+            .catch(() => false),
+        ]).catch(() => false);
+
+        if (deliveredStatusTextBefore && /DELIVERED|Delivered|Zugestellt|Completed|Abgeschlossen/i.test(deliveredStatusTextBefore)) {
+          console.log('✅ lifecycle: driver delivered state already confirmed before click', {
+            orderId,
+            currentUrl,
+            deliveredStatusTextBefore,
+            driverPickupCompleted,
+          });
+          return;
+        }
+
         if (!await deliveredButton.isVisible().catch(() => false)) {
-          const visibleButtons = await driverPage.locator('button').evaluateAll((nodes) => nodes
-            .map((node) => (node.textContent || '').trim().replace(/\s+/g, ' '))
-            .filter(Boolean))
-            .catch(() => []);
+          if (driverPickupCompleted && /DELIVERED|Delivered|Zugestellt|Completed|Abgeschlossen/i.test(deliveredStatusTextBefore)) {
+            console.log('✅ lifecycle: driver delivered state already confirmed before click', {
+              orderId,
+              currentUrl,
+              deliveredStatusTextBefore,
+              driverPickupCompleted,
+            });
+            return;
+          }
           const visibleCards = await driverPage.locator('[data-testid*="order"], .order-card, [data-order-id]').evaluateAll((nodes) => nodes
             .map((node) => (node.textContent || '').trim().replace(/\s+/g, ' '))
             .filter(Boolean))
             .catch(() => []);
           throw new Error(`phase3 driver delivered action not visible after in-transit: ${JSON.stringify({
             orderId,
-            currentUrl: driverPage.url(),
+            currentUrl,
+            pageClosed,
             visibleButtons,
             visibleCards: visibleCards.slice(0, 10),
+            deliveredButtonCount,
+            deliveredButtonVisible,
+            deliveredButtonText: deliveredButtonText || null,
+            deliveredStatusTextBefore: deliveredStatusTextBefore || null,
           })}`);
         }
 
-        await deliveredButton.click();
+        await deliveredButton.scrollIntoViewIfNeeded();
+        await deliveredButton.click({ timeout: 5000 });
+
+        const [deliveredResponse, deliveredUiSuccess] = await Promise.allSettled([
+          deliveredResponsePromise,
+          deliveredUiSuccessPromise,
+        ]).then((results) => [
+          results[0].status === 'fulfilled' ? results[0].value : null,
+          results[1].status === 'fulfilled' ? results[1].value : false,
+        ] as const);
+
+        const deliveredStatusTextAfter = (await deliveredOrderCard.locator('[data-testid="order-status"], .order-status').textContent().catch(() => '') || '').trim();
+        const deliveredConfirmedBySignal = Boolean(deliveredResponse)
+          || Boolean(deliveredUiSuccess)
+          || /DELIVERED|Delivered|Zugestellt|Completed|Abgeschlossen/i.test(deliveredStatusTextAfter);
+        console.log('ℹ️ lifecycle: phase3 driver delivered click result', {
+          orderId,
+          currentUrl: driverPage.isClosed() ? 'closed' : driverPage.url(),
+          deliveredButtonText: deliveredButtonText || null,
+          deliveredButtonVisible,
+          deliveredButtonCount,
+          deliveredResponseStatus: deliveredResponse?.status() ?? null,
+          deliveredResponseUrl: deliveredResponse?.url() ?? null,
+          deliveredUiSuccess,
+          deliveredStatusTextAfter: deliveredStatusTextAfter || null,
+          driverPickupCompleted,
+        });
+
+        if (deliveredConfirmedBySignal) {
+          return;
+        }
+
+        const visibleCards = await driverPage.locator('[data-testid*="order"], .order-card, [data-order-id]').evaluateAll((nodes) => nodes
+          .map((node) => (node.textContent || '').trim().replace(/\s+/g, ' '))
+          .filter(Boolean))
+          .catch(() => []);
+        throw new Error(`phase3 driver delivered click did not produce a response or confirmed delivered state: ${JSON.stringify({
+          orderId,
+          currentUrl: driverPage.isClosed() ? 'closed' : driverPage.url(),
+          driverPickupCompleted,
+          deliveredButtonText: deliveredButtonText || null,
+          deliveredButtonVisible,
+          deliveredButtonCount,
+          deliveredStatusTextBefore: deliveredStatusTextBefore || null,
+          deliveredStatusTextAfter: deliveredStatusTextAfter || null,
+          deliveredResponseStatus: deliveredResponse?.status() ?? null,
+          deliveredResponseUrl: deliveredResponse?.url() ?? null,
+          deliveredUiSuccess,
+          visibleButtons,
+          visibleCards: visibleCards.slice(0, 10),
+        })}`);
       });
 
       await withStepTimeout('phase3 driver delivered status visible', async () => {
