@@ -2967,23 +2967,32 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
 
         const pickupButton = resolvePickupButton();
         ensureDriverPageOpen();
+        const pickupClickStartedAt = Date.now();
         console.log('ℹ️ lifecycle: phase3 driver page state before pickup click', {
           orderId,
           isClosed: driverPage.isClosed(),
           currentUrl: driverPage.isClosed() ? 'closed' : driverPage.url(),
+          pickupClickStartedAt,
         });
-        await pickupButton.scrollIntoViewIfNeeded();
-        await expect(pickupButton).toBeVisible({ timeout: 10000 });
-        await expect(pickupButton).toBeEnabled({ timeout: 10000 });
-
-        const pickupButtonText = (await pickupButton.textContent().catch(() => '') || '').trim();
-        const pickupStatusTextBefore = (await pickupStatusLocator.textContent().catch(() => '') || '').trim();
+        const pickupButtonText = (await Promise.race([
+          pickupButton.textContent().catch(() => null),
+          new Promise<null>((resolve) => setTimeout(() => resolve(null), 1000)),
+        ]) || '').trim();
+        const pickupStatusTextBefore = (await Promise.race([
+          pickupStatusLocator.textContent().catch(() => null),
+          new Promise<null>((resolve) => setTimeout(() => resolve(null), 1000)),
+        ]) || '').trim();
+        const elapsedBeforeClickMs = Date.now() - pickupClickStartedAt;
         console.log('ℹ️ lifecycle: phase3 pickup click before', {
           orderId,
-          currentUrl: driverPage.url(),
+          currentUrl: driverPage.isClosed() ? 'closed' : driverPage.url(),
           pickupButtonText,
           pickupStatusText: pickupStatusTextBefore || null,
+          elapsedBeforeClickMs,
         });
+        if (elapsedBeforeClickMs > 2000) {
+          throw new Error(`Driver pickup pre-click preparation took too long for order ${orderId}: ${elapsedBeforeClickMs}ms`);
+        }
 
         const pickupResponsePromise = driverPage.waitForResponse((response) => {
           const url = response.url();
@@ -3012,15 +3021,18 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
         let clickError: string | null = null;
         try {
           ensureDriverPageOpen();
-          await pickupButton.evaluate((element) => {
-            const htmlElement = element as HTMLElement;
-            htmlElement.scrollIntoView({ block: 'center', inline: 'center' });
-            htmlElement.dispatchEvent(new MouseEvent('click', {
-              bubbles: true,
-              cancelable: true,
-              view: window,
-            }));
-          });
+          await Promise.race([
+            pickupButton.evaluate((element) => {
+              const htmlElement = element as HTMLElement;
+              htmlElement.scrollIntoView({ block: 'center', inline: 'center' });
+              htmlElement.dispatchEvent(new MouseEvent('click', {
+                bubbles: true,
+                cancelable: true,
+                view: window,
+              }));
+            }),
+            new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Pickup DOM click timed out after 1500ms')), 1500)),
+          ]);
         } catch (error) {
           clickError = error instanceof Error ? error.message : String(error);
           if (
@@ -3041,7 +3053,10 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
         if (clickError && !driverPage.isClosed()) {
           try {
             ensureDriverPageOpen();
-            await pickupButton.dispatchEvent('click');
+            await Promise.race([
+              pickupButton.dispatchEvent('click'),
+              new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Pickup dispatchEvent timed out after 1500ms')), 1500)),
+            ]);
             clickError = null;
           } catch (error) {
             clickError = error instanceof Error ? error.message : String(error);
