@@ -1911,7 +1911,13 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
           .filter({ hasText: /^(Place Order|Bestellen|Submit Order|Order Now|Jetzt bestellen|Zahlungspflichtig bestellen|Bezahlen|Pay)$/i })
           .first();
 
+        console.log('➡️ lifecycle: final submit before button resolve', {
+          currentUrl: customerPage.url(),
+        });
         await expect(finalPlaceOrderButton).toBeVisible();
+        console.log('✅ lifecycle: final submit button resolved', {
+          currentUrl: customerPage.url(),
+        });
         console.log('✅ lifecycle: phase1 final Place Order button visible');
         await expect(finalPlaceOrderButton).toBeEnabled();
         console.log('✅ lifecycle: phase1 final Place Order button enabled');
@@ -1929,12 +1935,13 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
               && isOrderCustomerUrl(response.url())
               && [200, 201, 202].includes(response.status());
           };
+          const submitWaitTimeout = 10000;
           const orderCreateResponsePromise = customerPage.waitForResponse((response) => {
             const request = response.request();
             return request.method() === 'POST'
               && isOrderCustomerUrl(response.url())
               && response.status() < 500;
-          }, { timeout: 20000 }).catch(() => null);
+          }, { timeout: submitWaitTimeout }).catch(() => null);
           pendingOrderCreateResponse = orderCreateResponsePromise;
           const orderCreateOutcomePromise = orderCreateResponsePromise.then((response) => {
             if (!response) {
@@ -1949,10 +1956,10 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
           const orderUrlPromise = customerPage.waitForURL((url) => {
             const value = url.toString();
             return /\/orders\/[^/?]+(?:\?.*)?$/i.test(value) || /\/orders\/customer(?:[/?#]|$)/i.test(value);
-          }, { timeout: 20000 })
+          }, { timeout: submitWaitTimeout })
             .then(() => ({ kind: 'order-url' as const }))
             .catch(() => null);
-          const orderTrackingPromise = orderTrackingPage.waitFor({ state: 'visible', timeout: 20000 })
+          const orderTrackingPromise = orderTrackingPage.waitFor({ state: 'visible', timeout: submitWaitTimeout })
             .then(() => ({ kind: 'order-tracking' as const }))
             .catch(() => null);
           const missingAddressPromise = profileAddressWarningLocator.first().waitFor({ state: 'visible', timeout: 2000 })
@@ -1961,8 +1968,10 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
 
           console.log('➡️ lifecycle: phase1 clicking final Place Order', { attemptLabel });
           await finalPlaceOrderButton.scrollIntoViewIfNeeded().catch(() => null);
+          console.log('➡️ lifecycle: final submit before click', { attemptLabel });
           await finalPlaceOrderButton.click({ noWaitAfter: true });
-          console.log('✅ lifecycle: phase1 final Place Order click completed', { attemptLabel });
+          console.log('✅ lifecycle: final submit click completed', { attemptLabel });
+          console.log('➡️ lifecycle: final submit before response wait', { attemptLabel });
 
           const attemptOutcome = await Promise.race([
             orderCreateOutcomePromise,
@@ -1972,6 +1981,10 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
           ]);
 
           if (attemptOutcome) {
+            console.log('✅ lifecycle: final submit response/UI observed', {
+              attemptLabel,
+              kind: attemptOutcome.kind,
+            });
             return attemptOutcome;
           }
 
@@ -2077,6 +2090,13 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
           if (probeSawSuccessfulOrderPost && lastOrderCreateResponse && isSuccessfulOrderCreateResponse(lastOrderCreateResponse)) {
             return { kind: 'response' as const, response: lastOrderCreateResponse };
           }
+          console.log('⚠️ lifecycle: final submit no response/UI yet after bounded waits', {
+            attemptLabel,
+            currentUrl: customerPage.url(),
+            submitWaitTimeout,
+            hasSuccessfulOrderCreateResponse,
+            hasOrderConfirmationUi,
+          });
           return null;
         };
 
