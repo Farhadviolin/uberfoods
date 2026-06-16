@@ -2931,6 +2931,7 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
         driverPage.on('pageerror', onPickupPageError);
         driverPage.on('console', onPickupConsole);
 
+        const pickupButton = resolvePickupButton();
         await pickupButton.scrollIntoViewIfNeeded();
         await expect(pickupButton).toBeVisible({ timeout: 10000 });
         await expect(pickupButton).toBeEnabled({ timeout: 10000 });
