@@ -3021,18 +3021,87 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
         let clickError: string | null = null;
         try {
           ensureDriverPageOpen();
-          await Promise.race([
-            pickupButton.evaluate((element) => {
-              const htmlElement = element as HTMLElement;
-              htmlElement.scrollIntoView({ block: 'center', inline: 'center' });
-              htmlElement.dispatchEvent(new MouseEvent('click', {
-                bubbles: true,
-                cancelable: true,
-                view: window,
-              }));
+          const clickAttemptResult = await Promise.race([
+            driverPage.evaluate(({ orderId: evalOrderId, pickupButtonText: evalPickupButtonText, pickupStatusTextBefore: evalPickupStatusTextBefore }) => {
+              const isVisible = (element: Element | null) => {
+                if (!element) return false;
+                const style = window.getComputedStyle(element as HTMLElement);
+                const rect = (element as HTMLElement).getBoundingClientRect();
+                return style.display !== 'none'
+                  && style.visibility !== 'hidden'
+                  && style.opacity !== '0'
+                  && rect.width > 0
+                  && rect.height > 0;
+              };
+              const getVisibleText = (element: Element | null) => (element?.textContent || '').trim().replace(/\s+/g, ' ');
+              const textMatches = (text: string) => /picked up|pickup|abgeholt|abholen/i.test(text);
+              const clickTarget = (target: HTMLElement) => {
+                target.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, cancelable: true }));
+                target.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
+                target.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true }));
+                target.click();
+                target.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+              };
+              const findTargets = (root: ParentNode) => Array.from(root.querySelectorAll('button, [role="button"], [data-action="pickup-order"], [data-testid*="picked-up"], [data-testid*="pickup"]'))
+                .filter((node): node is HTMLElement => node instanceof HTMLElement)
+                .filter((node) => isVisible(node))
+                .filter((node) => !node.hasAttribute('disabled') && node.getAttribute('aria-disabled') !== 'true')
+                .filter((node) => textMatches(getVisibleText(node)) || /picked-up|pickup/i.test(node.getAttribute('data-testid') || '') || /pickup-order/i.test(node.getAttribute('data-action') || ''));
+              const orderCard = document.querySelector(`[data-testid="driver-order-card-${evalOrderId}"], [data-order-id="${evalOrderId}"]`);
+              const cardTargets = orderCard ? findTargets(orderCard) : [];
+              const docTargets = findTargets(document);
+              const targets = cardTargets.length ? cardTargets : docTargets;
+              const visibleButtonTexts = Array.from(document.querySelectorAll('button, [role="button"]'))
+                .map((node) => getVisibleText(node))
+                .filter(Boolean)
+                .slice(0, 25);
+              const target = targets.find((node) => textMatches(getVisibleText(node)));
+              if (!target) {
+                return {
+                  ok: false,
+                  reason: 'no-target-found',
+                  orderId: evalOrderId,
+                  cardFound: Boolean(orderCard),
+                  candidateCount: targets.length,
+                  visibleButtonTexts,
+                  pickupButtonText: evalPickupButtonText || null,
+                  pickupStatusTextBefore: evalPickupStatusTextBefore || null,
+                  currentUrl: location.href,
+                };
+              }
+              target.scrollIntoView({ block: 'center', inline: 'center' });
+              clickTarget(target);
+              return {
+                ok: true,
+                orderId: evalOrderId,
+                cardFound: Boolean(orderCard),
+                candidateCount: targets.length,
+                targetText: getVisibleText(target),
+                currentUrl: location.href,
+              };
+            }, {
+              orderId,
+              pickupButtonText,
+              pickupStatusTextBefore,
             }),
             new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Pickup DOM click timed out after 1500ms')), 1500)),
           ]);
+          if (!clickAttemptResult || typeof clickAttemptResult !== 'object' || !(clickAttemptResult as { ok?: boolean }).ok) {
+            const diagnosis = clickAttemptResult && typeof clickAttemptResult === 'object'
+              ? clickAttemptResult
+              : {
+                  ok: false,
+                  reason: 'no-result',
+                  orderId,
+                  currentUrl: driverPage.isClosed() ? 'closed' : driverPage.url(),
+                  cardFound: false,
+                  candidateCount: 0,
+                  visibleButtonTexts: [],
+                  pickupButtonText: pickupButtonText || null,
+                  pickupStatusTextBefore: pickupStatusTextBefore || null,
+                };
+            throw new Error(`Driver pickup DOM click did not find or activate a button for order ${orderId}: ${JSON.stringify(diagnosis)}`);
+          }
         } catch (error) {
           clickError = error instanceof Error ? error.message : String(error);
           if (
@@ -3046,45 +3115,9 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
             orderId,
             currentUrl: driverPage.url(),
             pickupButtonText,
+            pickupStatusTextBefore: pickupStatusTextBefore || null,
             error: clickError,
           });
-        }
-
-        if (clickError && !driverPage.isClosed()) {
-          try {
-            ensureDriverPageOpen();
-            await Promise.race([
-              pickupButton.dispatchEvent('click'),
-              new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Pickup dispatchEvent timed out after 1500ms')), 1500)),
-            ]);
-            clickError = null;
-          } catch (error) {
-            clickError = error instanceof Error ? error.message : String(error);
-            if (
-              clickError.includes('Driver page closed')
-              || clickError.includes('Target page, context or browser has been closed')
-              || driverPage.isClosed()
-            ) {
-              throw new Error(`Driver page closed during pickup click for order ${orderId}: ${clickError}`);
-            }
-          }
-        }
-
-        if (clickError && !driverPage.isClosed()) {
-          try {
-            ensureDriverPageOpen();
-            await pickupButton.click({ force: true, timeout: 1500 });
-            clickError = null;
-          } catch (error) {
-            clickError = error instanceof Error ? error.message : String(error);
-            if (
-              clickError.includes('Driver page closed')
-              || clickError.includes('Target page, context or browser has been closed')
-              || driverPage.isClosed()
-            ) {
-              throw new Error(`Driver page closed during pickup click for order ${orderId}: ${clickError}`);
-            }
-          }
         }
 
         if (driverPage.isClosed()) {
