@@ -3018,6 +3018,132 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
             .catch(() => false),
         ]).catch(() => false);
 
+        const inspectPickupDom = async () => driverPage.evaluate(({ evalOrderId }) => {
+          const getVisibleText = (element: Element | null) => (element?.textContent || '').trim().replace(/\s+/g, ' ');
+          const isVisible = (element: Element | null) => {
+            if (!element) return false;
+            const style = window.getComputedStyle(element as HTMLElement);
+            const rect = (element as HTMLElement).getBoundingClientRect();
+            return style.display !== 'none'
+              && style.visibility !== 'hidden'
+              && style.opacity !== '0'
+              && rect.width > 0
+              && rect.height > 0;
+          };
+          const visibleButtonTexts = Array.from(document.querySelectorAll('button, [role="button"]'))
+            .filter((node): node is HTMLElement => node instanceof HTMLElement)
+            .filter((node) => isVisible(node))
+            .map((node) => getVisibleText(node))
+            .filter(Boolean)
+            .slice(0, 25);
+          const visibleLinkTexts = Array.from(document.querySelectorAll('a, [role="link"]'))
+            .filter((node): node is HTMLElement => node instanceof HTMLElement)
+            .filter((node) => isVisible(node))
+            .map((node) => getVisibleText(node))
+            .filter(Boolean)
+            .slice(0, 25);
+          const card = document.querySelector(`[data-testid="driver-order-card-${evalOrderId}"], [data-order-id="${evalOrderId}"], [data-testid*="driver-order-card"], [data-order-id]`);
+          const pickupCandidates = Array.from(document.querySelectorAll('button, [role="button"], [data-action="pickup-order"], [data-testid*="picked-up"], [data-testid*="pickup"]'))
+            .filter((node): node is HTMLElement => node instanceof HTMLElement)
+            .filter((node) => isVisible(node))
+            .filter((node) => !node.hasAttribute('disabled') && node.getAttribute('aria-disabled') !== 'true');
+          const pageTextPreview = document.body?.innerText?.slice(0, 700) || '';
+          return {
+            cardFound: Boolean(card),
+            pickupCandidateCount: pickupCandidates.length,
+            visibleButtonTexts,
+            visibleLinkTexts,
+            pageTextPreview,
+            hasPickupText: /picked up|pickup|abgeholt|abholen/i.test(pageTextPreview),
+            hasCardOrderIdText: pageTextPreview.includes(evalOrderId),
+          };
+        }, { evalOrderId: orderId }).catch(() => ({
+          cardFound: false,
+          pickupCandidateCount: 0,
+          visibleButtonTexts: [] as string[],
+          visibleLinkTexts: [] as string[],
+          pageTextPreview: '',
+          hasPickupText: false,
+          hasCardOrderIdText: false,
+        }));
+
+        const ensureDriverOrdersView = async (stage: string) => {
+          const before = await inspectPickupDom();
+          if (before.cardFound && before.pickupCandidateCount > 0) {
+            return before;
+          }
+
+          console.log('ℹ️ lifecycle: phase3 ensure driver orders view before pickup', {
+            orderId,
+            stage,
+            currentUrl: driverPage.url(),
+            cardFoundBeforeReopen: before.cardFound,
+            pickupCandidateCountBeforeReopen: before.pickupCandidateCount,
+          });
+
+          const openOrdersTargets = [
+            driverPage.getByRole('button', { name: /Orders|Bestellungen/i }).first(),
+            driverPage.getByRole('link', { name: /Orders|Bestellungen/i }).first(),
+            driverPage.locator('[data-testid*="orders"]').first(),
+          ];
+          for (const target of openOrdersTargets) {
+            try {
+              if (await target.isVisible().catch(() => false)) {
+                await target.click({ timeout: 1500 }).catch(() => null);
+                break;
+              }
+            } catch {
+              // continue with next candidate
+            }
+          }
+
+          const reopened = await Promise.race([
+            inspectPickupDom().then((result) => result).catch(() => ({
+              cardFound: false,
+              pickupCandidateCount: 0,
+              visibleButtonTexts: [] as string[],
+              visibleLinkTexts: [] as string[],
+              pageTextPreview: '',
+              hasPickupText: false,
+              hasCardOrderIdText: false,
+            })),
+            new Promise<Awaited<ReturnType<typeof inspectPickupDom>>>((resolve) => setTimeout(() => resolve({
+              cardFound: false,
+              pickupCandidateCount: 0,
+              visibleButtonTexts: [] as string[],
+              visibleLinkTexts: [] as string[],
+              pageTextPreview: '',
+              hasPickupText: false,
+              hasCardOrderIdText: false,
+            }), 2000)),
+          ]);
+
+          if (!reopened.cardFound && reopened.pickupCandidateCount === 0 && !reopened.hasPickupText && !reopened.hasCardOrderIdText) {
+            throw new Error(`phase3 driver orders view missing before pickup: ${JSON.stringify({
+              orderId,
+              currentUrl: driverPage.url(),
+              visibleButtonTexts: reopened.visibleButtonTexts,
+              visibleLinkTexts: reopened.visibleLinkTexts,
+              cardFoundBeforeReopen: before.cardFound,
+              cardFoundAfterReopen: reopened.cardFound,
+              pickupCandidateCount: reopened.pickupCandidateCount,
+              pageTextPreview: reopened.pageTextPreview,
+            })}`);
+          }
+
+          console.log('ℹ️ lifecycle: phase3 driver orders view ensured', {
+            orderId,
+            stage,
+            currentUrl: driverPage.url(),
+            cardFoundAfterReopen: reopened.cardFound,
+            pickupCandidateCountAfterReopen: reopened.pickupCandidateCount,
+          });
+
+          return reopened;
+        };
+
+        const ordersViewBeforePickup = await ensureDriverOrdersView('before pickup dom click');
+
         let clickError: string | null = null;
         try {
           ensureDriverPageOpen();
@@ -3099,6 +3225,8 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
                   visibleButtonTexts: [],
                   pickupButtonText: pickupButtonText || null,
                   pickupStatusTextBefore: pickupStatusTextBefore || null,
+                  visibleLinkTexts: ordersViewBeforePickup.visibleLinkTexts,
+                  pageTextPreview: ordersViewBeforePickup.pageTextPreview,
                 };
             throw new Error(`Driver pickup DOM click did not find or activate a button for order ${orderId}: ${JSON.stringify(diagnosis)}`);
           }
@@ -3116,6 +3244,7 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
             currentUrl: driverPage.url(),
             pickupButtonText,
             pickupStatusTextBefore: pickupStatusTextBefore || null,
+            visibleLinkTexts: ordersViewBeforePickup.visibleLinkTexts,
             error: clickError,
           });
         }
