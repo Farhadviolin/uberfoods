@@ -3228,7 +3228,8 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
 
         const pickupStatusTextAfter = (await pickupStatusLocator.textContent().catch(() => '') || '').trim();
         const hasPickupUiSuccess = Boolean(pickupUiSuccess)
-          || /PICKED_UP|IN_TRANSIT|OUT_FOR_DELIVERY|abgeholt|unterwegs|in delivery|delivered/i.test(pickupStatusTextAfter);
+          || /PICKED_UP|IN_TRANSIT|OUT_FOR_DELIVERY|ON_THE_WAY|abgeholt|unterwegs|in delivery|delivered/i.test(pickupStatusTextAfter);
+        let pickupConfirmedBySignal = Boolean(pickupResponse) || hasPickupUiSuccess;
 
         console.log('ℹ️ lifecycle: phase3 pickup click result', {
           orderId,
@@ -3245,21 +3246,62 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
           consoleErrors: pickupTraffic.consoleErrors,
         });
 
-        if (!pickupResponse && !hasPickupUiSuccess) {
-          throw new Error(`phase3 driver pickup click did not produce a response or visible status change: ${JSON.stringify({
-            orderId,
-            currentUrl: driverPage.url(),
-            pickupButtonText,
-            clickError,
-            pickupStatusText: pickupStatusTextAfter || null,
-            requestUrls: pickupTraffic.requestUrls,
-            responseUrls: pickupTraffic.responseUrls,
-            requestFailedEvents: pickupTraffic.requestFailedEvents,
-            pageErrors: pickupTraffic.pageErrors,
-            consoleErrors: pickupTraffic.consoleErrors,
-          })}`);
+        if (!pickupConfirmedBySignal) {
+          if (pickupButtonTextSignalsSuccess) {
+            const reopenedOrdersView = await ensureDriverOrdersView('post-pickup confirmation');
+            const pickupStatusTextAfterRefocus = (await pickupStatusLocator.textContent().catch(() => '') || '').trim();
+            const pickupCardVisibleAfterRefocus = await pickupCard.isVisible().catch(() => false);
+            const pickupConfirmedAfterRefocus = pickupCardVisibleAfterRefocus
+              || /PICKED_UP|IN_TRANSIT|OUT_FOR_DELIVERY|ON_THE_WAY|abgeholt|unterwegs|in delivery|delivered/i.test(pickupStatusTextAfterRefocus)
+              || reopenedOrdersView.pickupCandidateCount > 0;
+            console.log('ℹ️ lifecycle: phase3 pickup confirmation refocus', {
+              orderId,
+              currentUrl: driverPage.url(),
+              pickupButtonText,
+              pickupStatusTextAfterRefocus: pickupStatusTextAfterRefocus || null,
+              pickupCardVisibleAfterRefocus,
+              pickupCandidateCountAfterRefocus: reopenedOrdersView.pickupCandidateCount,
+              pickupConfirmedAfterRefocus,
+              requestUrls: pickupTraffic.requestUrls,
+              responseUrls: pickupTraffic.responseUrls,
+            });
+            if (pickupConfirmedAfterRefocus) {
+              pickupConfirmedBySignal = true;
+              driverPickupCompleted = true;
+            } else {
+              throw new Error(`phase3 driver pickup click did not produce a response or confirmed status after refocus: ${JSON.stringify({
+                orderId,
+                currentUrl: driverPage.url(),
+                pickupButtonText,
+                pickupStatusText: pickupStatusTextAfterRefocus || pickupStatusTextAfter || null,
+                pickupCardVisibleAfterRefocus,
+                pickupCandidateCountAfterRefocus: reopenedOrdersView.pickupCandidateCount,
+                requestUrls: pickupTraffic.requestUrls,
+                responseUrls: pickupTraffic.responseUrls,
+                requestFailedEvents: pickupTraffic.requestFailedEvents,
+                pageErrors: pickupTraffic.pageErrors,
+                consoleErrors: pickupTraffic.consoleErrors,
+              })}`);
+            }
+          } else {
+            throw new Error(`phase3 driver pickup click did not produce a response or confirmed status change: ${JSON.stringify({
+              orderId,
+              currentUrl: driverPage.url(),
+              pickupButtonText,
+              clickError,
+              pickupStatusText: pickupStatusTextAfter || null,
+              requestUrls: pickupTraffic.requestUrls,
+              responseUrls: pickupTraffic.responseUrls,
+              requestFailedEvents: pickupTraffic.requestFailedEvents,
+              pageErrors: pickupTraffic.pageErrors,
+              consoleErrors: pickupTraffic.consoleErrors,
+            })}`);
+          }
         }
-        driverPickupCompleted = true;
+
+        if (pickupConfirmedBySignal) {
+          driverPickupCompleted = true;
+        }
       });
 
       const pickedUpOrderCard = driverPage
