@@ -3457,8 +3457,12 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
           .or(driverPage.locator(`[data-order-id="${orderId}"]`))
           .first();
         const deliveredButton = findDeliveredActionButton(driverPage, orderId);
+        const deliveredCardVisible = await deliveredOrderCard.isVisible().catch(() => false);
         const deliveredButtonVisible = await deliveredButton.isVisible().catch(() => false);
-        const deliveredStatusTextBefore = (await deliveredOrderCard.locator('[data-testid="order-status"], .order-status').textContent().catch(() => '') || '').trim();
+        const deliveredButtonCount = await deliveredButton.count().catch(() => 0);
+        const deliveredStatusTextBefore = deliveredCardVisible
+          ? ((await deliveredOrderCard.locator('[data-testid="order-status"], .order-status').textContent().catch(() => '') || '').trim())
+          : '';
         if (deliveredStatusTextBefore && /DELIVERED|Delivered|Zugestellt|Completed|Abgeschlossen|COMPLETED/i.test(deliveredStatusTextBefore)) {
           console.log('✅ lifecycle: driver delivered state already confirmed before click', {
             orderId,
@@ -3481,6 +3485,8 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
             currentUrl: driverPage.url(),
             deliveredStatusTextBefore: deliveredStatusTextBefore || null,
             driverPickupCompleted,
+            deliveredCardVisible,
+            deliveredButtonCount,
             visibleButtons,
             visibleCards: visibleCards.slice(0, 10),
           })}`);
@@ -3490,6 +3496,8 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
           currentUrl: driverPage.isClosed() ? 'closed' : driverPage.url(),
           deliveredStatusTextBefore: deliveredStatusTextBefore || null,
           deliveredButtonVisible,
+          deliveredButtonCount,
+          deliveredCardVisible,
           driverPickupCompleted,
         });
       });
@@ -3516,11 +3524,15 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
           .catch(() => []);
         const deliveredButtonCount = visibleButtons.filter((text) => /delivered|zugestellt|lieferung abschließen|abschließen|complete delivery|complete order|mark as delivered/i.test(text)).length;
         const deliveredButtonVisible = await deliveredButton.isVisible().catch(() => false);
+        const deliveredActionCount = await deliveredButton.count().catch(() => 0);
         const deliveredButtonText = (await Promise.race([
           deliveredButton.textContent().catch(() => null),
           new Promise<null>((resolve) => setTimeout(() => resolve(null), 1000)),
         ]) || '').trim();
-        const deliveredStatusTextBefore = (await deliveredOrderCard.locator('[data-testid="order-status"], .order-status').textContent().catch(() => '') || '').trim();
+        const deliveredCardVisible = await deliveredOrderCard.isVisible().catch(() => false);
+        const deliveredStatusTextBefore = deliveredCardVisible
+          ? ((await deliveredOrderCard.locator('[data-testid="order-status"], .order-status').textContent().catch(() => '') || '').trim())
+          : '';
         const deliveredStatusAlreadyConfirmed = Boolean(deliveredStatusTextBefore)
           && /DELIVERED|Delivered|Zugestellt|Completed|Abgeschlossen|COMPLETED/i.test(deliveredStatusTextBefore);
         console.log('ℹ️ lifecycle: phase3 driver delivered click pre-check', {
@@ -3530,9 +3542,11 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
           visibleButtons,
           deliveredButtonCount,
           deliveredButtonVisible,
+          deliveredActionCount,
           deliveredButtonText: deliveredButtonText || null,
           deliveredStatusTextBefore: deliveredStatusTextBefore || null,
           deliveredStatusAlreadyConfirmed,
+          deliveredCardVisible,
           driverPickupCompleted,
         });
 
@@ -3557,9 +3571,11 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
             driverPickupCompleted,
             deliveredButtonCount,
             deliveredButtonVisible,
+            deliveredActionCount,
             deliveredButtonText: deliveredButtonText || null,
             deliveredStatusTextBefore: deliveredStatusTextBefore || null,
             deliveredStatusAlreadyConfirmed,
+            deliveredCardVisible,
             visibleButtons,
             visibleCards: visibleCards.slice(0, 10),
           })}`);
