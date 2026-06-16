@@ -3269,8 +3269,20 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
       await withStepTimeout('phase3 driver in-transit status visible', async () => {
         const pickedUpOrderCardVisible = await pickedUpOrderCard.isVisible().catch(() => false);
         if (pickedUpOrderCardVisible) {
-          await expect(pickedUpOrderCard).toHaveAttribute('data-status', 'PICKED_UP', {
-            timeout: 10000,
+          const status = await pickedUpOrderCard.getAttribute('data-status').catch(() => null);
+          if (!status || !/PICKED_UP|IN_TRANSIT/i.test(status)) {
+            throw new Error(`phase3 driver in-transit card has unexpected status after pickup: ${JSON.stringify({
+              orderId,
+              currentUrl: driverPage.isClosed() ? 'closed' : driverPage.url(),
+              driverPickupCompleted,
+              status,
+            })}`);
+          }
+          console.log('✅ lifecycle: driver in-transit card visible', {
+            orderId,
+            currentUrl: driverPage.isClosed() ? 'closed' : driverPage.url(),
+            driverPickupCompleted,
+            status,
           });
           return;
         }
