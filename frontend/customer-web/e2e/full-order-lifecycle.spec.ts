@@ -3288,7 +3288,7 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
         }
 
         if (driverPickupCompleted) {
-          console.log('✅ lifecycle: driver in-transit state accepted after pickup completion', {
+          console.log('✅ lifecycle: driver in-transit state accepted after confirmed pickup', {
             orderId,
             currentUrl: driverPage.isClosed() ? 'closed' : driverPage.url(),
             driverPickupCompleted,
@@ -3323,7 +3323,7 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
             .or(driverPage.locator(`[data-order-id="${orderId}"]`))
             .first();
         if (!pickedUpOrderCardVisible && driverPickupCompleted) {
-          console.log('✅ lifecycle: driver in-transit button accepted after pickup completion', {
+          console.log('✅ lifecycle: driver in-transit button accepted after confirmed pickup', {
             orderId,
             currentUrl: driverPage.isClosed() ? 'closed' : driverPage.url(),
             driverPickupCompleted,
@@ -3403,7 +3403,7 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
             timeout: 10000,
           });
         } else if (driverPickupCompleted) {
-          console.log('✅ lifecycle: in-transit card accepted after pickup completion', {
+          console.log('✅ lifecycle: in-transit card accepted after confirmed pickup', {
             orderId,
             currentUrl: driverPage.isClosed() ? 'closed' : driverPage.url(),
             driverPickupCompleted,
