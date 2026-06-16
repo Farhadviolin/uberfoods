@@ -1930,6 +1930,22 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
         console.log('✅ lifecycle: phase1 final Place Order button visible');
         await expect(finalPlaceOrderButton).toBeEnabled();
         console.log('✅ lifecycle: phase1 final Place Order button enabled');
+        const resolveOrderCreationAfterPaymentConfirm = async () => {
+          const responseTimeoutMs = 10000;
+          const response = await Promise.race([
+            customerPage.waitForResponse((res) => {
+              const request = res.request();
+              return request.method() === 'POST'
+                && /\/(?:api\/)?orders\/customer(?:[/?#]|$)/i.test(res.url())
+                && [200, 201, 202].includes(res.status());
+            }, { timeout: responseTimeoutMs }).catch(() => null),
+            customerPage.waitForURL(/\/orders\/[^/?]+(?:\?.*)?$/, { timeout: responseTimeoutMs })
+              .then(() => null)
+              .catch(() => null),
+          ]);
+
+          return response;
+        };
         const performFinalSubmitAttempt = async (attemptLabel: string) => {
           const isOrderCustomerUrl = (urlString: string) => {
             const lower = urlString.toLowerCase();
@@ -1981,6 +1997,63 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
           await finalPlaceOrderButton.click({ noWaitAfter: true });
           console.log('✅ lifecycle: final submit click completed', { attemptLabel });
           console.log('➡️ lifecycle: final submit before response wait', { attemptLabel });
+
+          const paymentModalVisibleAfterClick = await paymentModal.isVisible().catch(() => false);
+          if (paymentModalVisibleAfterClick) {
+            console.log('➡️ lifecycle: payment modal visible after place order', {
+              attemptLabel,
+              currentUrl: customerPage.url(),
+            });
+            console.log('➡️ lifecycle: resolving payment modal confirm button', {
+              attemptLabel,
+            });
+            const paymentConfirmButton = paymentModal
+              .getByTestId('payment-confirm-button')
+              .or(paymentModal.getByRole('button', {
+                name: /pay|bezahlen|zahlung bestätigen|zahlung abschließen|confirm|bestätigen|complete payment|place order|order/i,
+              }))
+              .or(paymentModal.locator('button').filter({
+                hasText: /pay|bezahlen|zahlung bestätigen|zahlung abschließen|confirm|bestätigen|complete payment|place order|order/i,
+              }))
+              .first();
+            const paymentConfirmButtonCount = await paymentConfirmButton.count().catch(() => 0);
+            if (paymentConfirmButtonCount === 0) {
+              throw new Error(`Payment confirmation button not found after place order: ${JSON.stringify({
+                attemptLabel,
+                currentUrl: customerPage.url(),
+                paymentModalVisible: paymentModalVisibleAfterClick,
+                paymentConfirmButtonCount,
+                cartVisible: await cartContainer.isVisible().catch(() => false),
+                cartItemCount: await cartContainer.locator('.cart-item').count().catch(() => 0),
+                visibleTotalText: await cartContainer.locator('text=/€|Mindestbestellwert|Total|Gesamt/i').allTextContents().catch(() => []),
+                responseSeen: Boolean(lastOrderCreateResponse),
+                orderIdResolved: Boolean(orderId),
+                consoleErrors: submitTraffic.consoleErrors,
+              })}`);
+            }
+            await expect(paymentConfirmButton).toBeVisible({ timeout: 5000 });
+            await expect(paymentConfirmButton).toBeEnabled({ timeout: 5000 });
+            await paymentConfirmButton.scrollIntoViewIfNeeded().catch(() => null);
+            await paymentConfirmButton.click({ timeout: 5000 });
+            console.log('✅ lifecycle: payment modal confirm button clicked', {
+              attemptLabel,
+            });
+            console.log('➡️ lifecycle: waiting for order creation after payment confirm', {
+              attemptLabel,
+            });
+
+            const confirmedOrderCreateResponse = await resolveOrderCreationAfterPaymentConfirm();
+            if (confirmedOrderCreateResponse) {
+              lastOrderCreateResponse = confirmedOrderCreateResponse;
+              pendingOrderCreateResponse = Promise.resolve(confirmedOrderCreateResponse);
+              console.log('✅ lifecycle: order creation response received after payment confirm', {
+                attemptLabel,
+                status: confirmedOrderCreateResponse.status(),
+                url: confirmedOrderCreateResponse.url(),
+              });
+              return { kind: 'response' as const, response: confirmedOrderCreateResponse };
+            }
+          }
 
           const attemptOutcome = await Promise.race([
             orderCreateOutcomePromise,
@@ -2210,21 +2283,65 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
 
       // Complete payment in the modal if the UI shows one, otherwise accept
       // the direct navigation flow after the order is created.
-      await Promise.race([
-        paymentModal.waitFor({ state: 'visible', timeout: 15000 }).catch(() => null),
-        customerPage.waitForURL(/\/orders\/[^/?]+(?:\?.*)?$/, { timeout: 15000 }).catch(() => null),
-      ]);
+      const paymentModalVisible = await paymentModal.waitFor({ state: 'visible', timeout: 8000 })
+        .then(() => true)
+        .catch(() => false);
+      const orderTrackingVisible = await orderTrackingPage.waitFor({ state: 'visible', timeout: 8000 })
+        .then(() => true)
+        .catch(() => false);
+      const orderUrlVisible = await customerPage.waitForURL(/\/orders\/[^/?]+(?:\?.*)?$/, { timeout: 8000 })
+        .then(() => true)
+        .catch(() => false);
 
-      if (await paymentModal.isVisible().catch(() => false)) {
-        console.log('➡️ lifecycle: payment modal visible, confirming payment');
-        const orderCreateResponse = await pendingOrderCreateResponse;
-        if (orderCreateResponse) {
-          lastOrderCreateResponse = orderCreateResponse;
-          console.log('✅ lifecycle: order create response received', {
-            status: orderCreateResponse.status(),
-            url: orderCreateResponse.url(),
+      if (paymentModalVisible) {
+        console.log('➡️ lifecycle: payment modal visible after place order');
+        console.log('➡️ lifecycle: resolving payment modal confirm button');
+        const paymentConfirmButton = paymentModal
+          .getByTestId('payment-confirm-button')
+          .or(paymentModal.getByRole('button', {
+            name: /pay|bezahlen|zahlung bestätigen|zahlung abschließen|confirm|bestätigen|complete payment|place order|order/i,
+          }))
+          .or(paymentModal.locator('button').filter({
+            hasText: /pay|bezahlen|zahlung bestätigen|zahlung abschließen|confirm|bestätigen|complete payment|place order|order/i,
+          }))
+          .first();
+        const paymentConfirmButtonCount = await paymentConfirmButton.count().catch(() => 0);
+        if (paymentConfirmButtonCount === 0) {
+          throw new Error(`Payment confirmation button not found after place order: ${JSON.stringify({
+            currentUrl: customerPage.url(),
+            paymentModalVisible,
+            paymentConfirmButtonCount,
+            orderTrackingVisible,
+            cartVisible: await cartContainer.isVisible().catch(() => false),
+            cartItemCount: await cartContainer.locator('.cart-item').count().catch(() => 0),
+            visibleTotalText: await cartContainer.locator('text=/€|Mindestbestellwert|Total|Gesamt/i').allTextContents().catch(() => []),
+            responseSeen: Boolean(lastOrderCreateResponse),
+            orderIdResolved: Boolean(orderId),
+            consoleErrors: [],
+          })}`);
+        }
+        await expect(paymentConfirmButton).toBeVisible({ timeout: 5000 });
+        await expect(paymentConfirmButton).toBeEnabled({ timeout: 5000 });
+        await paymentConfirmButton.scrollIntoViewIfNeeded().catch(() => null);
+        await paymentConfirmButton.click({ timeout: 5000 });
+        console.log('✅ lifecycle: payment modal confirm button clicked');
+        console.log('➡️ lifecycle: waiting for order creation after payment confirm');
+
+        const confirmedOrderCreateResponse = await resolveOrderCreationAfterPaymentConfirm();
+        if (confirmedOrderCreateResponse) {
+          lastOrderCreateResponse = confirmedOrderCreateResponse;
+          pendingOrderCreateResponse = Promise.resolve(confirmedOrderCreateResponse);
+          console.log('✅ lifecycle: order creation response received after payment confirm', {
+            status: confirmedOrderCreateResponse.status(),
+            url: confirmedOrderCreateResponse.url(),
           });
         }
+      } else {
+        console.log('ℹ️ Payment modal not shown, continuing with direct order confirmation signals', {
+          orderTrackingVisible,
+          orderUrlVisible,
+        });
+      }
 
         const cardForm = customerPage.locator('.card-form');
         if (await cardForm.isVisible()) {
