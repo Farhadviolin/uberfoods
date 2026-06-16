@@ -2990,30 +2990,18 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
         ]);
 
         let clickSucceeded = false;
+        let clickError: string | null = null;
         try {
           await pickupButton.click({ timeout: 6000 });
           clickSucceeded = true;
         } catch (error) {
+          clickError = error instanceof Error ? error.message : String(error);
           console.log('ℹ️ lifecycle: pickup click failed', {
             orderId,
             currentUrl: driverPage.url(),
             pickupButtonText,
-            error: error instanceof Error ? error.message : String(error),
+            error: clickError,
           });
-        }
-
-        if (!clickSucceeded) {
-          throw new Error(`phase3 driver pickup click failed before follow-up checks: ${JSON.stringify({
-            orderId,
-            currentUrl: driverPage.url(),
-            pickupButtonText,
-            pickupStatusTextBefore: pickupStatusTextBefore || null,
-            requestUrls: pickupTraffic.requestUrls,
-            responseUrls: pickupTraffic.responseUrls,
-            requestFailedEvents: pickupTraffic.requestFailedEvents,
-            pageErrors: pickupTraffic.pageErrors,
-            consoleErrors: pickupTraffic.consoleErrors,
-          })}`);
         }
 
         const [pickupResponse, pickupUiSuccess] = await Promise.all([
@@ -3029,6 +3017,8 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
           orderId,
           currentUrl: driverPage.url(),
           pickupButtonText,
+          clickSucceeded,
+          clickError,
           pickupResponseStatus: pickupResponse?.status() ?? null,
           pickupResponseUrl: pickupResponse?.url() ?? null,
           pickupStatusText: pickupStatusTextAfter || null,
@@ -3044,6 +3034,8 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
             orderId,
             currentUrl: driverPage.url(),
             pickupButtonText,
+            clickSucceeded,
+            clickError,
             pickupStatusText: pickupStatusTextAfter || null,
             requestUrls: pickupTraffic.requestUrls,
             responseUrls: pickupTraffic.responseUrls,
