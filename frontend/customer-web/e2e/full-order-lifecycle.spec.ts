@@ -1430,7 +1430,8 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
             }));
           const payloadSubtotal = payloadItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
           const subtotal = payloadSubtotal;
-          const payloadMinimumSatisfied = payloadSubtotal >= 25 && (payloadItems.length >= 2 || storageDiagnostics.quantityCount >= 2);
+          const payloadMinimumSatisfied = payloadSubtotal >= Math.max(25, lastSafeMinimumOrderSubtotal ?? 25)
+            && (payloadItems.length >= 2 || storageDiagnostics.quantityCount >= 2);
 
           return {
             ...storageDiagnostics,
@@ -1446,6 +1447,7 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
         };
 
         const ensureFinalSubmitMinimumCart = async () => {
+          const targetFinalSubmitSubtotal = Math.max(25, lastSafeMinimumOrderSubtotal ?? 25);
           const getVisibleCartContext = async () => {
             const storageSnapshot = await customerPage.evaluate(() => {
               const keys = Object.keys(window.localStorage);
@@ -1488,6 +1490,7 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
             visibleSubtotalBeforeSubmit: diagnostics.domSubtotal,
             storageSubtotalBeforeSubmit: diagnostics.storageSubtotal,
             safeSubtotalBeforeSubmit: lastSafeMinimumOrderSubtotal,
+            targetFinalSubmitSubtotal,
             finalSubmitItemCount: diagnostics.itemCount,
             finalSubmitQuantityCount: diagnostics.quantityCount,
             finalSubmitPayloadPreview: diagnostics.cartItems.slice(0, 5),
@@ -1506,6 +1509,7 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
             payloadItemsBeforeSubmit: diagnostics.payloadItems,
             finalSubmitItemCount: diagnostics.itemCount,
             finalSubmitQuantityCount: diagnostics.quantityCount,
+            targetFinalSubmitSubtotal,
           });
 
           const openRestaurantMenuForCartRepair = async () => {
@@ -1589,6 +1593,7 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
               finalSubmitItemCount: diagnostics.itemCount,
               finalSubmitQuantityCount: diagnostics.quantityCount,
               finalSubmitPayloadPreview: diagnostics.cartItems.slice(0, 5),
+              targetFinalSubmitSubtotal,
             });
 
             let buttonClicked = false;
@@ -1634,6 +1639,7 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
                 finalSubmitItemCount: diagnostics.itemCount,
                 finalSubmitQuantityCount: diagnostics.quantityCount,
                 finalSubmitPayloadPreview: diagnostics.cartItems.slice(0, 5),
+                targetFinalSubmitSubtotal,
               })}`);
             }
 
@@ -1657,6 +1663,7 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
             finalSubmitPayloadPreview: diagnostics.cartItems.slice(0, 5),
             finalSubmitMinimumSatisfied: diagnostics.finalSubmitMinimumSatisfied,
             subtotalSource: diagnostics.subtotalSource,
+            targetFinalSubmitSubtotal,
           });
 
           if (!diagnostics.finalSubmitMinimumSatisfied) {
@@ -1667,6 +1674,7 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
               finalSubmitItemCount: diagnostics.itemCount,
               finalSubmitQuantityCount: diagnostics.quantityCount,
               finalSubmitPayloadPreview: diagnostics.cartItems.slice(0, 5),
+              targetFinalSubmitSubtotal,
             })}`);
           }
 
@@ -1682,7 +1690,7 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
           const repairCheckoutCartToMinimum = async () => {
             for (let attempt = 1; attempt <= 8; attempt += 1) {
               diagnostics = await collectFinalSubmitCartDiagnostics();
-              if (diagnostics.payloadSubtotal >= 25) {
+              if (diagnostics.payloadSubtotal >= targetFinalSubmitSubtotal) {
                 return diagnostics;
               }
 
@@ -1712,7 +1720,7 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
           };
 
           diagnostics = await repairCheckoutCartToMinimum();
-          if (diagnostics.payloadSubtotal < 25) {
+          if (diagnostics.payloadSubtotal < targetFinalSubmitSubtotal) {
             throw new Error(`Final submit cart still below minimum after repair: ${JSON.stringify({
               payloadSubtotalAfterRepair: diagnostics.payloadSubtotal,
               visibleSubtotalAfterRepair: diagnostics.domSubtotal,
@@ -1720,6 +1728,7 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
               finalSubmitItemCount: diagnostics.itemCount,
               finalSubmitQuantityCount: diagnostics.quantityCount,
               finalSubmitPayloadPreview: diagnostics.cartItems.slice(0, 5),
+              targetFinalSubmitSubtotal,
             })}`);
           }
 
