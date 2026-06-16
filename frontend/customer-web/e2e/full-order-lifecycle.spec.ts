@@ -1043,6 +1043,18 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
           const submitButton = document.querySelector('button[data-testid="checkout-button"]') as HTMLButtonElement | null;
           const form = submitButton?.closest('form') as HTMLFormElement | null;
           const checkoutWarningVisible = Boolean(document.body.innerText.match(/missing-user-address|please provide a delivery address in your profile|delivery address in your profile/i));
+          const resolvedEffectiveAddress = [
+            userAddress,
+            profileAddressValue,
+            submitButton?.getAttribute('data-delivery-address'),
+          ].find((value): value is string => Boolean(value && value.trim()))?.trim() ?? '';
+          const resolvedAddressSource = userAddress?.trim()
+            ? 'customer_user.address'
+            : profileAddressValue?.trim()
+              ? 'customer_profile_address'
+              : submitButton?.getAttribute('data-delivery-address')?.trim()
+                ? 'checkout-button-data-attribute'
+                : 'none';
 
           return {
             hasCustomerUser: Boolean(rawUser),
@@ -1055,22 +1067,29 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
             submitButtonDisabled: submitButton?.disabled ?? null,
             formPresent: Boolean(form),
             formValid: form ? form.checkValidity() : null,
+            resolvedEffectiveAddress,
+            resolvedAddressSource,
           };
         });
 
         const ensureProfileAddress = async () => {
           const profileAddressSignals = await collectProfileAddressSignals();
+          const checkoutAddressSnapshot = await collectCheckoutAddressSnapshot();
 
           console.log('➡️ lifecycle: checking profile address before final submit', {
             currentUrl: customerPage.url(),
             ...profileAddressSignals,
+            ...checkoutAddressSnapshot,
           });
 
-          if (!profileAddressSignals.missingAddressDetected && !profileAddressSignals.locatorVisible) {
+          if (checkoutAddressSnapshot.resolvedEffectiveAddress.trim() && !profileAddressSignals.missingAddressDetected && !profileAddressSignals.locatorVisible) {
             console.log('ℹ️ lifecycle: profile address warning not visible, continuing with final submit');
-            return false;
+            return true;
           }
 
+          if (!checkoutAddressSnapshot.resolvedEffectiveAddress.trim()) {
+            console.log('ℹ️ lifecycle: profile address missing in customer state, applying deterministic recovery');
+          }
           console.log('ℹ️ lifecycle: missing profile address warning visible before final submit');
 
           await customerPage.goto('/profile', { waitUntil: 'domcontentloaded' });
@@ -1232,22 +1251,35 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
           const checkoutAddressTextsAfterProfileUpdate = await customerPage.locator(
             'text=/Please provide a delivery address in your profile|delivery address in your profile|addressRequired|missing-user-address|delivery address|address/i',
           ).allTextContents().catch(() => []);
+          const checkoutAddressSnapshotAfterProfileUpdate = await collectCheckoutAddressSnapshot();
           console.log('ℹ️ lifecycle: checkout address state after profile update', {
             checkoutStoredUserAddress,
             checkoutWarningTextsAfterProfileUpdate,
             checkoutAddressTextsAfterProfileUpdate,
+            checkoutAddressSnapshotAfterProfileUpdate,
           });
-          if (!checkoutWarningTextsAfterProfileUpdate.length && !checkoutAddressTextsAfterProfileUpdate.length) {
+          if (checkoutAddressSnapshotAfterProfileUpdate.resolvedEffectiveAddress.trim()
+            && !checkoutWarningTextsAfterProfileUpdate.length
+            && !checkoutAddressTextsAfterProfileUpdate.length) {
             console.log('✅ lifecycle: checkout address warning cleared after profile update');
           }
           console.log('✅ lifecycle: returned to checkout after profile update');
-          return true;
+          return Boolean(checkoutAddressSnapshotAfterProfileUpdate.resolvedEffectiveAddress.trim());
         };
 
         await logCheckoutDiagnostics('before final submit');
         await logCustomerUserSnapshot(customerPage, 'snapshot: before final submit');
         console.log('checkoutAddressSnapshot', await collectCheckoutAddressSnapshot());
-        await ensureProfileAddress();
+        const addressReadyForFinalSubmit = await ensureProfileAddress();
+        if (!addressReadyForFinalSubmit) {
+          const postRecoverySnapshot = await collectCheckoutAddressSnapshot();
+          if (!postRecoverySnapshot.resolvedEffectiveAddress.trim()) {
+            throw new Error(`Checkout address missing before final submit: ${JSON.stringify({
+              currentUrl: customerPage.url(),
+              ...postRecoverySnapshot,
+            })}`);
+          }
+        }
         await logCustomerUserSnapshot(customerPage, 'snapshot: after profile verification');
         console.log('checkoutAddressSnapshotAfterProfileVerification', await collectCheckoutAddressSnapshot());
         await logCheckoutDiagnostics('after profile verification');
@@ -1783,6 +1815,9 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
           const orderTrackingPromise = orderTrackingPage.waitFor({ state: 'visible', timeout: 20000 })
             .then(() => ({ kind: 'order-tracking' as const }))
             .catch(() => null);
+          const missingAddressPromise = profileAddressWarningLocator.first().waitFor({ state: 'visible', timeout: 2000 })
+            .then(() => ({ kind: 'missing-user-address' as const }))
+            .catch(() => null);
 
           console.log('➡️ lifecycle: phase1 clicking final Place Order', { attemptLabel });
           await finalPlaceOrderButton.scrollIntoViewIfNeeded().catch(() => null);
@@ -1793,6 +1828,7 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
             orderCreateOutcomePromise,
             orderUrlPromise,
             orderTrackingPromise,
+            missingAddressPromise,
           ]);
 
           if (attemptOutcome) {
@@ -1826,6 +1862,7 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
         };
 
         let orderSubmissionOutcome = await performFinalSubmitAttempt('initial');
+        let missingAddressRecoveryAttempted = false;
 
         if (!orderSubmissionOutcome) {
           const retryProbe = await customerPage.evaluate(() => (window as unknown as { __checkoutSubmitProbe?: unknown }).__checkoutSubmitProbe ?? null);
@@ -1833,7 +1870,7 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
             ? (retryProbe as { guard?: string | null }).guard
             : null;
 
-          if (retryGuard === 'missing-user-address') {
+          if (retryGuard === 'missing-user-address' || await profileAddressWarningLocator.first().isVisible().catch(() => false)) {
             console.log('ℹ️ lifecycle: missing-user-address recovery triggered', {
               retryGuard,
             });
@@ -1843,8 +1880,24 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
           }
         }
 
+        if (orderSubmissionOutcome?.kind === 'missing-user-address') {
+          if (!missingAddressRecoveryAttempted) {
+            missingAddressRecoveryAttempted = true;
+            console.log('ℹ️ lifecycle: missing-user-address recovery triggered', {
+              retryGuard: 'missing-user-address',
+            });
+            await ensureProfileAddress();
+            await installCheckoutSubmitProbe();
+            orderSubmissionOutcome = await performFinalSubmitAttempt('retry after missing-user-address recovery');
+          }
+        }
+
         if (!orderSubmissionOutcome) {
           throw new Error('Final order submission did not produce a response or confirmation UI');
+        }
+
+        if (orderSubmissionOutcome.kind === 'missing-user-address') {
+          throw new Error('Final order submission still reported missing-user-address after profile recovery');
         }
 
         if (orderSubmissionOutcome.kind === 'response') {
