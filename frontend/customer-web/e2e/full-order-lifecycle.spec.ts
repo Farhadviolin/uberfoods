@@ -3605,7 +3605,7 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
           return;
         }
 
-        const visibleCards = await driverPage.locator('[data-testid*="order"], .order-card, [data-order-id]').evaluateAll((nodes) => nodes
+        const driverVisibleCardsAfterDeliveredCheck = await driverPage.locator('[data-testid*="order"], .order-card, [data-order-id]').evaluateAll((nodes) => nodes
           .map((node) => (node.textContent || '').trim().replace(/\s+/g, ' '))
           .filter(Boolean))
           .catch(() => []);
@@ -3622,7 +3622,7 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
           deliveredResponseUrl: deliveredResponse?.url() ?? null,
           deliveredUiSuccess,
           visibleButtons,
-          visibleCards: visibleCards.slice(0, 10),
+          visibleCards: driverVisibleCardsAfterDeliveredCheck.slice(0, 10),
         })}`);
       });
 
