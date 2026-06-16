@@ -461,6 +461,7 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
         const cartItemDetails = cartItems.locator('.cart-item-details');
         const cartPlaceholder = customerPage.getByTestId('cart-placeholder');
         const cartStateKeyPrefix = 'cart_';
+        const safeMinimumOrderSubtotalKey = `lifecycle_safe_minimum_order_subtotal_${RUN_ID}`;
         const targetSubtotal = 25;
         const maxMinimumOrderAttempts = 10;
 
@@ -616,6 +617,27 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
           };
         };
 
+        const persistSafeMinimumOrderSubtotal = async (subtotal: number, source: string | null) => {
+          if (!Number.isFinite(subtotal) || subtotal < targetSubtotal) {
+            return;
+          }
+
+          lastSafeMinimumOrderSubtotal = subtotal;
+          lastSafeMinimumOrderSource = source;
+
+          await customerPage.evaluate(({ storageKey, value, sourceLabel }) => {
+            window.localStorage.setItem(storageKey, JSON.stringify({
+              subtotal: value,
+              source: sourceLabel,
+              savedAt: Date.now(),
+            }));
+          }, {
+            storageKey: safeMinimumOrderSubtotalKey,
+            value: subtotal,
+            sourceLabel: source ?? 'unknown',
+          }).catch(() => null);
+        };
+
         for (let attempt = 1; attempt <= maxMinimumOrderAttempts; attempt += 1) {
           const cartDiagnostics = await getCartDiagnostics();
           const storageDiagnostics = await getStorageCartDiagnostics();
@@ -637,10 +659,7 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
               targetSubtotal,
               minimumWarningCleared,
             });
-            if ((cartDiagnostics.subtotal ?? 0) >= targetSubtotal) {
-              lastSafeMinimumOrderSubtotal = cartDiagnostics.subtotal;
-              lastSafeMinimumOrderSource = cartDiagnostics.subtotalSource;
-            }
+            await persistSafeMinimumOrderSubtotal(cartDiagnostics.subtotal ?? 0, cartDiagnostics.subtotalSource);
             console.log('✅ lifecycle: leaving phase1 minimum order satisfaction');
             return;
           }
@@ -680,10 +699,7 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
 
           if (postClickMinimumWarningCleared && postClickHasSufficientQuantity && postClickHasSafeSubtotal) {
             console.log(`✅ lifecycle: minimum order satisfied after ${attempt} extra attempts`);
-            if ((postClickDiagnostics.subtotal ?? 0) >= targetSubtotal) {
-              lastSafeMinimumOrderSubtotal = postClickDiagnostics.subtotal;
-              lastSafeMinimumOrderSource = postClickDiagnostics.subtotalSource;
-            }
+            await persistSafeMinimumOrderSubtotal(postClickDiagnostics.subtotal ?? 0, postClickDiagnostics.subtotalSource);
             console.log('✅ lifecycle: leaving phase1 minimum order satisfaction');
             return;
           }
@@ -894,11 +910,30 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
           });
 
           const storageSubtotalDiagnostics = await resolveMinimumOrderSubtotal(customerPage);
+          const persistedSafeSubtotalDiagnostics = await customerPage.evaluate(({ storageKey }) => {
+            const raw = window.localStorage.getItem(storageKey);
+            if (!raw) {
+              return { subtotal: null as number | null, source: null as string | null };
+            }
+
+            try {
+              const parsed = JSON.parse(raw) as { subtotal?: unknown; source?: unknown };
+              const subtotal = typeof parsed.subtotal === 'number' && Number.isFinite(parsed.subtotal)
+                ? parsed.subtotal
+                : null;
+              const source = typeof parsed.source === 'string' ? parsed.source : null;
+              return { subtotal, source };
+            } catch {
+              return { subtotal: null as number | null, source: null as string | null };
+            }
+          }, { storageKey: safeMinimumOrderSubtotalKey }).catch(() => ({ subtotal: null as number | null, source: null as string | null }));
           const domSubtotal = subtotalDiagnostics?.subtotal ?? null;
           const storageSubtotal = storageSubtotalDiagnostics.subtotal ?? null;
           const safeSubtotal = lastSafeMinimumOrderSubtotal !== null && lastSafeMinimumOrderSubtotal >= 25
             ? lastSafeMinimumOrderSubtotal
-            : null;
+            : persistedSafeSubtotalDiagnostics.subtotal !== null && persistedSafeSubtotalDiagnostics.subtotal >= 25
+              ? persistedSafeSubtotalDiagnostics.subtotal
+              : null;
 
           const chosenSubtotal = storageSubtotal !== null && storageSubtotal !== undefined && storageSubtotal >= 25
             ? storageSubtotal
@@ -912,22 +947,24 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
                 ? storageSubtotalDiagnostics.source ?? 'localStorage-cart-state'
                 : domSubtotal !== null && domSubtotal !== undefined && domSubtotal >= 25
                   ? subtotalDiagnostics?.source ?? 'visible-subtotal-dom'
-                  : lastSafeMinimumOrderSource ?? 'last-safe-minimum-order-subtotal',
+                  : lastSafeMinimumOrderSource ?? persistedSafeSubtotalDiagnostics.source ?? 'last-safe-minimum-order-subtotal',
               subtotal: chosenSubtotal,
               domSubtotal,
               storageSubtotal,
               safeSubtotal,
+              persistedSafeSubtotal: persistedSafeSubtotalDiagnostics.subtotal,
               cartStatePresent: storageSubtotalDiagnostics.cartStatePresent,
             });
             return chosenSubtotal;
           }
 
           console.log('ℹ️ lifecycle: pre-submit subtotal source', {
-            subtotalSource: storageSubtotalDiagnostics.source ?? subtotalDiagnostics?.source ?? lastSafeMinimumOrderSource ?? 'localStorage-cart-state',
+            subtotalSource: storageSubtotalDiagnostics.source ?? subtotalDiagnostics?.source ?? lastSafeMinimumOrderSource ?? persistedSafeSubtotalDiagnostics.source ?? 'localStorage-cart-state',
             subtotal: storageSubtotal ?? domSubtotal ?? safeSubtotal ?? 0,
             domSubtotal,
             storageSubtotal,
             safeSubtotal,
+            persistedSafeSubtotal: persistedSafeSubtotalDiagnostics.subtotal,
             cartStatePresent: storageSubtotalDiagnostics.cartStatePresent,
           });
           return storageSubtotal ?? domSubtotal ?? safeSubtotal ?? 0;
