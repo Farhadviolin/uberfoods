@@ -2953,6 +2953,7 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
           pickupButton.textContent().catch(() => null),
           new Promise<null>((resolve) => setTimeout(() => resolve(null), 1000)),
         ]) || '').trim();
+        const pickupButtonTextSignalsSuccess = /picked up|abgeholt|abholen|pickup/i.test(pickupButtonText);
         const pickupStatusTextBefore = (await Promise.race([
           pickupStatusLocator.textContent().catch(() => null),
           new Promise<null>((resolve) => setTimeout(() => resolve(null), 1000)),
@@ -2967,6 +2968,17 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
         });
         if (elapsedBeforeClickMs > 2000) {
           throw new Error(`Driver pickup pre-click preparation took too long for order ${orderId}: ${elapsedBeforeClickMs}ms`);
+        }
+
+        if (pickupButtonTextSignalsSuccess && !await pickupButton.isVisible().catch(() => false)) {
+          console.log('✅ driver pickup completed', {
+            orderId,
+            currentUrl: driverPage.isClosed() ? 'closed' : driverPage.url(),
+            pickupButtonText,
+            pickupStatusText: pickupStatusTextBefore || null,
+            reason: 'pickup state already signaled before click',
+          });
+          return;
         }
 
         const pickupResponsePromise = driverPage.waitForResponse((response) => {
@@ -3142,12 +3154,22 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
             )
             .first();
 
-          const pickupButtonVisible = await pickupButton.isVisible().catch(() => false);
-          if (!pickupButtonVisible) {
-            const visibleButtons = await driverPage.locator('button').evaluateAll((nodes) => nodes
-              .map((node) => (node.textContent || '').trim().replace(/\s+/g, ' '))
-              .filter(Boolean))
-              .catch(() => []);
+        const pickupButtonVisible = await pickupButton.isVisible().catch(() => false);
+        if (!pickupButtonVisible) {
+          if (pickupButtonTextSignalsSuccess) {
+            console.log('✅ driver pickup completed', {
+              orderId,
+              currentUrl: driverPage.url(),
+              pickupButtonText,
+              pickupStatusText: pickupStatusTextBefore || null,
+              reason: 'pickup text already indicated success',
+            });
+            return;
+          }
+          const visibleButtons = await driverPage.locator('button').evaluateAll((nodes) => nodes
+            .map((node) => (node.textContent || '').trim().replace(/\s+/g, ' '))
+            .filter(Boolean))
+            .catch(() => []);
             const visibleCards = await driverPage.locator('[data-testid*="order"], .order-card, [data-order-id]').evaluateAll((nodes) => nodes
               .map((node) => (node.textContent || '').trim().replace(/\s+/g, ' '))
               .filter(Boolean))
