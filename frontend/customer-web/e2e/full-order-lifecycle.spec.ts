@@ -1930,7 +1930,7 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
         console.log('✅ lifecycle: phase1 final Place Order button visible');
         await expect(finalPlaceOrderButton).toBeEnabled();
         console.log('✅ lifecycle: phase1 final Place Order button enabled');
-        const resolveOrderCreationAfterPaymentConfirm = async () => {
+        async function resolveOrderCreationAfterPaymentConfirm() {
           const responseTimeoutMs = 10000;
           const response = await Promise.race([
             customerPage.waitForResponse((res) => {
@@ -1945,7 +1945,7 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
           ]);
 
           return response;
-        };
+        }
         const performFinalSubmitAttempt = async (attemptLabel: string) => {
           const isOrderCustomerUrl = (urlString: string) => {
             const lower = urlString.toLowerCase();
