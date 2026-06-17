@@ -3811,7 +3811,7 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
           return reopened;
         };
 
-        const ensureDriverOrdersViewAfterPickup = async (stage: string) => {
+        const ensureDriverOrdersViewAfterPickupInPickupClick = async (stage: string) => {
           const inspectOrdersDom = async () => {
             const evalOrderId = orderId;
             return driverPage.evaluate((resolvedOrderId) => {
@@ -4026,6 +4026,7 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
         );
 
         let clickError: string | null = null;
+        let pickupCardStateForDiagnostics = pickupCardState;
         try {
           ensureDriverPageOpen();
           const pickupCardState = driverPickupVisibleCardState?.targetCardVisible
@@ -4092,7 +4093,6 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
         }
 
         let pickupButtonToClick = pickupButton;
-        let pickupCardStateForDiagnostics = pickupCardState;
         let recoveryAttempted = false;
 
         if (!pickupButtonVisible && !pickupStatusConfirmed) {
@@ -4112,7 +4112,7 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
             }
           }
 
-          const recoveryOrdersView = await ensureDriverOrdersViewAfterPickup(driverPage, orderId, 'phase3 driver pickup click recovery').catch(() => null);
+          const recoveryOrdersView = await ensureDriverOrdersViewAfterPickupInPickupClick(driverPage, orderId, 'phase3 driver pickup click recovery').catch(() => null);
           const recoveredCardState = recoveryOrdersView?.orderCardVisible
             ? await resolveVisibleDriverTargetOrderCard(
               driverPage,
@@ -4202,7 +4202,7 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
             currentUrl: driverPage.url(),
             pickupButtonText,
             pickupStatusTextBefore: pickupStatusTextBefore || null,
-            visibleLinkTexts: pickupCardStateForDiagnostics.visibleLinkTexts,
+            visibleLinkTexts: pickupCardStateForDiagnostics?.visibleLinkTexts ?? [],
             error: clickError,
           });
         }
