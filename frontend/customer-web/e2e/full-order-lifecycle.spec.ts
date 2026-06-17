@@ -288,6 +288,23 @@ async function resolveMinimumOrderSubtotal(page: Page, cartPrefix = 'cart_') {
   }, { prefix: cartPrefix });
 }
 
+async function resolveOrderCreationAfterPaymentConfirm(customerPage: Page) {
+  const responseTimeoutMs = 10000;
+  const response = await Promise.race([
+    customerPage.waitForResponse((res) => {
+      const request = res.request();
+      return request.method() === 'POST'
+        && /\/(?:api\/)?orders\/customer(?:[/?#]|$)/i.test(res.url())
+        && [200, 201, 202].includes(res.status());
+    }, { timeout: responseTimeoutMs }).catch(() => null),
+    customerPage.waitForURL(/\/orders\/[^/?]+(?:\?.*)?$/, { timeout: responseTimeoutMs })
+      .then(() => null)
+      .catch(() => null),
+  ]);
+
+  return response;
+}
+
 test.describe('Full Order Lifecycle UI-E2E', () => {
   let orderId: string;
   let orderRestaurantId: string | null = null;
@@ -1930,22 +1947,6 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
         console.log('✅ lifecycle: phase1 final Place Order button visible');
         await expect(finalPlaceOrderButton).toBeEnabled();
         console.log('✅ lifecycle: phase1 final Place Order button enabled');
-        async function resolveOrderCreationAfterPaymentConfirm() {
-          const responseTimeoutMs = 10000;
-          const response = await Promise.race([
-            customerPage.waitForResponse((res) => {
-              const request = res.request();
-              return request.method() === 'POST'
-                && /\/(?:api\/)?orders\/customer(?:[/?#]|$)/i.test(res.url())
-                && [200, 201, 202].includes(res.status());
-            }, { timeout: responseTimeoutMs }).catch(() => null),
-            customerPage.waitForURL(/\/orders\/[^/?]+(?:\?.*)?$/, { timeout: responseTimeoutMs })
-              .then(() => null)
-              .catch(() => null),
-          ]);
-
-          return response;
-        }
         const performFinalSubmitAttempt = async (attemptLabel: string) => {
           const isOrderCustomerUrl = (urlString: string) => {
             const lower = urlString.toLowerCase();
@@ -2042,7 +2043,7 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
               attemptLabel,
             });
 
-            const confirmedOrderCreateResponse = await resolveOrderCreationAfterPaymentConfirm();
+            const confirmedOrderCreateResponse = await resolveOrderCreationAfterPaymentConfirm(customerPage);
             if (confirmedOrderCreateResponse) {
               lastOrderCreateResponse = confirmedOrderCreateResponse;
               pendingOrderCreateResponse = Promise.resolve(confirmedOrderCreateResponse);
@@ -2327,7 +2328,7 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
         console.log('✅ lifecycle: payment modal confirm button clicked');
         console.log('➡️ lifecycle: waiting for order creation after payment confirm');
 
-        const confirmedOrderCreateResponse = await resolveOrderCreationAfterPaymentConfirm();
+        const confirmedOrderCreateResponse = await resolveOrderCreationAfterPaymentConfirm(customerPage);
         if (confirmedOrderCreateResponse) {
           lastOrderCreateResponse = confirmedOrderCreateResponse;
           pendingOrderCreateResponse = Promise.resolve(confirmedOrderCreateResponse);
