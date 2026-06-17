@@ -4026,7 +4026,14 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
         let clickError: string | null = null;
         try {
           ensureDriverPageOpen();
-          const pickupCard = targetCardState.targetCard;
+          const pickupCardState = targetCardState.targetCardVisible
+            ? targetCardState
+            : await resolveVisibleDriverTargetOrderCard(
+              driverPage,
+              orderId,
+              'phase3 driver pickup click after reopen',
+            );
+          const pickupCard = pickupCardState.targetCard;
           const pickupButton = pickupCard
             .getByTestId(`driver-picked-up-order-${orderId}`)
             .or(pickupCard.locator('[data-action="pickup-order"]'))
@@ -4038,7 +4045,7 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
             .first();
 
         const pickupButtonVisible = await pickupButton.isVisible().catch(() => false);
-        const pickupCardVisible = Boolean(targetCardState.targetCardVisible);
+        const pickupCardVisible = Boolean(pickupCardState.targetCardVisible);
         const pickupStatusText = await readLocatorTextWithin(
           pickupCard.locator('[data-testid="order-status"], .order-status'),
           1000,
@@ -4059,10 +4066,10 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
             pickupStatusText,
             pickupSnapshotStatus: pickupSnapshot.status,
             pickupSnapshotDelivered: pickupSnapshot.delivered,
-            visibleButtons: targetCardState.visibleButtonTexts.slice(0, 25),
-            visibleCards: targetCardState.bodyTextPreview ? [targetCardState.bodyTextPreview.slice(0, 300)] : [],
-            visibleLinkTexts: targetCardState.visibleLinkTexts,
-            pageTextPreview: targetCardState.bodyTextPreview,
+            visibleButtons: pickupCardState.visibleButtonTexts.slice(0, 25),
+            visibleCards: pickupCardState.bodyTextPreview ? [pickupCardState.bodyTextPreview.slice(0, 300)] : [],
+            visibleLinkTexts: pickupCardState.visibleLinkTexts,
+            pageTextPreview: pickupCardState.bodyTextPreview,
           })}`);
         }
 
@@ -4091,9 +4098,9 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
             pickupStatusText,
             pickupSnapshotStatus: pickupSnapshot.status,
             pickupSnapshotDelivered: pickupSnapshot.delivered,
-            visibleButtons: targetCardState.visibleButtonTexts.slice(0, 25),
-            visibleCards: targetCardState.bodyTextPreview ? [targetCardState.bodyTextPreview.slice(0, 300)] : [],
-            visibleLinkTexts: targetCardState.visibleLinkTexts,
+            visibleButtons: pickupCardState.visibleButtonTexts.slice(0, 25),
+            visibleCards: pickupCardState.bodyTextPreview ? [pickupCardState.bodyTextPreview.slice(0, 300)] : [],
+            visibleLinkTexts: pickupCardState.visibleLinkTexts,
             pageTextPreview: targetCardState.bodyTextPreview,
           })}`);
         }
