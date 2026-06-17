@@ -3811,9 +3811,13 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
           return reopened;
         };
 
-        const ensureDriverOrdersViewAfterPickupInPickupClick = async (stage: string) => {
+        const ensureDriverOrdersViewAfterPickupInPickupClick = async (
+          driverPage: Page,
+          orderId: string,
+          stage: string,
+        ) => {
           const inspectOrdersDom = async () => {
-            const evalOrderId = orderId;
+          const evalOrderId = orderId;
             return driverPage.evaluate((resolvedOrderId) => {
               const isVisible = (node: Element | null | undefined) => {
                 if (!node || !(node instanceof HTMLElement)) return false;
