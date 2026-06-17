@@ -2445,7 +2445,6 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
             modalButtons,
             orderCreateResponseReceived: Boolean(lastOrderCreateResponse),
           })}`);
-        }
         await expect(paymentConfirmButton).toBeEnabled();
         await paymentConfirmButton.click();
         console.log('✅ lifecycle: payment confirm button clicked');
@@ -2454,7 +2453,9 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
           customerPage.waitForURL(/\/orders\/[^/?]+(?:\?.*)?$/, { timeout: 20000 }).catch(() => null),
           orderTrackingPage.waitFor({ state: 'visible', timeout: 20000 }).catch(() => null),
         ]);
-      } else {
+      }
+
+      if (!paymentModalVisible) {
         console.log('ℹ️ Payment modal not shown, waiting for direct order navigation');
       }
 
