@@ -2745,6 +2745,7 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
             status: confirmedOrderCreateResponse.status(),
             url: confirmedOrderCreateResponse.url(),
           });
+          return;
         }
       } else {
         console.log('ℹ️ Payment modal not shown, continuing with direct order confirmation signals', {
