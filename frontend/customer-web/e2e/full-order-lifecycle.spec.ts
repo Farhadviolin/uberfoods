@@ -704,6 +704,16 @@ async function resolveVisibleDriverTargetOrderCard(
   };
 }
 
+async function readLocatorTextWithin(
+  locator: ReturnType<Page['locator']>,
+  timeoutMs = 1000,
+) {
+  return (await Promise.race([
+    locator.textContent().catch(() => null),
+    new Promise<null>((resolve) => setTimeout(() => resolve(null), timeoutMs)),
+  ]) || '').trim();
+}
+
 test.describe('Full Order Lifecycle UI-E2E', () => {
   let orderId: string;
   let orderRestaurantId: string | null = null;
@@ -3492,7 +3502,10 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
           )
           .first();
         const pickupButtonVisible = await pickupButton.isVisible().catch(() => false);
-        const pickupStatusText = (await pickupCard.locator('[data-testid="order-status"], .order-status').textContent().catch(() => '') || '').trim();
+        const pickupStatusText = await readLocatorTextWithin(
+          pickupCard.locator('[data-testid="order-status"], .order-status'),
+          1000,
+        );
         const pickupStatusConfirmed = Boolean(
           pickupStatusText && /PICKED_UP|IN_TRANSIT|OUT_FOR_DELIVERY|DELIVERED|COMPLETED/i.test(pickupStatusText),
         );
@@ -3625,10 +3638,7 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
           pickupButton.textContent().catch(() => null),
           new Promise<null>((resolve) => setTimeout(() => resolve(null), 1000)),
         ]) || '').trim();
-        const pickupStatusTextBefore = (await Promise.race([
-          pickupStatusLocator.textContent().catch(() => null),
-          new Promise<null>((resolve) => setTimeout(() => resolve(null), 1000)),
-        ]) || '').trim();
+        const pickupStatusTextBefore = await readLocatorTextWithin(pickupStatusLocator, 1000);
         const elapsedBeforeClickMs = Date.now() - pickupClickStartedAt;
         console.log('ℹ️ lifecycle: phase3 pickup click before', {
           orderId,
@@ -4025,7 +4035,10 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
 
         const pickupButtonVisible = await pickupButton.isVisible().catch(() => false);
         const pickupCardVisible = Boolean(targetCardState.targetCardVisible);
-        const pickupStatusText = (await pickupCard.locator('[data-testid="order-status"], .order-status').textContent().catch(() => '') || '').trim();
+        const pickupStatusText = await readLocatorTextWithin(
+          pickupCard.locator('[data-testid="order-status"], .order-status'),
+          1000,
+        );
         const pickupStatusConfirmed = Boolean(
           pickupStatusText && /PICKED_UP|IN_TRANSIT|OUT_FOR_DELIVERY|DELIVERED|COMPLETED/i.test(pickupStatusText),
         );
@@ -4136,7 +4149,7 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
           }
         }
 
-        const pickupStatusTextAfter = (await pickupStatusLocator.textContent().catch(() => '') || '').trim();
+        const pickupStatusTextAfter = await readLocatorTextWithin(pickupStatusLocator, 1000);
         const hasPickupUiSuccess = Boolean(pickupUiSuccess)
           || /PICKED_UP|IN_TRANSIT|OUT_FOR_DELIVERY|ON_THE_WAY|abgeholt|unterwegs|in delivery|delivered/i.test(pickupStatusTextAfter);
         let pickupConfirmedBySignal = Boolean(pickupResponse) || hasPickupUiSuccess;
