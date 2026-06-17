@@ -3740,6 +3740,54 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
           });
         }
 
+        console.log('➡️ lifecycle: direct visible pickup click attempt start', {
+          orderId,
+          currentUrl: driverPage.isClosed() ? 'closed' : driverPage.url(),
+          directVisibleClickAttempted: Boolean(driverPickupVisibleCardState?.targetCardVisible && driverPickupVisiblePickupButtonSeen),
+          remainingDeadlineMs: remainingPickupClickMs(),
+        });
+
+        const visibleStateClickResult = driverPickupVisibleCardState?.targetCardVisible && driverPickupVisiblePickupButtonSeen
+          ? await Promise.race([
+            clickPickupActionWithinTargetCard(
+              driverPickupVisibleCardState.targetCard,
+              orderId,
+              'phase3 driver pickup click direct visible state',
+            ).catch((error) => ({
+              clicked: false,
+              reason: error instanceof Error ? error.message : String(error),
+              orderSuffix: orderId.slice(-8),
+            })),
+            new Promise<Awaited<ReturnType<typeof clickPickupActionWithinTargetCard>>>((resolve) => setTimeout(() => resolve({
+              clicked: false,
+              reason: 'direct-click-timeout',
+              orderSuffix: orderId.slice(-8),
+            }), boundedPickupTimeoutMs(2000))),
+          ])
+          : null;
+
+        if (visibleStateClickResult?.clicked) {
+          console.log('✅ lifecycle: direct visible pickup click completed', {
+            orderId,
+            currentUrl: driverPage.isClosed() ? 'closed' : driverPage.url(),
+            directVisibleClickDurationMs: Date.now() - pickupClickStartedAt,
+            directClickResult: visibleStateClickResult,
+          });
+        } else if (driverPickupVisibleCardState?.targetCardVisible && driverPickupVisiblePickupButtonSeen) {
+          console.warn('⚠️ lifecycle: direct visible pickup click failed', {
+            orderId,
+            currentUrl: driverPage.isClosed() ? 'closed' : driverPage.url(),
+            cardFound: driverPickupVisibleCardState.targetCardVisible,
+            pickupButtonVisible: driverPickupVisiblePickupButtonSeen,
+            pickupButtonText: pickupButtonText || null,
+            visibleButtons: driverPickupVisibleCardState.visibleButtonTexts.slice(0, 25),
+            visibleCards: driverPickupVisibleCardState.bodyTextPreview ? [driverPickupVisibleCardState.bodyTextPreview.slice(0, 300)] : [],
+            pickupSnapshotStatus: driverPickupVisibleCardState?.targetCardVisible ? null : pickupSnapshot?.status ?? null,
+            directVisibleClickAttempted: true,
+            directVisibleClickCompleted: false,
+          });
+        }
+
         const pickupResponsePromise = driverPage.waitForResponse((response) => {
           const url = response.url();
           const method = response.request().method();
@@ -4110,26 +4158,18 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
           return reopened;
         };
 
-        const targetCardState = await resolveVisibleDriverTargetOrderCard(
-          driverPage,
-          orderId,
-          'phase3 driver pickup click',
-        );
-
         let clickError: string | null = null;
-        let pickupCardStateForDiagnostics = driverPickupVisibleCardState ?? targetCardState;
+        let pickupCardStateForDiagnostics = driverPickupVisibleCardState ?? null;
         const pickupStepStartedAt = Date.now();
         try {
           ensureDriverPageOpen();
           const pickupCardState = driverPickupVisibleCardState?.targetCardVisible
             ? driverPickupVisibleCardState
-            : targetCardState.targetCardVisible
-              ? targetCardState
-              : await resolveVisibleDriverTargetOrderCard(
-                driverPage,
-                orderId,
-                'phase3 driver pickup click after reopen',
-              );
+            : await resolveVisibleDriverTargetOrderCard(
+              driverPage,
+              orderId,
+              'phase3 driver pickup click after direct pickup attempt',
+            );
           pickupCardStateForDiagnostics = pickupCardState;
           const pickupCard = pickupCardState.targetCard;
           const pickupButton = driverPickupVisiblePickupButton
@@ -4155,13 +4195,6 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
           pickupSnapshot = await fetchDriverOrderSnapshot(driverPage, orderId);
           latestApiStatus = pickupSnapshot.status;
           const pickupSnapshotConfirmed = isConfirmedDriverProgressStatus(pickupSnapshot.status) || pickupSnapshot.delivered;
-          const directVisibleClickDiagnosticsStart = Date.now();
-          console.log('➡️ lifecycle: direct visible pickup click attempt start', {
-            orderId,
-            currentUrl: driverPage.url(),
-            directVisibleClickAttempted,
-            remainingDeadlineMs: remainingPickupClickMs(),
-          });
         if (!pickupCardVisible && !pickupSnapshotConfirmed) {
           throw new Error(`Driver pickup target card not visible for order ${orderId}: ${JSON.stringify({
             orderId,
@@ -4204,7 +4237,7 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
         let directClickResult: Awaited<ReturnType<typeof clickPickupActionWithinTargetCard>> | null = null;
 
         assertPickupClickDeadline('before-direct-visible-click');
-        if (driverPickupVisibleCardState?.targetCardVisible && driverPickupVisiblePickupButtonSeen) {
+        if (!visibleStateClickResult?.clicked && driverPickupVisibleCardState?.targetCardVisible && driverPickupVisiblePickupButtonSeen) {
           directVisibleClickAttempted = true;
           try {
             const directClickTargetCard = driverPickupVisibleCardState.targetCard;
@@ -4254,7 +4287,7 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
         }
 
         assertPickupClickDeadline('before-recovery');
-        if (!directClickResult?.clicked && !pickupButtonVisible && !pickupStatusConfirmed) {
+        if (!visibleStateClickResult?.clicked && !directClickResult?.clicked && !pickupButtonVisible && !pickupStatusConfirmed) {
           recoveryAttempted = true;
           const recoveryStartedAt = Date.now();
           const dismissRecoveryTargets = [
