@@ -305,6 +305,148 @@ async function resolveOrderCreationAfterPaymentConfirm(customerPage: Page) {
   return response;
 }
 
+async function ensureDriverOrdersViewAfterPickup(
+  driverPage: Page,
+  orderId: string,
+  stage: string,
+) {
+  const inspectOrdersDom = async () => driverPage.evaluate((resolvedOrderId) => {
+    const isVisible = (node: Element | null | undefined) => {
+      if (!node || !(node instanceof HTMLElement)) return false;
+      const style = window.getComputedStyle(node);
+      return style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0' && node.getClientRects().length > 0;
+    };
+    const getVisibleText = (node: Element | null | undefined) => {
+      if (!node || !(node instanceof HTMLElement) || !isVisible(node)) return '';
+      return (node.textContent || '').trim().replace(/\s+/g, ' ');
+    };
+    const visibleButtonTexts = Array.from(document.querySelectorAll('button'))
+      .filter((node): node is HTMLElement => node instanceof HTMLElement)
+      .filter((node) => isVisible(node))
+      .map((node) => getVisibleText(node))
+      .filter(Boolean)
+      .slice(0, 40);
+    const visibleLinkTexts = Array.from(document.querySelectorAll('a, [role="link"]'))
+      .filter((node): node is HTMLElement => node instanceof HTMLElement)
+      .filter((node) => isVisible(node))
+      .map((node) => getVisibleText(node))
+      .filter(Boolean)
+      .slice(0, 30);
+    const orderCard = document.querySelector(`[data-testid="driver-order-card-${resolvedOrderId}"], [data-order-id="${resolvedOrderId}"]`);
+    const orderCards = Array.from(document.querySelectorAll('[data-testid*="driver-order-card"], .order-card, [data-order-id]'))
+      .filter((node): node is HTMLElement => node instanceof HTMLElement)
+      .filter((node) => isVisible(node));
+    const bodyText = document.body?.innerText?.slice(0, 1000) || '';
+    return {
+      orderCardVisible: Boolean(orderCard && isVisible(orderCard)),
+      orderCardCount: orderCards.length,
+      visibleButtonTexts,
+      visibleLinkTexts,
+      bodyTextPreview: bodyText,
+      hasOrdersText: /bestellungen|orders/i.test(bodyText),
+      hasActiveOrdersText: /aktive bestellungen|active orders|current orders|in transit|unterwegs|picked up/i.test(bodyText),
+      hasDeliveredText: /delivered|zugestellt|geliefert/i.test(bodyText),
+      hasOrderIdText: bodyText.includes(resolvedOrderId),
+    };
+  }, orderId).catch(() => ({
+    orderCardVisible: false,
+    orderCardCount: 0,
+    visibleButtonTexts: [] as string[],
+    visibleLinkTexts: [] as string[],
+    bodyTextPreview: '',
+    hasOrdersText: false,
+    hasActiveOrdersText: false,
+    hasDeliveredText: false,
+    hasOrderIdText: false,
+  }));
+
+  const before = await inspectOrdersDom();
+  if (before.orderCardVisible) {
+    return before;
+  }
+
+  console.log('ℹ️ lifecycle: phase3 ensure driver orders view after pickup', {
+    orderId,
+    stage,
+    currentUrl: driverPage.url(),
+    orderCardVisibleBeforeReopen: before.orderCardVisible,
+    orderCardCountBeforeReopen: before.orderCardCount,
+    hasOrdersTextBeforeReopen: before.hasOrdersText,
+    hasActiveOrdersTextBeforeReopen: before.hasActiveOrdersText,
+    hasDeliveredTextBeforeReopen: before.hasDeliveredText,
+  });
+
+  const openOrdersTargets = [
+    driverPage.getByRole('button', { name: /Orders|Bestellungen/i }).first(),
+    driverPage.getByRole('link', { name: /Orders|Bestellungen/i }).first(),
+    driverPage.locator('[data-testid*="orders"]').first(),
+  ];
+  for (const target of openOrdersTargets) {
+    try {
+      if (await target.isVisible().catch(() => false)) {
+        await target.click({ timeout: 1500 }).catch(() => null);
+        break;
+      }
+    } catch {
+      // continue with next candidate
+    }
+  }
+
+  if (!driverPage.url().includes('/orders')) {
+    await driverPage.goto(`${testUrls.driver}/orders`).catch(() => null);
+  }
+  await driverPage.waitForLoadState('domcontentloaded').catch(() => undefined);
+  await driverPage.waitForLoadState('networkidle').catch(() => undefined);
+
+  const reopened = await Promise.race([
+    inspectOrdersDom().then((result) => result).catch(() => ({
+      orderCardVisible: false,
+      orderCardCount: 0,
+      visibleButtonTexts: [] as string[],
+      visibleLinkTexts: [] as string[],
+      bodyTextPreview: '',
+      hasOrdersText: false,
+      hasActiveOrdersText: false,
+      hasDeliveredText: false,
+      hasOrderIdText: false,
+    })),
+    new Promise<Awaited<ReturnType<typeof inspectOrdersDom>>>((resolve) => setTimeout(() => resolve({
+      orderCardVisible: false,
+      orderCardCount: 0,
+      visibleButtonTexts: [] as string[],
+      visibleLinkTexts: [] as string[],
+      bodyTextPreview: '',
+      hasOrdersText: false,
+      hasActiveOrdersText: false,
+      hasDeliveredText: false,
+      hasOrderIdText: false,
+    }), 2000)),
+  ]);
+
+  if (!reopened.orderCardVisible && reopened.orderCardCount === 0 && !reopened.hasOrdersText && !reopened.hasActiveOrdersText && !reopened.hasDeliveredText && !reopened.hasOrderIdText) {
+    throw new Error(`phase3 driver orders view missing after pickup: ${JSON.stringify({
+      orderId,
+      currentUrl: driverPage.url(),
+      visibleButtonTexts: reopened.visibleButtonTexts,
+      visibleLinkTexts: reopened.visibleLinkTexts,
+      orderCardVisibleBeforeReopen: before.orderCardVisible,
+      orderCardVisibleAfterReopen: reopened.orderCardVisible,
+      orderCardCount: reopened.orderCardCount,
+      bodyTextPreview: reopened.bodyTextPreview,
+    })}`);
+  }
+
+  console.log('ℹ️ lifecycle: phase3 driver orders view ensured after pickup', {
+    orderId,
+    stage,
+    currentUrl: driverPage.url(),
+    orderCardVisibleAfterReopen: reopened.orderCardVisible,
+    orderCardCountAfterReopen: reopened.orderCardCount,
+  });
+
+  return reopened;
+}
+
 test.describe('Full Order Lifecycle UI-E2E', () => {
   let orderId: string;
   let orderRestaurantId: string | null = null;
@@ -3820,7 +3962,7 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
       };
 
       await withStepTimeout('phase3 driver delivered button visible', async () => {
-        const ordersViewAfterPickup = await ensureDriverOrdersViewAfterPickup('before delivered dom visibility');
+        const ordersViewAfterPickup = await ensureDriverOrdersViewAfterPickup(driverPage, orderId, 'before delivered dom visibility');
         const driverOrderSnapshot = await fetchDriverOrderSnapshot();
         const deliveredOrderCard = driverPage
           .getByTestId(`driver-order-card-${orderId}`)
