@@ -479,6 +479,54 @@ async function fetchDriverOrderSnapshot(driverPage: Page, orderId: string) {
   }, orderId);
 }
 
+function isConfirmedDriverProgressStatus(status: string | null | undefined) {
+  return Boolean(status && /PICKED_UP|IN_TRANSIT|OUT_FOR_DELIVERY|DELIVERED|COMPLETED/i.test(status));
+}
+
+async function waitForConfirmedDriverPickupStatus(
+  driverPage: Page,
+  orderId: string,
+  stage: string,
+) {
+  const maxAttempts = 5;
+  let lastSnapshot = await fetchDriverOrderSnapshot(driverPage, orderId);
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    console.log('ℹ️ lifecycle: pickup snapshot probe', {
+      orderId,
+      stage,
+      attempt,
+      currentUrl: lastSnapshot.currentUrl,
+      status: lastSnapshot.status,
+      delivered: lastSnapshot.delivered,
+    });
+
+    if (isConfirmedDriverProgressStatus(lastSnapshot.status) || lastSnapshot.delivered) {
+      console.log('✅ lifecycle: driver pickup status confirmed', {
+        orderId,
+        stage,
+        currentUrl: lastSnapshot.currentUrl,
+        status: lastSnapshot.status,
+        delivered: lastSnapshot.delivered,
+      });
+      return lastSnapshot;
+    }
+
+    if (attempt < maxAttempts) {
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+      lastSnapshot = await fetchDriverOrderSnapshot(driverPage, orderId);
+    }
+  }
+
+  throw new Error(`Driver pickup did not progress beyond ACCEPTED after confirmation wait: ${JSON.stringify({
+    orderId,
+    stage,
+    currentUrl: lastSnapshot.currentUrl,
+    status: lastSnapshot.status,
+    delivered: lastSnapshot.delivered,
+  })}`);
+}
+
 test.describe('Full Order Lifecycle UI-E2E', () => {
   let orderId: string;
   let orderRestaurantId: string | null = null;
@@ -3742,13 +3790,20 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
         const pickupButtonVisible = await pickupButton.isVisible().catch(() => false);
         if (!pickupButtonVisible) {
           if (pickupButtonTextSignalsSuccess) {
+            const confirmedPickupSnapshot = await waitForConfirmedDriverPickupStatus(
+              driverPage,
+              orderId,
+              'phase3 driver pickup click',
+            );
             driverPickupCompleted = true;
             console.log('✅ driver pickup completed', {
               orderId,
-              currentUrl: driverPage.url(),
+              currentUrl: confirmedPickupSnapshot.currentUrl,
               pickupButtonText,
               pickupStatusText: pickupStatusTextBefore || null,
-              reason: 'pickup text already indicated success',
+              pickupSnapshotStatus: confirmedPickupSnapshot.status,
+              pickupSnapshotDelivered: confirmedPickupSnapshot.delivered,
+              reason: 'pickup text already indicated success and snapshot confirmed progress',
             });
             return;
           }
@@ -3889,7 +3944,18 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
         }
 
         if (pickupConfirmedBySignal) {
+          const confirmedPickupSnapshot = await waitForConfirmedDriverPickupStatus(
+            driverPage,
+            orderId,
+            'phase3 driver pickup click',
+          );
           driverPickupCompleted = true;
+          console.log('✅ lifecycle: driver pickup completion confirmed by snapshot', {
+            orderId,
+            currentUrl: confirmedPickupSnapshot.currentUrl,
+            status: confirmedPickupSnapshot.status,
+            delivered: confirmedPickupSnapshot.delivered,
+          });
         }
       });
 
