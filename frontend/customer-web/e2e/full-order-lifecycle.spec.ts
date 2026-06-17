@@ -4091,26 +4091,103 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
           return;
         }
 
+        let pickupButtonToClick = pickupButton;
+        let pickupCardStateForDiagnostics = pickupCardState;
+        let recoveryAttempted = false;
+
         if (!pickupButtonVisible && !pickupStatusConfirmed) {
-          throw new Error(`Driver pickup button not visible for order ${orderId}: ${JSON.stringify({
-            orderId,
-            currentUrl: driverPage.url(),
-            cardFound: pickupCardVisible,
-            pickupButtonVisible,
-            pickupButtonText: pickupButtonText || null,
-            pickupStatusTextBefore: pickupStatusTextBefore || null,
-            pickupStatusText,
-            pickupSnapshotStatus: pickupSnapshot.status,
-            pickupSnapshotDelivered: pickupSnapshot.delivered,
-            visibleButtons: pickupCardState.visibleButtonTexts.slice(0, 25),
-            visibleCards: pickupCardState.bodyTextPreview ? [pickupCardState.bodyTextPreview.slice(0, 300)] : [],
-            visibleLinkTexts: pickupCardState.visibleLinkTexts,
-            pageTextPreview: targetCardState.bodyTextPreview,
-          })}`);
+          recoveryAttempted = true;
+          const dismissRecoveryTargets = [
+            driverPage.getByRole('button', { name: /Got it|Verstanden|OK/i }).first(),
+            driverPage.getByText(/Got it|Verstanden|OK/i).first(),
+          ];
+          for (const target of dismissRecoveryTargets) {
+            try {
+              if (await target.isVisible().catch(() => false)) {
+                await target.click({ timeout: 1200 }).catch(() => null);
+                break;
+              }
+            } catch {
+              // continue with next candidate
+            }
+          }
+
+          const recoveryOrdersView = await ensureDriverOrdersViewAfterPickup(driverPage, orderId, 'phase3 driver pickup click recovery').catch(() => null);
+          const recoveredCardState = recoveryOrdersView?.orderCardVisible
+            ? await resolveVisibleDriverTargetOrderCard(
+              driverPage,
+              orderId,
+              'phase3 driver pickup click recovery',
+            )
+            : pickupCardState;
+          pickupCardStateForDiagnostics = recoveredCardState;
+          pickupButtonToClick = recoveredCardState.targetCard
+            .getByTestId(`driver-picked-up-order-${orderId}`)
+            .or(recoveredCardState.targetCard.locator('[data-action="pickup-order"]'))
+            .or(
+              recoveredCardState.targetCard.getByRole('button', {
+                name: /picked up|abgeholt|pickup/i,
+              }),
+            )
+            .first();
+
+          const recoveredPickupButtonVisible = await pickupButtonToClick.isVisible().catch(() => false);
+          const recoveredPickupStatusText = await readLocatorTextWithin(
+            recoveredCardState.targetCard.locator('[data-testid="order-status"], .order-status'),
+            1000,
+          );
+          const recoveredPickupStatusConfirmed = Boolean(
+            recoveredPickupStatusText && /PICKED_UP|IN_TRANSIT|OUT_FOR_DELIVERY|DELIVERED|COMPLETED/i.test(recoveredPickupStatusText),
+          );
+          const recoveredPickupSnapshot = await fetchDriverOrderSnapshot(driverPage, orderId);
+          const recoveredPickupSnapshotConfirmed = isConfirmedDriverProgressStatus(recoveredPickupSnapshot.status) || recoveredPickupSnapshot.delivered;
+
+          if (recoveredPickupSnapshotConfirmed) {
+            driverPickupCompleted = true;
+            console.log('✅ driver pickup completed', {
+              orderId,
+              currentUrl: recoveredPickupSnapshot.currentUrl,
+              pickupButtonText: pickupButtonText || null,
+              pickupStatusText: recoveredPickupStatusText || null,
+              pickupSnapshotStatus: recoveredPickupSnapshot.status,
+              pickupSnapshotDelivered: recoveredPickupSnapshot.delivered,
+              reason: 'pickup confirmed by recovery snapshot before click',
+            });
+            return;
+          }
+
+          if (!recoveredPickupButtonVisible && !recoveredPickupStatusConfirmed) {
+            const visibleButtons = await driverPage.locator('button').evaluateAll((nodes) => nodes
+              .map((node) => (node.textContent || '').trim().replace(/\s+/g, ' '))
+              .filter(Boolean))
+              .catch(() => []);
+            const visibleCards = await driverPage.locator('[data-testid*="order"], .order-card, [data-order-id]').evaluateAll((nodes) => nodes
+              .map((node) => (node.textContent || '').trim().replace(/\s+/g, ' '))
+              .filter(Boolean))
+              .catch(() => []);
+            throw new Error(`Driver pickup button not visible for order ${orderId}: ${JSON.stringify({
+              orderId,
+              currentUrl: driverPage.url(),
+              cardFound: recoveredCardState.targetCardVisible,
+              pickupButtonVisible: recoveredPickupButtonVisible,
+              pickupButtonText: pickupButtonText || null,
+              pickupStatusTextBefore: pickupStatusTextBefore || null,
+              pickupStatusText: recoveredPickupStatusText || pickupStatusText || null,
+              pickupSnapshotStatus: recoveredPickupSnapshot.status,
+              pickupSnapshotDelivered: recoveredPickupSnapshot.delivered,
+              visibleButtons: visibleButtons.slice(0, 25),
+              visibleCards: visibleCards.slice(0, 10),
+              visibleLinkTexts: recoveredCardState.visibleLinkTexts,
+              pageTextPreview: recoveredCardState.bodyTextPreview,
+              recoveryAttempted,
+              recoveryOrdersView,
+              apiStatusChecked: true,
+            })}`);
+          }
         }
 
-          await pickupButton.scrollIntoViewIfNeeded();
-          await pickupButton.click({ timeout: 1500 });
+        await pickupButtonToClick.scrollIntoViewIfNeeded();
+        await pickupButtonToClick.click({ timeout: 1500 });
         } catch (error) {
           clickError = error instanceof Error ? error.message : String(error);
           if (
@@ -4125,7 +4202,7 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
             currentUrl: driverPage.url(),
             pickupButtonText,
             pickupStatusTextBefore: pickupStatusTextBefore || null,
-            visibleLinkTexts: targetCardState.visibleLinkTexts,
+            visibleLinkTexts: pickupCardStateForDiagnostics.visibleLinkTexts,
             error: clickError,
           });
         }
