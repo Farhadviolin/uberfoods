@@ -527,6 +527,27 @@ async function waitForConfirmedDriverPickupStatus(
   })}`);
 }
 
+async function resolveDriverPickupButton(
+  driverPage: Page,
+  orderId: string,
+) {
+  const pickupOrderCard = driverPage
+    .getByTestId(`driver-order-card-${orderId}`)
+    .or(driverPage.locator(`[data-order-id="${orderId}"]`))
+    .first();
+  await expect(pickupOrderCard).toBeVisible({ timeout: 10000 });
+
+  return pickupOrderCard
+    .getByTestId(`driver-picked-up-order-${orderId}`)
+    .or(pickupOrderCard.locator('[data-action="pickup-order"]'))
+    .or(
+      pickupOrderCard.getByRole('button', {
+        name: /picked up|abgeholt|pickup/i,
+      }),
+    )
+    .first();
+}
+
 test.describe('Full Order Lifecycle UI-E2E', () => {
   let orderId: string;
   let orderRestaurantId: string | null = null;
@@ -3338,7 +3359,9 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
 
         const pickupTraffic = {
           requestUrls: [] as string[],
+          requestDetails: [] as Array<{ method: string; url: string; postData: string | null }>,
           responseUrls: [] as string[],
+          responseDetails: [] as Array<{ method: string; url: string; status: number; bodySnippet: string | null }>,
           requestFailedEvents: [] as string[],
           pageErrors: [] as string[],
           consoleErrors: [] as string[],
@@ -3348,12 +3371,23 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
           const url = request.url();
           if (pickupTrafficMatcher.test(url)) {
             pickupTraffic.requestUrls.push(`${request.method()} ${url}`);
+            pickupTraffic.requestDetails.push({
+              method: request.method(),
+              url,
+              postData: request.postData()?.slice(0, 500) || null,
+            });
           }
         };
         const onPickupResponse = (response: Parameters<Parameters<typeof driverPage.on>[1]>[0]) => {
           const url = response.url();
           if (pickupTrafficMatcher.test(url)) {
             pickupTraffic.responseUrls.push(`${response.status()} ${url}`);
+            pickupTraffic.responseDetails.push({
+              method: response.request().method(),
+              url,
+              status: response.status(),
+              bodySnippet: null,
+            });
           }
         };
         const onPickupRequestFailed = (request: Parameters<Parameters<typeof driverPage.on>[1]>[0]) => {
@@ -3865,6 +3899,24 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
           results[1].status === 'fulfilled' ? results[1].value : false,
         ] as const);
 
+        if (pickupResponse) {
+          const pickupResponseBody = await Promise.race([
+            pickupResponse.text().catch(() => ''),
+            new Promise<string>((resolve) => setTimeout(() => resolve(''), 1000)),
+          ]);
+          const matchedResponseDetails = pickupTraffic.responseDetails.find((entry) => entry.url === pickupResponse.url() && entry.status === pickupResponse.status());
+          if (matchedResponseDetails) {
+            matchedResponseDetails.bodySnippet = (pickupResponseBody || '').slice(0, 500) || null;
+          } else {
+            pickupTraffic.responseDetails.push({
+              method: pickupResponse.request().method(),
+              url: pickupResponse.url(),
+              status: pickupResponse.status(),
+              bodySnippet: (pickupResponseBody || '').slice(0, 500) || null,
+            });
+          }
+        }
+
         const pickupStatusTextAfter = (await pickupStatusLocator.textContent().catch(() => '') || '').trim();
         const hasPickupUiSuccess = Boolean(pickupUiSuccess)
           || /PICKED_UP|IN_TRANSIT|OUT_FOR_DELIVERY|ON_THE_WAY|abgeholt|unterwegs|in delivery|delivered/i.test(pickupStatusTextAfter);
@@ -3878,6 +3930,8 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
           pickupResponseStatus: pickupResponse?.status() ?? null,
           pickupResponseUrl: pickupResponse?.url() ?? null,
           pickupStatusText: pickupStatusTextAfter || null,
+          pickupRequestDetails: pickupTraffic.requestDetails,
+          pickupResponseDetails: pickupTraffic.responseDetails,
           requestUrls: pickupTraffic.requestUrls,
           responseUrls: pickupTraffic.responseUrls,
           requestFailedEvents: pickupTraffic.requestFailedEvents,
@@ -3886,6 +3940,12 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
         });
 
         if (!pickupConfirmedBySignal) {
+          const lastPickupRequest = pickupTraffic.requestDetails[pickupTraffic.requestDetails.length - 1] || null;
+          if (!lastPickupRequest) {
+            const retryPickupButton = await resolveDriverPickupButton(driverPage, orderId);
+            await retryPickupButton.scrollIntoViewIfNeeded();
+            await retryPickupButton.click({ timeout: 1500 });
+          }
           if (pickupButtonTextSignalsSuccess) {
             const reopenedOrdersView = await ensureDriverOrdersView('post-pickup confirmation');
             const pickupStatusTextAfterRefocus = (await pickupStatusLocator.textContent().catch(() => '') || '').trim();
