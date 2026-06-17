@@ -447,6 +447,38 @@ async function ensureDriverOrdersViewAfterPickup(
   return reopened;
 }
 
+async function fetchDriverOrderSnapshot(driverPage: Page, orderId: string) {
+  const currentUrl = driverPage.isClosed() ? 'closed' : driverPage.url();
+  if (driverPage.isClosed()) {
+    return {
+      status: null as string | null,
+      delivered: false,
+      currentUrl,
+    };
+  }
+
+  return driverPage.evaluate(async (resolvedOrderId) => {
+    try {
+      const response = await fetch(`/api/orders/${resolvedOrderId}`, {
+        credentials: 'include',
+      });
+      const payload = await response.json().catch(() => null);
+      const status = typeof payload?.status === 'string' ? payload.status : null;
+      return {
+        status,
+        delivered: Boolean(status && /DELIVERED|Delivered|Zugestellt|Completed|Abgeschlossen|COMPLETED/i.test(status)),
+        currentUrl: window.location.href,
+      };
+    } catch {
+      return {
+        status: null,
+        delivered: false,
+        currentUrl: window.location.href,
+      };
+    }
+  }, orderId);
+}
+
 test.describe('Full Order Lifecycle UI-E2E', () => {
   let orderId: string;
   let orderRestaurantId: string | null = null;
@@ -3688,38 +3720,6 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
           return reopened;
         };
 
-        const fetchDriverOrderSnapshot = async () => {
-          const currentUrl = driverPage.isClosed() ? 'closed' : driverPage.url();
-          if (driverPage.isClosed()) {
-            return {
-              status: null as string | null,
-              delivered: false,
-              currentUrl,
-            };
-          }
-
-          return driverPage.evaluate(async (resolvedOrderId) => {
-            try {
-              const response = await fetch(`/api/orders/${resolvedOrderId}`, {
-                credentials: 'include',
-              });
-              const payload = await response.json().catch(() => null);
-              const status = typeof payload?.status === 'string' ? payload.status : null;
-              return {
-                status,
-                delivered: Boolean(status && /DELIVERED|Delivered|Zugestellt|Completed|Abgeschlossen|COMPLETED/i.test(status)),
-                currentUrl: window.location.href,
-              };
-            } catch {
-              return {
-                status: null,
-                delivered: false,
-                currentUrl: window.location.href,
-              };
-            }
-          }, orderId);
-        };
-
         const ordersViewBeforePickup = await ensureDriverOrdersView('before pickup dom click');
 
         let clickError: string | null = null;
@@ -3963,7 +3963,7 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
 
       await withStepTimeout('phase3 driver delivered button visible', async () => {
         const ordersViewAfterPickup = await ensureDriverOrdersViewAfterPickup(driverPage, orderId, 'before delivered dom visibility');
-        const driverOrderSnapshot = await fetchDriverOrderSnapshot();
+        const driverOrderSnapshot = await fetchDriverOrderSnapshot(driverPage, orderId);
         const deliveredOrderCard = driverPage
           .getByTestId(`driver-order-card-${orderId}`)
           .or(driverPage.locator(`[data-order-id="${orderId}"]`))
@@ -4060,7 +4060,7 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
           : '';
         const deliveredStatusAlreadyConfirmed = Boolean(deliveredStatusTextBefore)
           && /DELIVERED|Delivered|Zugestellt|Completed|Abgeschlossen|COMPLETED/i.test(deliveredStatusTextBefore);
-        const driverOrderSnapshot = await fetchDriverOrderSnapshot();
+        const driverOrderSnapshot = await fetchDriverOrderSnapshot(driverPage, orderId);
         const driverOrderDeliveredAlreadyConfirmed = Boolean(driverOrderSnapshot.delivered);
         console.log('ℹ️ lifecycle: phase3 driver delivered click pre-check', {
           orderId,
