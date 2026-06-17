@@ -447,6 +447,59 @@ async function ensureDriverOrdersViewAfterPickup(
   return reopened;
 }
 
+async function clickPickupActionWithinTargetCard(
+  targetCard: Locator,
+  orderId: string,
+  stage: string,
+) {
+  return targetCard.evaluate((card, resolvedOrderId) => {
+    const isVisible = (node: Element | null | undefined) => {
+      if (!node || !(node instanceof HTMLElement)) return false;
+      const style = window.getComputedStyle(node);
+      return style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0' && node.getClientRects().length > 0;
+    };
+    const normalizeText = (node: Element | null | undefined) => (node?.textContent || '').trim().replace(/\s+/g, ' ');
+    const orderSuffix = resolvedOrderId.slice(-8);
+    const candidateLabels = [
+      /picked up/i,
+      /pick up/i,
+      /pickup/i,
+      /abholen/i,
+      /abgeholt/i,
+      /bestellung abholen/i,
+    ];
+
+    const cardText = normalizeText(card);
+    const orderMatches = cardText.includes(resolvedOrderId) || cardText.includes(orderSuffix);
+    if (!orderMatches) {
+      return { clicked: false, reason: `card-mismatch:${stage}`, orderSuffix };
+    }
+
+    const candidates = Array.from(card.querySelectorAll('button, [role="button"], [data-action="pickup-order"], [data-testid*="picked-up"], [data-testid*="pickup"]'))
+      .filter((node): node is HTMLElement => node instanceof HTMLElement)
+      .filter((node) => isVisible(node))
+      .filter((node) => !node.hasAttribute('disabled') && node.getAttribute('aria-disabled') !== 'true');
+
+    const pickupButton = candidates.find((node) => {
+      const text = normalizeText(node);
+      return candidateLabels.some((label) => label.test(text));
+    });
+
+    if (!pickupButton) {
+      return {
+        clicked: false,
+        reason: `button-missing:${stage}`,
+        orderSuffix,
+        visibleCandidateTexts: candidates.map((node) => normalizeText(node)).slice(0, 10),
+      };
+    }
+
+    pickupButton.scrollIntoView({ block: 'center', inline: 'center' });
+    pickupButton.click();
+    return { clicked: true, reason: `clicked:${stage}`, orderSuffix };
+  }, orderId);
+}
+
 async function fetchDriverOrderSnapshot(driverPage: Page, orderId: string) {
   const currentUrl = driverPage.isClosed() ? 'closed' : driverPage.url();
   if (driverPage.isClosed()) {
@@ -4104,8 +4157,34 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
 
         let pickupButtonToClick = pickupButton;
         let recoveryAttempted = false;
+        let directVisibleClickAttempted = false;
+        let directVisibleClickError: string | null = null;
+        let directClickResult: Awaited<ReturnType<typeof clickPickupActionWithinTargetCard>> | null = null;
 
-        if (!pickupButtonVisible && !pickupStatusConfirmed) {
+        if (driverPickupVisibleCardState?.targetCardVisible && driverPickupVisiblePickupButtonSeen) {
+          directVisibleClickAttempted = true;
+          try {
+            const directClickTargetCard = driverPickupVisibleCardState.targetCard;
+            directClickResult = await clickPickupActionWithinTargetCard(
+              directClickTargetCard,
+              orderId,
+              'phase3 driver pickup click direct visible state',
+            );
+          } catch (error) {
+            directVisibleClickError = error instanceof Error ? error.message : String(error);
+          }
+
+          if (directClickResult?.clicked) {
+            console.log('ℹ️ lifecycle: direct pickup click attempted from visible state', {
+              orderId,
+              currentUrl: driverPage.url(),
+              directClickResult,
+              driverPickupVisiblePickupButtonSeen,
+            });
+          }
+        }
+
+        if (!directClickResult?.clicked && !pickupButtonVisible && !pickupStatusConfirmed) {
           recoveryAttempted = true;
           const dismissRecoveryTargets = [
             driverPage.getByRole('button', { name: /Got it|Verstanden|OK/i }).first(),
@@ -4190,6 +4269,9 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
               visibleLinkTexts: recoveredCardState.visibleLinkTexts,
               pageTextPreview: recoveredCardState.bodyTextPreview,
               recoveryAttempted,
+              directVisibleClickAttempted,
+              directVisibleClickError,
+              directClickResult,
               driverPickupVisiblePickupButtonSeen,
               recoveryOrdersView,
               apiStatusChecked: true,
@@ -4197,8 +4279,10 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
           }
         }
 
-        await pickupButtonToClick.scrollIntoViewIfNeeded();
-        await pickupButtonToClick.click({ timeout: 1500 });
+        if (!directClickResult?.clicked) {
+          await pickupButtonToClick.scrollIntoViewIfNeeded();
+          await pickupButtonToClick.click({ timeout: 1500 });
+        }
         } catch (error) {
           clickError = error instanceof Error ? error.message : String(error);
           if (
@@ -4214,6 +4298,8 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
             pickupButtonText,
             pickupStatusTextBefore: pickupStatusTextBefore || null,
             visibleLinkTexts: pickupCardStateForDiagnostics?.visibleLinkTexts ?? [],
+            directVisibleClickAttempted,
+            directVisibleClickError,
             error: clickError,
           });
         }
