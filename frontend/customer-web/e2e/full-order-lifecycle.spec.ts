@@ -722,6 +722,7 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
   let customerCredentials = createLifecycleCustomerCredentials();
   let lastSafeMinimumOrderSubtotal: number | null = null;
   let lastSafeMinimumOrderSource: string | null = null;
+  let driverPickupVisibleCardState: Awaited<ReturnType<typeof resolveVisibleDriverTargetOrderCard>> | null = null;
   const selectors = testSelectors;
   const testOrder = testDataFactory.getTestOrder();
   const driverUser = testDataFactory.getTestDriver();
@@ -3552,6 +3553,7 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
           pickupSnapshotStatus: pickupSnapshot.status,
           pickupSnapshotDelivered: pickupSnapshot.delivered,
         });
+        driverPickupVisibleCardState = targetCardState;
       });
 
       await withStepTimeout('phase3 driver pickup click', async () => {
@@ -4026,13 +4028,15 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
         let clickError: string | null = null;
         try {
           ensureDriverPageOpen();
-          const pickupCardState = targetCardState.targetCardVisible
-            ? targetCardState
-            : await resolveVisibleDriverTargetOrderCard(
-              driverPage,
-              orderId,
-              'phase3 driver pickup click after reopen',
-            );
+          const pickupCardState = driverPickupVisibleCardState?.targetCardVisible
+            ? driverPickupVisibleCardState
+            : targetCardState.targetCardVisible
+              ? targetCardState
+              : await resolveVisibleDriverTargetOrderCard(
+                driverPage,
+                orderId,
+                'phase3 driver pickup click after reopen',
+              );
           const pickupCard = pickupCardState.targetCard;
           const pickupButton = pickupCard
             .getByTestId(`driver-picked-up-order-${orderId}`)
