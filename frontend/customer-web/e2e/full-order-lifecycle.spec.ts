@@ -500,6 +500,92 @@ async function clickPickupActionWithinTargetCard(
   }, orderId);
 }
 
+async function clickPickupActionAtomically(
+  targetCard: Locator,
+  orderId: string,
+  stage: string,
+) {
+  const orderSuffix = orderId.slice(-8);
+  const candidateLocators = [
+    targetCard.getByTestId(`driver-picked-up-order-${orderId}`),
+    targetCard.locator('[data-action="pickup-order"]'),
+    targetCard.locator('[data-testid*="picked-up"]'),
+    targetCard.locator('[data-testid*="pickup"]'),
+    targetCard.getByRole('button', {
+      name: /picked up|abgeholt|pickup/i,
+    }),
+  ];
+
+  for (const candidate of candidateLocators) {
+    const resolved = candidate.first();
+    if (!(await resolved.isVisible().catch(() => false))) {
+      continue;
+    }
+
+    try {
+      await resolved.scrollIntoViewIfNeeded({ timeout: 1000 });
+    } catch {
+      // best-effort only
+    }
+
+    try {
+      await resolved.click({ timeout: 1200 });
+      return { clicked: true, reason: `locator-click:${stage}`, orderSuffix };
+    } catch (locatorError) {
+      const locatorReason = locatorError instanceof Error ? locatorError.message : String(locatorError);
+
+      try {
+        await resolved.click({ timeout: 1200, force: true });
+        return { clicked: true, reason: `force-click:${stage}`, orderSuffix };
+      } catch (forceError) {
+        const forceReason = forceError instanceof Error ? forceError.message : String(forceError);
+
+        try {
+          const domResult = await targetCard.evaluate((card, resolvedOrderId) => {
+            const isVisible = (node: Element | null | undefined) => {
+              if (!node || !(node instanceof HTMLElement)) return false;
+              const style = window.getComputedStyle(node);
+              return style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0' && node.getClientRects().length > 0;
+            };
+            const normalizeText = (node: Element | null | undefined) => (node?.textContent || '').trim().replace(/\s+/g, ' ');
+            const candidate = Array.from(card.querySelectorAll('button, [role="button"], [data-action="pickup-order"], [data-testid*="picked-up"], [data-testid*="pickup"]'))
+              .filter((node): node is HTMLElement => node instanceof HTMLElement)
+              .filter((node) => isVisible(node))
+              .find((node) => /picked up|pick up|pickup|abholen|abgeholt|bestellung abholen/i.test(normalizeText(node)));
+
+            if (!candidate) {
+              return { clicked: false, reason: `dom-click-button-missing:${resolvedOrderId}` };
+            }
+
+            candidate.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
+            candidate.click();
+            return { clicked: true, reason: `dom-evaluate-click:${resolvedOrderId}` };
+          }, orderId);
+
+          if (domResult?.clicked) {
+            return { clicked: true, reason: domResult.reason || `dom-evaluate-click:${stage}`, orderSuffix };
+          }
+
+          return {
+            clicked: false,
+            reason: `${locatorReason}; ${forceReason}; ${domResult?.reason || `dom-click-failed:${stage}`}`,
+            orderSuffix,
+          };
+        } catch (domError) {
+          const domReason = domError instanceof Error ? domError.message : String(domError);
+          return {
+            clicked: false,
+            reason: `${locatorReason}; ${forceReason}; ${domReason}`,
+            orderSuffix,
+          };
+        }
+      }
+    }
+  }
+
+  return { clicked: false, reason: `button-missing:${stage}`, orderSuffix };
+}
+
 async function fetchDriverOrderSnapshot(driverPage: Page, orderId: string) {
   const currentUrl = driverPage.isClosed() ? 'closed' : driverPage.url();
   if (driverPage.isClosed()) {
@@ -778,6 +864,14 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
   let driverPickupVisibleCardState: Awaited<ReturnType<typeof resolveVisibleDriverTargetOrderCard>> | null = null;
   let driverPickupVisiblePickupButton: Locator | null = null;
   let driverPickupVisiblePickupButtonSeen = false;
+  let driverPickupClickedDuringVisibleStep = false;
+  let driverPickupVisibleClickDiagnostics: {
+    orderId: string;
+    currentUrl: string;
+    clickedFromVisibleStep: boolean;
+    clickMethod: string;
+    elapsedMs: number;
+  } | null = null;
   const selectors = testSelectors;
   const testOrder = testDataFactory.getTestOrder();
   const driverUser = testDataFactory.getTestDriver();
@@ -3611,6 +3705,56 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
         driverPickupVisibleCardState = targetCardState;
         driverPickupVisiblePickupButton = pickupButton;
         driverPickupVisiblePickupButtonSeen = pickupButtonVisible;
+
+        if (targetCardState.targetCardVisible && pickupButtonVisible) {
+          const atomicClickStartedAt = Date.now();
+          console.log('➡️ lifecycle: atomic pickup click from visible step start', {
+            orderId,
+            currentUrl: driverPage.url(),
+            clickedFromVisibleStep: true,
+            clickMethod: 'locator-click',
+          });
+          const atomicClickResult = await clickPickupActionAtomically(
+            pickupCard,
+            orderId,
+            'phase3 driver pickup button visible',
+          );
+          if (atomicClickResult.clicked) {
+            driverPickupClickedDuringVisibleStep = true;
+            driverPickupVisibleClickDiagnostics = {
+              orderId,
+              currentUrl: driverPage.url(),
+              clickedFromVisibleStep: true,
+              clickMethod: atomicClickResult.reason.includes('force-click')
+                ? 'force-click'
+                : atomicClickResult.reason.includes('dom-evaluate-click')
+                  ? 'dom-evaluate-click'
+                  : 'locator-click',
+              elapsedMs: Date.now() - atomicClickStartedAt,
+            };
+            console.log('✅ lifecycle: atomic pickup click from visible step completed', {
+              orderId,
+              currentUrl: driverPage.url(),
+              clickedFromVisibleStep: true,
+              clickMethod: driverPickupVisibleClickDiagnostics.clickMethod,
+              elapsedMs: driverPickupVisibleClickDiagnostics.elapsedMs,
+            });
+            return;
+          }
+
+          console.warn('⚠️ lifecycle: atomic pickup click from visible step failed', {
+            orderId,
+            currentUrl: driverPage.url(),
+            clickedFromVisibleStep: true,
+            clickMethod: atomicClickResult.reason.includes('force-click')
+              ? 'force-click'
+              : atomicClickResult.reason.includes('dom-evaluate-click')
+                ? 'dom-evaluate-click'
+                : 'locator-click',
+            elapsedMs: Date.now() - atomicClickStartedAt,
+            reason: atomicClickResult.reason,
+          });
+        }
       });
 
       await withStepTimeout('phase3 driver pickup click', async () => {
@@ -3738,6 +3882,39 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
             orderId,
             elapsedBeforeClickMs,
           });
+        }
+
+        if (driverPickupClickedDuringVisibleStep) {
+          console.log('✅ lifecycle: pickup already clicked during visible step, verifying pickup state', {
+            orderId,
+            currentUrl: driverPage.isClosed() ? 'closed' : driverPage.url(),
+            driverPickupVisibleClickDiagnostics,
+          });
+          const confirmedPickupSnapshot = await waitForConfirmedDriverPickupStatus(
+            driverPage,
+            orderId,
+            'phase3 driver pickup click after visible-step click',
+          );
+          if (confirmedPickupSnapshot && (isConfirmedDriverProgressStatus(confirmedPickupSnapshot.status) || confirmedPickupSnapshot.delivered)) {
+            pickupSnapshot = confirmedPickupSnapshot;
+            latestApiStatus = confirmedPickupSnapshot.status;
+            driverPickupCompleted = true;
+            console.log('✅ lifecycle: driver pickup completion confirmed by snapshot', {
+              orderId,
+              currentUrl: confirmedPickupSnapshot.currentUrl,
+              status: confirmedPickupSnapshot.status,
+              delivered: confirmedPickupSnapshot.delivered,
+              reason: 'pickup already clicked during visible step, verifying pickup state',
+            });
+            return;
+          }
+          throw new Error(`phase3 driver pickup click failed to verify pickup after visible-step click: ${JSON.stringify({
+            orderId,
+            currentUrl: driverPage.isClosed() ? 'closed' : driverPage.url(),
+            driverPickupVisibleClickDiagnostics,
+            pickupSnapshotStatus: confirmedPickupSnapshot?.status ?? null,
+            pickupSnapshotDelivered: confirmedPickupSnapshot?.delivered ?? false,
+          })}`);
         }
 
         console.log('➡️ lifecycle: direct visible pickup click attempt start', {
