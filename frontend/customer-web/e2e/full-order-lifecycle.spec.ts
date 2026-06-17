@@ -4026,7 +4026,7 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
         );
 
         let clickError: string | null = null;
-        let pickupCardStateForDiagnostics = pickupCardState;
+        let pickupCardStateForDiagnostics = driverPickupVisibleCardState ?? targetCardState;
         try {
           ensureDriverPageOpen();
           const pickupCardState = driverPickupVisibleCardState?.targetCardVisible
@@ -4038,6 +4038,7 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
                 orderId,
                 'phase3 driver pickup click after reopen',
               );
+          pickupCardStateForDiagnostics = pickupCardState;
           const pickupCard = pickupCardState.targetCard;
           const pickupButton = pickupCard
             .getByTestId(`driver-picked-up-order-${orderId}`)
