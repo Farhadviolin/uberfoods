@@ -723,6 +723,8 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
   let lastSafeMinimumOrderSubtotal: number | null = null;
   let lastSafeMinimumOrderSource: string | null = null;
   let driverPickupVisibleCardState: Awaited<ReturnType<typeof resolveVisibleDriverTargetOrderCard>> | null = null;
+  let driverPickupVisiblePickupButton: Locator | null = null;
+  let driverPickupVisiblePickupButtonSeen = false;
   const selectors = testSelectors;
   const testOrder = testDataFactory.getTestOrder();
   const driverUser = testDataFactory.getTestDriver();
@@ -3554,6 +3556,8 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
           pickupSnapshotDelivered: pickupSnapshot.delivered,
         });
         driverPickupVisibleCardState = targetCardState;
+        driverPickupVisiblePickupButton = pickupButton;
+        driverPickupVisiblePickupButtonSeen = pickupButtonVisible;
       });
 
       await withStepTimeout('phase3 driver pickup click', async () => {
@@ -4033,7 +4037,7 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
         let pickupCardStateForDiagnostics = driverPickupVisibleCardState ?? targetCardState;
         try {
           ensureDriverPageOpen();
-          const pickupCardState = driverPickupVisibleCardState?.targetCardVisible
+        const pickupCardState = driverPickupVisibleCardState?.targetCardVisible
             ? driverPickupVisibleCardState
             : targetCardState.targetCardVisible
               ? targetCardState
@@ -4044,7 +4048,8 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
               );
           pickupCardStateForDiagnostics = pickupCardState;
           const pickupCard = pickupCardState.targetCard;
-          const pickupButton = pickupCard
+          const pickupButton = driverPickupVisiblePickupButton
+            ?? pickupCard
             .getByTestId(`driver-picked-up-order-${orderId}`)
             .or(pickupCard.locator('[data-action="pickup-order"]'))
             .or(
@@ -4185,6 +4190,7 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
               visibleLinkTexts: recoveredCardState.visibleLinkTexts,
               pageTextPreview: recoveredCardState.bodyTextPreview,
               recoveryAttempted,
+              driverPickupVisiblePickupButtonSeen,
               recoveryOrdersView,
               apiStatusChecked: true,
             })}`);
