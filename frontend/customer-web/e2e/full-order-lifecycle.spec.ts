@@ -548,13 +548,32 @@ async function clickPickupActionAtomically(
               return style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0' && node.getClientRects().length > 0;
             };
             const normalizeText = (node: Element | null | undefined) => (node?.textContent || '').trim().replace(/\s+/g, ' ');
-            const candidate = Array.from(card.querySelectorAll('button, [role="button"], [data-action="pickup-order"], [data-testid*="picked-up"], [data-testid*="pickup"]'))
+            const orderSuffix = resolvedOrderId.slice(-8);
+            const cardText = normalizeText(card);
+            const orderMatches = cardText.includes(resolvedOrderId) || cardText.includes(orderSuffix);
+            const cardCandidates = Array.from(card.querySelectorAll('button, [role="button"], [data-action="pickup-order"], [data-testid*="picked-up"], [data-testid*="pickup"]'))
               .filter((node): node is HTMLElement => node instanceof HTMLElement)
               .filter((node) => isVisible(node))
-              .find((node) => /picked up|pick up|pickup|abholen|abgeholt|bestellung abholen/i.test(normalizeText(node)));
+              .filter((node) => !node.hasAttribute('disabled') && node.getAttribute('aria-disabled') !== 'true');
+            const fallbackCandidates = cardCandidates.length > 0
+              ? cardCandidates
+              : Array.from(document.querySelectorAll('button, [role="button"], [data-action="pickup-order"], [data-testid*="picked-up"], [data-testid*="pickup"]'))
+                .filter((node): node is HTMLElement => node instanceof HTMLElement)
+                .filter((node) => isVisible(node))
+                .filter((node) => !node.hasAttribute('disabled') && node.getAttribute('aria-disabled') !== 'true')
+                .filter((node) => {
+                  const owner = node.closest('[data-testid*="order"], .order-card, [data-order-id]');
+                  const ownerText = normalizeText(owner);
+                  return ownerText.includes(resolvedOrderId) || ownerText.includes(orderSuffix) || normalizeText(node).includes(orderSuffix);
+                });
+            const candidate = fallbackCandidates.find((node) => /picked up|pick up|pickup|abholen|abgeholt|bestellung abholen/i.test(normalizeText(node)));
 
             if (!candidate) {
-              return { clicked: false, reason: `dom-click-button-missing:${resolvedOrderId}` };
+              return {
+                clicked: false,
+                reason: orderMatches ? `dom-click-button-missing:${resolvedOrderId}` : `card-mismatch:${resolvedOrderId}`,
+                visibleCandidateTexts: fallbackCandidates.map((node) => normalizeText(node)).slice(0, 10),
+              };
             }
 
             candidate.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
