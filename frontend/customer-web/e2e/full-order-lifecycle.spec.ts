@@ -1246,26 +1246,86 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
         };
 
         const captureFinalSubmitValidCartSnapshot = async (cartDiagnostics: Awaited<ReturnType<typeof getCartDiagnostics>>, storageDiagnostics: Awaited<ReturnType<typeof getStorageCartDiagnostics>>) => {
-          if (!Number.isFinite(cartDiagnostics.subtotal ?? NaN) || (cartDiagnostics.subtotal ?? 0) < targetSubtotal) {
-            return;
-          }
-
           const snapshotKey = storageDiagnostics.storageKeys.find((key) => key.startsWith(cartStateKeyPrefix)) || null;
           const snapshotRawValue = snapshotKey
             ? await customerPage.evaluate((resolvedKey) => window.localStorage.getItem(resolvedKey), snapshotKey).catch(() => null)
             : null;
+
+          if (!snapshotKey || !snapshotRawValue) {
+            console.warn('⚠️ lifecycle: invalid final submit cart snapshot ignored', {
+              reason: 'missing-cart-key-or-raw-value',
+              snapshotKey,
+              subtotal: cartDiagnostics.subtotal,
+              itemCount: cartDiagnostics.cartItemCount,
+              quantityCount: cartDiagnostics.quantityCount,
+            });
+            return;
+          }
+
+          let parsedSnapshot: unknown;
+          try {
+            parsedSnapshot = JSON.parse(snapshotRawValue);
+          } catch {
+            console.warn('⚠️ lifecycle: invalid final submit cart snapshot ignored', {
+              reason: 'unparseable-raw-value',
+              snapshotKey,
+              subtotal: cartDiagnostics.subtotal,
+              itemCount: cartDiagnostics.cartItemCount,
+              quantityCount: cartDiagnostics.quantityCount,
+            });
+            return;
+          }
+
+          const parsedItems = Array.isArray(parsedSnapshot)
+            ? parsedSnapshot
+            : Array.isArray((parsedSnapshot as { items?: unknown[] })?.items)
+              ? (parsedSnapshot as { items: unknown[] }).items
+              : Array.isArray((parsedSnapshot as { cart?: unknown[] })?.cart)
+                ? (parsedSnapshot as { cart: unknown[] }).cart
+                : [];
+          const parsedItemCount = parsedItems.length;
+          const parsedQuantityCount = parsedItems.reduce((count, item) => {
+            const quantity = Number((item as { quantity?: unknown; qty?: unknown; count?: unknown })?.quantity
+              ?? (item as { quantity?: unknown; qty?: unknown; count?: unknown })?.qty
+              ?? (item as { quantity?: unknown; qty?: unknown; count?: unknown })?.count
+              ?? 1);
+            return count + (Number.isFinite(quantity) && quantity > 0 ? quantity : 1);
+          }, 0);
+
+          if (parsedItemCount === 0 || parsedQuantityCount === 0) {
+            console.warn('⚠️ lifecycle: invalid final submit cart snapshot ignored', {
+              reason: 'empty-parsed-cart',
+              snapshotKey,
+              subtotal: cartDiagnostics.subtotal,
+              itemCount: cartDiagnostics.cartItemCount,
+              quantityCount: cartDiagnostics.quantityCount,
+            });
+            return;
+          }
+
+          if (!Number.isFinite(cartDiagnostics.subtotal ?? NaN) || (cartDiagnostics.subtotal ?? 0) < targetSubtotal) {
+            return;
+          }
+
           finalSubmitValidCartSnapshot = {
-            cartSnapshotKey: snapshotKey ?? '',
+            cartSnapshotKey: snapshotKey,
             cartSnapshotRawValue: snapshotRawValue,
             restaurantId: orderRestaurantId ?? null,
             restaurantUrl: customerPage.url(),
             subtotal: cartDiagnostics.subtotal ?? 0,
-            itemCount: cartDiagnostics.cartItemCount,
-            quantityCount: cartDiagnostics.quantityCount,
+            itemCount: Math.max(cartDiagnostics.cartItemCount, parsedItemCount),
+            quantityCount: Math.max(cartDiagnostics.quantityCount, parsedQuantityCount),
             targetSubtotal,
             timestamp: Date.now(),
             visibleCartText: cartDiagnostics.cartItemTexts.join(' ').slice(0, 500),
           };
+          console.log('✅ lifecycle: valid final submit cart snapshot captured', {
+            cartSnapshotKey: finalSubmitValidCartSnapshot.cartSnapshotKey,
+            cartSnapshotSubtotal: finalSubmitValidCartSnapshot.subtotal,
+            cartSnapshotItemCount: finalSubmitValidCartSnapshot.itemCount,
+            cartSnapshotQuantityCount: finalSubmitValidCartSnapshot.quantityCount,
+            targetSubtotal: finalSubmitValidCartSnapshot.targetSubtotal,
+          });
         };
 
         for (let attempt = 1; attempt <= maxMinimumOrderAttempts; attempt += 1) {
@@ -2172,6 +2232,7 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
               window.localStorage.setItem(storageKey, rawValue);
               window.localStorage.setItem('lifecycle_final_submit_snapshot_key', snapshotKey);
               window.localStorage.setItem('lifecycle_final_submit_snapshot_ts', String(Date.now()));
+              window.dispatchEvent(new Event('storage'));
             }, {
               storageKey: finalSubmitValidCartSnapshot.cartSnapshotKey,
               rawValue: finalSubmitValidCartSnapshot.cartSnapshotRawValue,
@@ -2186,11 +2247,14 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
             const postRestoreCheckoutEnabled = postRestoreCheckoutVisible
               ? await checkoutButton.isEnabled().catch(() => false)
               : false;
-
-            const restored = postRestoreDiagnostics.finalSubmitMinimumSatisfied
+            const postRestoreValidPayload = postRestoreDiagnostics.finalSubmitMinimumSatisfied
               && postRestoreDiagnostics.subtotal >= targetFinalSubmitSubtotal
+              && postRestoreDiagnostics.itemCount > 0
+              && postRestoreDiagnostics.quantityCount > 0
               && postRestoreCheckoutVisible
               && postRestoreCheckoutEnabled;
+
+            const restored = postRestoreValidPayload;
 
             if (restored) {
               console.log('✅ lifecycle: final submit cart snapshot restore completed', {
@@ -2213,7 +2277,7 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
               return true;
             }
 
-            console.warn('⚠️ lifecycle: final submit cart snapshot restore failed', {
+            console.warn('⚠️ lifecycle: final submit cart raw snapshot restore produced invalid state', {
               currentUrl: customerPage.url(),
               cartSnapshotPresent: true,
               cartSnapshotKey: finalSubmitValidCartSnapshot.cartSnapshotKey,
@@ -2229,7 +2293,13 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
               restoreAttemptCount: 1,
               elapsedMs: Date.now() - finalSubmitRestoreStartedAt,
               remainingDeadlineMs: remainingFinalSubmitRestoreMs(),
+              currentItemCount: postRestoreDiagnostics.itemCount,
+              currentQuantityCount: postRestoreDiagnostics.quantityCount,
             });
+
+            if (postRestoreDiagnostics.subtotal === 17 || postRestoreDiagnostics.itemCount <= 1 || postRestoreDiagnostics.quantityCount <= 2) {
+              throw new Error('Final submit cart snapshot restore produced invalid cart state');
+            }
 
             return false;
           };
