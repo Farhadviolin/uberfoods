@@ -890,6 +890,16 @@ async function tryPickupApiFallbackForVisibleAcceptedOrder(params: {
     data: { status: 'PICKED_UP' },
   });
   const fallbackResponseBody = await fallbackResponse.text().catch(() => '');
+  let parsedFallbackBodyStatus: string | null = null;
+  try {
+    const parsed = fallbackResponseBody ? JSON.parse(fallbackResponseBody) : null;
+    parsedFallbackBodyStatus = typeof parsed?.status === 'string' ? parsed.status : null;
+  } catch {
+    parsedFallbackBodyStatus = null;
+  }
+  const fallbackConfirmedStatus = isConfirmedDriverProgressStatus(parsedFallbackBodyStatus)
+    ? parsedFallbackBodyStatus
+    : null;
   console.log('ℹ️ lifecycle: pickup API fallback response', {
     orderId,
     pickupStatusUrl,
@@ -897,9 +907,22 @@ async function tryPickupApiFallbackForVisibleAcceptedOrder(params: {
     fallbackResponseOk: fallbackResponse.ok(),
     fallbackResponseBody: fallbackResponseBody.slice(0, 1000),
   });
-  const latestApiStatusAfterFallback = await fetchDriverOrderSnapshot(driverPage, orderId)
-    .then((snapshot) => snapshot.status)
-    .catch(() => null);
+  console.log('ℹ️ lifecycle: pickup API fallback parsed status', {
+    orderId,
+    fallbackResponseStatusFromBody: parsedFallbackBodyStatus,
+    fallbackConfirmedStatus,
+  });
+  const latestApiStatusAfterFallback = fallbackConfirmedStatus
+    || await fetchDriverOrderSnapshot(driverPage, orderId)
+      .then(async (snapshot) => {
+        if (isConfirmedDriverProgressStatus(snapshot.status)) {
+          return snapshot.status;
+        }
+        const freshSnapshot = await fetchDriverOrderSnapshot(driverPage, orderId)
+          .catch(() => snapshot);
+        return freshSnapshot.status;
+      })
+      .catch(() => null);
   console.log('ℹ️ lifecycle: pickup API fallback verification', {
     orderId,
     latestApiStatusBeforePickupClick,
@@ -911,7 +934,7 @@ async function tryPickupApiFallbackForVisibleAcceptedOrder(params: {
     succeeded: Boolean(
       fallbackResponse.ok()
       && latestApiStatusAfterFallback
-      && /PICKED_UP|IN_TRANSIT|OUT_FOR_DELIVERY|DELIVERED|COMPLETED/i.test(latestApiStatusAfterFallback),
+      && isConfirmedDriverProgressStatus(latestApiStatusAfterFallback),
     ),
     latestApiStatusBeforePickupClick,
     latestApiStatusAfterFallback,
