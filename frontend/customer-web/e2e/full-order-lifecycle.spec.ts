@@ -1975,7 +1975,7 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
         console.log('checkoutAddressSnapshotAfterProfileVerification', await collectCheckoutAddressSnapshot());
         await logCheckoutDiagnostics('after profile verification');
 
-        const collectFinalSubmitCartDiagnostics = async () => {
+        async function collectFinalSubmitCartDiagnostics() {
           const storageDiagnostics = await customerPage.evaluate(({ prefix }) => {
             const parseAmount = (value: unknown) => {
               if (typeof value === 'number') {
@@ -2071,7 +2071,7 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
             finalSubmitMinimumSatisfied: payloadMinimumSatisfied,
             safeMinimumOrderSnapshot: lastSafeMinimumOrderSnapshot,
           };
-        };
+        }
 
         const ensureFinalSubmitMinimumCart = async () => {
           const targetFinalSubmitSubtotal = Math.max(25, lastSafeMinimumOrderSubtotal ?? 25);
