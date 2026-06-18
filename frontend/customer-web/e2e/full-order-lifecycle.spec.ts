@@ -697,6 +697,25 @@ async function fetchDriverOrderSnapshot(driverPage: Page, orderId: string) {
   }, orderId);
 }
 
+async function resolveDriverAccessToken(driverPage: Page) {
+  return driverPage.evaluate(() => {
+    const candidateKeys = [
+      'driver_token',
+      'access_token',
+      'auth_token',
+      'uberfoods_auth_token',
+    ];
+    const storageSources = [window.localStorage, window.sessionStorage];
+    for (const storage of storageSources) {
+      for (const key of candidateKeys) {
+        const value = storage.getItem(key);
+        if (value) return value;
+      }
+    }
+    return null;
+  }).catch(() => null);
+}
+
 async function tryPickupApiFallbackForVisibleAcceptedOrder(params: {
   driverPage: Page;
   orderId: string;
@@ -846,7 +865,28 @@ async function tryPickupApiFallbackForVisibleAcceptedOrder(params: {
   }
 
   const pickupStatusUrl = new URL(`/api/drivers/orders/${orderId}/status`, testUrls.driver).href;
+  const driverAccessToken = await resolveDriverAccessToken(driverPage);
+  const hasDriverAuthToken = Boolean(driverAccessToken);
+  if (!hasDriverAuthToken) {
+    throw new Error(`Driver pickup API fallback missing driver auth token: ${JSON.stringify({
+      orderId,
+      orderSuffix,
+      stage,
+      latestApiStatusBeforePickupClick,
+      targetOrderVisibleInCurrentPageText,
+      targetOrderVisibleInPreviousContext,
+    })}`);
+  }
+  console.log('ℹ️ lifecycle: pickup API fallback auth', {
+    orderId,
+    hasDriverAuthToken,
+    authHeaderApplied: true,
+  });
   const fallbackResponse = await driverPage.request.put(pickupStatusUrl, {
+    headers: {
+      Authorization: `Bearer ${driverAccessToken}`,
+      'Content-Type': 'application/json',
+    },
     data: { status: 'PICKED_UP' },
   });
   const fallbackResponseBody = await fallbackResponse.text().catch(() => '');
