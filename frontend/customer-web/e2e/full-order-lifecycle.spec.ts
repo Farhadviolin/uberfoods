@@ -4226,8 +4226,10 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
 
         ensureDriverPageOpen();
         const pickupClickStartedAt = Date.now();
+        let directVisibleClickAttempted = false;
         let directVisibleClickCompleted = false;
-        let directVisibleClickDurationMs = 0;
+        let directVisibleClickError: string | null = null;
+        let directVisibleClickDurationMs: number | null = null;
         let recoveryDurationMs = 0;
         let pickupSnapshot: Awaited<ReturnType<typeof fetchDriverOrderSnapshot>> | null = null;
         let latestApiStatus: string | null = null;
@@ -4710,10 +4712,6 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
 
         let clickError: string | null = null;
         let pickupCardStateForDiagnostics = driverPickupVisibleCardState ?? null;
-        let directVisibleClickAttempted = false;
-        let directVisibleClickCompleted = false;
-        let directVisibleClickError: string | null = null;
-        let directVisibleClickDurationMs: number | null = null;
         let directClickResult: Awaited<ReturnType<typeof clickPickupActionWithinTargetCard>> | null = null;
         const pickupStepStartedAt = Date.now();
         try {
