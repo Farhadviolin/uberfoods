@@ -766,7 +766,6 @@ async function tryPickupApiFallbackForVisibleAcceptedOrder(params: {
       ))
     ),
   ) || driverPickupVisiblePickupButtonSeen;
-  );
   const visibleButtons = Array.isArray(visibleButtonsBeforeRecovery) ? visibleButtonsBeforeRecovery : [];
   const visibleInteractiveElements = Array.isArray(visibleInteractiveElementsBeforeRecovery) ? visibleInteractiveElementsBeforeRecovery : [];
   const hasClickablePickupCandidate = [
