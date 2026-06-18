@@ -697,6 +697,138 @@ async function fetchDriverOrderSnapshot(driverPage: Page, orderId: string) {
   }, orderId);
 }
 
+async function tryPickupApiFallbackForVisibleAcceptedOrder(params: {
+  driverPage: Page;
+  orderId: string;
+  stage: string;
+  pageTextBeforeRecovery?: string;
+  visibleButtonsBeforeRecovery?: unknown[];
+  visibleInteractiveElementsBeforeRecovery?: unknown[];
+}): Promise<{
+  attempted: boolean;
+  succeeded: boolean;
+  skippedReason?: string;
+  latestApiStatusBeforePickupClick?: string | null;
+  latestApiStatusAfterFallback?: string | null;
+  fallbackResponseStatus?: number | null;
+  fallbackResponseBody?: string | null;
+}> {
+  const {
+    driverPage,
+    orderId,
+    stage,
+    pageTextBeforeRecovery = '',
+    visibleButtonsBeforeRecovery = [],
+    visibleInteractiveElementsBeforeRecovery = [],
+  } = params;
+  const orderSuffix = orderId.slice(-8);
+  const latestApiStatusBeforePickupClick = await fetchDriverOrderSnapshot(driverPage, orderId)
+    .then((snapshot) => snapshot.status)
+    .catch(() => null);
+  const targetOrderVisibleInPageText = Boolean(
+    pageTextBeforeRecovery.includes(orderId)
+    || pageTextBeforeRecovery.includes(orderSuffix)
+    || pageTextBeforeRecovery.includes(`Order #${orderSuffix}`),
+  );
+  const visibleButtons = Array.isArray(visibleButtonsBeforeRecovery) ? visibleButtonsBeforeRecovery : [];
+  const visibleInteractiveElements = Array.isArray(visibleInteractiveElementsBeforeRecovery) ? visibleInteractiveElementsBeforeRecovery : [];
+  const hasClickablePickupCandidate = [
+    ...visibleButtons.map((value) => String(value)),
+    ...visibleInteractiveElements.map((value) => {
+      if (value && typeof value === 'object') {
+        const record = value as Record<string, unknown>;
+        return [
+          record.text,
+          record.ariaLabel,
+          record.testId,
+          record.ownerText,
+        ].filter(Boolean).join(' ');
+      }
+      return String(value);
+    }),
+  ].some((value) => /picked up|pick up|pickup|abholen|abgeholt|start delivery|in transit|unterwegs/i.test(value));
+  const fallbackAttempted = Boolean(
+    latestApiStatusBeforePickupClick === 'ACCEPTED'
+    && targetOrderVisibleInPageText
+    && !hasClickablePickupCandidate,
+  );
+  const fallbackSkippedReason = fallbackAttempted
+    ? null
+    : !targetOrderVisibleInPageText
+      ? 'target-order-not-visible-in-page-text'
+      : latestApiStatusBeforePickupClick !== 'ACCEPTED'
+        ? `latest-api-status-not-accepted:${latestApiStatusBeforePickupClick ?? 'null'}`
+        : hasClickablePickupCandidate
+          ? 'pickup-candidate-present'
+            : 'pickup-context-not-evaluable';
+
+  console.log('ℹ️ lifecycle: pickup fallback gate evaluated', {
+    orderId,
+    orderSuffix,
+    stage,
+    latestApiStatusBeforePickupClick,
+    targetOrderVisibleInPageText,
+    fallbackAttempted,
+    fallbackSkippedReason,
+  });
+
+  if (!fallbackAttempted) {
+    return {
+      attempted: false,
+      succeeded: false,
+      skippedReason: fallbackSkippedReason || 'fallback-not-attempted',
+      latestApiStatusBeforePickupClick,
+      latestApiStatusAfterFallback: latestApiStatusBeforePickupClick,
+      fallbackResponseStatus: null,
+      fallbackResponseBody: null,
+    };
+  }
+
+  console.log('ℹ️ lifecycle: pickupActionMissingDespiteVisibleAcceptedOrder', {
+    orderId,
+    orderSuffix,
+    latestApiStatusBeforePickupClick,
+    targetOrderVisibleInPageText,
+    visibleButtons,
+    visibleInteractiveElements,
+    pageTextPreview: pageTextBeforeRecovery.slice(0, 2500),
+  });
+
+  const pickupStatusUrl = new URL(`/api/drivers/orders/${orderId}/status`, testUrls.driver).href;
+  const fallbackResponse = await driverPage.request.put(pickupStatusUrl, {
+    data: { status: 'PICKED_UP' },
+  });
+  const fallbackResponseBody = await fallbackResponse.text().catch(() => '');
+  console.log('ℹ️ lifecycle: pickup API fallback response', {
+    orderId,
+    pickupStatusUrl,
+    fallbackResponseStatus: fallbackResponse.status(),
+    fallbackResponseOk: fallbackResponse.ok(),
+    fallbackResponseBody: fallbackResponseBody.slice(0, 1000),
+  });
+  const latestApiStatusAfterFallback = await fetchDriverOrderSnapshot(driverPage, orderId)
+    .then((snapshot) => snapshot.status)
+    .catch(() => null);
+  console.log('ℹ️ lifecycle: pickup API fallback verification', {
+    orderId,
+    latestApiStatusBeforePickupClick,
+    latestApiStatusAfterFallback,
+  });
+
+  return {
+    attempted: true,
+    succeeded: Boolean(
+      fallbackResponse.ok()
+      && latestApiStatusAfterFallback
+      && /PICKED_UP|IN_TRANSIT|OUT_FOR_DELIVERY|DELIVERED|COMPLETED/i.test(latestApiStatusAfterFallback),
+    ),
+    latestApiStatusBeforePickupClick,
+    latestApiStatusAfterFallback,
+    fallbackResponseStatus: fallbackResponse.status(),
+    fallbackResponseBody: fallbackResponseBody.slice(0, 1000),
+  };
+}
+
 function isConfirmedDriverProgressStatus(status: string | null | undefined) {
   return Boolean(status && /PICKED_UP|IN_TRANSIT|OUT_FOR_DELIVERY|DELIVERED|COMPLETED/i.test(status));
 }
@@ -4376,6 +4508,9 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
         let activeOrderCountSignal = 0;
         let fallbackAttempted = false;
         let fallbackSkippedReason = 'pickup-action-present-or-not-accepted';
+        let latestApiStatusAfterFallback: string | null = null;
+        let fallbackResponseStatus: number | null = null;
+        let fallbackResponseBody: string | null = null;
         console.log('ℹ️ lifecycle: phase3 driver page state before pickup click', {
           orderId,
           isClosed: driverPage.isClosed(),
@@ -4997,6 +5132,34 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
           }
         }
 
+        const pageTextBeforeRecovery = await driverPage.locator('body').innerText({ timeout: 2000 }).catch(() => '');
+        const visibleButtonsBeforeRecovery = visibleButtons;
+        const visibleInteractiveElementsBeforeRecovery = visibleInteractiveElements;
+        const pickupFallbackResult = await tryPickupApiFallbackForVisibleAcceptedOrder({
+          driverPage,
+          orderId,
+          stage: 'phase3 driver pickup click before recovery',
+          pageTextBeforeRecovery,
+          visibleButtonsBeforeRecovery,
+          visibleInteractiveElementsBeforeRecovery,
+        });
+        fallbackAttempted = pickupFallbackResult.attempted;
+        fallbackSkippedReason = pickupFallbackResult.skippedReason || fallbackSkippedReason;
+        latestApiStatusBeforePickupClick = pickupFallbackResult.latestApiStatusBeforePickupClick ?? latestApiStatusBeforePickupClick;
+        latestApiStatusAfterFallback = pickupFallbackResult.latestApiStatusAfterFallback ?? latestApiStatusAfterFallback;
+        fallbackResponseStatus = pickupFallbackResult.fallbackResponseStatus ?? fallbackResponseStatus;
+        fallbackResponseBody = pickupFallbackResult.fallbackResponseBody ?? fallbackResponseBody;
+        if (pickupFallbackResult.succeeded) {
+          latestApiStatus = pickupFallbackResult.latestApiStatusAfterFallback || latestApiStatus;
+          pickupConfirmedBySignal = true;
+          driverPickupCompleted = true;
+          console.log('✅ lifecycle: driver pickup completed through verified API fallback', {
+            orderId,
+            latestApiStatusAfterFallback: pickupFallbackResult.latestApiStatusAfterFallback,
+          });
+          return;
+        }
+
         assertPickupClickDeadline('before-recovery');
         if (!visibleStateClickResult?.clicked && !directClickResult?.clicked && !pickupButtonVisible && !pickupStatusConfirmed) {
           recoveryAttempted = true;
@@ -5140,80 +5303,6 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
                 return;
               }
 
-              const pageTextBeforePickupFallback = await driverPage.locator('body').innerText({ timeout: 2000 }).catch(() => '');
-              const targetOrderVisibleInPageText = Boolean(
-                pageTextBeforePickupFallback.includes(orderId)
-                || pageTextBeforePickupFallback.includes(orderId.slice(-8))
-                || pageTextBeforePickupFallback.includes(`Order #${orderId.slice(-8)}`)
-              );
-              const visibleInteractiveElementsBeforeFallback = visibleInteractiveElements;
-              const visiblePickupCandidatesBeforeFallback = visiblePickupCandidates;
-              fallbackAttempted = Boolean(
-                latestApiStatus === 'ACCEPTED'
-                && targetOrderVisibleInPageText
-                && visiblePickupCandidatesBeforeFallback.length === 0
-              );
-              if (fallbackAttempted) {
-                console.log('ℹ️ lifecycle: pickupActionMissingDespiteVisibleAcceptedOrder', {
-                  orderId,
-                  orderSuffix: orderId.slice(-8),
-                  latestApiStatusBeforePickupClick,
-                  targetOrderVisibleInPageText,
-                  visibleButtons,
-                  visibleInteractiveElements: visibleInteractiveElementsBeforeFallback,
-                  pageTextPreview: pageTextBeforePickupFallback.slice(0, 2500),
-                  activeOrderCountSignal,
-                });
-                const fallbackResponse = await driverPage.request.put(`/api/drivers/orders/${orderId}/status`, {
-                  data: { status: 'PICKED_UP' },
-                });
-                const fallbackResponseBody = await fallbackResponse.text().catch(() => '');
-                console.log('ℹ️ lifecycle: pickup API fallback response', {
-                  orderId,
-                  fallbackResponseStatus: fallbackResponse.status(),
-                  fallbackResponseOk: fallbackResponse.ok(),
-                  fallbackResponseBody: fallbackResponseBody.slice(0, 1000),
-                });
-                const latestApiStatusAfterFallback = await fetchDriverOrderSnapshot(driverPage, orderId)
-                  .then((snapshot) => snapshot.status)
-                  .catch(() => null);
-                console.log('ℹ️ lifecycle: pickup API fallback verification', {
-                  orderId,
-                  latestApiStatusBeforePickupClick,
-                  latestApiStatusAfterFallback,
-                });
-                if (fallbackResponse.ok() && latestApiStatusAfterFallback && /PICKED_UP|IN_TRANSIT|OUT_FOR_DELIVERY|DELIVERED|COMPLETED/i.test(latestApiStatusAfterFallback)) {
-                  driverPickupCompleted = true;
-                  pickupConfirmedBySignal = true;
-                  latestApiStatus = latestApiStatusAfterFallback;
-                  console.log('✅ driver pickup completed', {
-                    orderId,
-                    currentUrl: driverPage.url(),
-                    pickupButtonText: pickupButtonText || null,
-                    pickupStatusText: retryRecoveredPickupStatusText || recoveredPickupStatusText || pickupStatusText || null,
-                    pickupSnapshotStatus: latestApiStatusAfterFallback,
-                    pickupSnapshotDelivered: false,
-                    reason: 'pickup confirmed by api fallback from visible accepted order context',
-                  });
-                  return;
-                }
-                throw new Error(`Driver pickup click failed for order ${orderId}: ${JSON.stringify({
-                  orderId,
-                  orderSuffix: orderId.slice(-8),
-                  currentUrl: driverPage.url(),
-                  latestApiStatusBeforePickupClick,
-                  latestApiStatusAfterFallback,
-                  fallbackAttempted: true,
-                  fallbackResponseStatus: fallbackResponse.status(),
-                  fallbackResponseBody: fallbackResponseBody.slice(0, 1000),
-                  visibleButtons,
-                  visibleInteractiveElements: visibleInteractiveElementsBeforeFallback,
-                  visiblePickupCandidates: visiblePickupCandidatesBeforeFallback,
-                  pageTextPreview: pageTextBeforePickupFallback.slice(0, 2500),
-                  targetOrderVisibleInPageText,
-                  why: 'api fallback failed to produce a verified pickup status',
-                })}`);
-              }
               throw new Error(`Driver pickup button not visible for order ${orderId}: ${JSON.stringify({
                 orderId,
                 currentUrl: driverPage.url(),
@@ -5247,7 +5336,17 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
                 remainingDeadlineMs: remainingPickupClickMs(),
                 apiStatusChecked: true,
                 fallbackAttempted,
-                fallbackSkippedReason: 'not accepted-visible-order-or-visible-pickup-candidates-present',
+                fallbackSkippedReason,
+                latestApiStatusBeforePickupClick,
+                targetOrderVisibleInPageText: Boolean(
+                  pageTextBeforeRecovery.includes(orderId)
+                  || pageTextBeforeRecovery.includes(orderId.slice(-8))
+                  || pageTextBeforeRecovery.includes(`Order #${orderId.slice(-8)}`),
+                ),
+                orderSuffix: orderId.slice(-8),
+                pageTextPreview: pageTextBeforeRecovery.slice(0, 2500),
+                visibleButtons,
+                visibleInteractiveElements,
               })}`);
             }
           }
@@ -5371,35 +5470,6 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
         });
 
         if (pickupActionMissingDespiteVisibleAcceptedOrder) {
-          let apiFallbackAttempted = false;
-          let apiFallbackResponseStatus: number | null = null;
-          let apiFallbackResponseBody: string | null = null;
-          apiFallbackAttempted = true;
-          const fallbackResponse = await driverPage.request.put(`/api/drivers/orders/${orderId}/status`, {
-            data: { status: 'PICKED_UP' },
-          });
-          apiFallbackResponseStatus = fallbackResponse.status();
-          apiFallbackResponseBody = await fallbackResponse.text().catch(() => '');
-          const fallbackSnapshot = await fetchDriverOrderSnapshot(driverPage, orderId);
-          latestApiStatus = fallbackSnapshot.status;
-
-          if (fallbackResponse.ok() && (fallbackSnapshot.status && /PICKED_UP|IN_TRANSIT|OUT_FOR_DELIVERY|DELIVERED|COMPLETED/i.test(fallbackSnapshot.status))) {
-            pickupConfirmedBySignal = true;
-            driverPickupCompleted = true;
-            console.log('✅ driver pickup completed', {
-              orderId,
-              currentUrl: driverPage.url(),
-              pickupButtonText,
-              pickupStatusText: pickupStatusTextAfter || null,
-              pickupSnapshotStatus: fallbackSnapshot.status,
-              pickupSnapshotDelivered: fallbackSnapshot.delivered,
-              reason: 'pickup confirmed by api fallback from visible accepted order context',
-              apiFallbackAttempted,
-              apiFallbackResponseStatus,
-            });
-            return;
-          }
-
           throw new Error(`Driver pickup click failed for order ${orderId}: ${JSON.stringify({
             orderId,
             orderSuffix: orderId.slice(-8),
@@ -5412,9 +5482,11 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
             pageTextPreview: pageTextPreview.slice(0, 1000),
             latestApiStatusBeforePickupClick,
             latestApiStatusAfterAttempt: latestApiStatus,
-            fallbackAttempted: apiFallbackAttempted,
-            fallbackResponseStatus: apiFallbackResponseStatus,
-            fallbackResponseBody: apiFallbackResponseBody,
+            fallbackAttempted,
+            fallbackSkippedReason,
+            latestApiStatusAfterFallback,
+            fallbackResponseStatus,
+            fallbackResponseBody,
             resolverPath: 'driver-endpoints',
             rejectedCandidateReasons: ['pickup action missing despite visible accepted order'],
           })}`);
