@@ -4284,7 +4284,8 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
         let directVisibleClickCompleted = false;
         let directVisibleClickError: string | null = null;
         let directVisibleClickDurationMs: number | null = null;
-        let recoveryDurationMs = 0;
+        let recoveryAttempted = false;
+        let recoveryDurationMs: number | null = null;
         let pickupSnapshot: Awaited<ReturnType<typeof fetchDriverOrderSnapshot>> | null = null;
         let latestApiStatus: string | null = null;
         console.log('ℹ️ lifecycle: phase3 driver page state before pickup click', {
@@ -4835,8 +4836,6 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
         }
 
         let pickupButtonToClick = pickupButton;
-        let recoveryAttempted = false;
-        let recoveryDurationMs = 0;
 
         assertPickupClickDeadline('before-direct-visible-click');
         if (!visibleStateClickResult?.clicked && driverPickupVisibleCardState?.targetCardVisible && driverPickupVisiblePickupButtonSeen) {
