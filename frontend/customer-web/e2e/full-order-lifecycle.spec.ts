@@ -704,6 +704,7 @@ async function tryPickupApiFallbackForVisibleAcceptedOrder(params: {
   pageTextBeforeRecovery?: string;
   visibleButtonsBeforeRecovery?: unknown[];
   visibleInteractiveElementsBeforeRecovery?: unknown[];
+  driverPickupVisiblePickupButtonSeen?: boolean;
   previousVisibleOrderContext?: {
     orderId?: string;
     orderSuffix?: string;
@@ -733,6 +734,7 @@ async function tryPickupApiFallbackForVisibleAcceptedOrder(params: {
     pageTextBeforeRecovery = '',
     visibleButtonsBeforeRecovery = [],
     visibleInteractiveElementsBeforeRecovery = [],
+    driverPickupVisiblePickupButtonSeen = false,
     previousVisibleOrderContext = undefined,
   } = params;
   const orderSuffix = orderId.slice(-8);
@@ -763,6 +765,7 @@ async function tryPickupApiFallbackForVisibleAcceptedOrder(params: {
         || previousVisibleOrderContext.cardText.includes(`Order #${orderSuffix}`)
       ))
     ),
+  ) || driverPickupVisiblePickupButtonSeen;
   );
   const visibleButtons = Array.isArray(visibleButtonsBeforeRecovery) ? visibleButtonsBeforeRecovery : [];
   const visibleInteractiveElements = Array.isArray(visibleInteractiveElementsBeforeRecovery) ? visibleInteractiveElementsBeforeRecovery : [];
@@ -803,7 +806,7 @@ async function tryPickupApiFallbackForVisibleAcceptedOrder(params: {
     latestApiStatusBeforePickupClick,
     targetOrderVisibleInCurrentPageText,
     targetOrderVisibleInPreviousContext,
-    driverPickupVisiblePickupButtonSeen: previousVisibleOrderContext?.pickupButtonSeen ?? false,
+    driverPickupVisiblePickupButtonSeen,
     previousVisibleOrderContextSource: previousVisibleOrderContext?.source ?? null,
     fallbackAttempted,
     fallbackSkippedReason,
@@ -838,7 +841,7 @@ async function tryPickupApiFallbackForVisibleAcceptedOrder(params: {
       latestApiStatusBeforePickupClick,
       targetOrderVisibleInCurrentPageText,
       targetOrderVisibleInPreviousContext,
-      driverPickupVisiblePickupButtonSeen: previousVisibleOrderContext?.pickupButtonSeen ?? false,
+      driverPickupVisiblePickupButtonSeen,
       previousVisibleOrderContext,
     });
   }
@@ -5204,6 +5207,7 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
           pageTextBeforeRecovery,
           visibleButtonsBeforeRecovery,
           visibleInteractiveElementsBeforeRecovery,
+          driverPickupVisiblePickupButtonSeen,
           previousVisibleOrderContext,
         });
         fallbackAttempted = pickupFallbackResult.attempted;
@@ -5555,7 +5559,7 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
               || pageTextBeforeRecovery.includes(orderId.slice(-8))
               || pageTextBeforeRecovery.includes(`Order #${orderId.slice(-8)}`),
             ),
-            targetOrderVisibleInPreviousContext: Boolean(previousVisibleOrderContext),
+            targetOrderVisibleInPreviousContext: Boolean(previousVisibleOrderContext) || driverPickupVisiblePickupButtonSeen,
             driverPickupVisiblePickupButtonSeen,
             previousVisibleOrderContext,
             resolverPath: 'driver-endpoints',
