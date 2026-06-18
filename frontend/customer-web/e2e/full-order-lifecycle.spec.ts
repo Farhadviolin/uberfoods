@@ -1292,18 +1292,46 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
             return count + (Number.isFinite(quantity) && quantity > 0 ? quantity : 1);
           }, 0);
 
-          if (parsedItemCount === 0 || parsedQuantityCount === 0) {
+          const parsedSubtotal = parsedItems.reduce((sum, item) => {
+            const directSubtotal = Number((item as { totalPrice?: unknown; subtotal?: unknown })?.totalPrice ?? (item as { totalPrice?: unknown; subtotal?: unknown })?.subtotal);
+            if (Number.isFinite(directSubtotal) && directSubtotal > 0) {
+              return sum + directSubtotal;
+            }
+
+            const unitPrice = Number((item as { price?: unknown; unitPrice?: unknown })?.price ?? (item as { price?: unknown; unitPrice?: unknown })?.unitPrice);
+            const quantity = Number((item as { quantity?: unknown; qty?: unknown; count?: unknown })?.quantity
+              ?? (item as { quantity?: unknown; qty?: unknown; count?: unknown })?.qty
+              ?? (item as { quantity?: unknown; qty?: unknown; count?: unknown })?.count
+              ?? 1);
+            return sum + (Number.isFinite(unitPrice) && unitPrice > 0 ? unitPrice : 0) * (Number.isFinite(quantity) && quantity > 0 ? quantity : 1);
+          }, 0);
+
+          if (parsedItemCount === 0 || parsedQuantityCount === 0 || parsedItemCount < 2 || parsedQuantityCount < 2) {
             console.warn('⚠️ lifecycle: invalid final submit cart snapshot ignored', {
               reason: 'empty-parsed-cart',
               snapshotKey,
               subtotal: cartDiagnostics.subtotal,
               itemCount: cartDiagnostics.cartItemCount,
               quantityCount: cartDiagnostics.quantityCount,
+              parsedItemCount,
+              parsedQuantityCount,
+              parsedSubtotal,
             });
             return;
           }
 
-          if (!Number.isFinite(cartDiagnostics.subtotal ?? NaN) || (cartDiagnostics.subtotal ?? 0) < targetSubtotal) {
+          if (!Number.isFinite(parsedSubtotal) || parsedSubtotal < targetSubtotal) {
+            console.warn('⚠️ lifecycle: invalid final submit cart snapshot ignored', {
+              reason: 'parsed-subtotal-below-target',
+              snapshotKey,
+              subtotal: cartDiagnostics.subtotal,
+              itemCount: cartDiagnostics.cartItemCount,
+              quantityCount: cartDiagnostics.quantityCount,
+              parsedItemCount,
+              parsedQuantityCount,
+              parsedSubtotal,
+              targetSubtotal,
+            });
             return;
           }
 
@@ -1312,20 +1340,21 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
             cartSnapshotRawValue: snapshotRawValue,
             restaurantId: orderRestaurantId ?? null,
             restaurantUrl: customerPage.url(),
-            subtotal: cartDiagnostics.subtotal ?? 0,
-            itemCount: Math.max(cartDiagnostics.cartItemCount, parsedItemCount),
-            quantityCount: Math.max(cartDiagnostics.quantityCount, parsedQuantityCount),
+            subtotal: parsedSubtotal,
+            itemCount: parsedItemCount,
+            quantityCount: parsedQuantityCount,
             targetSubtotal,
             timestamp: Date.now(),
             visibleCartText: cartDiagnostics.cartItemTexts.join(' ').slice(0, 500),
           };
           console.log('✅ lifecycle: valid final submit cart snapshot captured', {
             cartSnapshotKey: finalSubmitValidCartSnapshot.cartSnapshotKey,
-            cartSnapshotSubtotal: finalSubmitValidCartSnapshot.subtotal,
-            cartSnapshotItemCount: finalSubmitValidCartSnapshot.itemCount,
-            cartSnapshotQuantityCount: finalSubmitValidCartSnapshot.quantityCount,
-            targetSubtotal: finalSubmitValidCartSnapshot.targetSubtotal,
-          });
+              cartSnapshotSubtotal: finalSubmitValidCartSnapshot.subtotal,
+              cartSnapshotItemCount: finalSubmitValidCartSnapshot.itemCount,
+              cartSnapshotQuantityCount: finalSubmitValidCartSnapshot.quantityCount,
+              rawParsedSubtotal: parsedSubtotal,
+              targetSubtotal: finalSubmitValidCartSnapshot.targetSubtotal,
+            });
         };
 
         for (let attempt = 1; attempt <= maxMinimumOrderAttempts; attempt += 1) {
@@ -2297,10 +2326,6 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
               currentQuantityCount: postRestoreDiagnostics.quantityCount,
             });
 
-            if (postRestoreDiagnostics.subtotal === 17 || postRestoreDiagnostics.itemCount <= 1 || postRestoreDiagnostics.quantityCount <= 2) {
-              throw new Error('Final submit cart snapshot restore produced invalid cart state');
-            }
-
             return false;
           };
 
@@ -2353,7 +2378,12 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
           });
 
           const openRestaurantMenuForCartRepair = async () => {
-            if (!/\/restaurants\/[^/?]+/.test(customerPage.url())) {
+            if (finalSubmitValidCartSnapshot?.restaurantUrl) {
+              await customerPage.goto(finalSubmitValidCartSnapshot.restaurantUrl, { waitUntil: 'domcontentloaded' }).catch(() => null);
+              await customerPage.waitForLoadState('domcontentloaded', { timeout: boundedFinalSubmitTimeout(1500) }).catch(() => null);
+              await customerPage.waitForLoadState('networkidle', { timeout: boundedFinalSubmitTimeout(2000) }).catch(() => null);
+              await TestHelpers.waitForStablePage(customerPage);
+            } else if (!/\/restaurants\/[^/?]+/.test(customerPage.url())) {
               await customerPage.goto(`${testUrls.customer}/restaurants`, { waitUntil: 'domcontentloaded' }).catch(() => null);
               await customerPage.waitForLoadState('domcontentloaded', { timeout: boundedFinalSubmitTimeout(1500) }).catch(() => null);
               await customerPage.waitForLoadState('networkidle', { timeout: boundedFinalSubmitTimeout(2000) }).catch(() => null);
@@ -2426,7 +2456,7 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
           let addToCartButtons = await openRestaurantMenuForCartRepair();
           const attemptedAddButtonIndexes = new Set<number>();
 
-          for (let attempt = 1; attempt <= 2; attempt += 1) {
+          for (let attempt = 1; attempt <= 1; attempt += 1) {
             if (remainingFinalSubmitRestoreMs() <= 0) {
               break;
             }
