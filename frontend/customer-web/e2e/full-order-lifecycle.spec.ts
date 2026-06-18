@@ -2209,6 +2209,12 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
           const finalSubmitRestoreStartedAt = Date.now();
           const remainingFinalSubmitRestoreMs = () => Math.max(0, finalSubmitRestoreDeadlineMs - (Date.now() - finalSubmitRestoreStartedAt));
           const boundedFinalSubmitTimeout = (preferredMs: number) => Math.max(250, Math.min(preferredMs, remainingFinalSubmitRestoreMs()));
+          const boundedLoadState = async (page: Page, state: 'domcontentloaded' | 'networkidle', preferredMs: number) => page.waitForLoadState(state, { timeout: boundedFinalSubmitTimeout(preferredMs) }).catch(() => null);
+          const boundedGoto = async (page: Page, url: string, timeoutMs: number) => page.goto(url, { waitUntil: 'domcontentloaded', timeout: boundedFinalSubmitTimeout(timeoutMs) }).catch(() => null);
+          const boundedStablePage = async (page: Page, timeoutMs: number) => Promise.race([
+            TestHelpers.waitForStablePage(page),
+            new Promise<null>((resolve) => setTimeout(() => resolve(null), boundedFinalSubmitTimeout(timeoutMs))),
+          ]).catch(() => null);
           const restoreAttempts: Array<{
             attempt: number;
             subtotal: number;
@@ -2420,15 +2426,15 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
 
           const openRestaurantMenuForCartRepair = async () => {
             if (finalSubmitValidCartSnapshot?.restaurantUrl) {
-              await customerPage.goto(finalSubmitValidCartSnapshot.restaurantUrl, { waitUntil: 'domcontentloaded' }).catch(() => null);
-              await customerPage.waitForLoadState('domcontentloaded', { timeout: boundedFinalSubmitTimeout(1500) }).catch(() => null);
-              await customerPage.waitForLoadState('networkidle', { timeout: boundedFinalSubmitTimeout(2000) }).catch(() => null);
-              await TestHelpers.waitForStablePage(customerPage);
+              await boundedGoto(customerPage, finalSubmitValidCartSnapshot.restaurantUrl, 2500);
+              await boundedLoadState(customerPage, 'domcontentloaded', 1500);
+              await boundedLoadState(customerPage, 'networkidle', 1500);
+              await boundedStablePage(customerPage, 2000);
             } else if (!/\/restaurants\/[^/?]+/.test(customerPage.url())) {
-              await customerPage.goto(`${testUrls.customer}/restaurants`, { waitUntil: 'domcontentloaded' }).catch(() => null);
-              await customerPage.waitForLoadState('domcontentloaded', { timeout: boundedFinalSubmitTimeout(1500) }).catch(() => null);
-              await customerPage.waitForLoadState('networkidle', { timeout: boundedFinalSubmitTimeout(2000) }).catch(() => null);
-              await TestHelpers.waitForStablePage(customerPage);
+              await boundedGoto(customerPage, `${testUrls.customer}/restaurants`, 2500);
+              await boundedLoadState(customerPage, 'domcontentloaded', 1500);
+              await boundedLoadState(customerPage, 'networkidle', 1500);
+              await boundedStablePage(customerPage, 2000);
             }
 
             const restaurantCards = customerPage.getByTestId('restaurant-card');
@@ -2454,9 +2460,9 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
               await restaurantCard.click({ timeout: boundedFinalSubmitTimeout(1500) }).catch(async () => {
                 await restaurantCard.locator('a, button').first().click({ timeout: boundedFinalSubmitTimeout(1500) });
               });
-              await customerPage.waitForLoadState('domcontentloaded', { timeout: boundedFinalSubmitTimeout(1500) }).catch(() => null);
-              await customerPage.waitForLoadState('networkidle', { timeout: boundedFinalSubmitTimeout(2000) }).catch(() => null);
-              await TestHelpers.waitForStablePage(customerPage);
+              await boundedLoadState(customerPage, 'domcontentloaded', 1500);
+              await boundedLoadState(customerPage, 'networkidle', 1500);
+              await boundedStablePage(customerPage, 2000);
             }
 
             const addToCartButtons = customerPage
@@ -2597,10 +2603,10 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
             await customerPage.waitForTimeout(250);
             diagnostics = await collectFinalSubmitCartDiagnostics();
             if (diagnostics.payloadSubtotal <= diagnosticsBeforeRepair.payloadSubtotal) {
-              await customerPage.goto(`${testUrls.customer}/restaurants`, { waitUntil: 'domcontentloaded' }).catch(() => null);
-              await customerPage.waitForLoadState('domcontentloaded', { timeout: boundedFinalSubmitTimeout(1500) }).catch(() => null);
-              await customerPage.waitForLoadState('networkidle', { timeout: boundedFinalSubmitTimeout(2000) }).catch(() => null);
-              await TestHelpers.waitForStablePage(customerPage);
+              await boundedGoto(customerPage, `${testUrls.customer}/restaurants`, 2500);
+              await boundedLoadState(customerPage, 'domcontentloaded', 1500);
+              await boundedLoadState(customerPage, 'networkidle', 1500);
+              await boundedStablePage(customerPage, 2000);
             }
           }
 
@@ -2638,7 +2644,7 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
               remainingDeadlineMs: remainingFinalSubmitRestoreMs(),
               restoreAttempts,
             });
-            throw new Error(`Final submit cart restore failed before order submit: ${JSON.stringify({
+            throw new Error(`Final submit cart recovery failed before submit: ${JSON.stringify({
               currentUrl: customerPage.url(),
               subtotal: diagnostics.subtotal,
               subtotalSource: diagnostics.subtotalSource,
@@ -2668,9 +2674,9 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
             elapsedMs: Date.now() - finalSubmitRestoreStartedAt,
           });
 
-          await customerPage.goto('/checkout', { waitUntil: 'domcontentloaded' });
-          await customerPage.waitForLoadState('networkidle').catch(() => null);
-          await TestHelpers.waitForStablePage(customerPage);
+          await boundedGoto(customerPage, '/checkout', 2500);
+          await boundedLoadState(customerPage, 'networkidle', 1500);
+          await boundedStablePage(customerPage, 2000);
 
           const checkoutCart = customerPage.getByTestId('cart');
           const checkoutIncreaseButtons = checkoutCart
@@ -2702,7 +2708,7 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
                 quantityCountBeforeRepair: diagnostics.quantityCount,
               });
               await increaseButton.click();
-              await customerPage.waitForTimeout(300);
+              await customerPage.waitForTimeout(200);
             }
 
             diagnostics = await collectFinalSubmitCartDiagnostics();
