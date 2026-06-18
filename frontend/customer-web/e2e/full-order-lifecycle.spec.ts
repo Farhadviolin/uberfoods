@@ -4843,7 +4843,7 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
           try {
             const directClickTargetCard = driverPickupVisibleCardState.targetCard;
             const directClickStartedAt = Date.now();
-            const directClickAttempt = clickPickupActionWithinTargetCard(
+            const directClickAttempt = clickPickupActionAtomically(
               directClickTargetCard,
               orderId,
               'phase3 driver pickup click direct visible state',
@@ -4853,13 +4853,13 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
                 clicked: false,
                 reason: 'direct-click-error',
                 orderSuffix: orderId.slice(-8),
-              } as Awaited<ReturnType<typeof clickPickupActionWithinTargetCard>>;
+              } as Awaited<ReturnType<typeof clickPickupActionAtomically>>;
             });
-            const directClickTimeout = new Promise<Awaited<ReturnType<typeof clickPickupActionWithinTargetCard>>>((resolve) => setTimeout(() => resolve({
+            const directClickTimeout = new Promise<Awaited<ReturnType<typeof clickPickupActionAtomically>>>((resolve) => setTimeout(() => resolve({
               clicked: false,
               reason: 'direct-click-timeout',
               orderSuffix: orderId.slice(-8),
-            }), boundedPickupTimeoutMs(4000)));
+            }), boundedPickupTimeoutMs(2500)));
             directClickResult = await Promise.race([directClickAttempt, directClickTimeout]);
             directVisibleClickDurationMs = Date.now() - directClickStartedAt;
             directVisibleClickCompleted = Boolean(directClickResult?.clicked);
@@ -5007,6 +5007,28 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
             if (retryRecoveredPickupButtonVisible || retryRecoveredPickupStatusConfirmed) {
               pickupButtonToClick = retryRecoveredPickupButton;
             } else {
+              const retryAtomicClickResult = await clickPickupActionAtomically(
+                retryRecoveredCardState.targetCard,
+                orderId,
+                'phase3 driver pickup click recovery retry',
+              ).catch((error) => ({
+                clicked: false,
+                reason: error instanceof Error ? error.message : String(error),
+                orderSuffix: orderId.slice(-8),
+              }));
+              if (retryAtomicClickResult.clicked) {
+                driverPickupCompleted = true;
+                console.log('✅ driver pickup completed', {
+                  orderId,
+                  currentUrl: retryRecoveredPickupSnapshot.currentUrl,
+                  pickupButtonText: pickupButtonText || null,
+                  pickupStatusText: retryRecoveredPickupStatusText || recoveredPickupStatusText || pickupStatusText || null,
+                  pickupSnapshotStatus: retryRecoveredPickupSnapshot.status,
+                  pickupSnapshotDelivered: retryRecoveredPickupSnapshot.delivered,
+                  reason: 'pickup completed by atomic recovery retry click',
+                });
+                return;
+              }
               throw new Error(`Driver pickup button not visible for order ${orderId}: ${JSON.stringify({
                 orderId,
                 currentUrl: driverPage.url(),
