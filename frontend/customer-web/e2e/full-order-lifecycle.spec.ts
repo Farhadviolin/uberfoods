@@ -1283,27 +1283,68 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
               : Array.isArray((parsedSnapshot as { cart?: unknown[] })?.cart)
                 ? (parsedSnapshot as { cart: unknown[] }).cart
                 : [];
+          const parseAmount = (value: unknown) => {
+            if (typeof value === 'number') {
+              return Number.isFinite(value) ? value : null;
+            }
+            if (typeof value !== 'string') {
+              return null;
+            }
+
+            const normalized = value.replace(/[^\d,.-]/g, '').replace(',', '.');
+            const amount = Number(normalized);
+            return Number.isFinite(amount) ? amount : null;
+          };
+          const resolveNestedRecord = (item: Record<string, unknown>, key: string) => {
+            const value = item[key];
+            return value && typeof value === 'object' && !Array.isArray(value)
+              ? value as Record<string, unknown>
+              : null;
+          };
+          const resolveItemUnitPrice = (item: Record<string, unknown>) => {
+            const nestedDish = resolveNestedRecord(item, 'dish');
+            const nestedMenuItem = resolveNestedRecord(item, 'menuItem');
+            const nestedItem = resolveNestedRecord(item, 'item');
+            const nestedProduct = resolveNestedRecord(item, 'product');
+            const candidates = [
+              item.price,
+              item.unitPrice,
+              item.dishPrice,
+              nestedDish?.price,
+              nestedDish?.unitPrice,
+              nestedMenuItem?.price,
+              nestedMenuItem?.unitPrice,
+              nestedItem?.price,
+              nestedItem?.unitPrice,
+              nestedProduct?.price,
+              nestedProduct?.unitPrice,
+            ];
+            return candidates.map((candidate) => parseAmount(candidate)).find((amount): amount is number => amount !== null) ?? null;
+          };
+          const resolveItemQuantity = (item: Record<string, unknown>) => {
+            const candidates = [
+              item.quantity,
+              item.qty,
+              item.count,
+            ];
+            return candidates.map((candidate) => parseAmount(candidate)).find((amount): amount is number => amount !== null && amount > 0) ?? 1;
+          };
           const parsedItemCount = parsedItems.length;
           const parsedQuantityCount = parsedItems.reduce((count, item) => {
-            const quantity = Number((item as { quantity?: unknown; qty?: unknown; count?: unknown })?.quantity
-              ?? (item as { quantity?: unknown; qty?: unknown; count?: unknown })?.qty
-              ?? (item as { quantity?: unknown; qty?: unknown; count?: unknown })?.count
-              ?? 1);
-            return count + (Number.isFinite(quantity) && quantity > 0 ? quantity : 1);
+            const quantity = resolveItemQuantity(item as Record<string, unknown>);
+            return count + quantity;
           }, 0);
 
           const parsedSubtotal = parsedItems.reduce((sum, item) => {
-            const directSubtotal = Number((item as { totalPrice?: unknown; subtotal?: unknown })?.totalPrice ?? (item as { totalPrice?: unknown; subtotal?: unknown })?.subtotal);
-            if (Number.isFinite(directSubtotal) && directSubtotal > 0) {
+            const typedItem = item as Record<string, unknown>;
+            const directSubtotal = parseAmount(typedItem.totalPrice ?? typedItem.subtotal);
+            if (directSubtotal !== null && directSubtotal > 0) {
               return sum + directSubtotal;
             }
 
-            const unitPrice = Number((item as { price?: unknown; unitPrice?: unknown })?.price ?? (item as { price?: unknown; unitPrice?: unknown })?.unitPrice);
-            const quantity = Number((item as { quantity?: unknown; qty?: unknown; count?: unknown })?.quantity
-              ?? (item as { quantity?: unknown; qty?: unknown; count?: unknown })?.qty
-              ?? (item as { quantity?: unknown; qty?: unknown; count?: unknown })?.count
-              ?? 1);
-            return sum + (Number.isFinite(unitPrice) && unitPrice > 0 ? unitPrice : 0) * (Number.isFinite(quantity) && quantity > 0 ? quantity : 1);
+            const unitPrice = resolveItemUnitPrice(typedItem);
+            const quantity = resolveItemQuantity(typedItem);
+            return sum + (unitPrice ?? 0) * quantity;
           }, 0);
 
           if (parsedItemCount === 0 || parsedQuantityCount === 0 || parsedItemCount < 2 || parsedQuantityCount < 2) {
