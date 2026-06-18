@@ -2024,6 +2024,21 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
 
         const ensureFinalSubmitMinimumCart = async () => {
           const targetFinalSubmitSubtotal = Math.max(25, lastSafeMinimumOrderSubtotal ?? 25);
+          const finalSubmitRestoreDeadlineMs = 9000;
+          const finalSubmitRestoreStartedAt = Date.now();
+          const remainingFinalSubmitRestoreMs = () => Math.max(0, finalSubmitRestoreDeadlineMs - (Date.now() - finalSubmitRestoreStartedAt));
+          const boundedFinalSubmitTimeout = (preferredMs: number) => Math.max(250, Math.min(preferredMs, remainingFinalSubmitRestoreMs()));
+          const restoreAttempts: Array<{
+            attempt: number;
+            subtotal: number;
+            subtotalSource: string | null;
+            storageItemCount: number;
+            storageQuantityCount: number;
+            cartStatePresent: boolean;
+            checkoutButtonVisible: boolean;
+            checkoutButtonEnabled: boolean;
+            elapsedMs: number;
+          }> = [];
           const getVisibleCartContext = async () => {
             const storageSnapshot = await customerPage.evaluate(() => {
               const keys = Object.keys(window.localStorage);
@@ -2045,19 +2060,32 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
                   visible: !!(rect.width && rect.height) && style.display !== 'none' && style.visibility !== 'hidden',
                 };
               })
-              .filter((button) => button.visible && /quick add|add to cart|add|plus|\+/i.test(button.text || '') || button.testId === 'add-to-cart-button'))
+              .filter((button) => button.visible && (/quick add|add to cart|add|plus|\+/i.test(button.text || '') || button.testId === 'add-to-cart-button')))
               .catch(() => []);
 
             return {
               currentUrl: customerPage.url(),
               storageKeys: storageSnapshot.keys,
               storageEntries: storageSnapshot.entries,
+              storageItemCount: diagnostics.itemCount,
+              storageQuantityCount: diagnostics.quantityCount,
+              cartStatePresent: Boolean(await customerPage.getByTestId('cart').count().catch(() => 0)),
               visibleCartText: (await customerPage.getByTestId('cart').textContent().catch(() => '')) || '',
               visibleQuickAddButtons: quickAddButtons,
             };
           };
 
           let diagnostics = await collectFinalSubmitCartDiagnostics();
+          const checkoutButton = customerPage
+            .getByTestId('cart')
+            .locator('button[data-testid="checkout-button"]')
+            .filter({ hasText: /^(Place Order|Bestellen|Submit Order|Order Now|Jetzt bestellen|Zahlungspflichtig bestellen|Bezahlen|Pay)$/i })
+            .first();
+          const checkoutButtonVisible = await checkoutButton.isVisible().catch(() => false);
+          const checkoutButtonEnabled = checkoutButtonVisible
+            ? await checkoutButton.isEnabled().catch(() => false)
+            : false;
+
           console.log('ℹ️ lifecycle: final submit cart diagnostics', {
             finalSubmitCartItems: diagnostics.cartItems,
             finalSubmitSubtotal: diagnostics.subtotal,
@@ -2074,7 +2102,23 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
             subtotalSource: diagnostics.subtotalSource,
           });
 
-          if (diagnostics.finalSubmitMinimumSatisfied) {
+          if (diagnostics.finalSubmitMinimumSatisfied
+            && diagnostics.subtotal >= targetFinalSubmitSubtotal
+            && diagnostics.itemCount > 0
+            && diagnostics.quantityCount > 0
+            && checkoutButtonVisible
+            && checkoutButtonEnabled) {
+            console.log('✅ lifecycle: final submit cart already valid, skipping restore', {
+              currentUrl: customerPage.url(),
+              subtotal: diagnostics.subtotal,
+              subtotalSource: diagnostics.subtotalSource,
+              storageItemCount: diagnostics.itemCount,
+              storageQuantityCount: diagnostics.quantityCount,
+              cartStatePresent: true,
+              checkoutButtonVisible,
+              checkoutButtonEnabled,
+              targetSubtotal: targetFinalSubmitSubtotal,
+            });
             return diagnostics;
           }
 
@@ -2090,8 +2134,9 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
 
           const openRestaurantMenuForCartRepair = async () => {
             if (!/\/restaurants\/[^/?]+/.test(customerPage.url())) {
-              await customerPage.goto(`${testUrls.customer}/restaurants`, { waitUntil: 'domcontentloaded' });
-              await customerPage.waitForLoadState('networkidle').catch(() => null);
+              await customerPage.goto(`${testUrls.customer}/restaurants`, { waitUntil: 'domcontentloaded' }).catch(() => null);
+              await customerPage.waitForLoadState('domcontentloaded', { timeout: boundedFinalSubmitTimeout(1500) }).catch(() => null);
+              await customerPage.waitForLoadState('networkidle', { timeout: boundedFinalSubmitTimeout(2000) }).catch(() => null);
               await TestHelpers.waitForStablePage(customerPage);
             }
 
@@ -2114,11 +2159,12 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
 
             if (restaurantCardCount > 0) {
               const restaurantCard = restaurantCards.first();
-              await restaurantCard.scrollIntoViewIfNeeded().catch(() => null);
-              await restaurantCard.click().catch(async () => {
-                await restaurantCard.locator('a, button').first().click();
+              await restaurantCard.scrollIntoViewIfNeeded({ timeout: boundedFinalSubmitTimeout(1000) }).catch(() => null);
+              await restaurantCard.click({ timeout: boundedFinalSubmitTimeout(1500) }).catch(async () => {
+                await restaurantCard.locator('a, button').first().click({ timeout: boundedFinalSubmitTimeout(1500) });
               });
-              await customerPage.waitForLoadState('networkidle').catch(() => null);
+              await customerPage.waitForLoadState('domcontentloaded', { timeout: boundedFinalSubmitTimeout(1500) }).catch(() => null);
+              await customerPage.waitForLoadState('networkidle', { timeout: boundedFinalSubmitTimeout(2000) }).catch(() => null);
               await TestHelpers.waitForStablePage(customerPage);
             }
 
@@ -2146,19 +2192,53 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
             return addToCartButtons;
           };
 
+          console.log('➡️ lifecycle: final submit cart restore start', {
+            currentUrl: customerPage.url(),
+            subtotal: diagnostics.subtotal,
+            subtotalSource: diagnostics.subtotalSource,
+            storageItemCount: diagnostics.itemCount,
+            storageQuantityCount: diagnostics.quantityCount,
+            cartStatePresent: true,
+            targetSubtotal: targetFinalSubmitSubtotal,
+            remainingDeadlineMs: remainingFinalSubmitRestoreMs(),
+          });
+
           let addToCartButtons = await openRestaurantMenuForCartRepair();
-          let addButtonCount = await addToCartButtons.count().catch(() => 0);
           const attemptedAddButtonIndexes = new Set<number>();
 
-          for (let attempt = 1; attempt <= 10; attempt += 1) {
+          for (let attempt = 1; attempt <= 2; attempt += 1) {
+            if (remainingFinalSubmitRestoreMs() <= 0) {
+              break;
+            }
+
             const diagnosticsBeforeRepair = diagnostics;
             diagnostics = await collectFinalSubmitCartDiagnostics();
-            if (diagnostics.finalSubmitMinimumSatisfied) {
+            const checkoutVisibleNow = await checkoutButton.isVisible().catch(() => false);
+            const checkoutEnabledNow = checkoutVisibleNow
+              ? await checkoutButton.isEnabled().catch(() => false)
+              : false;
+            restoreAttempts.push({
+              attempt,
+              subtotal: diagnostics.subtotal,
+              subtotalSource: diagnostics.subtotalSource,
+              storageItemCount: diagnostics.itemCount,
+              storageQuantityCount: diagnostics.quantityCount,
+              cartStatePresent: true,
+              checkoutButtonVisible: checkoutVisibleNow,
+              checkoutButtonEnabled: checkoutEnabledNow,
+              elapsedMs: Date.now() - finalSubmitRestoreStartedAt,
+            });
+
+            if (diagnostics.finalSubmitMinimumSatisfied
+              && diagnostics.subtotal >= targetFinalSubmitSubtotal
+              && diagnostics.itemCount > 0
+              && diagnostics.quantityCount > 0
+              && checkoutVisibleNow
+              && checkoutEnabledNow) {
               break;
             }
 
             addToCartButtons = await openRestaurantMenuForCartRepair();
-            addButtonCount = await addToCartButtons.count().catch(() => 0);
 
             console.log('➡️ lifecycle: restoring final submit cart minimum', {
               attempt,
@@ -2170,6 +2250,7 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
               finalSubmitQuantityCount: diagnostics.quantityCount,
               finalSubmitPayloadPreview: diagnostics.cartItems.slice(0, 5),
               targetFinalSubmitSubtotal,
+              remainingDeadlineMs: remainingFinalSubmitRestoreMs(),
             });
 
             let buttonClicked = false;
@@ -2199,8 +2280,8 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
               }
 
               attemptedAddButtonIndexes.add(buttonIndex);
-              await button.scrollIntoViewIfNeeded().catch(() => null);
-              await button.click().catch(async () => {
+              await button.scrollIntoViewIfNeeded({ timeout: boundedFinalSubmitTimeout(1000) }).catch(() => null);
+              await button.click({ timeout: boundedFinalSubmitTimeout(1500) }).catch(async () => {
                 await customerPage.mouse.click(0, 0).catch(() => null);
               });
               buttonClicked = true;
@@ -2209,21 +2290,25 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
 
             if (!buttonClicked) {
               const visibleContext = await getVisibleCartContext();
-              throw new Error(`Final submit cart could not be restored above minimum: ${JSON.stringify({
+              throw new Error(`Final submit cart restore failed before order submit: ${JSON.stringify({
                 ...visibleContext,
                 finalSubmitSubtotal: diagnostics.subtotal,
                 finalSubmitItemCount: diagnostics.itemCount,
                 finalSubmitQuantityCount: diagnostics.quantityCount,
                 finalSubmitPayloadPreview: diagnostics.cartItems.slice(0, 5),
                 targetFinalSubmitSubtotal,
+                restoreAttemptCount: restoreAttempts.length,
+                elapsedMs: Date.now() - finalSubmitRestoreStartedAt,
+                remainingDeadlineMs: remainingFinalSubmitRestoreMs(),
               })}`);
             }
 
-            await customerPage.waitForTimeout(300);
+            await customerPage.waitForTimeout(250);
             diagnostics = await collectFinalSubmitCartDiagnostics();
             if (diagnostics.payloadSubtotal <= diagnosticsBeforeRepair.payloadSubtotal) {
               await customerPage.goto(`${testUrls.customer}/restaurants`, { waitUntil: 'domcontentloaded' }).catch(() => null);
-              await customerPage.waitForLoadState('networkidle').catch(() => null);
+              await customerPage.waitForLoadState('domcontentloaded', { timeout: boundedFinalSubmitTimeout(1500) }).catch(() => null);
+              await customerPage.waitForLoadState('networkidle', { timeout: boundedFinalSubmitTimeout(2000) }).catch(() => null);
               await TestHelpers.waitForStablePage(customerPage);
             }
           }
@@ -2243,16 +2328,54 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
           });
 
           if (!diagnostics.finalSubmitMinimumSatisfied) {
-            throw new Error(`Final submit cart could not be restored above minimum: ${JSON.stringify({
-              ...(await getVisibleCartContext()),
-              finalSubmitSubtotal: diagnostics.subtotal,
-              payloadSubtotalAfterRepair: diagnostics.payloadSubtotal,
-              finalSubmitItemCount: diagnostics.itemCount,
-              finalSubmitQuantityCount: diagnostics.quantityCount,
-              finalSubmitPayloadPreview: diagnostics.cartItems.slice(0, 5),
-              targetFinalSubmitSubtotal,
+            const visibleContext = await getVisibleCartContext();
+            console.warn('⚠️ lifecycle: final submit cart restore failed', {
+              currentUrl: customerPage.url(),
+              subtotal: diagnostics.subtotal,
+              subtotalSource: diagnostics.subtotalSource,
+              storageKeys: visibleContext.storageKeys,
+              storageItemCount: diagnostics.itemCount,
+              storageQuantityCount: diagnostics.quantityCount,
+              cartStatePresent: visibleContext.cartStatePresent,
+              visibleCartText: visibleContext.visibleCartText,
+              visibleButtons: visibleContext.visibleQuickAddButtons.map((button) => button.text).slice(0, 10),
+              checkoutButtonVisible,
+              checkoutButtonEnabled,
+              targetSubtotal: targetFinalSubmitSubtotal,
+              restoreAttemptCount: restoreAttempts.length,
+              elapsedMs: Date.now() - finalSubmitRestoreStartedAt,
+              remainingDeadlineMs: remainingFinalSubmitRestoreMs(),
+              restoreAttempts,
+            });
+            throw new Error(`Final submit cart restore failed before order submit: ${JSON.stringify({
+              currentUrl: customerPage.url(),
+              subtotal: diagnostics.subtotal,
+              subtotalSource: diagnostics.subtotalSource,
+              storageKeys: visibleContext.storageKeys,
+              storageItemCount: diagnostics.itemCount,
+              storageQuantityCount: diagnostics.quantityCount,
+              cartStatePresent: visibleContext.cartStatePresent,
+              visibleCartText: visibleContext.visibleCartText,
+              visibleButtons: visibleContext.visibleQuickAddButtons.map((button) => button.text).slice(0, 10),
+              checkoutButtonVisible,
+              checkoutButtonEnabled,
+              targetSubtotal: targetFinalSubmitSubtotal,
+              restoreAttemptCount: restoreAttempts.length,
+              elapsedMs: Date.now() - finalSubmitRestoreStartedAt,
+              remainingDeadlineMs: remainingFinalSubmitRestoreMs(),
             })}`);
           }
+
+          console.log('✅ lifecycle: final submit cart restore completed', {
+            currentUrl: customerPage.url(),
+            subtotal: diagnostics.subtotal,
+            subtotalSource: diagnostics.subtotalSource,
+            storageItemCount: diagnostics.itemCount,
+            storageQuantityCount: diagnostics.quantityCount,
+            targetSubtotal: targetFinalSubmitSubtotal,
+            restoreAttemptCount: restoreAttempts.length,
+            elapsedMs: Date.now() - finalSubmitRestoreStartedAt,
+          });
 
           await customerPage.goto('/checkout', { waitUntil: 'domcontentloaded' });
           await customerPage.waitForLoadState('networkidle').catch(() => null);
