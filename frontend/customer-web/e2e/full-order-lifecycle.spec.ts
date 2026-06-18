@@ -2503,7 +2503,7 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
           let addToCartButtons = await openRestaurantMenuForCartRepair();
           const attemptedAddButtonIndexes = new Set<number>();
 
-          for (let attempt = 1; attempt <= 1; attempt += 1) {
+          for (let attempt = 1; attempt <= 3; attempt += 1) {
             if (remainingFinalSubmitRestoreMs() <= 0) {
               break;
             }
@@ -2607,6 +2607,13 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
               await boundedLoadState(customerPage, 'domcontentloaded', 1500);
               await boundedLoadState(customerPage, 'networkidle', 1500);
               await boundedStablePage(customerPage, 2000);
+            }
+
+            if (diagnostics.finalSubmitMinimumSatisfied
+              && diagnostics.subtotal >= targetFinalSubmitSubtotal
+              && diagnostics.itemCount > 0
+              && diagnostics.quantityCount > 0) {
+              break;
             }
           }
 
