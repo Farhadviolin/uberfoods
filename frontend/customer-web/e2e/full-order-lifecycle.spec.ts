@@ -894,6 +894,18 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
     storageEntries: Array<[string, string | null]>;
     cartItemTexts: string[];
   } | null = null;
+  let finalSubmitValidCartSnapshot: {
+    cartSnapshotKey: string;
+    cartSnapshotRawValue: string | null;
+    restaurantId: string | null;
+    restaurantUrl: string | null;
+    subtotal: number;
+    itemCount: number;
+    quantityCount: number;
+    targetSubtotal: number;
+    timestamp: number;
+    visibleCartText?: string;
+  } | null = null;
 
   async function logCustomerUserSnapshot(page: Page, label: string) {
     const snapshot = await page.evaluate(() => {
@@ -1233,6 +1245,29 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
           }).catch(() => null);
         };
 
+        const captureFinalSubmitValidCartSnapshot = async (cartDiagnostics: Awaited<ReturnType<typeof getCartDiagnostics>>, storageDiagnostics: Awaited<ReturnType<typeof getStorageCartDiagnostics>>) => {
+          if (!Number.isFinite(cartDiagnostics.subtotal ?? NaN) || (cartDiagnostics.subtotal ?? 0) < targetSubtotal) {
+            return;
+          }
+
+          const snapshotKey = storageDiagnostics.storageKeys.find((key) => key.startsWith(cartStateKeyPrefix)) || null;
+          const snapshotRawValue = snapshotKey
+            ? await customerPage.evaluate((resolvedKey) => window.localStorage.getItem(resolvedKey), snapshotKey).catch(() => null)
+            : null;
+          finalSubmitValidCartSnapshot = {
+            cartSnapshotKey: snapshotKey ?? '',
+            cartSnapshotRawValue: snapshotRawValue,
+            restaurantId: orderRestaurantId ?? null,
+            restaurantUrl: customerPage.url(),
+            subtotal: cartDiagnostics.subtotal ?? 0,
+            itemCount: cartDiagnostics.cartItemCount,
+            quantityCount: cartDiagnostics.quantityCount,
+            targetSubtotal,
+            timestamp: Date.now(),
+            visibleCartText: cartDiagnostics.cartItemTexts.join(' ').slice(0, 500),
+          };
+        };
+
         for (let attempt = 1; attempt <= maxMinimumOrderAttempts; attempt += 1) {
           const cartDiagnostics = await getCartDiagnostics();
           const storageDiagnostics = await getStorageCartDiagnostics();
@@ -1259,6 +1294,7 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
               storageEntries: storageDiagnostics.storageEntries.map((entry) => [entry.key, JSON.stringify(entry)] as const),
               cartItemTexts: cartDiagnostics.cartItemTexts,
             });
+            await captureFinalSubmitValidCartSnapshot(cartDiagnostics, storageDiagnostics);
             console.log('✅ lifecycle: leaving phase1 minimum order satisfaction');
             return;
           }
@@ -1303,6 +1339,7 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
               storageEntries: postClickStorageDiagnostics.storageEntries.map((entry) => [entry.key, JSON.stringify(entry)] as const),
               cartItemTexts: postClickDiagnostics.cartItemTexts,
             });
+            await captureFinalSubmitValidCartSnapshot(postClickDiagnostics, postClickStorageDiagnostics);
             console.log('✅ lifecycle: leaving phase1 minimum order satisfaction');
             return;
           }
@@ -1920,6 +1957,20 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
             })}`);
           }
         }
+        if (finalSubmitValidCartSnapshot) {
+          const profileRecoveryCartDiagnostics = await collectFinalSubmitCartDiagnostics().catch(() => null);
+          if (profileRecoveryCartDiagnostics?.finalSubmitMinimumSatisfied) {
+            finalSubmitValidCartSnapshot = {
+              ...finalSubmitValidCartSnapshot,
+              timestamp: Date.now(),
+              subtotal: profileRecoveryCartDiagnostics.subtotal,
+              itemCount: profileRecoveryCartDiagnostics.itemCount,
+              quantityCount: profileRecoveryCartDiagnostics.quantityCount,
+              restaurantUrl: customerPage.url(),
+              visibleCartText: profileRecoveryCartDiagnostics.cartItems.map((item) => item.name ?? item.dishId ?? '').filter(Boolean).join(' ').slice(0, 500),
+            };
+          }
+        }
         await logCustomerUserSnapshot(customerPage, 'snapshot: after profile verification');
         console.log('checkoutAddressSnapshotAfterProfileVerification', await collectCheckoutAddressSnapshot());
         await logCheckoutDiagnostics('after profile verification');
@@ -2101,6 +2152,105 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
             finalSubmitMinimumSatisfied: diagnostics.finalSubmitMinimumSatisfied,
             subtotalSource: diagnostics.subtotalSource,
           });
+
+          const restoreCheckoutFromSnapshot = async () => {
+            if (!finalSubmitValidCartSnapshot?.cartSnapshotKey || !finalSubmitValidCartSnapshot.cartSnapshotRawValue) {
+              return false;
+            }
+
+            console.log('➡️ lifecycle: final submit cart snapshot restore start', {
+              currentUrl: customerPage.url(),
+              cartSnapshotPresent: Boolean(finalSubmitValidCartSnapshot),
+              cartSnapshotKey: finalSubmitValidCartSnapshot.cartSnapshotKey,
+              cartSnapshotSubtotal: finalSubmitValidCartSnapshot.subtotal,
+              cartSnapshotItemCount: finalSubmitValidCartSnapshot.itemCount,
+              cartSnapshotQuantityCount: finalSubmitValidCartSnapshot.quantityCount,
+              targetSubtotal: targetFinalSubmitSubtotal,
+            });
+
+            await customerPage.evaluate(({ storageKey, rawValue, snapshotKey }) => {
+              window.localStorage.setItem(storageKey, rawValue);
+              window.localStorage.setItem('lifecycle_final_submit_snapshot_key', snapshotKey);
+              window.localStorage.setItem('lifecycle_final_submit_snapshot_ts', String(Date.now()));
+            }, {
+              storageKey: finalSubmitValidCartSnapshot.cartSnapshotKey,
+              rawValue: finalSubmitValidCartSnapshot.cartSnapshotRawValue,
+              snapshotKey: finalSubmitValidCartSnapshot.cartSnapshotKey,
+            }).catch(() => null);
+
+            await customerPage.goto('/checkout', { waitUntil: 'domcontentloaded' }).catch(() => null);
+            await customerPage.waitForLoadState('domcontentloaded', { timeout: boundedFinalSubmitTimeout(1500) }).catch(() => null);
+
+            const postRestoreDiagnostics = await collectFinalSubmitCartDiagnostics();
+            const postRestoreCheckoutVisible = await checkoutButton.isVisible().catch(() => false);
+            const postRestoreCheckoutEnabled = postRestoreCheckoutVisible
+              ? await checkoutButton.isEnabled().catch(() => false)
+              : false;
+
+            const restored = postRestoreDiagnostics.finalSubmitMinimumSatisfied
+              && postRestoreDiagnostics.subtotal >= targetFinalSubmitSubtotal
+              && postRestoreCheckoutVisible
+              && postRestoreCheckoutEnabled;
+
+            if (restored) {
+              console.log('✅ lifecycle: final submit cart snapshot restore completed', {
+                currentUrl: customerPage.url(),
+                cartSnapshotKey: finalSubmitValidCartSnapshot.cartSnapshotKey,
+                cartSnapshotSubtotal: finalSubmitValidCartSnapshot.subtotal,
+                cartSnapshotItemCount: finalSubmitValidCartSnapshot.itemCount,
+                cartSnapshotQuantityCount: finalSubmitValidCartSnapshot.quantityCount,
+                restoredStorageKeys: [finalSubmitValidCartSnapshot.cartSnapshotKey],
+                currentStorageKeys: postRestoreDiagnostics.storageKeys,
+                currentSubtotal: postRestoreDiagnostics.subtotal,
+                subtotalSource: postRestoreDiagnostics.subtotalSource,
+                checkoutButtonVisible: postRestoreCheckoutVisible,
+                checkoutButtonEnabled: postRestoreCheckoutEnabled,
+                restoreAttemptCount: 1,
+                elapsedMs: Date.now() - finalSubmitRestoreStartedAt,
+                remainingDeadlineMs: remainingFinalSubmitRestoreMs(),
+              });
+              diagnostics = postRestoreDiagnostics;
+              return true;
+            }
+
+            console.warn('⚠️ lifecycle: final submit cart snapshot restore failed', {
+              currentUrl: customerPage.url(),
+              cartSnapshotPresent: true,
+              cartSnapshotKey: finalSubmitValidCartSnapshot.cartSnapshotKey,
+              cartSnapshotSubtotal: finalSubmitValidCartSnapshot.subtotal,
+              cartSnapshotItemCount: finalSubmitValidCartSnapshot.itemCount,
+              cartSnapshotQuantityCount: finalSubmitValidCartSnapshot.quantityCount,
+              restoredStorageKeys: [finalSubmitValidCartSnapshot.cartSnapshotKey],
+              currentStorageKeys: postRestoreDiagnostics.storageKeys,
+              currentSubtotal: postRestoreDiagnostics.subtotal,
+              subtotalSource: postRestoreDiagnostics.subtotalSource,
+              checkoutButtonVisible: postRestoreCheckoutVisible,
+              checkoutButtonEnabled: postRestoreCheckoutEnabled,
+              restoreAttemptCount: 1,
+              elapsedMs: Date.now() - finalSubmitRestoreStartedAt,
+              remainingDeadlineMs: remainingFinalSubmitRestoreMs(),
+            });
+
+            return false;
+          };
+
+          if (!diagnostics.finalSubmitMinimumSatisfied
+            || diagnostics.subtotal < targetFinalSubmitSubtotal
+            || diagnostics.itemCount === 0
+            || diagnostics.quantityCount === 0
+            || !checkoutButtonVisible
+            || !checkoutButtonEnabled) {
+            const snapshotRestored = await restoreCheckoutFromSnapshot();
+            if (snapshotRestored) {
+              return diagnostics;
+            }
+            if (!finalSubmitValidCartSnapshot) {
+              console.warn('⚠️ lifecycle: final submit valid cart snapshot missing', {
+                currentUrl: customerPage.url(),
+                restoreAttemptCount: 0,
+              });
+            }
+          }
 
           if (diagnostics.finalSubmitMinimumSatisfied
             && diagnostics.subtotal >= targetFinalSubmitSubtotal
