@@ -912,6 +912,25 @@ async function tryPickupApiFallbackForVisibleAcceptedOrder(params: {
     fallbackResponseStatusFromBody: parsedFallbackBodyStatus,
     fallbackConfirmedStatus,
   });
+  if (fallbackConfirmedStatus) {
+    console.log('✅ lifecycle: pickup API fallback accepted as completed', {
+      orderId,
+      fallbackConfirmedStatus,
+    });
+    console.log('✅ lifecycle: driver pickup completed', {
+      orderId,
+      source: 'api-fallback',
+      status: fallbackConfirmedStatus,
+    });
+    return {
+      attempted: true,
+      succeeded: true,
+      latestApiStatusBeforePickupClick,
+      latestApiStatusAfterFallback: fallbackConfirmedStatus,
+      fallbackResponseStatus: fallbackResponse.status(),
+      fallbackResponseBody: fallbackResponseBody.slice(0, 1000),
+    };
+  }
   const latestApiStatusAfterFallback = fallbackConfirmedStatus
     || await fetchDriverOrderSnapshot(driverPage, orderId)
       .then(async (snapshot) => {
