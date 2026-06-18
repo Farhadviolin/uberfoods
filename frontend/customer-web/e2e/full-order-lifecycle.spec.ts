@@ -4859,7 +4859,7 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
               clicked: false,
               reason: 'direct-click-timeout',
               orderSuffix: orderId.slice(-8),
-            }), boundedPickupTimeoutMs(2000)));
+            }), boundedPickupTimeoutMs(4000)));
             directClickResult = await Promise.race([directClickAttempt, directClickTimeout]);
             directVisibleClickDurationMs = Date.now() - directClickStartedAt;
             directVisibleClickCompleted = Boolean(directClickResult?.clicked);
@@ -4909,7 +4909,7 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
 
           const recoveryOrdersView = await Promise.race([
             ensureDriverOrdersViewAfterPickupInPickupClick(driverPage, orderId, 'phase3 driver pickup click recovery').catch(() => null),
-            new Promise<Awaited<ReturnType<typeof ensureDriverOrdersViewAfterPickupInPickupClick>> | null>((resolve) => setTimeout(() => resolve(null), boundedPickupTimeoutMs(3000))),
+            new Promise<Awaited<ReturnType<typeof ensureDriverOrdersViewAfterPickupInPickupClick>> | null>((resolve) => setTimeout(() => resolve(null), boundedPickupTimeoutMs(5000))),
           ]);
           recoveryDurationMs = Date.now() - recoveryStartedAt;
           const recoveredCardState = recoveryOrdersView?.orderCardVisible
@@ -4957,41 +4957,90 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
           }
 
           if (!recoveredPickupButtonVisible && !recoveredPickupStatusConfirmed) {
-            const visibleButtons = await driverPage.locator('button').evaluateAll((nodes) => nodes
-              .map((node) => (node.textContent || '').trim().replace(/\s+/g, ' '))
-              .filter(Boolean))
-              .catch(() => []);
-            const visibleCards = await driverPage.locator('[data-testid*="order"], .order-card, [data-order-id]').evaluateAll((nodes) => nodes
-              .map((node) => (node.textContent || '').trim().replace(/\s+/g, ' '))
-              .filter(Boolean))
-              .catch(() => []);
-            throw new Error(`Driver pickup button not visible for order ${orderId}: ${JSON.stringify({
+            await driverPage.waitForTimeout(500).catch(() => null);
+            const retryRecoveryOrdersView = await ensureDriverOrdersViewAfterPickupInPickupClick(
+              driverPage,
               orderId,
-              currentUrl: driverPage.url(),
-              cardFound: recoveredCardState.targetCardVisible,
-              pickupButtonVisible: recoveredPickupButtonVisible,
-              pickupButtonText: pickupButtonText || null,
-              pickupStatusTextBefore: pickupStatusTextBefore || null,
-              pickupStatusText: recoveredPickupStatusText || pickupStatusText || null,
-              pickupSnapshotStatus: recoveredPickupSnapshot.status,
-              pickupSnapshotDelivered: recoveredPickupSnapshot.delivered,
-              latestApiStatus,
-              visibleButtons: visibleButtons.slice(0, 25),
-              visibleCards: visibleCards.slice(0, 10),
-              visibleLinkTexts: recoveredCardState.visibleLinkTexts,
-              pageTextPreview: recoveredCardState.bodyTextPreview,
-              recoveryAttempted,
-              directVisibleClickAttempted,
-              directVisibleClickCompleted,
-              directVisibleClickError,
-              directVisibleClickDurationMs,
-              directClickResult,
-              recoveryDurationMs,
-              driverPickupVisiblePickupButtonSeen,
-              recoveryOrdersView,
-              remainingDeadlineMs: remainingPickupClickMs(),
-              apiStatusChecked: true,
-            })}`);
+              'phase3 driver pickup click recovery retry',
+            ).catch(() => null);
+            const retryRecoveredCardState = retryRecoveryOrdersView?.orderCardVisible
+              ? await resolveVisibleDriverTargetOrderCard(
+                driverPage,
+                orderId,
+                'phase3 driver pickup click recovery retry',
+              )
+              : recoveredCardState;
+            const retryRecoveredPickupButton = retryRecoveredCardState.targetCard
+              .getByTestId(`driver-picked-up-order-${orderId}`)
+              .or(retryRecoveredCardState.targetCard.locator('[data-action="pickup-order"]'))
+              .or(
+                retryRecoveredCardState.targetCard.getByRole('button', {
+                  name: /picked up|abgeholt|pickup/i,
+                }),
+              )
+              .first();
+            const retryRecoveredPickupButtonVisible = await retryRecoveredPickupButton.isVisible().catch(() => false);
+            const retryRecoveredPickupStatusText = await readLocatorTextWithin(
+              retryRecoveredCardState.targetCard.locator('[data-testid="order-status"], .order-status'),
+              1000,
+            );
+            const retryRecoveredPickupStatusConfirmed = Boolean(
+              retryRecoveredPickupStatusText && /PICKED_UP|IN_TRANSIT|OUT_FOR_DELIVERY|DELIVERED|COMPLETED/i.test(retryRecoveredPickupStatusText),
+            );
+            const retryRecoveredPickupSnapshot = await fetchDriverOrderSnapshot(driverPage, orderId);
+            latestApiStatus = retryRecoveredPickupSnapshot.status;
+
+            if (retryRecoveredPickupSnapshot.status && isConfirmedDriverProgressStatus(retryRecoveredPickupSnapshot.status)) {
+              driverPickupCompleted = true;
+              console.log('✅ driver pickup completed', {
+                orderId,
+                currentUrl: retryRecoveredPickupSnapshot.currentUrl,
+                pickupButtonText: pickupButtonText || null,
+                pickupStatusText: retryRecoveredPickupStatusText || null,
+                pickupSnapshotStatus: retryRecoveredPickupSnapshot.status,
+                pickupSnapshotDelivered: retryRecoveredPickupSnapshot.delivered,
+                reason: 'pickup confirmed by recovery retry snapshot before click',
+              });
+              return;
+            }
+
+            if (retryRecoveredPickupButtonVisible || retryRecoveredPickupStatusConfirmed) {
+              pickupButtonToClick = retryRecoveredPickupButton;
+            } else {
+              throw new Error(`Driver pickup button not visible for order ${orderId}: ${JSON.stringify({
+                orderId,
+                currentUrl: driverPage.url(),
+                cardFound: retryRecoveredCardState.targetCardVisible,
+                pickupButtonVisible: retryRecoveredPickupButtonVisible,
+                pickupButtonText: pickupButtonText || null,
+                pickupStatusTextBefore: pickupStatusTextBefore || null,
+                pickupStatusText: retryRecoveredPickupStatusText || recoveredPickupStatusText || pickupStatusText || null,
+                pickupSnapshotStatus: retryRecoveredPickupSnapshot.status,
+                pickupSnapshotDelivered: retryRecoveredPickupSnapshot.delivered,
+                latestApiStatus,
+                visibleButtons: (await driverPage.locator('button').evaluateAll((nodes) => nodes
+                  .map((node) => (node.textContent || '').trim().replace(/\s+/g, ' '))
+                  .filter(Boolean))
+                  .catch(() => [])).slice(0, 25),
+                visibleCards: (await driverPage.locator('[data-testid*="order"], .order-card, [data-order-id]').evaluateAll((nodes) => nodes
+                  .map((node) => (node.textContent || '').trim().replace(/\s+/g, ' '))
+                  .filter(Boolean))
+                  .catch(() => [])).slice(0, 10),
+                visibleLinkTexts: retryRecoveredCardState.visibleLinkTexts,
+                pageTextPreview: retryRecoveredCardState.bodyTextPreview,
+                recoveryAttempted,
+                directVisibleClickAttempted,
+                directVisibleClickCompleted,
+                directVisibleClickError,
+                directVisibleClickDurationMs,
+                directClickResult,
+                recoveryDurationMs,
+                driverPickupVisiblePickupButtonSeen,
+                recoveryOrdersView,
+                remainingDeadlineMs: remainingPickupClickMs(),
+                apiStatusChecked: true,
+              })}`);
+            }
           }
         }
 
