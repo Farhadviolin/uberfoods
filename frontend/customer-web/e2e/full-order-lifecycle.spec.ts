@@ -704,6 +704,19 @@ async function tryPickupApiFallbackForVisibleAcceptedOrder(params: {
   pageTextBeforeRecovery?: string;
   visibleButtonsBeforeRecovery?: unknown[];
   visibleInteractiveElementsBeforeRecovery?: unknown[];
+  previousVisibleOrderContext?: {
+    orderId?: string;
+    orderSuffix?: string;
+    cardFound?: boolean;
+    pickupButtonSeen?: boolean;
+    pickupButtonVisible?: boolean;
+    pickupButtonText?: string | null;
+    pageTextPreview?: string | null;
+    cardText?: string | null;
+    visibleButtons?: unknown[];
+    visibleInteractiveElements?: unknown[];
+    source?: string;
+  };
 }): Promise<{
   attempted: boolean;
   succeeded: boolean;
@@ -720,15 +733,36 @@ async function tryPickupApiFallbackForVisibleAcceptedOrder(params: {
     pageTextBeforeRecovery = '',
     visibleButtonsBeforeRecovery = [],
     visibleInteractiveElementsBeforeRecovery = [],
+    previousVisibleOrderContext = undefined,
   } = params;
   const orderSuffix = orderId.slice(-8);
   const latestApiStatusBeforePickupClick = await fetchDriverOrderSnapshot(driverPage, orderId)
     .then((snapshot) => snapshot.status)
     .catch(() => null);
-  const targetOrderVisibleInPageText = Boolean(
+  const targetOrderVisibleInCurrentPageText = Boolean(
     pageTextBeforeRecovery.includes(orderId)
     || pageTextBeforeRecovery.includes(orderSuffix)
     || pageTextBeforeRecovery.includes(`Order #${orderSuffix}`),
+  );
+  const targetOrderVisibleInPreviousContext = Boolean(
+    previousVisibleOrderContext
+    && (
+      previousVisibleOrderContext.orderId === orderId
+      || previousVisibleOrderContext.orderSuffix === orderSuffix
+      || Boolean(previousVisibleOrderContext.cardFound)
+      || Boolean(previousVisibleOrderContext.pickupButtonSeen)
+      || Boolean(previousVisibleOrderContext.pickupButtonVisible)
+      || Boolean(previousVisibleOrderContext.pageTextPreview && (
+        previousVisibleOrderContext.pageTextPreview.includes(orderId)
+        || previousVisibleOrderContext.pageTextPreview.includes(orderSuffix)
+        || previousVisibleOrderContext.pageTextPreview.includes(`Order #${orderSuffix}`)
+      ))
+      || Boolean(previousVisibleOrderContext.cardText && (
+        previousVisibleOrderContext.cardText.includes(orderId)
+        || previousVisibleOrderContext.cardText.includes(orderSuffix)
+        || previousVisibleOrderContext.cardText.includes(`Order #${orderSuffix}`)
+      ))
+    ),
   );
   const visibleButtons = Array.isArray(visibleButtonsBeforeRecovery) ? visibleButtonsBeforeRecovery : [];
   const visibleInteractiveElements = Array.isArray(visibleInteractiveElementsBeforeRecovery) ? visibleInteractiveElementsBeforeRecovery : [];
@@ -749,12 +783,12 @@ async function tryPickupApiFallbackForVisibleAcceptedOrder(params: {
   ].some((value) => /picked up|pick up|pickup|abholen|abgeholt|start delivery|in transit|unterwegs/i.test(value));
   const fallbackAttempted = Boolean(
     latestApiStatusBeforePickupClick === 'ACCEPTED'
-    && targetOrderVisibleInPageText
+    && (targetOrderVisibleInCurrentPageText || targetOrderVisibleInPreviousContext || Boolean(previousVisibleOrderContext?.pickupButtonSeen))
     && !hasClickablePickupCandidate,
   );
   const fallbackSkippedReason = fallbackAttempted
     ? null
-    : !targetOrderVisibleInPageText
+    : !(targetOrderVisibleInCurrentPageText || targetOrderVisibleInPreviousContext || Boolean(previousVisibleOrderContext?.pickupButtonSeen))
       ? 'target-order-not-visible-in-page-text'
       : latestApiStatusBeforePickupClick !== 'ACCEPTED'
         ? `latest-api-status-not-accepted:${latestApiStatusBeforePickupClick ?? 'null'}`
@@ -767,7 +801,10 @@ async function tryPickupApiFallbackForVisibleAcceptedOrder(params: {
     orderSuffix,
     stage,
     latestApiStatusBeforePickupClick,
-    targetOrderVisibleInPageText,
+    targetOrderVisibleInCurrentPageText,
+    targetOrderVisibleInPreviousContext,
+    driverPickupVisiblePickupButtonSeen: previousVisibleOrderContext?.pickupButtonSeen ?? false,
+    previousVisibleOrderContextSource: previousVisibleOrderContext?.source ?? null,
     fallbackAttempted,
     fallbackSkippedReason,
   });
@@ -788,11 +825,23 @@ async function tryPickupApiFallbackForVisibleAcceptedOrder(params: {
     orderId,
     orderSuffix,
     latestApiStatusBeforePickupClick,
-    targetOrderVisibleInPageText,
+    targetOrderVisibleInCurrentPageText,
+    targetOrderVisibleInPreviousContext,
     visibleButtons,
     visibleInteractiveElements,
     pageTextPreview: pageTextBeforeRecovery.slice(0, 2500),
   });
+  if (targetOrderVisibleInPreviousContext && !targetOrderVisibleInCurrentPageText) {
+    console.log('ℹ️ lifecycle: pickupActionMissingDespitePreviouslyVisibleAcceptedOrder', {
+      orderId,
+      orderSuffix,
+      latestApiStatusBeforePickupClick,
+      targetOrderVisibleInCurrentPageText,
+      targetOrderVisibleInPreviousContext,
+      driverPickupVisiblePickupButtonSeen: previousVisibleOrderContext?.pickupButtonSeen ?? false,
+      previousVisibleOrderContext,
+    });
+  }
 
   const pickupStatusUrl = new URL(`/api/drivers/orders/${orderId}/status`, testUrls.driver).href;
   const fallbackResponse = await driverPage.request.put(pickupStatusUrl, {
@@ -5135,6 +5184,19 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
         const pageTextBeforeRecovery = await driverPage.locator('body').innerText({ timeout: 2000 }).catch(() => '');
         const visibleButtonsBeforeRecovery = visibleButtons;
         const visibleInteractiveElementsBeforeRecovery = visibleInteractiveElements;
+        const previousVisibleOrderContext = driverPickupVisibleCardState ? {
+          orderId,
+          orderSuffix: orderId.slice(-8),
+          cardFound: driverPickupVisibleCardState.targetCardVisible,
+          pickupButtonSeen: driverPickupVisiblePickupButtonSeen,
+          pickupButtonVisible: driverPickupVisiblePickupButtonSeen,
+          pickupButtonText: pickupButtonText || null,
+          pageTextPreview: driverPickupVisibleCardState.bodyTextPreview || null,
+          cardText: driverPickupVisibleCardState.bodyTextPreview || null,
+          visibleButtons: driverPickupVisibleCardState.visibleButtonTexts,
+          visibleInteractiveElements: driverPickupVisibleCardState.visibleLinkTexts,
+          source: 'phase3 driver pickup button visible',
+        } : undefined;
         const pickupFallbackResult = await tryPickupApiFallbackForVisibleAcceptedOrder({
           driverPage,
           orderId,
@@ -5142,6 +5204,7 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
           pageTextBeforeRecovery,
           visibleButtonsBeforeRecovery,
           visibleInteractiveElementsBeforeRecovery,
+          previousVisibleOrderContext,
         });
         fallbackAttempted = pickupFallbackResult.attempted;
         fallbackSkippedReason = pickupFallbackResult.skippedReason || fallbackSkippedReason;
@@ -5487,6 +5550,14 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
             latestApiStatusAfterFallback,
             fallbackResponseStatus,
             fallbackResponseBody,
+            targetOrderVisibleInCurrentPageText: Boolean(
+              pageTextBeforeRecovery.includes(orderId)
+              || pageTextBeforeRecovery.includes(orderId.slice(-8))
+              || pageTextBeforeRecovery.includes(`Order #${orderId.slice(-8)}`),
+            ),
+            targetOrderVisibleInPreviousContext: Boolean(previousVisibleOrderContext),
+            driverPickupVisiblePickupButtonSeen,
+            previousVisibleOrderContext,
             resolverPath: 'driver-endpoints',
             rejectedCandidateReasons: ['pickup action missing despite visible accepted order'],
           })}`);
