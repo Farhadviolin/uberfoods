@@ -5730,35 +5730,39 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
           }
         }
 
-        let confirmedPickupSnapshot = await fetchDriverOrderSnapshot(driverPage, orderId);
-        console.log('ℹ️ lifecycle: pickup snapshot after visible-step verification', {
+        let confirmedPickupSnapshot = await waitForConfirmedDriverPickupStatus(
+          driverPage,
           orderId,
-          currentUrl: confirmedPickupSnapshot.currentUrl,
-          status: confirmedPickupSnapshot.status,
-          delivered: confirmedPickupSnapshot.delivered,
-          clickedFromVisibleStep: driverPickupClickedDuringVisibleStep,
-        });
+          'phase3 driver pickup click',
+        ).catch(async (error) => {
+          const snapshotAfterFailure = await fetchDriverOrderSnapshot(driverPage, orderId).catch(() => null);
+          console.log('ℹ️ lifecycle: pickup confirmation wait failed', {
+            orderId,
+            currentUrl: snapshotAfterFailure?.currentUrl ?? driverPage.url(),
+            status: snapshotAfterFailure?.status ?? null,
+            delivered: snapshotAfterFailure?.delivered ?? false,
+            clickedFromVisibleStep: driverPickupClickedDuringVisibleStep,
+            retryPickupAttempted,
+            error: error instanceof Error ? error.message : String(error),
+          });
 
-        if (
-          driverPickupClickedDuringVisibleStep
-          && confirmedPickupSnapshot.status === 'ACCEPTED'
-          && !confirmedPickupSnapshot.delivered
-          && !retryPickupAttempted
-        ) {
-          retryPickupAttempted = true;
-          retryPickupButtonText = await retryPickupClickWithDiagnostics('post-visible-step snapshot still ACCEPTED');
-          confirmedPickupSnapshot = await waitForConfirmedDriverPickupStatus(
-            driverPage,
-            orderId,
-            'phase3 driver pickup click after visible-step retry',
-          );
-        } else {
-          confirmedPickupSnapshot = await waitForConfirmedDriverPickupStatus(
-            driverPage,
-            orderId,
-            'phase3 driver pickup click',
-          );
-        }
+          if (
+            driverPickupClickedDuringVisibleStep
+            && snapshotAfterFailure?.status === 'ACCEPTED'
+            && !snapshotAfterFailure.delivered
+            && !retryPickupAttempted
+          ) {
+            retryPickupAttempted = true;
+            retryPickupButtonText = await retryPickupClickWithDiagnostics('post-visible-step snapshot still ACCEPTED');
+            return waitForConfirmedDriverPickupStatus(
+              driverPage,
+              orderId,
+              'phase3 driver pickup click after visible-step retry',
+            );
+          }
+
+          throw error;
+        });
 
         if (confirmedPickupSnapshot && isConfirmedDriverProgressStatus(confirmedPickupSnapshot.status) || confirmedPickupSnapshot?.delivered) {
           driverPickupCompleted = true;
