@@ -49,6 +49,10 @@ interface OrderWithRelations {
   } | null;
   items?: Array<unknown>;
   metadata?: Record<string, unknown>;
+  assignmentLogs?: Array<{
+    driverId: string;
+    createdAt: Date;
+  }>;
 }
 
 interface OrderFilters {
@@ -66,6 +70,18 @@ function normalizeStatusWhere(status?: string) {
     .filter(Boolean);
   if (statuses.length === 0) return undefined;
   return statuses.length === 1 ? statuses[0] : { in: statuses };
+}
+
+function applyAssignedDriverId<T extends { driverId?: string | null; assignmentLogs?: Array<{ driverId: string; createdAt: Date }> }>(
+  order: T,
+) {
+  return {
+    ...order,
+    driverId:
+      order.driverId ||
+      order.assignmentLogs?.[0]?.driverId ||
+      null,
+  };
 }
 
 interface OrderModifications {
@@ -557,6 +573,11 @@ export class OrderService {
           driver: {
             select: { id: true, name: true, phone: true },
           },
+          assignmentLogs: {
+            take: 1,
+            orderBy: { createdAt: "desc" },
+            select: { driverId: true, createdAt: true },
+          },
         },
       });
 
@@ -572,7 +593,7 @@ export class OrderService {
       }
 
       const result: KeysetPaginationResult<OrderWithRelations> = {
-        data: data as unknown as OrderWithRelations[],
+        data: data.map((order) => applyAssignedDriverId(order)) as unknown as OrderWithRelations[],
         nextCursor,
         hasMore,
       };
@@ -619,6 +640,11 @@ export class OrderService {
         customer: true,
         restaurant: true,
         driver: true,
+        assignmentLogs: {
+          take: 1,
+          orderBy: { createdAt: "desc" },
+          select: { driverId: true, createdAt: true },
+        },
         items: {
           include: {
             dish: true,
@@ -634,8 +660,9 @@ export class OrderService {
     }
 
     // Cache for 1 minute (order details change frequently)
-    this.cacheService.set(cacheKey, order, 60000);
-    return order;
+    const normalizedOrder = applyAssignedDriverId(order);
+    this.cacheService.set(cacheKey, normalizedOrder, 60000);
+    return normalizedOrder;
   }
 
   async create(data: {

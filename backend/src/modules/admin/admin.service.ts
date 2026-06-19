@@ -2068,6 +2068,11 @@ export class AdminService {
           priority: true,
           estimatedDeliveryTime: true,
           driver: { select: { id: true, name: true, phone: true } },
+          assignmentLogs: {
+            take: 1,
+            orderBy: { createdAt: "desc" },
+            select: { driverId: true, createdAt: true },
+          },
           restaurant: { select: { id: true, name: true, address: true } },
           customer: { select: { id: true, name: true, phone: true } },
           items: {
@@ -2084,7 +2089,10 @@ export class AdminService {
     ]);
 
     return {
-      orders,
+      orders: orders.map((order) => ({
+        ...order,
+        driverId: order.driverId || order.assignmentLogs?.[0]?.driverId || null,
+      })),
       pagination: {
         page,
         limit,
