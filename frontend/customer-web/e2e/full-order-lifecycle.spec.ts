@@ -5730,22 +5730,35 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
           }
         }
 
-        const confirmedPickupSnapshot = await waitForConfirmedDriverPickupStatus(
-          driverPage,
+        let confirmedPickupSnapshot = await fetchDriverOrderSnapshot(driverPage, orderId);
+        console.log('ℹ️ lifecycle: pickup snapshot after visible-step verification', {
           orderId,
-          'phase3 driver pickup click',
-        ).catch(async (error) => {
-          if (driverPickupClickedDuringVisibleStep && !retryPickupAttempted) {
-            retryPickupAttempted = true;
-            retryPickupButtonText = await retryPickupClickWithDiagnostics('post-visible-step snapshot still ACCEPTED');
-            return waitForConfirmedDriverPickupStatus(
-              driverPage,
-              orderId,
-              'phase3 driver pickup click after visible-step retry',
-            );
-          }
-          throw error;
+          currentUrl: confirmedPickupSnapshot.currentUrl,
+          status: confirmedPickupSnapshot.status,
+          delivered: confirmedPickupSnapshot.delivered,
+          clickedFromVisibleStep: driverPickupClickedDuringVisibleStep,
         });
+
+        if (
+          driverPickupClickedDuringVisibleStep
+          && confirmedPickupSnapshot.status === 'ACCEPTED'
+          && !confirmedPickupSnapshot.delivered
+          && !retryPickupAttempted
+        ) {
+          retryPickupAttempted = true;
+          retryPickupButtonText = await retryPickupClickWithDiagnostics('post-visible-step snapshot still ACCEPTED');
+          confirmedPickupSnapshot = await waitForConfirmedDriverPickupStatus(
+            driverPage,
+            orderId,
+            'phase3 driver pickup click after visible-step retry',
+          );
+        } else {
+          confirmedPickupSnapshot = await waitForConfirmedDriverPickupStatus(
+            driverPage,
+            orderId,
+            'phase3 driver pickup click',
+          );
+        }
 
         if (confirmedPickupSnapshot && isConfirmedDriverProgressStatus(confirmedPickupSnapshot.status) || confirmedPickupSnapshot?.delivered) {
           driverPickupCompleted = true;
