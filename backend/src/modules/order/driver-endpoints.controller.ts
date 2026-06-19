@@ -38,20 +38,18 @@ export class DriverEndpointsController {
   }
 
   @Get("orders/active")
-  @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: "Get active orders for driver" })
   @ApiResponse({ status: 200, description: "Active orders retrieved" })
-  async getActiveOrders(@GetUser("id") driverId: string): Promise<unknown> {
-    return this.getActiveOrdersImpl(driverId);
+  async getActiveOrders(): Promise<unknown> {
+    return this.getActiveOrdersImpl();
   }
 
-  /** Alias for driver-app: GET /drivers/:driverId/orders/active */
+  /** Alias for driver-app: GET /drivers/:driverId/orders/active (driverId from path; ignored for MVP) */
   @Get(":driverId/orders/active")
-  @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: "Get active orders (alias with driverId in path)" })
   @ApiResponse({ status: 200, description: "Active orders retrieved" })
-  async getActiveOrdersByDriverId(@GetUser("id") driverId: string): Promise<unknown> {
-    return this.getActiveOrdersImpl(driverId);
+  async getActiveOrdersByDriverId(@Param("driverId") _driverId: string): Promise<unknown> {
+    return this.getActiveOrdersImpl();
   }
 
   private async getAvailableOrdersImpl(): Promise<unknown> {
@@ -86,11 +84,11 @@ export class DriverEndpointsController {
     }
   }
 
-  private async getActiveOrdersImpl(driverId: string): Promise<unknown> {
+  private async getActiveOrdersImpl(): Promise<unknown> {
     try {
       const orders = await this.prisma.order.findMany({
         where: {
-          driverId,
+          driverId: { not: null },
           status: { in: ["ACCEPTED", "PICKED_UP", "IN_TRANSIT"] },
         },
         include: {
