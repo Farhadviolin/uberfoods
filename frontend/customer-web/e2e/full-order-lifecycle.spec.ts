@@ -4638,6 +4638,7 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
         let visibleInteractiveElements: Array<{ text: string; visible: boolean; [key: string]: unknown }> = [];
         let visiblePickupCandidates: Array<{ text: string; visible: boolean; [key: string]: unknown }> = [];
         let pickupActionMissingDespiteVisibleAcceptedOrder = false;
+        let pickupConfirmedBySignal = false;
         let activeOrderCountSignal = 0;
         let fallbackAttempted = false;
         let fallbackSkippedReason = 'pickup-action-present-or-not-accepted';
@@ -5569,7 +5570,7 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
         const pickupStatusTextAfter = await readLocatorTextWithin(pickupStatusLocator, 1000);
         const hasPickupUiSuccess = Boolean(pickupUiSuccess)
           || /PICKED_UP|IN_TRANSIT|OUT_FOR_DELIVERY|ON_THE_WAY|abgeholt|unterwegs|in delivery|delivered/i.test(pickupStatusTextAfter);
-        let pickupConfirmedBySignal = Boolean(pickupResponse) || hasPickupUiSuccess;
+        pickupConfirmedBySignal = Boolean(pickupResponse) || hasPickupUiSuccess;
         latestApiStatusBeforePickupClick = latestApiStatus || pickupSnapshot?.status || null;
         pageTextPreview = driverPickupVisibleCardState?.bodyTextPreview || '';
         visibleButtons = (await driverPage.locator('button').evaluateAll((nodes) => nodes
