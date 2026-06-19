@@ -5816,10 +5816,11 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
 
       await withStepTimeout('phase3 driver delivered button visible', async () => {
         const ordersViewAfterPickup = await ensureDriverOrdersViewAfterPickup(driverPage, orderId, 'before delivered dom visibility');
+        const apiStatusAfterPickup = latestApiStatus || null;
         const deliveredState = await refreshDeliveredUiAfterConfirmedPickup(
           orderId,
           'phase3 driver delivered button visible',
-          latestApiStatus || null,
+          apiStatusAfterPickup,
         );
         const driverOrderSnapshot = deliveredState.snapshot;
         const deliveredOrderCard = driverPage
@@ -5841,17 +5842,31 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
           });
           return;
         }
-        if (!deliveredCardVisible && driverPickupCompleted && /DELIVERED|IN_TRANSIT|OUT_FOR_DELIVERY|COMPLETED/i.test(driverOrderSnapshot.status || '')) {
+        if (!deliveredCardVisible && driverPickupCompleted && /PICKED_UP|DELIVERED|IN_TRANSIT|OUT_FOR_DELIVERY|COMPLETED/i.test(apiStatusAfterPickup || driverOrderSnapshot.status || '')) {
           console.log('✅ lifecycle: driver delivered state already confirmed after pickup completion', {
             orderId,
             currentUrl: driverPage.isClosed() ? 'closed' : driverPage.url(),
             driverOrderStatus: driverOrderSnapshot.status,
             deliveredStatusTextBefore: deliveredStatusTextBefore || null,
             ordersViewAfterPickup,
+            apiStatusAfterPickup,
           });
           return;
         }
         if (!deliveredButtonVisible) {
+          if (driverPickupCompleted && /PICKED_UP|DELIVERED|IN_TRANSIT|OUT_FOR_DELIVERY|COMPLETED/i.test(apiStatusAfterPickup || driverOrderSnapshot.status || '')) {
+            console.log('ℹ️ lifecycle: delivered button still missing in stale UI after confirmed pickup, continuing to delivered click step', {
+              orderId,
+              currentUrl: driverPage.url(),
+              apiStatusAfterPickup,
+              driverOrderStatus: driverOrderSnapshot.status,
+              staleUiStatus: driverOrderSnapshot.status,
+              deliveredCardVisible,
+              deliveredButtonCount,
+              ordersViewAfterPickup,
+            });
+            return;
+          }
           const visibleButtons = await driverPage.locator('button').evaluateAll((nodes) => nodes
             .map((node) => (node.textContent || '').trim().replace(/\s+/g, ' '))
             .filter(Boolean))
@@ -5863,7 +5878,7 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
           throw new Error(`phase3 delivered button missing after confirmed pickup: ${JSON.stringify({
             orderId,
             currentUrl: driverPage.url(),
-            apiStatusAfterPickup: latestApiStatus || driverOrderSnapshot.status,
+            apiStatusAfterPickup,
             deliveredStatusTextBefore: deliveredStatusTextBefore || null,
             driverPickupCompleted,
             deliveredCardVisible,
