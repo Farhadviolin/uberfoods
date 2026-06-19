@@ -5095,7 +5095,7 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
         let pickupButtonToClick = pickupButton;
 
         assertPickupClickDeadline('before-direct-visible-click');
-        if (!visibleStateClickResult?.clicked && driverPickupVisibleCardState?.targetCardVisible && driverPickupVisiblePickupButtonSeen) {
+        if (!directClickResult?.clicked && driverPickupVisibleCardState?.targetCardVisible && driverPickupVisiblePickupButtonSeen) {
           directVisibleClickAttempted = true;
           try {
             const directClickTargetCard = driverPickupVisibleCardState.targetCard;
@@ -5187,7 +5187,7 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
         }
 
         assertPickupClickDeadline('before-recovery');
-        if (!visibleStateClickResult?.clicked && !directClickResult?.clicked && !pickupButtonVisible && !pickupStatusConfirmed) {
+        if (!directClickResult?.clicked && !pickupButtonVisible && !pickupStatusConfirmed) {
           recoveryAttempted = true;
           const recoveryStartedAt = Date.now();
           const dismissRecoveryTargets = [
