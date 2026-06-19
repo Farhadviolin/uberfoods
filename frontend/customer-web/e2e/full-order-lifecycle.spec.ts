@@ -4632,7 +4632,7 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
         let recoveryDurationMs: number | null = null;
         let pickupSnapshot: Awaited<ReturnType<typeof fetchDriverOrderSnapshot>> | null = null;
         let latestApiStatus: string | null = null;
-        let latestApiStatusAfterFallback: string | null = null;
+        let phase3LatestApiStatusAfterFallback: string | null = null;
         let latestApiStatusBeforePickupClick: string | null = null;
         let pageTextPreview = '';
         let visibleButtons: string[] = [];
@@ -5295,11 +5295,11 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
         fallbackAttempted = pickupFallbackResult.attempted;
         fallbackSkippedReason = pickupFallbackResult.skippedReason || fallbackSkippedReason;
         latestApiStatusBeforePickupClick = pickupFallbackResult.latestApiStatusBeforePickupClick ?? latestApiStatusBeforePickupClick;
-        latestApiStatusAfterFallback = pickupFallbackResult.latestApiStatusAfterFallback ?? latestApiStatusAfterFallback;
+        phase3LatestApiStatusAfterFallback = pickupFallbackResult.latestApiStatusAfterFallback ?? phase3LatestApiStatusAfterFallback;
         fallbackResponseStatus = pickupFallbackResult.fallbackResponseStatus ?? fallbackResponseStatus;
         fallbackResponseBody = pickupFallbackResult.fallbackResponseBody ?? fallbackResponseBody;
         if (pickupFallbackResult.succeeded) {
-          latestApiStatus = pickupFallbackResult.latestApiStatusAfterFallback || latestApiStatus;
+          latestApiStatus = phase3LatestApiStatusAfterFallback || latestApiStatus;
           pickupConfirmedBySignal = true;
           driverPickupCompleted = true;
           console.log('✅ lifecycle: driver pickup completed through verified API fallback', {
@@ -5889,7 +5889,7 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
         const deliveredState = await refreshDeliveredUiAfterConfirmedPickup(
           orderId,
           'phase3 driver delivered button visible',
-          latestApiStatusAfterFallback || latestApiStatus,
+          phase3LatestApiStatusAfterFallback || latestApiStatus || null,
         );
         const driverOrderSnapshot = deliveredState.snapshot;
         const deliveredOrderCard = driverPage
@@ -5933,7 +5933,7 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
           throw new Error(`phase3 delivered button missing after confirmed pickup: ${JSON.stringify({
             orderId,
             currentUrl: driverPage.url(),
-            apiStatusAfterPickup: latestApiStatusAfterFallback || driverOrderSnapshot.status,
+            apiStatusAfterPickup: phase3LatestApiStatusAfterFallback || driverOrderSnapshot.status,
             deliveredStatusTextBefore: deliveredStatusTextBefore || null,
             driverPickupCompleted,
             deliveredCardVisible,
