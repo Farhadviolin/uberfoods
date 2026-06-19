@@ -97,8 +97,16 @@ export function Dashboard() {
     try {
       setLoading(true);
       setError(null);
-      const response = await api.get(`/drivers/${driver.id}/orders/available`);
-      const fetchedOrders = Array.isArray(response.data) ? response.data : [];
+      const [availableResponse, activeResponse] = await Promise.all([
+        api.get(`/drivers/${driver.id}/orders/available`),
+        api.get(`/drivers/${driver.id}/orders/active`),
+      ]);
+      const availableOrders = Array.isArray(availableResponse.data) ? availableResponse.data : [];
+      const activeOrdersFromApi = Array.isArray(activeResponse.data) ? activeResponse.data : [];
+      const fetchedOrders = [
+        ...activeOrdersFromApi,
+        ...availableOrders.filter((availableOrder) => !activeOrdersFromApi.some((activeOrder) => activeOrder.id === availableOrder.id)),
+      ];
       setOrders(fetchedOrders);
       
       // Save to offline storage
