@@ -6276,9 +6276,33 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
       });
 
       // Navigate to orders management
-      await adminPage.goto(testUrls.adminOrders);
+      const adminBaseUrl =
+        testUrls.admin ||
+        process.env.ADMIN_URL ||
+        process.env.VITE_ADMIN_URL ||
+        'http://127.0.0.1:3002';
+      const adminOrdersUrl = new URL('/admin/orders', adminBaseUrl).toString();
+
+      if (!adminOrdersUrl || typeof adminOrdersUrl !== 'string') {
+        throw new Error(`Admin orders URL could not be resolved: ${JSON.stringify({
+          adminBaseUrl,
+          availableTestUrls: Object.keys(testUrls ?? {}),
+        })}`);
+      }
+
+      console.log('➡️ lifecycle: phase4 navigating directly to admin orders', {
+        adminBaseUrl,
+        adminOrdersUrl,
+        orderId,
+      });
+
+      await adminPage.goto(adminOrdersUrl, { waitUntil: 'domcontentloaded', timeout: 15_000 });
       await TestHelpers.waitForStablePage(adminPage);
       await expect(adminPage.locator(selectors.adminOrdersTable)).toBeVisible({ timeout: 15_000 });
+      console.log('✅ lifecycle: phase4 admin orders table visible', {
+        currentUrl: adminPage.url(),
+        orderId,
+      });
 
       // Find the completed order
       const adminOrderRow = adminPage.locator(selectors.adminOrderRow).filter({ hasText: orderId || testOrder.id });
