@@ -4632,6 +4632,7 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
         let recoveryDurationMs: number | null = null;
         let pickupSnapshot: Awaited<ReturnType<typeof fetchDriverOrderSnapshot>> | null = null;
         let latestApiStatus: string | null = null;
+        let latestApiStatusAfterFallback: string | null = null;
         let latestApiStatusBeforePickupClick: string | null = null;
         let pageTextPreview = '';
         let visibleButtons: string[] = [];
@@ -4642,7 +4643,6 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
         let activeOrderCountSignal = 0;
         let fallbackAttempted = false;
         let fallbackSkippedReason = 'pickup-action-present-or-not-accepted';
-        let latestApiStatusAfterFallback: string | null = null;
         let fallbackResponseStatus: number | null = null;
         let fallbackResponseBody: string | null = null;
         console.log('ℹ️ lifecycle: phase3 driver page state before pickup click', {
@@ -5572,6 +5572,9 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
           || /PICKED_UP|IN_TRANSIT|OUT_FOR_DELIVERY|ON_THE_WAY|abgeholt|unterwegs|in delivery|delivered/i.test(pickupStatusTextAfter);
         pickupConfirmedBySignal = Boolean(pickupResponse) || hasPickupUiSuccess;
         latestApiStatusBeforePickupClick = latestApiStatus || pickupSnapshot?.status || null;
+        if (pickupFallbackResult.latestApiStatusAfterFallback) {
+          latestApiStatusAfterFallback = pickupFallbackResult.latestApiStatusAfterFallback;
+        }
         pageTextPreview = driverPickupVisibleCardState?.bodyTextPreview || '';
         visibleButtons = (await driverPage.locator('button').evaluateAll((nodes) => nodes
           .map((node) => (node.textContent || '').trim().replace(/\s+/g, ' '))
