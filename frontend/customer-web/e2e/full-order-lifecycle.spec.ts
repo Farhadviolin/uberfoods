@@ -1396,7 +1396,7 @@ async function expectDeliveredStatusForOrderInApp(params: {
     return;
   }
 
-  if (appName === 'restaurant' && !deliveredConfirmed && staleRestaurantStatusMatch) {
+  if (appName === 'restaurant' && restaurantOrderContextVisible && !deliveredConfirmed) {
     console.log('➡️ final verification: restaurant visible order stale before refresh', {
       orderId,
       shortOrderId,
@@ -1479,9 +1479,8 @@ async function expectDeliveredStatusForOrderInApp(params: {
       orderId,
       shortOrderId,
       isCustomerOrderDetailUrl,
-      visibleOrderRows,
-      visibleStatusTexts,
-      bodyTextExcerpt,
+      restaurantOrderContextVisible,
+      restaurantCardVisible: cardVisible,
       restaurantFinalRefreshAttempted: true,
       restaurantFinalRefreshReason: 'visible-order-stale-status',
       restaurantStatusBeforeRefresh: staleRestaurantStatusMatch,
@@ -1490,8 +1489,11 @@ async function expectDeliveredStatusForOrderInApp(params: {
       restaurantRowsAfterRefresh: refreshedVisibleRows,
       restaurantTabsTried,
       restaurantOrderStillStale: true,
+      visibleOrderRows,
+      visibleStatusTexts,
+      bodyTextExcerpt,
       deliveredPatternMatched: refreshedDelivered,
-      reason: 'restaurant-final-delivered-status-not-found-after-refresh',
+      reason: 'restaurant-order-visible-but-stale-status',
     })}`);
   }
 
