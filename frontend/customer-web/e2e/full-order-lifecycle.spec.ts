@@ -5819,7 +5819,7 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
         console.log('ℹ️ lifecycle: phase3 delivered button missing after confirmed pickup', {
           orderId: resolvedOrderId,
           stage,
-          apiStatusAfterPickup: latestApiStatusAfterFallback,
+          apiStatusAfterPickup: initial.snapshot.status,
           staleUiStatus: initial.snapshot.status,
           orderCardVisible: initial.orderCardVisible,
         });
@@ -5922,7 +5922,7 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
           throw new Error(`phase3 delivered button missing after confirmed pickup: ${JSON.stringify({
             orderId,
             currentUrl: driverPage.url(),
-            apiStatusAfterPickup: latestApiStatusAfterFallback,
+            apiStatusAfterPickup: driverOrderSnapshot.status,
             deliveredStatusTextBefore: deliveredStatusTextBefore || null,
             driverPickupCompleted,
             deliveredCardVisible,
