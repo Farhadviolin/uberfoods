@@ -32,16 +32,16 @@ interface Order {
   createdAt: string;
   customer: {
     id: string;
-    name: string;
-    email: string;
-  };
+    name?: string;
+    email?: string;
+  } | null;
   restaurant: {
     id: string;
-    name: string;
-  };
+    name?: string;
+  } | null;
   driver: {
     id: string;
-    name: string;
+    name?: string;
   } | null;
   items: Array<{
     dish: {
@@ -51,6 +51,24 @@ interface Order {
     quantity: number;
     price: number;
   }>;
+}
+
+function getOrderCustomerName(order: Order) {
+  return order.customer?.name
+    || order.customer?.email
+    || 'Unknown customer';
+}
+
+function getOrderCustomerEmail(order: Order) {
+  return order.customer?.email || 'Unknown customer';
+}
+
+function getOrderRestaurantName(order: Order) {
+  return order.restaurant?.name || 'Unknown restaurant';
+}
+
+function getOrderDriverName(order: Order) {
+  return order.driver?.name || 'Unassigned';
 }
 
 interface Restaurant {
@@ -209,9 +227,9 @@ function OrdersManagementInner() {
       const query = debouncedSearchQuery.toLowerCase();
       filtered = filtered.filter(o =>
         o.id.toLowerCase().includes(query) ||
-        o.customer.name.toLowerCase().includes(query) ||
-        o.customer.email.toLowerCase().includes(query) ||
-        o.restaurant.name.toLowerCase().includes(query) ||
+        getOrderCustomerName(o).toLowerCase().includes(query) ||
+        getOrderCustomerEmail(o).toLowerCase().includes(query) ||
+        getOrderRestaurantName(o).toLowerCase().includes(query) ||
         o.address.toLowerCase().includes(query)
       );
     }
@@ -418,17 +436,17 @@ function OrdersManagementInner() {
               </div>
 
               <div className="order-info">
-                <p><strong>Restaurant:</strong> {order.restaurant.name}</p>
+                <p><strong>Restaurant:</strong> {getOrderRestaurantName(order)}</p>
                 <p>
                   <strong>Kunde:</strong>{' '}
                   <span 
                     style={{ cursor: 'pointer', color: '#1877F2', textDecoration: 'underline' }}
-                    onClick={() => openCustomerProfile(order.customer.id)}
+                    onClick={() => openCustomerProfile(order.customer?.id || order.id)}
                     title="In Customer-Web öffnen"
                   >
-                    {order.customer.name}
+                    {getOrderCustomerName(order)}
                   </span>
-                  {' '}({order.customer.email})
+                  {' '}({getOrderCustomerEmail(order)})
                 </p>
                 <p><strong>Telefon:</strong> {order.phone}</p>
                 <p><strong>Adresse:</strong> {order.address}</p>
@@ -437,10 +455,10 @@ function OrdersManagementInner() {
                     <strong>Fahrer:</strong>{' '}
                     <span 
                       style={{ cursor: 'pointer', color: '#1877F2', textDecoration: 'underline' }}
-                      onClick={() => openDriverProfile(order.driver!.id)}
+                      onClick={() => openDriverProfile(order.driver?.id || order.id)}
                       title="In Driver-App öffnen"
                     >
-                      {order.driver.name}
+                      {getOrderDriverName(order)}
                     </span>
                   </p>
                 )}
@@ -489,7 +507,7 @@ function OrdersManagementInner() {
                     <option value="">Fahrer zuweisen...</option>
                     {(drivers || []).filter(d => d && d.isActive).map(driver => (
                       <option key={driver.id} value={driver.id}>
-                        {driver.name}
+                        {driver.name || 'Unbenannter Fahrer'}
                       </option>
                     ))}
                   </select>

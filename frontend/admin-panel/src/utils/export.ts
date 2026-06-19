@@ -122,13 +122,13 @@ export const exportToExcel = async (data: any[], filename: string) => {
 
 export const exportOrdersToCSV = (orders: any[]) => {
   const csvData = orders.map(order => ({
+    'Kunde': order.customer?.name || order.customer?.email || 'Unknown customer',
+    'E-Mail': order.customer?.email || 'Unknown customer',
+    'Restaurant': order.restaurant?.name || 'Unknown restaurant',
+    'Fahrer': order.driver?.name || 'Nicht zugewiesen',
     'Bestellnummer': order.id,
     'Datum': new Date(order.createdAt).toLocaleString('de-DE'),
     'Status': order.status,
-    'Kunde': order.customer.name,
-    'E-Mail': order.customer.email,
-    'Restaurant': order.restaurant.name,
-    'Fahrer': order.driver?.name || 'Nicht zugewiesen',
     'Adresse': order.address,
     'Telefon': order.phone,
     'Gesamtbetrag': order.totalAmount.toFixed(2),
@@ -167,12 +167,12 @@ export const exportCustomersToCSV = (customers: any[]) => {
 // PDF Export Funktionen
 export const exportOrdersToPDF = (orders: any[]) => {
   const pdfData = orders.map(order => ({
+    'Kunde': order.customer?.name || order.customer?.email || 'Unknown customer',
+    'Restaurant': order.restaurant?.name || 'Unknown restaurant',
+    'Fahrer': order.driver?.name || 'Nicht zugewiesen',
     'Bestellnummer': order.id,
     'Datum': new Date(order.createdAt).toLocaleString('de-DE'),
     'Status': order.status,
-    'Kunde': order.customer.name,
-    'Restaurant': order.restaurant.name,
-    'Fahrer': order.driver?.name || 'Nicht zugewiesen',
     'Gesamtbetrag': `${order.totalAmount.toFixed(2)} €`,
   }));
 
@@ -207,13 +207,13 @@ export const exportCustomersToPDF = (customers: any[]) => {
 // Excel Export Funktionen
 export const exportOrdersToExcel = async (orders: any[]) => {
   const excelData = orders.map(order => ({
+    'Kunde': order.customer?.name || order.customer?.email || 'Unknown customer',
+    'E-Mail': order.customer?.email || 'Unknown customer',
+    'Restaurant': order.restaurant?.name || 'Unknown restaurant',
+    'Fahrer': order.driver?.name || 'Nicht zugewiesen',
     'Bestellnummer': order.id,
     'Datum': new Date(order.createdAt).toLocaleString('de-DE'),
     'Status': order.status,
-    'Kunde': order.customer.name,
-    'E-Mail': order.customer.email,
-    'Restaurant': order.restaurant.name,
-    'Fahrer': order.driver?.name || 'Nicht zugewiesen',
     'Adresse': order.address,
     'Telefon': order.phone,
     'Gesamtbetrag': order.totalAmount.toFixed(2),
