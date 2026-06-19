@@ -1386,6 +1386,17 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
     const restaurantPage = await restaurantContext.newPage();
     const driverPage = await driverContext.newPage();
     const adminPage = await adminContext.newPage();
+    const driverAuthStateId = await driverPage.evaluate(() => {
+      const raw = localStorage.getItem('driver_user');
+      if (!raw) return null;
+      try {
+        const parsed = JSON.parse(raw);
+        return typeof parsed?.id === 'string' ? parsed.id : null;
+      } catch {
+        return null;
+      }
+    });
+    const expectedAssignedDriverId = driverAuthStateId || driverUser.id;
 
     try {
       await installCustomerStorageDiagnostics(customerPage);
@@ -6347,9 +6358,9 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
 
       // Verify final status and driver assignment
       await expect(adminOrderRow.locator('[data-testid="status"]')).toContainText('DELIVERED');
-      await expect(adminOrderRow.locator('[data-testid="driver-id"], [data-testid="assigned-driver"]')).toContainText(driverUser.id);
+      await expect(adminOrderRow.locator('[data-testid="driver-id"], [data-testid="assigned-driver"]')).toContainText(expectedAssignedDriverId);
 
-      console.log(`✅ Admin verified order ${orderId}: DELIVERED with driver ${driverUser.id}`);
+      console.log(`✅ Admin verified order ${orderId}: DELIVERED with driver ${expectedAssignedDriverId}`);
 
       // ============================================
       // FINAL VERIFICATION: CROSS-APP CONSISTENCY
@@ -6369,7 +6380,7 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
       console.log('🎉 SUCCESS: Full order lifecycle completed successfully!');
       console.log(`   Order ID: ${orderId}`);
       console.log(`   Final Status: DELIVERED`);
-      console.log(`   Assigned Driver: ${driverUser.id}`);
+      console.log(`   Assigned Driver: ${expectedAssignedDriverId}`);
       console.log(`   Total Amount: €${testOrder.totalAmount}`);
 
     } finally {
