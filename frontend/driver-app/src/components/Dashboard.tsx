@@ -81,6 +81,25 @@ export function Dashboard() {
   // Retry Hook für robuste API-Calls
   const retry = useRetry('dashboard');
 
+  const normalizeOrdersResponse = (payload: unknown): Order[] => {
+    if (Array.isArray(payload)) return payload;
+    if (!payload || typeof payload !== 'object') return [];
+
+    const candidate = payload as {
+      orders?: unknown;
+      data?: unknown;
+    };
+
+    if (Array.isArray(candidate.orders)) return candidate.orders as Order[];
+    if (Array.isArray(candidate.data)) return candidate.data as Order[];
+    if (candidate.data && typeof candidate.data === 'object') {
+      const nestedData = candidate.data as { orders?: unknown };
+      if (Array.isArray(nestedData.orders)) return nestedData.orders as Order[];
+    }
+
+    return [];
+  };
+
   // Smart Acceptance für KI-gestützte Entscheidungen
   const {
     isAnalyzing: aiAnalyzing,
@@ -97,16 +116,42 @@ export function Dashboard() {
     try {
       setLoading(true);
       setError(null);
-      const [availableResponse, activeResponse] = await Promise.all([
+      const [availableResult, activeResult] = await Promise.allSettled([
         api.get(`/drivers/${driver.id}/orders/available`),
         api.get(`/drivers/${driver.id}/orders/active`),
       ]);
-      const availableOrders = Array.isArray(availableResponse.data) ? availableResponse.data : [];
-      const activeOrdersFromApi = Array.isArray(activeResponse.data) ? activeResponse.data : [];
+
+      const availableOrders = availableResult.status === 'fulfilled'
+        ? normalizeOrdersResponse(availableResult.value.data)
+        : [];
+      const activeOrdersFromApi = activeResult.status === 'fulfilled'
+        ? normalizeOrdersResponse(activeResult.value.data)
+        : [];
+
+      if (availableResult.status === 'rejected') {
+        console.warn('⚠️ Driver dashboard fetchOrders available failed', {
+          endpoint: '/drivers/:driverId/orders/available',
+          stage: 'available',
+          error: availableResult.reason instanceof Error ? availableResult.reason.message : String(availableResult.reason),
+        });
+      }
+      if (activeResult.status === 'rejected') {
+        console.warn('⚠️ Driver dashboard fetchOrders active failed', {
+          endpoint: '/drivers/:driverId/orders/active',
+          stage: 'active',
+          error: activeResult.reason instanceof Error ? activeResult.reason.message : String(activeResult.reason),
+        });
+      }
+
+      if (availableResult.status === 'rejected' && activeResult.status === 'rejected') {
+        setError('Fehler beim Laden der Bestellungen. Bitte versuchen Sie es später erneut.');
+      }
+
       const fetchedOrders = [
         ...activeOrdersFromApi,
         ...availableOrders.filter((availableOrder) => !activeOrdersFromApi.some((activeOrder) => activeOrder.id === availableOrder.id)),
       ];
+
       setOrders(fetchedOrders);
       
       // Save to offline storage
