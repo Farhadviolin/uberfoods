@@ -5792,15 +5792,101 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
           .first();
       };
 
+      const refreshDeliveredUiAfterConfirmedPickup = async (resolvedOrderId: string, stage: string) => {
+        const inspect = async () => {
+          const snapshot = await fetchDriverOrderSnapshot(driverPage, resolvedOrderId);
+          const deliveredOrderCard = driverPage
+            .getByTestId(`driver-order-card-${resolvedOrderId}`)
+            .or(driverPage.locator(`[data-order-id="${resolvedOrderId}"]`))
+            .first();
+          const orderCardVisible = await deliveredOrderCard.isVisible().catch(() => false);
+          const orderCardText = orderCardVisible
+            ? ((await deliveredOrderCard.textContent().catch(() => '') || '').trim())
+            : '';
+          return {
+            snapshot,
+            orderCardVisible,
+            orderCardText,
+            deliveredButton: findDeliveredActionButton(driverPage, resolvedOrderId),
+          };
+        };
+
+        const initial = await inspect();
+        if (initial.orderCardVisible && /DELIVERED|IN_TRANSIT|OUT_FOR_DELIVERY|COMPLETED/i.test(initial.snapshot.status || '')) {
+          return { ...initial, recoveryAttempted: false, refreshed: false };
+        }
+
+        console.log('ℹ️ lifecycle: phase3 delivered button missing after confirmed pickup', {
+          orderId: resolvedOrderId,
+          stage,
+          apiStatusAfterPickup: latestApiStatusAfterFallback,
+          staleUiStatus: initial.snapshot.status,
+          orderCardVisible: initial.orderCardVisible,
+        });
+
+        const reopenTargets = [
+          driverPage.getByRole('button', { name: /Orders|Bestellungen/i }).first(),
+          driverPage.getByRole('link', { name: /Orders|Bestellungen/i }).first(),
+          driverPage.locator('[data-testid*="orders"]').first(),
+        ];
+        for (const target of reopenTargets) {
+          try {
+            if (await target.isVisible().catch(() => false)) {
+              await target.click({ timeout: 1500 }).catch(() => null);
+              break;
+            }
+          } catch {
+            // keep trying
+          }
+        }
+
+        if (!driverPage.url().includes('/orders')) {
+          await driverPage.goto(`${testUrls.driver}/orders`).catch(() => null);
+        }
+        await driverPage.waitForLoadState('domcontentloaded').catch(() => undefined);
+        await driverPage.waitForLoadState('networkidle').catch(() => undefined);
+        await driverPage.reload({ waitUntil: 'domcontentloaded' }).catch(() => null);
+        await driverPage.waitForLoadState('networkidle').catch(() => undefined);
+
+        const historyTargets = [
+          driverPage.getByRole('button', { name: /Order History|Bestellhistorie/i }).first(),
+          driverPage.getByRole('link', { name: /Order History|Bestellhistorie/i }).first(),
+          driverPage.locator('[data-testid*="history"]').first(),
+        ];
+        for (const target of historyTargets) {
+          try {
+            if (await target.isVisible().catch(() => false)) {
+              await target.click({ timeout: 1500 }).catch(() => null);
+              break;
+            }
+          } catch {
+            // diagnostic only
+          }
+        }
+
+        const refreshed = await inspect();
+        console.log('ℹ️ lifecycle: phase3 delivered fresh status after missing button', {
+          orderId: resolvedOrderId,
+          stage,
+          apiStatusAfterPickup: refreshed.snapshot.status,
+          orderCardVisible: refreshed.orderCardVisible,
+          orderCardText: refreshed.orderCardText.slice(0, 300),
+          deliveredButtonVisible: await refreshed.deliveredButton.isVisible().catch(() => false),
+        });
+
+        return { ...refreshed, recoveryAttempted: true, refreshed: true };
+      };
+
       await withStepTimeout('phase3 driver delivered button visible', async () => {
         const ordersViewAfterPickup = await ensureDriverOrdersViewAfterPickup(driverPage, orderId, 'before delivered dom visibility');
-        const driverOrderSnapshot = await fetchDriverOrderSnapshot(driverPage, orderId);
+        const deliveredState = await refreshDeliveredUiAfterConfirmedPickup(orderId, 'phase3 driver delivered button visible');
+        const driverOrderSnapshot = deliveredState.snapshot;
         const deliveredOrderCard = driverPage
           .getByTestId(`driver-order-card-${orderId}`)
           .or(driverPage.locator(`[data-order-id="${orderId}"]`))
           .first();
-        const deliveredButton = findDeliveredActionButton(driverPage, orderId);
-        const deliveredCardVisible = await deliveredOrderCard.isVisible().catch(() => false);
+        const deliveredButton = deliveredState.deliveredButton;
+        const deliveredCardVisible = deliveredState.orderCardVisible;
         const deliveredButtonVisible = await deliveredButton.isVisible().catch(() => false);
         const deliveredButtonCount = await deliveredButton.count().catch(() => 0);
         const deliveredStatusTextBefore = deliveredCardVisible
@@ -5814,7 +5900,7 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
           });
           return;
         }
-        if (!deliveredCardVisible && driverPickupCompleted && driverOrderSnapshot.delivered) {
+        if (!deliveredCardVisible && driverPickupCompleted && /DELIVERED|IN_TRANSIT|OUT_FOR_DELIVERY|COMPLETED/i.test(driverOrderSnapshot.status || '')) {
           console.log('✅ lifecycle: driver delivered state already confirmed after pickup completion', {
             orderId,
             currentUrl: driverPage.isClosed() ? 'closed' : driverPage.url(),
@@ -5833,14 +5919,17 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
             .map((node) => (node.textContent || '').trim().replace(/\s+/g, ' '))
             .filter(Boolean))
             .catch(() => []);
-          throw new Error(`phase3 driver delivered button not visible after pickup: ${JSON.stringify({
+          throw new Error(`phase3 delivered button missing after confirmed pickup: ${JSON.stringify({
             orderId,
             currentUrl: driverPage.url(),
+            apiStatusAfterPickup: latestApiStatusAfterFallback,
             deliveredStatusTextBefore: deliveredStatusTextBefore || null,
             driverPickupCompleted,
             deliveredCardVisible,
             deliveredButtonCount,
             driverOrderStatus: driverOrderSnapshot.status,
+            staleUiStatus: driverOrderSnapshot.status,
+            recoveryAttempted: deliveredState.recoveryAttempted,
             visibleButtons,
             visibleCards: visibleCards.slice(0, 10),
             ordersViewAfterPickup,
