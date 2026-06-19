@@ -1362,6 +1362,36 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
     });
   }
 
+  async function readJsonFromLocalStorageSafely<T = unknown>(
+    page: Page,
+    key: string,
+  ): Promise<T | null> {
+    try {
+      const pageUrl = page.url();
+
+      if (
+        !pageUrl ||
+        pageUrl === 'about:blank' ||
+        pageUrl.startsWith('data:') ||
+        pageUrl.startsWith('chrome-error://')
+      ) {
+        return null;
+      }
+
+      return await page.evaluate((storageKey) => {
+        try {
+          const rawValue = window.localStorage.getItem(storageKey);
+          if (!rawValue) return null;
+          return JSON.parse(rawValue);
+        } catch {
+          return null;
+        }
+      }, key);
+    } catch {
+      return null;
+    }
+  }
+
   test.setTimeout(25 * 60 * 1000); // 25 minutes, stays below the 35-minute CI job timeout
 
   test('Complete Order Lifecycle: Customer → Restaurant → Driver → Admin', async ({ browser }) => {
@@ -1386,17 +1416,7 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
     const restaurantPage = await restaurantContext.newPage();
     const driverPage = await driverContext.newPage();
     const adminPage = await adminContext.newPage();
-    const driverAuthStateId = await driverPage.evaluate(() => {
-      const raw = localStorage.getItem('driver_user');
-      if (!raw) return null;
-      try {
-        const parsed = JSON.parse(raw);
-        return typeof parsed?.id === 'string' ? parsed.id : null;
-      } catch {
-        return null;
-      }
-    });
-    const expectedAssignedDriverId = driverAuthStateId || driverUser.id;
+    let expectedAssignedDriverId = driverUser.id;
 
     try {
       await installCustomerStorageDiagnostics(customerPage);
@@ -6357,6 +6377,11 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
       await expect(adminOrderRow).toBeVisible();
 
       // Verify final status and driver assignment
+      const storedDriverUser = await readJsonFromLocalStorageSafely<{ id?: string }>(
+        driverPage,
+        'driver_user',
+      );
+      expectedAssignedDriverId = storedDriverUser?.id || driverUser.id;
       await expect(adminOrderRow.locator('[data-testid="status"]')).toContainText('DELIVERED');
       await expect(adminOrderRow.locator('[data-testid="driver-id"], [data-testid="assigned-driver"]')).toContainText(expectedAssignedDriverId);
 
