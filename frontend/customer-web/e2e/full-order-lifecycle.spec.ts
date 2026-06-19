@@ -5792,7 +5792,11 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
           .first();
       };
 
-      const refreshDeliveredUiAfterConfirmedPickup = async (resolvedOrderId: string, stage: string) => {
+      const refreshDeliveredUiAfterConfirmedPickup = async (
+        resolvedOrderId: string,
+        stage: string,
+        confirmedPickupApiStatus: string | null,
+      ) => {
         const inspect = async () => {
           const snapshot = await fetchDriverOrderSnapshot(driverPage, resolvedOrderId);
           const deliveredOrderCard = driverPage
@@ -5819,7 +5823,7 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
         console.log('ℹ️ lifecycle: phase3 delivered button missing after confirmed pickup', {
           orderId: resolvedOrderId,
           stage,
-          apiStatusAfterPickup: initial.snapshot.status,
+          apiStatusAfterPickup: confirmedPickupApiStatus || initial.snapshot.status,
           staleUiStatus: initial.snapshot.status,
           orderCardVisible: initial.orderCardVisible,
         });
@@ -5868,7 +5872,7 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
         console.log('ℹ️ lifecycle: phase3 delivered fresh status after missing button', {
           orderId: resolvedOrderId,
           stage,
-          apiStatusAfterPickup: refreshed.snapshot.status,
+          apiStatusAfterPickup: confirmedPickupApiStatus || refreshed.snapshot.status,
           orderCardVisible: refreshed.orderCardVisible,
           orderCardText: refreshed.orderCardText.slice(0, 300),
           deliveredButtonVisible: await refreshed.deliveredButton.isVisible().catch(() => false),
@@ -5879,7 +5883,11 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
 
       await withStepTimeout('phase3 driver delivered button visible', async () => {
         const ordersViewAfterPickup = await ensureDriverOrdersViewAfterPickup(driverPage, orderId, 'before delivered dom visibility');
-        const deliveredState = await refreshDeliveredUiAfterConfirmedPickup(orderId, 'phase3 driver delivered button visible');
+        const deliveredState = await refreshDeliveredUiAfterConfirmedPickup(
+          orderId,
+          'phase3 driver delivered button visible',
+          latestApiStatusAfterFallback || latestApiStatus,
+        );
         const driverOrderSnapshot = deliveredState.snapshot;
         const deliveredOrderCard = driverPage
           .getByTestId(`driver-order-card-${orderId}`)
@@ -5922,7 +5930,7 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
           throw new Error(`phase3 delivered button missing after confirmed pickup: ${JSON.stringify({
             orderId,
             currentUrl: driverPage.url(),
-            apiStatusAfterPickup: driverOrderSnapshot.status,
+            apiStatusAfterPickup: latestApiStatusAfterFallback || driverOrderSnapshot.status,
             deliveredStatusTextBefore: deliveredStatusTextBefore || null,
             driverPickupCompleted,
             deliveredCardVisible,
