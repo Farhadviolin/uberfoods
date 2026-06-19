@@ -1267,15 +1267,20 @@ async function expectDeliveredStatusForOrderInApp(params: {
   );
   const shortOrderId = orderId.slice(0, 8);
   const isCustomerOrderDetailUrl = appName === 'customer' && page.url().includes(`/orders/${orderId}`);
-  const getVisibleTexts = async (locator: Locator, limit = 20) => locator.evaluateAll((nodes, resolvedLimit) => nodes
-    .filter((node): node is HTMLElement => node instanceof HTMLElement)
-    .map((node) => (node.textContent || '').trim().replace(/\s+/g, ' '))
-    .filter(Boolean)
-    .slice(0, resolvedLimit), limit).catch(() => []);
+  const getVisibleTexts = async (locator: Locator, limit = 20) => Promise.race([
+    locator.evaluateAll((nodes, resolvedLimit) => nodes
+      .filter((node): node is HTMLElement => node instanceof HTMLElement)
+      .map((node) => (node.textContent || '').trim().replace(/\s+/g, ' '))
+      .filter(Boolean)
+      .slice(0, resolvedLimit), limit).catch(() => []),
+    new Promise<string[]>((resolve) => setTimeout(() => resolve([]), 1500)),
+  ]);
 
-  await openOrdersView();
-  await page.waitForLoadState('domcontentloaded').catch(() => undefined);
-  await page.waitForLoadState('networkidle').catch(() => undefined);
+  await Promise.race([
+    openOrdersView(),
+    new Promise<never>((_, reject) => setTimeout(() => reject(new Error(`${appName} final delivered verification timed out while opening orders view`)), 10000)),
+  ]);
+  await page.waitForLoadState('domcontentloaded', { timeout: 5000 }).catch(() => undefined);
 
   const orderCardSelectors = [
     `[data-testid="${appName}-order-card-${orderId}"]`,
@@ -1293,9 +1298,6 @@ async function expectDeliveredStatusForOrderInApp(params: {
   const orderScope = appName === 'customer' && isCustomerOrderDetailUrl
     ? page.locator('main, [data-testid="order-detail"], body').first()
     : page.locator(orderCardSelectors).filter({ hasText: orderId }).first();
-  const orderCard = appName === 'customer' && isCustomerOrderDetailUrl
-    ? orderScope
-    : orderScope;
   const cardVisible = await orderScope.isVisible().catch(() => false);
   const cardText = cardVisible ? await orderScope.textContent().catch(() => '') : '';
   const visibleOrderRows = await getVisibleTexts(page.locator('[data-testid*="order"], .order-card, .order-row, tr, li, article, section'));
@@ -1319,11 +1321,17 @@ async function expectDeliveredStatusForOrderInApp(params: {
   const statusLocator = orderScope
     .locator('[data-testid*="status"], .order-status, [role="status"], [data-status]')
     .first();
-  const statusText = normalizeStatus((await statusLocator.textContent().catch(() => '') || '').trim());
+  const statusText = normalizeStatus((await Promise.race([
+    statusLocator.textContent().catch(() => ''),
+    new Promise<string>((resolve) => setTimeout(() => resolve(''), 1500)),
+  ]) || '').trim());
   const orderCardText = normalizeStatus((cardText || '').trim());
   const statusCandidates = [
     statusText,
-    (await orderScope.getAttribute('data-status').catch(() => null)) || '',
+    (await Promise.race([
+      orderScope.getAttribute('data-status').catch(() => null),
+      new Promise<string | null>((resolve) => setTimeout(() => resolve(null), 1000)),
+    ])) || '',
     orderCardText,
   ].filter(Boolean);
   const deliveredConfirmed = statusCandidates.some((candidate) => isDeliveredStatus(candidate));
@@ -1338,7 +1346,10 @@ async function expectDeliveredStatusForOrderInApp(params: {
       isCustomerOrderDetailUrl,
       orderCardText: orderCardText.slice(0, 500),
       statusText: statusText || null,
-      dataStatus: await orderScope.getAttribute('data-status').catch(() => null),
+      dataStatus: await Promise.race([
+        orderScope.getAttribute('data-status').catch(() => null),
+        new Promise<string | null>((resolve) => setTimeout(() => resolve(null), 1000)),
+      ]),
       visibleOrderRows,
       visibleStatusTexts,
       bodyTextExcerpt,
@@ -6489,42 +6500,64 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
 
       const openCustomerOrdersView = async () => {
         if (!customerPage.url().includes(`/orders/${orderId}`)) {
-          await customerPage.goto(`${testUrls.customer}/orders/${orderId}`);
+          await customerPage.goto(`${testUrls.customer}/orders/${orderId}`, {
+            waitUntil: 'domcontentloaded',
+            timeout: 10000,
+          });
         }
-        await TestHelpers.waitForStablePage(customerPage);
+        await customerPage.waitForLoadState('domcontentloaded', { timeout: 5000 }).catch(() => undefined);
       };
 
       const openRestaurantOrdersView = async () => {
         if (!restaurantPage.url().includes('/orders')) {
-          await restaurantPage.goto(`${testUrls.restaurant}/orders`);
+          await restaurantPage.goto(`${testUrls.restaurant}/orders`, {
+            waitUntil: 'domcontentloaded',
+            timeout: 10000,
+          });
         }
-        await TestHelpers.waitForStablePage(restaurantPage);
+        await restaurantPage.waitForLoadState('domcontentloaded', { timeout: 5000 }).catch(() => undefined);
       };
 
       const openDriverOrdersView = async () => {
         await ensureDriverOrdersViewAfterPickup(driverPage, orderId, 'final verification');
-        await TestHelpers.waitForStablePage(driverPage);
+        await driverPage.waitForLoadState('domcontentloaded', { timeout: 5000 }).catch(() => undefined);
       };
 
       // All should show DELIVERED, scoped to the concrete orderId in each app
-      await expectDeliveredStatusForOrderInApp({
-        page: customerPage,
-        appName: 'customer',
-        orderId,
-        openOrdersView: openCustomerOrdersView,
-      });
-      await expectDeliveredStatusForOrderInApp({
-        page: restaurantPage,
-        appName: 'restaurant',
-        orderId,
-        openOrdersView: openRestaurantOrdersView,
-      });
-      await expectDeliveredStatusForOrderInApp({
-        page: driverPage,
-        appName: 'driver',
-        orderId,
-        openOrdersView: openDriverOrdersView,
-      });
+      await withStepTimeout('final verification customer delivered check', async () => {
+        console.log('➡️ final verification: customer delivered check start');
+        await expectDeliveredStatusForOrderInApp({
+          page: customerPage,
+          appName: 'customer',
+          orderId,
+          openOrdersView: openCustomerOrdersView,
+        });
+        console.log('✅ final verification: customer delivered check done');
+      }, 30000);
+
+      await withStepTimeout('final verification restaurant delivered check', async () => {
+        console.log('➡️ final verification: restaurant delivered check start');
+        await expectDeliveredStatusForOrderInApp({
+          page: restaurantPage,
+          appName: 'restaurant',
+          orderId,
+          openOrdersView: openRestaurantOrdersView,
+        });
+        console.log('✅ final verification: restaurant delivered check done');
+      }, 30000);
+
+      await withStepTimeout('final verification driver delivered check', async () => {
+        console.log('➡️ final verification: driver delivered check start');
+        await expectDeliveredStatusForOrderInApp({
+          page: driverPage,
+          appName: 'driver',
+          orderId,
+          openOrdersView: openDriverOrdersView,
+        });
+        console.log('✅ final verification: driver delivered check done');
+      }, 30000);
+
+      console.log('✅ Final verification: cross-app consistency check completed');
 
       console.log('🎉 SUCCESS: Full order lifecycle completed successfully!');
       console.log(`   Order ID: ${orderId}`);
