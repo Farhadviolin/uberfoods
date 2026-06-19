@@ -4528,6 +4528,8 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
         }
       });
 
+      let latestApiStatus: string | null = null;
+
       await withStepTimeout('phase3 driver pickup click', async () => {
         const ensureDriverPageOpen = () => {
           if (driverPage.isClosed()) {
@@ -4631,7 +4633,6 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
         let recoveryAttempted = false;
         let recoveryDurationMs: number | null = null;
         let pickupSnapshot: Awaited<ReturnType<typeof fetchDriverOrderSnapshot>> | null = null;
-        let latestApiStatus: string | null = null;
         let latestApiStatusBeforePickupClick: string | null = null;
         let pageTextPreview = '';
         let visibleButtons: string[] = [];
