@@ -1265,6 +1265,8 @@ async function expectDeliveredStatusForOrderInApp(params: {
   const isDeliveredStatus = (value: string | null | undefined) => Boolean(
     value && /^(DELIVERED|Delivered|delivered|Geliefert|Zugestellt)$/i.test(normalizeStatus(value)),
   );
+  const shortOrderId = orderId.slice(0, 8);
+  const isCustomerOrderDetailUrl = appName === 'customer' && page.url().includes(`/orders/${orderId}`);
   const getVisibleTexts = async (locator: Locator, limit = 20) => locator.evaluateAll((nodes, resolvedLimit) => nodes
     .filter((node): node is HTMLElement => node instanceof HTMLElement)
     .map((node) => (node.textContent || '').trim().replace(/\s+/g, ' '))
@@ -1278,7 +1280,9 @@ async function expectDeliveredStatusForOrderInApp(params: {
   const orderCardSelectors = [
     `[data-testid="${appName}-order-card-${orderId}"]`,
     `[data-testid="order-card-${orderId}"]`,
+    `[data-testid*="${shortOrderId}"]`,
     `[data-order-id="${orderId}"]`,
+    `[data-order-id*="${shortOrderId}"]`,
     `[data-testid*="order-card"]`,
     `.order-card`,
     `.order-row`,
@@ -1286,18 +1290,25 @@ async function expectDeliveredStatusForOrderInApp(params: {
     `li`,
     `article`,
   ].join(', ');
-  const orderCard = page.locator(orderCardSelectors).filter({ hasText: orderId }).first();
-  const cardVisible = await orderCard.isVisible().catch(() => false);
-  const cardText = cardVisible ? await orderCard.textContent().catch(() => '') : '';
+  const orderScope = appName === 'customer' && isCustomerOrderDetailUrl
+    ? page.locator('main, [data-testid="order-detail"], body').first()
+    : page.locator(orderCardSelectors).filter({ hasText: orderId }).first();
+  const orderCard = appName === 'customer' && isCustomerOrderDetailUrl
+    ? orderScope
+    : orderScope;
+  const cardVisible = await orderScope.isVisible().catch(() => false);
+  const cardText = cardVisible ? await orderScope.textContent().catch(() => '') : '';
   const visibleOrderRows = await getVisibleTexts(page.locator('[data-testid*="order"], .order-card, .order-row, tr, li, article, section'));
   const visibleStatusTexts = await getVisibleTexts(page.locator('[data-testid*="status"], .order-status, [role="status"]'));
 
-  if (!cardVisible) {
+  if (!cardVisible && !(appName === 'customer' && isCustomerOrderDetailUrl)) {
     const bodyTextExcerpt = (await page.locator('body').innerText().catch(() => '')).slice(0, 1200);
     throw new Error(`${appName} final delivered verification failed: ${JSON.stringify({
       appName,
       currentUrl: page.url(),
       orderId,
+      shortOrderId,
+      isCustomerOrderDetailUrl,
       visibleOrderRows,
       visibleStatusTexts,
       bodyTextExcerpt,
@@ -1305,14 +1316,14 @@ async function expectDeliveredStatusForOrderInApp(params: {
     })}`);
   }
 
-  const statusLocator = orderCard
+  const statusLocator = orderScope
     .locator('[data-testid*="status"], .order-status, [role="status"], [data-status]')
     .first();
   const statusText = normalizeStatus((await statusLocator.textContent().catch(() => '') || '').trim());
   const orderCardText = normalizeStatus((cardText || '').trim());
   const statusCandidates = [
     statusText,
-    (await orderCard.getAttribute('data-status').catch(() => null)) || '',
+    (await orderScope.getAttribute('data-status').catch(() => null)) || '',
     orderCardText,
   ].filter(Boolean);
   const deliveredConfirmed = statusCandidates.some((candidate) => isDeliveredStatus(candidate));
@@ -1323,13 +1334,17 @@ async function expectDeliveredStatusForOrderInApp(params: {
       appName,
       currentUrl: page.url(),
       orderId,
+      shortOrderId,
+      isCustomerOrderDetailUrl,
       orderCardText: orderCardText.slice(0, 500),
       statusText: statusText || null,
-      dataStatus: await orderCard.getAttribute('data-status').catch(() => null),
+      dataStatus: await orderScope.getAttribute('data-status').catch(() => null),
       visibleOrderRows,
       visibleStatusTexts,
       bodyTextExcerpt,
-      reason: 'delivered-status-not-found',
+      reason: appName === 'customer' && isCustomerOrderDetailUrl
+        ? 'customer-order-detail-delivered-status-not-found'
+        : 'delivered-status-not-found',
     })}`);
   }
 }
