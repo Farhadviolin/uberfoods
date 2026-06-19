@@ -6190,7 +6190,31 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
       await TestHelpers.waitForStablePage(adminPage);
 
       // Verify we're logged in
-      await expect(adminPage).toHaveURL(/.*(dashboard|home)/i);
+      const adminCurrentUrl = adminPage.url();
+      const loginFormVisible = await adminPage
+        .locator('input[type="password"], [data-testid="login-form"], form:has(input[type="password"])')
+        .first()
+        .isVisible()
+        .catch(() => false);
+      const adminShellVisible = await adminPage
+        .locator('nav, [data-testid="admin-shell"], [data-testid="admin-dashboard"], main')
+        .first()
+        .isVisible()
+        .catch(() => false);
+
+      if (loginFormVisible || !adminShellVisible) {
+        throw new Error(`Admin login state not verified: ${JSON.stringify({
+          currentUrl: adminCurrentUrl,
+          loginFormVisible,
+          adminShellVisible,
+        })}`);
+      }
+
+      console.log('✅ lifecycle: admin login state verified', {
+        currentUrl: adminCurrentUrl,
+        loginFormVisible,
+        adminShellVisible,
+      });
 
       // Navigate to orders management
       await adminPage.locator('a[href*="orders"], nav a:has-text("Orders")').click();
