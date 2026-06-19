@@ -400,9 +400,9 @@ function OrdersManagementInner() {
           ))}
         </div>
       ) : (
-        <div className="orders-container">
+        <div className="orders-container" data-testid="orders-table">
           {filteredOrders.map(order => (
-            <div key={order.id} className="order-card">
+            <div key={order.id} className="order-card" data-testid="admin-order-card" data-order-id={order.id}>
               <div className="order-header">
                 <div>
                   <h3 
