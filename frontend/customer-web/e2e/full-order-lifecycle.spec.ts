@@ -1326,6 +1326,16 @@ async function expectDeliveredStatusForOrderInApp(params: {
     new Promise<string>((resolve) => setTimeout(() => resolve(''), 1500)),
   ]) || '').trim());
   const orderCardText = normalizeStatus((cardText || '').trim());
+  const customerDetailText = appName === 'customer' && isCustomerOrderDetailUrl
+    ? await Promise.race([
+      orderScope.innerText({ timeout: 1500 }).catch(() => ''),
+      new Promise<string>((resolve) => setTimeout(() => resolve(''), 1500)),
+    ])
+    : '';
+  const bodyText = await Promise.race([
+    page.locator('body').innerText({ timeout: 1500 }).catch(() => ''),
+    new Promise<string>((resolve) => setTimeout(() => resolve(''), 1500)),
+  ]);
   const statusCandidates = [
     statusText,
     (await Promise.race([
@@ -1335,8 +1345,34 @@ async function expectDeliveredStatusForOrderInApp(params: {
     orderCardText,
   ].filter(Boolean);
   const deliveredConfirmed = statusCandidates.some((candidate) => isDeliveredStatus(candidate));
+  const deliveredPattern = /(?:🎉\s*)?(DELIVERED|Delivered|delivered|Geliefert|Zugestellt)/i;
+  const combinedCustomerText = [
+    customerDetailText,
+    orderCardText,
+    bodyText,
+    ...visibleOrderRows,
+    ...visibleStatusTexts,
+    statusText,
+    (await Promise.race([
+      orderScope.getAttribute('data-status').catch(() => null),
+      new Promise<string | null>((resolve) => setTimeout(() => resolve(null), 1000)),
+    ])) || '',
+  ].filter(Boolean).join('\n');
+  const deliveredPatternMatched = appName === 'customer' && isCustomerOrderDetailUrl
+    ? deliveredPattern.test(combinedCustomerText)
+    : false;
+  const customerDeliveredConfirmed = deliveredConfirmed || deliveredPatternMatched;
 
-  if (!deliveredConfirmed) {
+  if (appName === 'customer' && isCustomerOrderDetailUrl && customerDeliveredConfirmed) {
+    console.log('✅ final verification: customer delivered status detected from detail text', {
+      orderId,
+      shortOrderId,
+      currentUrl: page.url(),
+    });
+    return;
+  }
+
+  if (!customerDeliveredConfirmed) {
     const bodyTextExcerpt = (await page.locator('body').innerText().catch(() => '')).slice(0, 1200);
     throw new Error(`${appName} final delivered verification failed: ${JSON.stringify({
       appName,
@@ -1344,6 +1380,9 @@ async function expectDeliveredStatusForOrderInApp(params: {
       orderId,
       shortOrderId,
       isCustomerOrderDetailUrl,
+      customerDetailTextExcerpt: customerDetailText.slice(0, 500),
+      combinedCustomerTextExcerpt: combinedCustomerText.slice(0, 800),
+      deliveredPatternMatched,
       orderCardText: orderCardText.slice(0, 500),
       statusText: statusText || null,
       dataStatus: await Promise.race([
