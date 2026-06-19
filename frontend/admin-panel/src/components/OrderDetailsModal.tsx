@@ -36,6 +36,10 @@ interface Order {
   }>;
 }
 
+function getOrderItems(order: Order) {
+  return Array.isArray(order.items) ? order.items : [];
+}
+
 interface OrderDetailsModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -147,7 +151,7 @@ function OrderDetailsModalInner({
         <div className="order-details-section">
           <h3>Bestellte Gerichte</h3>
           <div className="order-items-list">
-            {order.items.map((item, idx) => (
+            {getOrderItems(order).map((item, idx) => (
               <div key={idx} className="order-item-row">
                 {item.dish.imageUrl && (
                   <img

@@ -71,6 +71,10 @@ function getOrderDriverName(order: Order) {
   return order.driver?.name || 'Unassigned';
 }
 
+function getOrderItems(order: Order) {
+  return Array.isArray(order.items) ? order.items : [];
+}
+
 interface Restaurant {
   id: string;
   name: string;
@@ -467,7 +471,7 @@ function OrdersManagementInner() {
 
               <div className="order-items">
                 <h4>Gerichte:</h4>
-                {order.items.map((item, idx) => (
+                {getOrderItems(order).map((item, idx) => (
                   <div key={idx} className="order-item">
                     <span>{item.dish.name} × {item.quantity}</span>
                     <span>{item.price.toFixed(2)} €</span>
