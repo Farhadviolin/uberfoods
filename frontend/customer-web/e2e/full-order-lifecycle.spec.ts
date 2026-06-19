@@ -6298,6 +6298,12 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
 
       await adminPage.goto(adminOrdersUrl, { waitUntil: 'domcontentloaded', timeout: 15_000 });
       await TestHelpers.waitForStablePage(adminPage);
+      const adminOrderTab = adminPage.getByRole('menuitem', { name: /Bestellungen|Orders/i }).first();
+      if (await adminOrderTab.isVisible().catch(() => false)) {
+        await adminOrderTab.click();
+        await TestHelpers.waitForStablePage(adminPage);
+      }
+
       await expect(adminPage.locator(selectors.adminOrdersTable)).toBeVisible({ timeout: 15_000 });
       console.log('✅ lifecycle: phase4 admin orders table visible', {
         currentUrl: adminPage.url(),
