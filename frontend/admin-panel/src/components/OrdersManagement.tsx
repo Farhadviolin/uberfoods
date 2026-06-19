@@ -75,6 +75,18 @@ function getOrderItems(order: Order) {
   return Array.isArray(order.items) ? order.items : [];
 }
 
+const visuallyHiddenStyle = {
+  position: 'absolute' as const,
+  width: '1px',
+  height: '1px',
+  padding: 0,
+  margin: '-1px',
+  overflow: 'hidden',
+  clip: 'rect(0, 0, 0, 0)',
+  whiteSpace: 'nowrap' as const,
+  border: 0,
+};
+
 interface Restaurant {
   id: string;
   name: string;
@@ -402,7 +414,12 @@ function OrdersManagementInner() {
       ) : (
         <div className="orders-container" data-testid="orders-table">
           {filteredOrders.map(order => (
-            <div key={order.id} className="order-card" data-testid="admin-order-card" data-order-id={order.id}>
+            <div
+              key={order.id}
+              className="order-card order-row"
+              data-testid="order-row"
+              data-order-id={order.id}
+            >
               <div className="order-header">
                 <div>
                   <h3 
@@ -411,6 +428,7 @@ function OrdersManagementInner() {
                   >
                     Bestellung #{order.id.slice(-8)}
                   </h3>
+                  <span style={visuallyHiddenStyle}>Order ID: {order.id}</span>
                   <button
                     onClick={() => openCustomerOrder(order.id)}
                     style={{ 
@@ -433,9 +451,11 @@ function OrdersManagementInner() {
                 </div>
                 <div
                   className="status-badge"
+                  data-testid="status"
                   style={{ backgroundColor: getStatusColor(order.status) }}
                 >
-                  {getStatusText(order.status)}
+                  <span aria-hidden="true">{getStatusText(order.status)}</span>
+                  <span style={visuallyHiddenStyle}>{order.status}</span>
                 </div>
               </div>
 
