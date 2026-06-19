@@ -1254,6 +1254,86 @@ async function readLocatorTextWithin(
   ]) || '').trim();
 }
 
+async function expectDeliveredStatusForOrderInApp(params: {
+  page: Page;
+  appName: 'customer' | 'restaurant' | 'driver';
+  orderId: string;
+  openOrdersView: () => Promise<void>;
+}) {
+  const { page, appName, orderId, openOrdersView } = params;
+  const normalizeStatus = (value: string) => value.trim().replace(/\s+/g, ' ');
+  const isDeliveredStatus = (value: string | null | undefined) => Boolean(
+    value && /^(DELIVERED|Delivered|delivered|Geliefert|Zugestellt)$/i.test(normalizeStatus(value)),
+  );
+  const getVisibleTexts = async (locator: Locator, limit = 20) => locator.evaluateAll((nodes, resolvedLimit) => nodes
+    .filter((node): node is HTMLElement => node instanceof HTMLElement)
+    .map((node) => (node.textContent || '').trim().replace(/\s+/g, ' '))
+    .filter(Boolean)
+    .slice(0, resolvedLimit), limit).catch(() => []);
+
+  await openOrdersView();
+  await page.waitForLoadState('domcontentloaded').catch(() => undefined);
+  await page.waitForLoadState('networkidle').catch(() => undefined);
+
+  const orderCardSelectors = [
+    `[data-testid="${appName}-order-card-${orderId}"]`,
+    `[data-testid="order-card-${orderId}"]`,
+    `[data-order-id="${orderId}"]`,
+    `[data-testid*="order-card"]`,
+    `.order-card`,
+    `.order-row`,
+    `tr`,
+    `li`,
+    `article`,
+  ].join(', ');
+  const orderCard = page.locator(orderCardSelectors).filter({ hasText: orderId }).first();
+  const cardVisible = await orderCard.isVisible().catch(() => false);
+  const cardText = cardVisible ? await orderCard.textContent().catch(() => '') : '';
+  const visibleOrderRows = await getVisibleTexts(page.locator('[data-testid*="order"], .order-card, .order-row, tr, li, article, section'));
+  const visibleStatusTexts = await getVisibleTexts(page.locator('[data-testid*="status"], .order-status, [role="status"]'));
+
+  if (!cardVisible) {
+    const bodyTextExcerpt = (await page.locator('body').innerText().catch(() => '')).slice(0, 1200);
+    throw new Error(`${appName} final delivered verification failed: ${JSON.stringify({
+      appName,
+      currentUrl: page.url(),
+      orderId,
+      visibleOrderRows,
+      visibleStatusTexts,
+      bodyTextExcerpt,
+      reason: 'order-card-not-visible',
+    })}`);
+  }
+
+  const statusLocator = orderCard
+    .locator('[data-testid*="status"], .order-status, [role="status"], [data-status]')
+    .first();
+  const statusText = normalizeStatus((await statusLocator.textContent().catch(() => '') || '').trim());
+  const orderCardText = normalizeStatus((cardText || '').trim());
+  const statusCandidates = [
+    statusText,
+    (await orderCard.getAttribute('data-status').catch(() => null)) || '',
+    orderCardText,
+  ].filter(Boolean);
+  const deliveredConfirmed = statusCandidates.some((candidate) => isDeliveredStatus(candidate));
+
+  if (!deliveredConfirmed) {
+    const bodyTextExcerpt = (await page.locator('body').innerText().catch(() => '')).slice(0, 1200);
+    throw new Error(`${appName} final delivered verification failed: ${JSON.stringify({
+      appName,
+      currentUrl: page.url(),
+      orderId,
+      orderCardText: orderCardText.slice(0, 500),
+      statusText: statusText || null,
+      dataStatus: await orderCard.getAttribute('data-status').catch(() => null),
+      visibleOrderRows,
+      visibleStatusTexts,
+      bodyTextExcerpt,
+      reason: 'delivered-status-not-found',
+    })}`);
+  }
+}
+
 test.describe('Full Order Lifecycle UI-E2E', () => {
   let orderId: string;
   let orderRestaurantId: string | null = null;
@@ -6392,15 +6472,44 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
       // ============================================
       console.log('🔍 Final verification: Cross-app consistency check');
 
-      // Check order status in all apps
-      const customerOrderStatus = customerPage.locator(selectors.orderStatus);
-      const restaurantOrderStatus = restaurantPage.locator(selectors.orderStatus);
-      const driverOrderStatus = driverPage.locator(selectors.orderStatus);
+      const openCustomerOrdersView = async () => {
+        if (!customerPage.url().includes(`/orders/${orderId}`)) {
+          await customerPage.goto(`${testUrls.customer}/orders/${orderId}`);
+        }
+        await TestHelpers.waitForStablePage(customerPage);
+      };
 
-      // All should show DELIVERED
-      await expect(customerOrderStatus).toContainText('DELIVERED');
-      await expect(restaurantOrderStatus).toContainText('DELIVERED');
-      await expect(driverOrderStatus).toContainText('DELIVERED');
+      const openRestaurantOrdersView = async () => {
+        if (!restaurantPage.url().includes('/orders')) {
+          await restaurantPage.goto(`${testUrls.restaurant}/orders`);
+        }
+        await TestHelpers.waitForStablePage(restaurantPage);
+      };
+
+      const openDriverOrdersView = async () => {
+        await ensureDriverOrdersViewAfterPickup(driverPage, orderId, 'final verification');
+        await TestHelpers.waitForStablePage(driverPage);
+      };
+
+      // All should show DELIVERED, scoped to the concrete orderId in each app
+      await expectDeliveredStatusForOrderInApp({
+        page: customerPage,
+        appName: 'customer',
+        orderId,
+        openOrdersView: openCustomerOrdersView,
+      });
+      await expectDeliveredStatusForOrderInApp({
+        page: restaurantPage,
+        appName: 'restaurant',
+        orderId,
+        openOrdersView: openRestaurantOrdersView,
+      });
+      await expectDeliveredStatusForOrderInApp({
+        page: driverPage,
+        appName: 'driver',
+        orderId,
+        openOrdersView: openDriverOrdersView,
+      });
 
       console.log('🎉 SUCCESS: Full order lifecycle completed successfully!');
       console.log(`   Order ID: ${orderId}`);
