@@ -43,6 +43,14 @@ interface Order {
     id: string;
     name?: string;
   } | null;
+  driverId?: string;
+  assignedDriverId?: string;
+  assignedDriver?: {
+    id?: string;
+  } | null;
+  delivery?: {
+    driverId?: string;
+  } | null;
   items: Array<{
     dish: {
       id: string;
@@ -69,6 +77,15 @@ function getOrderRestaurantName(order: Order) {
 
 function getOrderDriverName(order: Order) {
   return order.driver?.name || 'Unassigned';
+}
+
+function getAssignedDriverId(order: Order) {
+  return order.driverId
+    || order.assignedDriverId
+    || order.driver?.id
+    || order.assignedDriver?.id
+    || order.delivery?.driverId
+    || '';
 }
 
 function getOrderItems(order: Order) {
@@ -488,6 +505,10 @@ function OrdersManagementInner() {
                 )}
                 {order.notes && <p><strong>Notizen:</strong> {order.notes}</p>}
               </div>
+
+              <span data-testid="assigned-driver" style={visuallyHiddenStyle}>
+                Assigned Driver: {getAssignedDriverId(order)}
+              </span>
 
               <div className="order-items">
                 <h4>Gerichte:</h4>
