@@ -4477,55 +4477,16 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
         driverPickupVisiblePickupButton = pickupButton;
         driverPickupVisiblePickupButtonSeen = pickupButtonVisible;
 
-        if (targetCardState.targetCardVisible && pickupButtonVisible) {
-          const atomicClickStartedAt = Date.now();
-          console.log('➡️ lifecycle: atomic pickup click from visible step start', {
-            orderId,
-            currentUrl: driverPage.url(),
-            clickedFromVisibleStep: true,
-            clickMethod: 'locator-click',
-          });
-          const atomicClickResult = await clickPickupActionAtomically(
-            pickupCard,
-            orderId,
-            'phase3 driver pickup button visible',
-          );
-          if (atomicClickResult.clicked) {
-            driverPickupClickedDuringVisibleStep = true;
-            driverPickupVisibleClickDiagnostics = {
-              orderId,
-              currentUrl: driverPage.url(),
-              clickedFromVisibleStep: true,
-              clickMethod: atomicClickResult.reason.includes('force-click')
-                ? 'force-click'
-                : atomicClickResult.reason.includes('dom-evaluate-click')
-                  ? 'dom-evaluate-click'
-                  : 'locator-click',
-              elapsedMs: Date.now() - atomicClickStartedAt,
-            };
-            console.log('✅ lifecycle: atomic pickup click from visible step completed', {
-              orderId,
-              currentUrl: driverPage.url(),
-              clickedFromVisibleStep: true,
-              clickMethod: driverPickupVisibleClickDiagnostics.clickMethod,
-              elapsedMs: driverPickupVisibleClickDiagnostics.elapsedMs,
-            });
-            return;
-          }
-
-          console.warn('⚠️ lifecycle: atomic pickup click from visible step failed', {
-            orderId,
-            currentUrl: driverPage.url(),
-            clickedFromVisibleStep: true,
-            clickMethod: atomicClickResult.reason.includes('force-click')
-              ? 'force-click'
-              : atomicClickResult.reason.includes('dom-evaluate-click')
-                ? 'dom-evaluate-click'
-                : 'locator-click',
-            elapsedMs: Date.now() - atomicClickStartedAt,
-            reason: atomicClickResult.reason,
-          });
-        }
+        console.log('✅ lifecycle: pickup visible step verified target action without clicking', {
+          orderId,
+          currentUrl: driverPage.url(),
+          targetCardFound: targetCardState.targetCardVisible,
+          pickupButtonFound: pickupButtonVisible,
+          pickupButtonEnabled: await pickupButton.isEnabled().catch(() => false),
+          pickupButtonText: await pickupButton.textContent().catch(() => null),
+          pickupSnapshotStatus: pickupSnapshot.status,
+          pickupSnapshotDelivered: pickupSnapshot.delivered,
+        });
       });
 
       let latestApiStatus: string | null = null;
@@ -4688,109 +4649,6 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
           console.warn('⚠️ lifecycle: driver pickup pre-click preparation exceeded diagnostic threshold', {
             orderId,
             elapsedBeforeClickMs,
-          });
-        }
-
-        if (driverPickupClickedDuringVisibleStep) {
-          console.log('✅ lifecycle: pickup already clicked during visible step, verifying pickup state', {
-            orderId,
-            currentUrl: driverPage.isClosed() ? 'closed' : driverPage.url(),
-            driverPickupVisibleClickDiagnostics,
-          });
-          const confirmedPickupSnapshot = await waitForConfirmedDriverPickupStatus(
-            driverPage,
-            orderId,
-            'phase3 driver pickup click after visible-step click',
-          );
-          if (confirmedPickupSnapshot && (isConfirmedDriverProgressStatus(confirmedPickupSnapshot.status) || confirmedPickupSnapshot.delivered)) {
-            pickupSnapshot = confirmedPickupSnapshot;
-            latestApiStatus = confirmedPickupSnapshot.status;
-            driverPickupCompleted = true;
-            console.log('✅ lifecycle: driver pickup completion confirmed by snapshot', {
-              orderId,
-              currentUrl: confirmedPickupSnapshot.currentUrl,
-              status: confirmedPickupSnapshot.status,
-              delivered: confirmedPickupSnapshot.delivered,
-              reason: 'pickup already clicked during visible step, verifying pickup state',
-            });
-            return;
-          }
-          throw new Error(`phase3 driver pickup click failed to verify pickup after visible-step click: ${JSON.stringify({
-            orderId,
-            currentUrl: driverPage.isClosed() ? 'closed' : driverPage.url(),
-            driverPickupVisibleClickDiagnostics,
-            pickupSnapshotStatus: confirmedPickupSnapshot?.status ?? null,
-            pickupSnapshotDelivered: confirmedPickupSnapshot?.delivered ?? false,
-          })}`);
-        }
-
-        console.log('➡️ lifecycle: direct visible pickup click attempt start', {
-          orderId,
-          currentUrl: driverPage.isClosed() ? 'closed' : driverPage.url(),
-          directVisibleClickAttempted: Boolean(driverPickupVisibleCardState?.targetCardVisible && driverPickupVisiblePickupButtonSeen),
-          remainingDeadlineMs: remainingPickupClickMs(),
-        });
-
-        const visibleStateClickResult = driverPickupVisibleCardState?.targetCardVisible && driverPickupVisiblePickupButtonSeen
-          ? await Promise.race([
-            clickPickupActionWithinTargetCard(
-              driverPickupVisibleCardState.targetCard,
-              orderId,
-              'phase3 driver pickup click direct visible state',
-            ).catch((error) => ({
-              clicked: false,
-              reason: error instanceof Error ? error.message : String(error),
-              orderSuffix: orderId.slice(-8),
-            })),
-            new Promise<Awaited<ReturnType<typeof clickPickupActionWithinTargetCard>>>((resolve) => setTimeout(() => resolve({
-              clicked: false,
-              reason: 'direct-click-timeout',
-              orderSuffix: orderId.slice(-8),
-            }), boundedPickupTimeoutMs(2000))),
-          ])
-          : null;
-
-        if (driverPickupVisibleCardState?.targetCardVisible && driverPickupVisiblePickupButtonSeen && !visibleStateClickResult?.clicked) {
-          const preferredVisibleClickResult = await clickPickupActionAtomically(
-            driverPickupVisibleCardState.targetCard,
-            orderId,
-            'phase3 driver pickup click visible-state retry',
-          ).catch((error) => ({
-            clicked: false,
-            reason: error instanceof Error ? error.message : String(error),
-            orderSuffix: orderId.slice(-8),
-          }));
-          if (preferredVisibleClickResult.clicked) {
-            console.log('✅ lifecycle: direct visible pickup click completed', {
-              orderId,
-              currentUrl: driverPage.isClosed() ? 'closed' : driverPage.url(),
-              directVisibleClickDurationMs: Date.now() - pickupClickStartedAt,
-              directClickResult: preferredVisibleClickResult,
-              clickResolverPath: 'visible-state-retry-atomic',
-            });
-            return;
-          }
-        }
-
-        if (visibleStateClickResult?.clicked) {
-          console.log('✅ lifecycle: direct visible pickup click completed', {
-            orderId,
-            currentUrl: driverPage.isClosed() ? 'closed' : driverPage.url(),
-            directVisibleClickDurationMs: Date.now() - pickupClickStartedAt,
-            directClickResult: visibleStateClickResult,
-          });
-        } else if (driverPickupVisibleCardState?.targetCardVisible && driverPickupVisiblePickupButtonSeen) {
-          console.warn('⚠️ lifecycle: direct visible pickup click failed', {
-            orderId,
-            currentUrl: driverPage.isClosed() ? 'closed' : driverPage.url(),
-            cardFound: driverPickupVisibleCardState.targetCardVisible,
-            pickupButtonVisible: driverPickupVisiblePickupButtonSeen,
-            pickupButtonText: pickupButtonText || null,
-            visibleButtons: driverPickupVisibleCardState.visibleButtonTexts.slice(0, 25),
-            visibleCards: driverPickupVisibleCardState.bodyTextPreview ? [driverPickupVisibleCardState.bodyTextPreview.slice(0, 300)] : [],
-            pickupSnapshotStatus: driverPickupVisibleCardState?.targetCardVisible ? null : pickupSnapshot?.status ?? null,
-            directVisibleClickAttempted: true,
-            directVisibleClickCompleted: false,
           });
         }
 
@@ -5688,48 +5546,47 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
           consoleErrors: pickupTraffic.consoleErrors,
         });
 
-        if (!pickupConfirmedBySignal) {
-          const lastPickupRequest = pickupTraffic.requestDetails[pickupTraffic.requestDetails.length - 1] || null;
-          if (!lastPickupRequest) {
-            const retryPickupButton = await resolveDriverPickupButton(driverPage, orderId);
-            await retryPickupButton.scrollIntoViewIfNeeded({ timeout: boundedPickupTimeoutMs(1000) }).catch(() => null);
-            await retryPickupButton.click({ timeout: boundedPickupTimeoutMs(1500) });
-          }
-          const confirmedPickupSnapshot = await waitForConfirmedDriverPickupStatus(
-            driverPage,
+        console.log('➡️ lifecycle: pickup click step resolving target action', {
+          orderId,
+          currentUrl: driverPage.isClosed() ? 'closed' : driverPage.url(),
+        });
+        const pickupClickTargetCard = await resolveVisibleDriverTargetOrderCard(
+          driverPage,
+          orderId,
+          'phase3 driver pickup click',
+        );
+        const pickupClickButton = await resolveDriverPickupButton(driverPage, orderId);
+        const pickupClickButtonEnabled = await pickupClickButton.isEnabled().catch(() => false);
+        const pickupClickButtonText = (await pickupClickButton.textContent().catch(() => null))?.trim() || null;
+        console.log('✅ lifecycle: pickup click step target action resolved', {
+          orderId,
+          currentUrl: driverPage.isClosed() ? 'closed' : driverPage.url(),
+          targetCardFound: Boolean(pickupClickTargetCard),
+          pickupButtonFound: Boolean(pickupClickButton),
+          pickupButtonEnabled: pickupClickButtonEnabled,
+          pickupButtonText: pickupClickButtonText,
+        });
+        if (!pickupClickButtonEnabled) {
+          throw new Error(`phase3 driver pickup click target action is disabled: ${JSON.stringify({
             orderId,
-            'phase3 driver pickup click',
-          ).catch(() => null);
-          if (confirmedPickupSnapshot && isConfirmedDriverProgressStatus(confirmedPickupSnapshot.status) || confirmedPickupSnapshot?.delivered) {
-            pickupConfirmedBySignal = true;
-            driverPickupCompleted = true;
-            console.log('✅ driver pickup completed', {
-              orderId,
-              currentUrl: confirmedPickupSnapshot.currentUrl,
-              pickupButtonText,
-              pickupStatusText: pickupStatusTextAfter || null,
-              pickupSnapshotStatus: confirmedPickupSnapshot.status,
-              pickupSnapshotDelivered: confirmedPickupSnapshot.delivered,
-              reason: 'pickup confirmed by response, ui, or snapshot after retry',
-            });
-          } else {
-            throw new Error(`phase3 driver pickup click did not produce a response or confirmed status change: ${JSON.stringify({
-              orderId,
-              currentUrl: driverPage.url(),
-              pickupButtonText,
-              clickError,
-              pickupStatusText: pickupStatusTextAfter || null,
-              pickupSnapshotStatus: confirmedPickupSnapshot?.status ?? null,
-              pickupSnapshotDelivered: confirmedPickupSnapshot?.delivered ?? false,
-              requestUrls: pickupTraffic.requestUrls,
-              responseUrls: pickupTraffic.responseUrls,
-              requestFailedEvents: pickupTraffic.requestFailedEvents,
-              pageErrors: pickupTraffic.pageErrors,
-              consoleErrors: pickupTraffic.consoleErrors,
-            })}`);
-          }
+            currentUrl: driverPage.url(),
+            targetCardFound: Boolean(pickupClickTargetCard),
+            pickupButtonFound: Boolean(pickupClickButton),
+            pickupButtonEnabled: pickupClickButtonEnabled,
+            pickupButtonText: pickupClickButtonText,
+          })}`);
         }
 
+        await pickupClickButton.scrollIntoViewIfNeeded({ timeout: boundedPickupTimeoutMs(1000) }).catch(() => null);
+        await pickupClickButton.click({ timeout: boundedPickupTimeoutMs(1500) });
+        console.log('✅ lifecycle: pickup click step clicked target action', {
+          orderId,
+          currentUrl: driverPage.isClosed() ? 'closed' : driverPage.url(),
+          pickupButtonText: pickupClickButtonText,
+        });
+
+        let pickupRequestObserved = false;
+        let pickupResponseStatus: number | null = null;
         let confirmedPickupSnapshot = await waitForConfirmedDriverPickupStatus(
           driverPage,
           orderId,
@@ -5741,14 +5598,12 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
             currentUrl: snapshotAfterFailure?.currentUrl ?? driverPage.url(),
             status: snapshotAfterFailure?.status ?? null,
             delivered: snapshotAfterFailure?.delivered ?? false,
-            clickedFromVisibleStep: driverPickupClickedDuringVisibleStep,
             retryPickupAttempted,
             error: error instanceof Error ? error.message : String(error),
           });
 
           if (
-            driverPickupClickedDuringVisibleStep
-            && snapshotAfterFailure?.status === 'ACCEPTED'
+            snapshotAfterFailure?.status === 'ACCEPTED'
             && !snapshotAfterFailure.delivered
             && !retryPickupAttempted
           ) {
@@ -5762,6 +5617,16 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
           }
 
           throw error;
+        });
+        pickupRequestObserved = Boolean(pickupTraffic.requestUrls.length);
+        pickupResponseStatus = pickupTraffic.responseDetails[pickupTraffic.responseDetails.length - 1]?.status ?? null;
+        console.log('✅ lifecycle: pickup click step confirmed status progression', {
+          orderId,
+          currentUrl: confirmedPickupSnapshot.currentUrl,
+          status: confirmedPickupSnapshot.status,
+          delivered: confirmedPickupSnapshot.delivered,
+          pickupRequestObserved,
+          pickupResponseStatus,
         });
 
         if (confirmedPickupSnapshot && isConfirmedDriverProgressStatus(confirmedPickupSnapshot.status) || confirmedPickupSnapshot?.delivered) {
@@ -5777,8 +5642,8 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
             orderId,
             currentUrl: driverPage.url(),
             pickupButtonText: retryPickupButtonText || pickupButtonText || null,
-            clickedFromVisibleStep: driverPickupClickedDuringVisibleStep,
-            clickMethod: retryPickupAttempted ? 'resolve-driver-pickup-button' : 'locator-click',
+            clickedFromVisibleStep: false,
+            clickMethod: 'resolve-driver-pickup-button',
             retryPickupAttempted,
             pickupStatusText: pickupStatusTextAfter || null,
             pickupSnapshotStatus: confirmedPickupSnapshot?.status ?? null,
