@@ -37,6 +37,23 @@ export class DriverEndpointsController {
     return this.getAvailableOrdersImpl();
   }
 
+  @Get("orders/active")
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: "Get active orders for driver" })
+  @ApiResponse({ status: 200, description: "Active orders retrieved" })
+  async getActiveOrders(@GetUser("id") driverId: string): Promise<unknown> {
+    return this.getActiveOrdersImpl(driverId);
+  }
+
+  /** Alias for driver-app: GET /drivers/:driverId/orders/active */
+  @Get(":driverId/orders/active")
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: "Get active orders (alias with driverId in path)" })
+  @ApiResponse({ status: 200, description: "Active orders retrieved" })
+  async getActiveOrdersByDriverId(@GetUser("id") driverId: string): Promise<unknown> {
+    return this.getActiveOrdersImpl(driverId);
+  }
+
   private async getAvailableOrdersImpl(): Promise<unknown> {
     try {
       const orders = await this.prisma.order.findMany({
@@ -65,6 +82,38 @@ export class DriverEndpointsController {
       return orders;
     } catch (error) {
       this.logger.error(`Failed to get available orders: ${error.message}`);
+      throw error;
+    }
+  }
+
+  private async getActiveOrdersImpl(driverId: string): Promise<unknown> {
+    try {
+      const orders = await this.prisma.order.findMany({
+        where: {
+          driverId,
+          status: { in: ["ACCEPTED", "PICKED_UP", "IN_TRANSIT"] },
+        },
+        include: {
+          customer: {
+            select: { id: true, name: true, phone: true },
+          },
+          restaurant: {
+            select: { id: true, name: true, address: true },
+          },
+          items: {
+            include: {
+              dish: {
+                select: { id: true, name: true, price: true },
+              },
+            },
+          },
+        },
+        orderBy: { createdAt: "desc" },
+        take: 50,
+      });
+      return orders;
+    } catch (error) {
+      this.logger.error(`Failed to get active orders: ${error.message}`);
       throw error;
     }
   }
