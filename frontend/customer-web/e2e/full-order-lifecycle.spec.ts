@@ -5930,6 +5930,16 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
 
         if (!deliveredButtonVisible) {
           if (driverPickupCompleted) {
+            if (driverOrderSnapshot.delivered || /DELIVERED|COMPLETED/i.test(driverOrderSnapshot.status || '')) {
+              console.log('✅ lifecycle: driver delivered state already confirmed after pickup completion', {
+                orderId,
+                currentUrl: driverPage.isClosed() ? 'closed' : driverPage.url(),
+                driverOrderStatus: driverOrderSnapshot.status,
+                deliveredStatusTextBefore: deliveredStatusTextBefore || null,
+              });
+              return;
+            }
+
             const deliveredStatusUrl = new URL(`/api/drivers/orders/${orderId}/status`, testUrls.driver).href;
             const driverAccessToken = await resolveDriverAccessToken(driverPage);
             if (driverAccessToken) {
