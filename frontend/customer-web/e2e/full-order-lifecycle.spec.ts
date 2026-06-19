@@ -46,6 +46,63 @@ async function withStepTimeout<T>(
   }
 }
 
+async function ensureAdminLoggedInForLifecycle(page: Page): Promise<void> {
+  const loginForm = page.locator('form[aria-label="Login-Formular"]');
+  const adminShell = page.locator('[data-testid="admin-shell"]');
+  const loadingSpinner = page.locator('[role="status"], .loading-spinner-container, .loading-spinner').first();
+
+  if (await adminShell.isVisible({ timeout: 1000 }).catch(() => false)) {
+    return;
+  }
+
+  if (!(await loginForm.isVisible({ timeout: 1000 }).catch(() => false))) {
+    const bodyText = await page.locator('body').innerText().catch(() => '');
+    throw new Error(`Admin login UI did not become ready within Phase 4: ${JSON.stringify({
+      currentUrl: page.url(),
+      bodyText: bodyText.slice(0, 200),
+    })}`);
+  }
+
+  if (await loadingSpinner.isVisible({ timeout: 1000 }).catch(() => false)) {
+    await loadingSpinner.waitFor({ state: 'hidden', timeout: 15_000 }).catch(() => undefined);
+  }
+
+  await page.fill('[name="email"]', process.env.TEST_ADMIN_EMAIL || 'admin@uberfoods.com');
+  await page.fill('[name="password"]', process.env.TEST_ADMIN_PASSWORD || 'admin123');
+
+  const [loginRes] = await Promise.all([
+    page.waitForResponse(res =>
+      res.url().includes('/api/auth/login')
+      && res.request().method() === 'POST'
+    ),
+    page.click('button[type="submit"]'),
+  ]);
+
+  const body = await loginRes.text().catch(() => '');
+  if (loginRes.status() >= 500) {
+    throw new Error(`Admin login API 5xx (${loginRes.status()}). Body: ${body.slice(0, 400)}`);
+  }
+  if (loginRes.status() >= 400) {
+    throw new Error(`Admin login API failed (${loginRes.status()}). Body: ${body.slice(0, 400)}`);
+  }
+
+  const loginFormVisibleAfterLogin = await loginForm.isVisible({ timeout: 1000 }).catch(() => false);
+  const adminShellVisibleAfterLogin = await adminShell.isVisible({ timeout: 15_000 }).catch(() => false);
+  if (loginFormVisibleAfterLogin || !adminShellVisibleAfterLogin) {
+    throw new Error(`Admin login did not complete: ${JSON.stringify({
+      currentUrl: page.url(),
+      loginFormVisibleAfterLogin,
+      adminShellVisibleAfterLogin,
+    })}`);
+  }
+
+  console.log('✅ lifecycle: admin login completed before phase4 verification', {
+    currentUrl: page.url(),
+    loginFormVisibleAfterLogin,
+    adminShellVisibleAfterLogin,
+  });
+}
+
 type LifecycleCustomerCredentials = {
   email: string;
   password: string;
@@ -6190,6 +6247,8 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
       await TestHelpers.waitForStablePage(adminPage);
 
       // Verify we're logged in
+      await ensureAdminLoggedInForLifecycle(adminPage);
+
       const adminCurrentUrl = adminPage.url();
       const loginFormVisible = await adminPage
         .locator('input[type="password"], [data-testid="login-form"], form:has(input[type="password"])')
