@@ -6281,32 +6281,61 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
         process.env.ADMIN_URL ||
         process.env.VITE_ADMIN_URL ||
         'http://127.0.0.1:3002';
-      const adminOrdersUrl = new URL('/admin/orders', adminBaseUrl).toString();
 
-      if (!adminOrdersUrl || typeof adminOrdersUrl !== 'string') {
-        throw new Error(`Admin orders URL could not be resolved: ${JSON.stringify({
-          adminBaseUrl,
-          availableTestUrls: Object.keys(testUrls ?? {}),
-        })}`);
-      }
-
-      console.log('➡️ lifecycle: phase4 navigating directly to admin orders', {
+      console.log('➡️ lifecycle: phase4 opening admin root and orders sidebar', {
         adminBaseUrl,
-        adminOrdersUrl,
         orderId,
       });
 
       await adminPage.goto(adminBaseUrl, { waitUntil: 'domcontentloaded', timeout: 15_000 });
       await TestHelpers.waitForStablePage(adminPage);
-      const adminOrderTab = adminPage.getByTestId('sidebar-link-orders')
-        .or(adminPage.getByRole('menuitem', { name: /Bestellungen|Orders/i }))
-        .first();
-      if (await adminOrderTab.isVisible().catch(() => false)) {
-        await adminOrderTab.click();
+      const ordersNav = adminPage.getByTestId('sidebar-link-orders');
+      const visibleOrdersNavCount = await ordersNav.count().catch(() => 0);
+      if (visibleOrdersNavCount > 0 && await ordersNav.first().isVisible().catch(() => false)) {
+        await ordersNav.first().click();
         await TestHelpers.waitForStablePage(adminPage);
+      } else {
+        const fallbackOrdersLink = adminPage.getByRole('link', { name: /Bestellungen|Orders/i })
+          .or(adminPage.getByRole('button', { name: /Bestellungen|Orders/i }))
+          .first();
+        if (await fallbackOrdersLink.isVisible().catch(() => false)) {
+          await fallbackOrdersLink.click({ timeout: 15_000 });
+          await TestHelpers.waitForStablePage(adminPage);
+        }
       }
 
-      await expect(adminPage.locator(selectors.adminOrdersTable)).toBeVisible({ timeout: 15_000 });
+      const adminOrdersTable = adminPage.locator(selectors.adminOrdersTable);
+      try {
+        await expect(adminOrdersTable).toBeVisible({ timeout: 15_000 });
+      } catch (error) {
+        const adminShellVisible = await adminPage
+          .locator('[data-testid="admin-shell"], nav, main')
+          .first()
+          .isVisible()
+          .catch(() => false);
+        const visibleNavTexts = await adminPage.locator('nav, [data-testid="sidebar"], [data-testid="admin-shell"], button, a')
+          .evaluateAll((nodes) => nodes
+            .map((node) => (node.textContent || '').trim().replace(/\s+/g, ' '))
+            .filter(Boolean)
+            .slice(0, 30))
+          .catch(() => []);
+        const visibleTableLikeElements = await adminPage.locator('table, [role="table"], [data-testid*="table"], .table, .orders-table, .datatable')
+          .evaluateAll((nodes) => nodes
+            .map((node) => (node.textContent || '').trim().replace(/\s+/g, ' '))
+            .filter(Boolean)
+            .slice(0, 20))
+          .catch(() => []);
+        const pageTextSnippet = (await adminPage.locator('body').innerText().catch(() => '')).slice(0, 1000);
+        throw new Error(`Admin orders table not visible after sidebar navigation: ${JSON.stringify({
+          currentUrl: adminPage.url(),
+          adminShellVisible,
+          visibleNavTexts,
+          visibleTableLikeElements,
+          orderId,
+          pageTextSnippet,
+          cause: error instanceof Error ? error.message : String(error),
+        })}`);
+      }
       console.log('✅ lifecycle: phase4 admin orders table visible', {
         currentUrl: adminPage.url(),
         orderId,
