@@ -4529,12 +4529,30 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
       });
 
       let latestApiStatus: string | null = null;
+      let latestApiStatusAfterFallback: string | null = null;
 
       await withStepTimeout('phase3 driver pickup click', async () => {
         const ensureDriverPageOpen = () => {
           if (driverPage.isClosed()) {
             throw new Error(`Driver page closed before pickup operation for order ${orderId}`);
           }
+        };
+        const retryPickupClickWithDiagnostics = async (reason: string) => {
+          const retryPickupButton = await resolveDriverPickupButton(driverPage, orderId);
+          const retryPickupButtonText = (await Promise.race([
+            retryPickupButton.textContent().catch(() => null),
+            new Promise<null>((resolve) => setTimeout(() => resolve(null), 1000)),
+          ]) || '').trim();
+          await retryPickupButton.scrollIntoViewIfNeeded({ timeout: boundedPickupTimeoutMs(1000) }).catch(() => null);
+          await retryPickupButton.click({ timeout: boundedPickupTimeoutMs(1500) });
+          console.log('ℹ️ lifecycle: pickup click retry executed', {
+            orderId,
+            currentUrl: driverPage.isClosed() ? 'closed' : driverPage.url(),
+            reason,
+            clickMethod: 'resolve-driver-pickup-button',
+            retryPickupButtonText: retryPickupButtonText || null,
+          });
+          return retryPickupButtonText || null;
         };
         const pickupClickStepDeadline = Date.now() + 12000;
         const remainingPickupClickMs = () => Math.max(0, pickupClickStepDeadline - Date.now());
@@ -4645,6 +4663,8 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
         let fallbackSkippedReason = 'pickup-action-present-or-not-accepted';
         let fallbackResponseStatus: number | null = null;
         let fallbackResponseBody: string | null = null;
+        let retryPickupAttempted = false;
+        let retryPickupButtonText: string | null = null;
         console.log('ℹ️ lifecycle: phase3 driver page state before pickup click', {
           orderId,
           isClosed: driverPage.isClosed(),
@@ -5710,12 +5730,24 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
           }
         }
 
-        if (pickupConfirmedBySignal) {
-          const confirmedPickupSnapshot = await waitForConfirmedDriverPickupStatus(
-            driverPage,
-            orderId,
-            'phase3 driver pickup click',
-          );
+        const confirmedPickupSnapshot = await waitForConfirmedDriverPickupStatus(
+          driverPage,
+          orderId,
+          'phase3 driver pickup click',
+        ).catch(async (error) => {
+          if (driverPickupClickedDuringVisibleStep && !retryPickupAttempted) {
+            retryPickupAttempted = true;
+            retryPickupButtonText = await retryPickupClickWithDiagnostics('post-visible-step snapshot still ACCEPTED');
+            return waitForConfirmedDriverPickupStatus(
+              driverPage,
+              orderId,
+              'phase3 driver pickup click after visible-step retry',
+            );
+          }
+          throw error;
+        });
+
+        if (confirmedPickupSnapshot && isConfirmedDriverProgressStatus(confirmedPickupSnapshot.status) || confirmedPickupSnapshot?.delivered) {
           driverPickupCompleted = true;
           console.log('✅ lifecycle: driver pickup completion confirmed by snapshot', {
             orderId,
@@ -5723,6 +5755,23 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
             status: confirmedPickupSnapshot.status,
             delivered: confirmedPickupSnapshot.delivered,
           });
+        } else {
+          throw new Error(`phase3 driver pickup click did not produce a response or confirmed status change: ${JSON.stringify({
+            orderId,
+            currentUrl: driverPage.url(),
+            pickupButtonText: retryPickupButtonText || pickupButtonText || null,
+            clickedFromVisibleStep: driverPickupClickedDuringVisibleStep,
+            clickMethod: retryPickupAttempted ? 'resolve-driver-pickup-button' : 'locator-click',
+            retryPickupAttempted,
+            pickupStatusText: pickupStatusTextAfter || null,
+            pickupSnapshotStatus: confirmedPickupSnapshot?.status ?? null,
+            pickupSnapshotDelivered: confirmedPickupSnapshot?.delivered ?? false,
+            requestUrls: pickupTraffic.requestUrls,
+            responseUrls: pickupTraffic.responseUrls,
+            requestFailedEvents: pickupTraffic.requestFailedEvents,
+            pageErrors: pickupTraffic.pageErrors,
+            consoleErrors: pickupTraffic.consoleErrors,
+          })}`);
         }
       });
 
