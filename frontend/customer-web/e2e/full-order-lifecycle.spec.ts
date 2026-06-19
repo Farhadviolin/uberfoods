@@ -1345,6 +1345,9 @@ async function expectDeliveredStatusForOrderInApp(params: {
     orderCardText,
   ].filter(Boolean);
   const deliveredConfirmed = statusCandidates.some((candidate) => isDeliveredStatus(candidate));
+  const staleRestaurantStatusMatch = appName === 'restaurant'
+    ? statusCandidates.find((candidate) => /READY_FOR_PICKUP|PENDING|PREPARING|ACCEPTED|IN_PROGRESS/i.test(candidate)) ?? null
+    : null;
   const deliveredPattern = /(?:🎉\s*)?(DELIVERED|Delivered|delivered|Geliefert|Zugestellt)/i;
   const combinedCustomerText = [
     customerDetailText,
@@ -1370,6 +1373,105 @@ async function expectDeliveredStatusForOrderInApp(params: {
       currentUrl: page.url(),
     });
     return;
+  }
+
+  if (appName === 'restaurant' && !deliveredConfirmed && staleRestaurantStatusMatch) {
+    console.log('➡️ final verification: restaurant visible order stale before refresh', {
+      orderId,
+      shortOrderId,
+      currentUrl: page.url(),
+      visibleStatusTexts,
+    });
+    console.log('➡️ final verification: restaurant refreshing orders before delivered assertion', {
+      orderId,
+      shortOrderId,
+    });
+
+    await page.reload({ waitUntil: 'domcontentloaded', timeout: 7000 }).catch(() => null);
+    await page.waitForLoadState('domcontentloaded', { timeout: 3000 }).catch(() => null);
+
+    const restaurantTabsTried: string[] = [];
+    const tryRestaurantTab = async (label: RegExp, displayName: string) => {
+      const tabTargets = [
+        page.getByTestId('sidebar-link-orders').first(),
+        page.getByTestId('nav-orders').first(),
+        page.getByTestId('orders-link').first(),
+        page.getByRole('button', { name: label }).first(),
+        page.getByRole('link', { name: label }).first(),
+        page.locator('button, a').filter({ hasText: label }).first(),
+        page.locator('a[href*="/orders"]').first(),
+      ];
+
+      for (const target of tabTargets) {
+        try {
+          if (await target.isVisible().catch(() => false)) {
+            await target.click({ timeout: 1500 });
+            restaurantTabsTried.push(displayName);
+            return true;
+          }
+        } catch {
+          // keep trying
+        }
+      }
+
+      restaurantTabsTried.push(`${displayName}:miss`);
+      return false;
+    };
+
+    await tryRestaurantTab(/Bestellungen|Orders/i, 'Orders');
+    await tryRestaurantTab(/Alle/i, 'Alle');
+    await tryRestaurantTab(/Abgeschlossen|Completed|Delivered/i, 'Completed');
+
+    const refreshedVisibleRows = await Promise.race([
+      getVisibleTexts(page.locator('[data-testid*="order"], .order-card, .order-row, tr, li, article, section')),
+      new Promise<string[]>((resolve) => setTimeout(() => resolve([]), 2000)),
+    ]);
+    const refreshedVisibleStatusTexts = await Promise.race([
+      getVisibleTexts(page.locator('[data-testid*="status"], .order-status, [role="status"]')),
+      new Promise<string[]>((resolve) => setTimeout(() => resolve([]), 2000)),
+    ]);
+    const refreshedBodyText = (await Promise.race([
+      page.locator('body').innerText({ timeout: 1500 }).catch(() => ''),
+      new Promise<string>((resolve) => setTimeout(() => resolve(''), 1500)),
+    ])).slice(0, 1200);
+    const refreshedCombinedText = [
+      refreshedBodyText,
+      ...refreshedVisibleRows,
+      ...refreshedVisibleStatusTexts,
+    ].filter(Boolean).join('\n');
+    const refreshedDelivered = deliveredPattern.test(refreshedCombinedText)
+      && (refreshedCombinedText.includes(orderId) || refreshedCombinedText.includes(shortOrderId));
+
+    if (refreshedDelivered) {
+      console.log('✅ final verification: restaurant delivered status detected after refresh', {
+        orderId,
+        shortOrderId,
+        currentUrl: page.url(),
+      });
+      return;
+    }
+
+    const bodyTextExcerpt = refreshedBodyText;
+    throw new Error(`${appName} final delivered verification failed: ${JSON.stringify({
+      appName,
+      currentUrl: page.url(),
+      orderId,
+      shortOrderId,
+      isCustomerOrderDetailUrl,
+      visibleOrderRows,
+      visibleStatusTexts,
+      bodyTextExcerpt,
+      restaurantFinalRefreshAttempted: true,
+      restaurantFinalRefreshReason: 'visible-order-stale-status',
+      restaurantStatusBeforeRefresh: staleRestaurantStatusMatch,
+      restaurantStatusAfterRefresh: refreshedVisibleStatusTexts.find((text) => /READY_FOR_PICKUP|PENDING|PREPARING|ACCEPTED|IN_PROGRESS/i.test(text)) ?? null,
+      restaurantRowsBeforeRefresh: visibleOrderRows,
+      restaurantRowsAfterRefresh: refreshedVisibleRows,
+      restaurantTabsTried,
+      restaurantOrderStillStale: true,
+      deliveredPatternMatched: refreshedDelivered,
+      reason: 'restaurant-final-delivered-status-not-found-after-refresh',
+    })}`);
   }
 
   if (!customerDeliveredConfirmed) {
@@ -6591,6 +6693,104 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
           return { rowTexts, selectorCounts, bodyText };
         };
 
+        const collectRestaurantRefreshDiagnostics = async () => {
+          const visibleButtons = await restaurantPage.locator('button').evaluateAll((nodes) => nodes
+            .map((node) => (node.textContent || '').trim().replace(/\s+/g, ' '))
+            .filter(Boolean)
+            .slice(0, 30))
+            .catch(() => []);
+          const visibleLinks = await restaurantPage.locator('a').evaluateAll((nodes) => nodes
+            .map((node) => (node.textContent || '').trim().replace(/\s+/g, ' '))
+            .filter(Boolean)
+            .slice(0, 30))
+            .catch(() => []);
+          const bodyTextExcerpt = (await restaurantPage.locator('body').innerText().catch(() => '')).slice(0, 1200);
+          return {
+            currentUrl: restaurantPage.url(),
+            visibleButtons,
+            visibleLinks,
+            bodyTextExcerpt,
+          };
+        };
+
+        const clickRestaurantTab = async (label: RegExp) => {
+          const tabTargets = [
+            restaurantPage.getByRole('button', { name: label }).first(),
+            restaurantPage.getByRole('link', { name: label }).first(),
+            restaurantPage.locator('button, a').filter({ hasText: label }).first(),
+          ];
+          for (const target of tabTargets) {
+            try {
+              if (await target.isVisible().catch(() => false)) {
+                await target.click({ timeout: 1500 });
+                return true;
+              }
+            } catch {
+              // continue with next tab candidate
+            }
+          }
+          return false;
+        };
+
+        const reopenRestaurantOrdersAndTabs = async () => {
+          const tabsTried: string[] = [];
+          const beforeSnapshot = await orderSignals();
+          const restaurantStatusBeforeRefresh = beforeSnapshot.rowTexts.find((text) => /READY_FOR_PICKUP|PENDING|PREPARING|ACCEPTED|IN_PROGRESS/i.test(text)) ?? null;
+          const restaurantRowsBeforeRefresh = beforeSnapshot.rowTexts;
+
+          if (restaurantStatusBeforeRefresh) {
+            console.log('➡️ final verification: restaurant visible order stale before refresh', {
+              orderId,
+              shortOrderId,
+              currentUrl: restaurantPage.url(),
+              visibleStatusTexts: beforeSnapshot.rowTexts.filter((text) => /READY_FOR_PICKUP|PENDING|PREPARING|ACCEPTED|IN_PROGRESS/i.test(text)),
+            });
+          }
+
+          console.log('➡️ final verification: restaurant refreshing orders before delivered assertion', {
+            orderId,
+            shortOrderId,
+          });
+
+          await restaurantPage.reload({ waitUntil: 'domcontentloaded', timeout: 7000 }).catch(() => null);
+          await restaurantPage.waitForLoadState('domcontentloaded', { timeout: 3000 }).catch(() => null);
+
+          const navActivated = await activateOrdersView();
+          tabsTried.push('orders-nav');
+
+          const tabSelectors = [
+            { label: /Alle/i, name: 'Alle' },
+            { label: /Abgeschlossen|Completed|Delivered/i, name: 'Abgeschlossen/Completed/Delivered' },
+          ];
+          for (const tab of tabSelectors) {
+            const clicked = await clickRestaurantTab(tab.label);
+            tabsTried.push(tab.name);
+            if (clicked) {
+              await restaurantPage.waitForLoadState('domcontentloaded', { timeout: 3000 }).catch(() => null);
+            }
+          }
+
+          const afterSnapshot = await Promise.race([
+            orderSignals(),
+            new Promise<Awaited<ReturnType<typeof orderSignals>>>((resolve) => setTimeout(() => resolve({
+              rowTexts: [],
+              selectorCounts: { orderCards: 0, orderLinks: 0 },
+              bodyText: '',
+            }), 2000)),
+          ]);
+
+          return {
+            tabsTried,
+            navActivated,
+            restaurantStatusBeforeRefresh,
+            restaurantStatusAfterRefresh: afterSnapshot.rowTexts.find((text) => /READY_FOR_PICKUP|PENDING|PREPARING|ACCEPTED|IN_PROGRESS/i.test(text)) ?? null,
+            restaurantRowsBeforeRefresh,
+            restaurantRowsAfterRefresh: afterSnapshot.rowTexts,
+            restaurantOrderSelectorCounts: afterSnapshot.selectorCounts,
+            restaurantBodyTextExcerpt: afterSnapshot.bodyText.slice(0, 1000),
+          };
+        };
+
         const activateOrdersView = async () => {
           const navTargets = [
             restaurantPage.getByTestId('sidebar-link-orders').first(),
@@ -6658,6 +6858,20 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
           orderId,
           shortOrderId,
         });
+
+        return {
+          restaurantOrdersViewActivated,
+          restaurantOrdersNavAttempted,
+          restaurantStatusBeforeRefresh: null,
+          restaurantStatusAfterRefresh: null,
+          restaurantRowsBeforeRefresh: signalSnapshot.rowTexts,
+          restaurantRowsAfterRefresh: signalSnapshot.rowTexts,
+          restaurantTabsTried: [] as string[],
+          restaurantOrderSelectorCounts: signalSnapshot.selectorCounts,
+          restaurantBodyTextExcerpt: signalSnapshot.bodyText.slice(0, 1000),
+          restaurantFinalRefreshAttempted: false,
+          restaurantOrderStillStale: false,
+        };
       };
 
       const openDriverOrdersView = async () => {
