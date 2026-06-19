@@ -6548,13 +6548,116 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
       };
 
       const openRestaurantOrdersView = async () => {
-        if (!restaurantPage.url().includes('/orders')) {
-          await restaurantPage.goto(`${testUrls.restaurant}/orders`, {
-            waitUntil: 'domcontentloaded',
-            timeout: 10000,
-          });
-        }
+        const shortOrderId = orderId.slice(0, 8);
+        console.log('➡️ final verification: restaurant opening real orders view', {
+          currentUrl: restaurantPage.url(),
+          orderId,
+          shortOrderId,
+        });
+
+        const collectRestaurantOpenDiagnostics = async () => {
+          const visibleButtons = await restaurantPage.locator('button').evaluateAll((nodes) => nodes
+            .map((node) => (node.textContent || '').trim().replace(/\s+/g, ' '))
+            .filter(Boolean)
+            .slice(0, 30))
+            .catch(() => []);
+          const visibleLinks = await restaurantPage.locator('a').evaluateAll((nodes) => nodes
+            .map((node) => (node.textContent || '').trim().replace(/\s+/g, ' '))
+            .filter(Boolean)
+            .slice(0, 30))
+            .catch(() => []);
+          const bodyTextExcerpt = (await restaurantPage.locator('body').innerText().catch(() => '')).slice(0, 1000);
+          return {
+            currentUrl: restaurantPage.url(),
+            visibleButtons,
+            visibleLinks,
+            bodyTextExcerpt,
+          };
+        };
+
+        const orderSignals = async () => {
+          const rowTexts = await restaurantPage
+            .locator('[data-testid*="order"], .order-card, .order-row, tr, li, article, section')
+            .evaluateAll((nodes) => nodes
+              .map((node) => (node.textContent || '').trim().replace(/\s+/g, ' '))
+              .filter(Boolean)
+              .slice(0, 20))
+            .catch(() => []);
+          const selectorCounts = {
+            orderCards: await restaurantPage.locator('[data-testid*="order-card"], .order-card, .order-row, tr, li, article').count().catch(() => 0),
+            orderLinks: await restaurantPage.locator('a[href*="/orders/"], button[href*="/orders/"], [data-testid*="order"]').count().catch(() => 0),
+          };
+          const bodyText = (await restaurantPage.locator('body').innerText().catch(() => '')).slice(0, 1000);
+          return { rowTexts, selectorCounts, bodyText };
+        };
+
+        const activateOrdersView = async () => {
+          const navTargets = [
+            restaurantPage.getByTestId('sidebar-link-orders').first(),
+            restaurantPage.getByTestId('nav-orders').first(),
+            restaurantPage.getByTestId('orders-link').first(),
+            restaurantPage.getByRole('button', { name: /bestellungen|orders/i }).first(),
+            restaurantPage.getByRole('link', { name: /bestellungen|orders/i }).first(),
+            restaurantPage.locator('a[href*="/orders"]').first(),
+          ];
+
+          for (const target of navTargets) {
+            try {
+              if (await target.isVisible().catch(() => false)) {
+                await target.click({ timeout: 1500 });
+                return true;
+              }
+            } catch {
+              // try next candidate
+            }
+          }
+
+          if (!restaurantPage.url().includes('/orders')) {
+            await restaurantPage.goto(`${testUrls.restaurant}/orders`, {
+              waitUntil: 'domcontentloaded',
+              timeout: 10000,
+            }).catch(() => null);
+          }
+
+          return restaurantPage.url().includes('/orders');
+        };
+
+        let restaurantOrdersViewActivated = false;
+        const restaurantOrdersNavAttempted = await activateOrdersView();
         await restaurantPage.waitForLoadState('domcontentloaded', { timeout: 5000 }).catch(() => undefined);
+
+        const signalSnapshot = await Promise.race([
+          orderSignals(),
+          new Promise<Awaited<ReturnType<typeof orderSignals>>>((resolve) => setTimeout(() => resolve({
+            rowTexts: [],
+            selectorCounts: { orderCards: 0, orderLinks: 0 },
+            bodyText: '',
+          }), 2000)),
+        ]);
+        restaurantOrdersViewActivated = Boolean(
+          signalSnapshot.selectorCounts.orderCards > 0
+          || signalSnapshot.selectorCounts.orderLinks > 0
+          || signalSnapshot.rowTexts.some((text) => text.includes(orderId) || text.includes(shortOrderId))
+          || /bestellungen|orders/i.test(signalSnapshot.bodyText),
+        );
+
+        if (!restaurantOrdersViewActivated) {
+          const diagnostics = {
+            ...(await collectRestaurantOpenDiagnostics()),
+            orderId,
+            shortOrderId,
+            restaurantOrdersViewActivated,
+            restaurantOrdersNavAttempted,
+            restaurantOrderSelectorCounts: signalSnapshot.selectorCounts,
+          };
+          throw new Error(`Restaurant orders view did not activate in final verification: ${JSON.stringify(diagnostics)}`);
+        }
+
+        console.log('✅ final verification: restaurant orders view activated', {
+          currentUrl: restaurantPage.url(),
+          orderId,
+          shortOrderId,
+        });
       };
 
       const openDriverOrdersView = async () => {
