@@ -6276,7 +6276,9 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
       });
 
       // Navigate to orders management
-      await adminPage.locator('a[href*="orders"], nav a:has-text("Orders")').click();
+      await adminPage.goto(testUrls.adminOrders);
+      await TestHelpers.waitForStablePage(adminPage);
+      await expect(adminPage.locator(selectors.adminOrdersTable)).toBeVisible({ timeout: 15_000 });
 
       // Find the completed order
       const adminOrderRow = adminPage.locator(selectors.adminOrderRow).filter({ hasText: orderId || testOrder.id });
