@@ -1303,6 +1303,13 @@ async function expectDeliveredStatusForOrderInApp(params: {
   const visibleOrderRows = await getVisibleTexts(page.locator('[data-testid*="order"], .order-card, .order-row, tr, li, article, section'));
   const visibleStatusTexts = await getVisibleTexts(page.locator('[data-testid*="status"], .order-status, [role="status"]'));
   const bodyTextExcerpt = (await page.locator('body').innerText().catch(() => '')).slice(0, 1200);
+  const statusLocator = orderScope
+    .locator('[data-testid*="status"], .order-status, [role="status"], [data-status]')
+    .first();
+  const statusText = normalizeStatus((await Promise.race([
+    statusLocator.textContent().catch(() => ''),
+    new Promise<string>((resolve) => setTimeout(() => resolve(''), 1500)),
+  ]) || '').trim());
   const restaurantVisibleOrderText = [
     ...visibleOrderRows,
     bodyTextExcerpt,
@@ -1339,13 +1346,6 @@ async function expectDeliveredStatusForOrderInApp(params: {
     });
   }
 
-  const statusLocator = orderScope
-    .locator('[data-testid*="status"], .order-status, [role="status"], [data-status]')
-    .first();
-  const statusText = normalizeStatus((await Promise.race([
-    statusLocator.textContent().catch(() => ''),
-    new Promise<string>((resolve) => setTimeout(() => resolve(''), 1500)),
-  ]) || '').trim());
   const orderCardText = normalizeStatus((cardText || '').trim());
   const customerDetailText = appName === 'customer' && isCustomerOrderDetailUrl
     ? await Promise.race([
