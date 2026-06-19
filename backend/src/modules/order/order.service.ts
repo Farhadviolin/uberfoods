@@ -428,10 +428,27 @@ export class OrderService {
           createdAt: true,
           restaurantId: true,
           customerId: true,
+          driverId: true,
           priority: true,
           estimatedDeliveryTime: true,
+          customer: {
+            select: { id: true, name: true, email: true, phone: true },
+          },
           restaurant: {
             select: { id: true, name: true, imageUrl: true },
+          },
+          driver: {
+            select: { id: true, name: true, phone: true },
+          },
+          assignmentLogs: {
+            take: 1,
+            orderBy: { createdAt: "desc" },
+            select: { driverId: true, createdAt: true },
+          },
+          items: {
+            include: {
+              dish: { select: { name: true, price: true } },
+            },
           },
         },
       });
@@ -473,10 +490,27 @@ export class OrderService {
             createdAt: true,
             restaurantId: true,
             customerId: true,
+            driverId: true,
             priority: true,
             estimatedDeliveryTime: true,
+            customer: {
+              select: { id: true, name: true, email: true, phone: true },
+            },
             restaurant: {
               select: { id: true, name: true, imageUrl: true },
+            },
+            driver: {
+              select: { id: true, name: true, phone: true },
+            },
+            assignmentLogs: {
+              take: 1,
+              orderBy: { createdAt: "desc" },
+              select: { driverId: true, createdAt: true },
+            },
+            items: {
+              include: {
+                dish: { select: { name: true, price: true } },
+              },
             },
           },
         });
