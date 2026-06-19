@@ -6296,9 +6296,11 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
         orderId,
       });
 
-      await adminPage.goto(adminOrdersUrl, { waitUntil: 'domcontentloaded', timeout: 15_000 });
+      await adminPage.goto(adminBaseUrl, { waitUntil: 'domcontentloaded', timeout: 15_000 });
       await TestHelpers.waitForStablePage(adminPage);
-      const adminOrderTab = adminPage.getByRole('menuitem', { name: /Bestellungen|Orders/i }).first();
+      const adminOrderTab = adminPage.getByTestId('sidebar-link-orders')
+        .or(adminPage.getByRole('menuitem', { name: /Bestellungen|Orders/i }))
+        .first();
       if (await adminOrderTab.isVisible().catch(() => false)) {
         await adminOrderTab.click();
         await TestHelpers.waitForStablePage(adminPage);
