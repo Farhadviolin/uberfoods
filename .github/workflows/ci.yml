@@ -321,7 +321,8 @@ jobs:
       run: |
         npm exec -- playwright --version
         node -e "const { chromium } = require('@playwright/test'); console.log('chromium executable:', chromium.executablePath())"
-        test -x "$(node -e \"const { chromium } = require('@playwright/test'); process.stdout.write(chromium.executablePath())\")"
+        chromium_path="$(node -e 'const { chromium } = require("@playwright/test"); process.stdout.write(chromium.executablePath())')"
+        test -x "$chromium_path"
 
     - name: Setup Authentication States
       working-directory: ./frontend/customer-web
