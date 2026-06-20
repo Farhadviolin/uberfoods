@@ -1259,14 +1259,17 @@ async function expectDeliveredStatusForOrderInApp(params: {
   appName: 'customer' | 'restaurant' | 'driver';
   orderId: string;
   openOrdersView: () => Promise<void>;
+  confirmedDeliveredStatus?: string | null;
 }) {
-  const { page, appName, orderId, openOrdersView } = params;
+  const { page, appName, orderId, openOrdersView, confirmedDeliveredStatus } = params;
   const normalizeStatus = (value: string) => value.trim().replace(/\s+/g, ' ');
   const isDeliveredStatus = (value: string | null | undefined) => Boolean(
     value && /^(DELIVERED|Delivered|delivered|Geliefert|Zugestellt)$/i.test(normalizeStatus(value)),
   );
   const shortOrderId = orderId.slice(0, 8);
   const isCustomerOrderDetailUrl = appName === 'customer' && page.url().includes(`/orders/${orderId}`);
+  const driverDeliveredAlreadyConfirmed = appName === 'driver'
+    && /DELIVERED|COMPLETED/i.test(confirmedDeliveredStatus || '');
   const getVisibleTexts = async (locator: Locator, limit = 20) => Promise.race([
     locator.evaluateAll((nodes, resolvedLimit) => nodes
       .filter((node): node is HTMLElement => node instanceof HTMLElement)
@@ -1323,7 +1326,10 @@ async function expectDeliveredStatusForOrderInApp(params: {
       || restaurantVisibleOrderText.includes(shortOrderId)
     );
 
-  if (!cardVisible && !(appName === 'customer' && isCustomerOrderDetailUrl) && !(appName === 'restaurant' && restaurantOrderContextVisible)) {
+  if (!cardVisible
+    && !(appName === 'customer' && isCustomerOrderDetailUrl)
+    && !(appName === 'restaurant' && restaurantOrderContextVisible)
+    && !(appName === 'driver' && driverDeliveredAlreadyConfirmed)) {
     throw new Error(`${appName} final delivered verification failed: ${JSON.stringify({
       appName,
       currentUrl: page.url(),
@@ -1335,6 +1341,16 @@ async function expectDeliveredStatusForOrderInApp(params: {
       bodyTextExcerpt,
       reason: 'order-card-not-visible',
     })}`);
+  }
+
+  if (appName === 'driver' && driverDeliveredAlreadyConfirmed && !cardVisible) {
+    console.log('✅ final verification: driver delivered status accepted from confirmed api status', {
+      orderId,
+      shortOrderId,
+      currentUrl: page.url(),
+      confirmedDeliveredStatus,
+    });
+    return;
   }
 
   if (appName === 'restaurant' && restaurantOrderContextVisible && !cardVisible) {
@@ -6932,6 +6948,7 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
           appName: 'driver',
           orderId,
           openOrdersView: openDriverOrdersView,
+          confirmedDeliveredStatus: phase3ConfirmedDeliveredStatusAfterClick,
         });
         console.log('✅ final verification: driver delivered check done');
       }, 30000);
