@@ -308,10 +308,18 @@ jobs:
         cat frontend/logs/driver-app.log || true
         exit 1
 
+    - name: Cache Playwright browsers
+      uses: actions/cache@v4
+      with:
+        path: ~/.cache/ms-playwright
+        key: ${{ runner.os }}-playwright-${{ hashFiles('frontend/customer-web/package-lock.json') }}
+        restore-keys: |
+          ${{ runner.os }}-playwright-
+
     - name: Install Playwright Chromium
       working-directory: ./frontend/customer-web
-      timeout-minutes: 8
-      run: npx playwright install --with-deps
+      timeout-minutes: 15
+      run: npm exec -- playwright install --only-shell chromium
 
     - name: Verify Playwright Chromium installation
       working-directory: ./frontend/customer-web
