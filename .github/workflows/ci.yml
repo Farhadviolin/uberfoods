@@ -1,10 +1,11 @@
 name: CI
 
 on:
+  workflow_dispatch:
   push:
-    branches: [ master, main, develop ]
+    branches: [ master, main, develop, release/uberfoods-rc1-production-readiness ]
   pull_request:
-    branches: [ master, main, develop ]
+    branches: [ master, main, develop, release/uberfoods-rc1-production-readiness ]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
