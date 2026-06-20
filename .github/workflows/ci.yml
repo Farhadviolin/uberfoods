@@ -316,7 +316,46 @@ jobs:
         RELEASE_GATE_MANAGED: true
         CUSTOMER_URL: http://127.0.0.1:3102
         E2E_AUTH_ROLES: customer,admin,restaurant,driver
-      run: npm run test:setup-auth
+      shell: bash
+      run: |
+        set -euo pipefail
+
+        echo "Auth setup diagnostics"
+        pwd
+        echo "RELEASE_GATE_MANAGED=${RELEASE_GATE_MANAGED:-unset}"
+        echo "CUSTOMER_URL=${CUSTOMER_URL:-unset}"
+        echo "E2E_AUTH_ROLES=${E2E_AUTH_ROLES:-unset}"
+        node --version
+        npm --version
+        npx playwright --version || true
+        ls -la playwright || true
+        ls -la playwright/.auth || true
+
+        set +e
+        npm run test:setup-auth 2>&1 | tee ../logs/setup-auth.log
+        AUTH_EXIT=${PIPESTATUS[0]}
+        set -e
+
+        if [ "$AUTH_EXIT" -ne 0 ]; then
+          echo "Auth setup failed with exit code $AUTH_EXIT"
+          echo "===== setup-auth.log ====="
+          cat ../logs/setup-auth.log || true
+          echo "===== playwright auth dir ====="
+          ls -la playwright/.auth || true
+          echo "===== ports ====="
+          (ss -ltnp | grep -E ':3102|:3002|:3003|:3004' || true)
+          echo "===== processes ====="
+          ps aux | grep -E "vite|node|npm" || true
+          echo "===== customer-web log ====="
+          cat ../logs/customer-web.log || true
+          echo "===== admin-panel log ====="
+          cat ../logs/admin-panel.log || true
+          echo "===== restaurant-web log ====="
+          cat ../logs/restaurant-web.log || true
+          echo "===== driver-app log ====="
+          cat ../logs/driver-app.log || true
+          exit "$AUTH_EXIT"
+        fi
 
     - name: Run Full Order Lifecycle UI-E2E Test
       working-directory: ./frontend/customer-web
