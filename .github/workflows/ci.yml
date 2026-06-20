@@ -318,8 +318,10 @@ jobs:
 
     - name: Install Playwright Chromium
       working-directory: ./frontend/customer-web
-      timeout-minutes: 15
-      run: npm exec -- playwright install --only-shell chromium
+      timeout-minutes: 20
+      env:
+        DEBUG: pw:install
+      run: npx playwright install --with-deps
 
     - name: Verify Playwright Chromium installation
       working-directory: ./frontend/customer-web
