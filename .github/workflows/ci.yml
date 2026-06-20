@@ -275,6 +275,41 @@ jobs:
         wait_for_url "restaurant-web" "http://127.0.0.1:3003" "frontend/logs/restaurant-web.log" "$(cat frontend/logs/restaurant-web.pid)"
         wait_for_url "driver-app" "http://127.0.0.1:3004" "frontend/logs/driver-app.log" "$(cat frontend/logs/driver-app.pid)"
 
+    - name: Verify frontend readiness before auth setup
+      shell: bash
+      run: |
+        set -euo pipefail
+
+        echo "Verifying customer-web readiness before auth setup..."
+        for i in {1..30}; do
+          if curl -fsS http://127.0.0.1:3102/ >/dev/null 2>&1 && curl -fsS http://127.0.0.1:3102/login >/dev/null 2>&1; then
+            echo "customer-web is reachable for auth setup"
+            exit 0
+          fi
+          echo "customer-web not ready yet for auth setup attempt $i/30"
+          sleep 2
+        done
+
+        echo "customer-web did not become reachable before auth setup"
+        echo "===== HTTP checks ====="
+        for url in http://127.0.0.1:3102/ http://127.0.0.1:3102/login; do
+          echo "--- $url ---"
+          curl -fsS -D - "$url" -o /dev/null || true
+        done
+        echo "===== processes ====="
+        ps aux | grep -E "vite|node|npm" || true
+        echo "===== ports ====="
+        (ss -ltnp | grep -E ':3102|:3002|:3003|:3004' || true)
+        echo "===== customer-web log ====="
+        cat frontend/logs/customer-web.log || true
+        echo "===== admin-panel log ====="
+        cat frontend/logs/admin-panel.log || true
+        echo "===== restaurant-web log ====="
+        cat frontend/logs/restaurant-web.log || true
+        echo "===== driver-app log ====="
+        cat frontend/logs/driver-app.log || true
+        exit 1
+
     - name: Setup Authentication States
       working-directory: ./frontend/customer-web
       env:
