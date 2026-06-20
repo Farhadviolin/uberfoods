@@ -177,7 +177,7 @@ jobs:
       timeout-minutes: 25
       env:
         DEBUG: pw:install
-      run: npx playwright install chromium --with-deps
+      run: npx playwright install chromium
 
     - name: Verify Playwright browsers
       working-directory: ./frontend/customer-web
