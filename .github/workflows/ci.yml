@@ -317,8 +317,11 @@ jobs:
 
     - name: Ensure Playwright Chromium installation
       working-directory: frontend/customer-web
+      timeout-minutes: 8
       run: |
-        npx playwright install --with-deps chromium
+        npx playwright --version
+        npx playwright install chromium
+        ls -la ~/.cache/ms-playwright || true
 
     - name: Verify Playwright Chromium installation
       working-directory: ./frontend/customer-web
