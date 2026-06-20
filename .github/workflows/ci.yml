@@ -221,9 +221,6 @@ jobs:
         npm ci --prefix frontend/restaurant-web
         npm ci --prefix frontend/driver-app
 
-    - name: Install Playwright Chromium
-      run: npm exec --prefix frontend/customer-web playwright install chromium --with-deps
-
     - name: Start all frontend apps
       run: |
         mkdir -p frontend/logs
