@@ -310,10 +310,16 @@ jobs:
 
     - name: Install Playwright Chromium
       working-directory: ./frontend/customer-web
-      run: npm exec -- playwright install --with-deps chromium
+      timeout-minutes: 8
+      env:
+        PLAYWRIGHT_BROWSERS_PATH: 0
+      run: npm exec -- playwright install chromium
 
     - name: Verify Playwright Chromium installation
       working-directory: ./frontend/customer-web
+      timeout-minutes: 2
+      env:
+        PLAYWRIGHT_BROWSERS_PATH: 0
       run: |
         npm exec -- playwright --version
         node -e "const { chromium } = require('@playwright/test'); console.log('chromium executable:', chromium.executablePath())"
@@ -325,6 +331,7 @@ jobs:
         RELEASE_GATE_MANAGED: true
         CUSTOMER_URL: http://127.0.0.1:3102
         E2E_AUTH_ROLES: customer,admin,restaurant,driver
+        PLAYWRIGHT_BROWSERS_PATH: 0
       shell: bash
       run: |
         set -euo pipefail
