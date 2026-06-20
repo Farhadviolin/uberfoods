@@ -315,6 +315,11 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-playwright-
 
+    - name: Ensure Playwright Chromium installation
+      working-directory: frontend/customer-web
+      run: |
+        npx playwright install --with-deps chromium
+
     - name: Verify Playwright Chromium installation
       working-directory: ./frontend/customer-web
       timeout-minutes: 2
