@@ -184,10 +184,6 @@ jobs:
       with:
         node-version: '24'
 
-    - name: Install Playwright Chromium
-      working-directory: ./frontend/customer-web
-      run: npm exec -- playwright install --with-deps chromium
-
     - name: Setup backend for E2E
       working-directory: ./backend
       run: |
@@ -311,6 +307,17 @@ jobs:
         echo "===== driver-app log ====="
         cat frontend/logs/driver-app.log || true
         exit 1
+
+    - name: Install Playwright Chromium
+      working-directory: ./frontend/customer-web
+      run: npm exec -- playwright install --with-deps chromium
+
+    - name: Verify Playwright Chromium installation
+      working-directory: ./frontend/customer-web
+      run: |
+        npm exec -- playwright --version
+        node -e "const { chromium } = require('@playwright/test'); console.log('chromium executable:', chromium.executablePath())"
+        test -x "$(node -e \"const { chromium } = require('@playwright/test'); process.stdout.write(chromium.executablePath())\")"
 
     - name: Setup Authentication States
       working-directory: ./frontend/customer-web
