@@ -308,6 +308,7 @@ jobs:
         exit 1
 
     - name: Restore Playwright browsers cache
+      id: playwright-cache
       uses: actions/cache@v4
       with:
         path: ~/.cache/ms-playwright
@@ -317,7 +318,7 @@ jobs:
 
     - name: Ensure Playwright Chromium installation
       working-directory: frontend/customer-web
-      timeout-minutes: 8
+      timeout-minutes: 15
       run: |
         npx playwright --version
         npx playwright install chromium
@@ -376,6 +377,13 @@ jobs:
           cat ../logs/driver-app.log || true
           exit "$AUTH_EXIT"
         fi
+
+    - name: Save Playwright browsers cache
+      if: steps.playwright-cache.outputs.cache-hit != 'true'
+      uses: actions/cache/save@v4
+      with:
+        path: ~/.cache/ms-playwright
+        key: ${{ runner.os }}-playwright-${{ hashFiles('frontend/customer-web/package-lock.json') }}
 
     - name: Run Full Order Lifecycle UI-E2E Test
       working-directory: ./frontend/customer-web
