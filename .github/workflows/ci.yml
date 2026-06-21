@@ -428,9 +428,34 @@ jobs:
       working-directory: ./frontend/customer-web
       timeout-minutes: 2
       run: |
+        set -euo pipefail
+
         npm exec -- playwright --version
         npm exec -- playwright install --dry-run chromium || true
-        node -e "const { chromium } = require('@playwright/test'); console.log('chromium executable: '+chromium.executablePath())"
+
+        echo "Playwright browser cache:"
+        find "$HOME/.cache/ms-playwright" -maxdepth 4 -type f | sort | head -200 || true
+
+        chromium_path="$(find "$HOME/.cache/ms-playwright" -type f -path '*/chrome-linux*/chrome' | head -n 1)"
+
+        if [ -z "$chromium_path" ]; then
+          echo "No Chromium executable found in Playwright cache"
+          find "$HOME/.cache/ms-playwright" -maxdepth 6 -type f | sort | head -300 || true
+          exit 1
+        fi
+
+        echo "chromium executable: $chromium_path"
+
+        if [ ! -f "$chromium_path" ]; then
+          echo "Chromium path is not a file: $chromium_path"
+          exit 1
+        fi
+
+        chmod +x "$chromium_path" || true
+
+        "$chromium_path" --version
+
+        echo "Playwright Chromium cache verification succeeded"
 
     - name: Save Playwright browsers cache
       if: steps.playwright-cache.outputs.cache-hit != 'true'
