@@ -430,7 +430,7 @@ jobs:
       run: |
         npm exec -- playwright --version
         npm exec -- playwright install --dry-run chromium || true
-        node -e "const { chromium } = require('playwright'); console.log('chromium executable: '+chromium.executablePath())"
+        node -e "const { chromium } = require('@playwright/test'); console.log('chromium executable: '+chromium.executablePath())"
 
     - name: Save Playwright browsers cache
       if: steps.playwright-cache.outputs.cache-hit != 'true'
