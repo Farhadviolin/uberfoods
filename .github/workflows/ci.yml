@@ -147,6 +147,7 @@ jobs:
     runs-on: ubuntu-latest
     needs:
       - api-verification
+      - playwright-browsers
     timeout-minutes: 35
     env:
       DATABASE_URL: postgresql://postgres:postgres123@localhost:5434/uberfoods
@@ -220,7 +221,8 @@ jobs:
           find "$PW_CACHE_DIR" -type f \( \
             -path "*/chrome-linux*/chrome" -o \
             -path "*/chrome-linux*/headless_shell" -o \
-            -path "*/chromium_headless_shell-*/chrome-linux/headless_shell" \
+            -path "*/chromium_headless_shell-*/chrome-linux/headless_shell" -o \
+            -path "*/chromium_headless_shell-*/chrome-headless-shell-linux64/chrome-headless-shell" \
           \) | head -n 1
         )"
 
@@ -477,7 +479,12 @@ jobs:
 
         if [ ! -x "$chromium_path" ]; then
           chromium_path="$(
-            find "$HOME/.cache/ms-playwright" -type f \( -path "*/chrome-linux*/chrome" -o -path "*/chrome-linux*/headless_shell" \) | head -n 1
+            find "$HOME/.cache/ms-playwright" -type f \( \
+              -path "*/chrome-linux*/chrome" -o \
+              -path "*/chrome-linux*/headless_shell" -o \
+              -path "*/chromium_headless_shell-*/chrome-linux/headless_shell" -o \
+              -path "*/chromium_headless_shell-*/chrome-headless-shell-linux64/chrome-headless-shell" \
+            \) | head -n 1
           )"
         fi
 
