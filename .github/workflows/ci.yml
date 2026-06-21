@@ -147,7 +147,6 @@ jobs:
     runs-on: ubuntu-latest
     needs:
       - api-verification
-      - playwright-browsers
     timeout-minutes: 35
     env:
       DATABASE_URL: postgresql://postgres:postgres123@localhost:5434/uberfoods
@@ -357,6 +356,11 @@ jobs:
         echo "===== driver-app log ====="
         cat frontend/logs/driver-app.log || true
         exit 1
+
+    - name: Install Playwright Chromium for lifecycle
+      working-directory: ./frontend/customer-web
+      run: |
+        npm --prefix . exec -- playwright install chromium
 
     - name: Setup Authentication States
       working-directory: ./frontend/customer-web
