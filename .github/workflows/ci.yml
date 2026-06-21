@@ -467,16 +467,24 @@ jobs:
         echo "Expected Chromium executable: $expected_chromium_path"
 
         if [ ! -x "$expected_chromium_path" ]; then
-          ./node_modules/.bin/playwright install chromium
+          ./node_modules/.bin/playwright install --only-shell chromium
         fi
 
-        if [ ! -x "$expected_chromium_path" ]; then
+        chromium_path="$expected_chromium_path"
+
+        if [ ! -x "$chromium_path" ]; then
+          chromium_path="$(
+            find "$HOME/.cache/ms-playwright" -type f \( -path "*/chrome-linux*/chrome" -o -path "*/chrome-linux*/headless_shell" \) | head -n 1
+          )"
+        fi
+
+        if [ ! -x "$chromium_path" ]; then
           echo "Expected Chromium executable is still missing or not executable: $expected_chromium_path"
           find "$HOME/.cache/ms-playwright" -maxdepth 6 -type f | sort | head -300 || true
           exit 1
         fi
 
-        "$expected_chromium_path" --version
+        "$chromium_path" --version
         echo "Playwright Chromium installation succeeded"
         ls -la ~/.cache/ms-playwright || true
 
@@ -501,16 +509,24 @@ jobs:
 
         if [ ! -x "$expected_chromium_path" ]; then
           echo "Expected Chromium executable is missing or not executable: $expected_chromium_path"
-          ./node_modules/.bin/playwright install chromium
+          ./node_modules/.bin/playwright install --only-shell chromium
         fi
 
-        if [ ! -x "$expected_chromium_path" ]; then
+        chromium_path="$expected_chromium_path"
+
+        if [ ! -x "$chromium_path" ]; then
+          chromium_path="$(
+            find "$HOME/.cache/ms-playwright" -type f \( -path "*/chrome-linux*/chrome" -o -path "*/chrome-linux*/headless_shell" \) | head -n 1
+          )"
+        fi
+
+        if [ ! -x "$chromium_path" ]; then
           echo "Expected Chromium executable is still missing or not executable: $expected_chromium_path"
           find "$HOME/.cache/ms-playwright" -maxdepth 6 -type f | sort | head -300 || true
           exit 1
         fi
 
-        "$expected_chromium_path" --version
+        "$chromium_path" --version
 
         echo "Playwright Chromium cache verification succeeded"
 
