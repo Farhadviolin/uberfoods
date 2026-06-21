@@ -562,7 +562,7 @@ jobs:
         node-version: '24'
 
     - name: Install Playwright
-      run: npx playwright install --with-deps
+      run: npx playwright install chromium
 
     - name: Setup backend for E2E
       working-directory: ./backend
