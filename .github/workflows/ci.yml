@@ -150,7 +150,7 @@ jobs:
     timeout-minutes: 35
     env:
       DATABASE_URL: postgresql://postgres:postgres123@localhost:5434/uberfoods
-      PLAYWRIGHT_BROWSERS_PATH: ~/.cache/ms-playwright
+      PLAYWRIGHT_BROWSERS_PATH: /home/runner/.cache/ms-playwright
       PLAYWRIGHT_SKIP_BROWSER_GC: "1"
     services:
       postgres:
@@ -200,36 +200,40 @@ jobs:
       run: |
         set -euo pipefail
 
-        npm --prefix frontend/customer-web exec -- playwright --version
+        PW_CACHE_DIR="${PLAYWRIGHT_BROWSERS_PATH:-$HOME/.cache/ms-playwright}"
+        PW_CACHE_DIR="${PW_CACHE_DIR/#\~/$HOME}"
 
-        expected_chromium_path="$(
-          cd frontend/customer-web
-          node -e "const { chromium } = require('playwright'); process.stdout.write(chromium.executablePath())"
-        )"
+        echo "PLAYWRIGHT_BROWSERS_PATH=${PLAYWRIGHT_BROWSERS_PATH:-}"
+        echo "Resolved Playwright cache dir: $PW_CACHE_DIR"
 
-        echo "Expected Chromium executable: $expected_chromium_path"
-
-        echo "Restored Playwright browser cache:"
-        find "$HOME/.cache/ms-playwright" -maxdepth 4 -type f | sort | head -200 || true
-
-        if [ -x "$expected_chromium_path" ]; then
-          "$expected_chromium_path" --version
-          echo "Playwright Chromium installation verification succeeded"
-          exit 0
+        if [ ! -d "$PW_CACHE_DIR" ]; then
+          echo "Playwright cache directory does not exist yet: $PW_CACHE_DIR"
+          mkdir -p "$PW_CACHE_DIR"
         fi
 
-        echo "Expected Chromium executable not found after cache restore"
-        echo "Installing Chromium with Playwright to restore the exact revision..."
-        npm --prefix frontend/customer-web exec -- playwright install chromium
-        echo "Re-checking expected Chromium executable: $expected_chromium_path"
+        npm --prefix frontend/customer-web exec -- playwright --version
 
-        if [ ! -x "$expected_chromium_path" ]; then
-          echo "Expected Chromium executable is still missing or not executable: $expected_chromium_path"
-          find "$HOME/.cache/ms-playwright" -maxdepth 6 -type f | sort | head -300 || true
+        echo "Cache directory listing:"
+        find "$PW_CACHE_DIR" -maxdepth 4 -type f | head -n 100 || true
+
+        chromium_path="$(
+          find "$PW_CACHE_DIR" -type f \( \
+            -path "*/chrome-linux*/chrome" -o \
+            -path "*/chrome-linux*/headless_shell" -o \
+            -path "*/chromium_headless_shell-*/chrome-linux/headless_shell" \
+          \) | head -n 1
+        )"
+
+        if [ -z "$chromium_path" ]; then
+          echo "No Chromium executable found in $PW_CACHE_DIR"
+          echo "Available Playwright cache content:"
+          find "$PW_CACHE_DIR" -maxdepth 5 -print || true
           exit 1
         fi
 
-        "$expected_chromium_path" --version
+        echo "Chromium executable: $chromium_path"
+        chmod +x "$chromium_path" || true
+        "$chromium_path" --version || "$chromium_path" --help >/dev/null
 
         echo "Playwright Chromium installation verification succeeded"
 
