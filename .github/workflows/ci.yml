@@ -151,6 +151,8 @@ jobs:
     timeout-minutes: 35
     env:
       DATABASE_URL: postgresql://postgres:postgres123@localhost:5434/uberfoods
+      PLAYWRIGHT_BROWSERS_PATH: ~/.cache/ms-playwright
+      PLAYWRIGHT_SKIP_BROWSER_GC: "1"
     services:
       postgres:
         image: postgres:15
@@ -426,6 +428,9 @@ jobs:
     runs-on: ubuntu-latest
     needs: api-verification
     timeout-minutes: 50
+    env:
+      PLAYWRIGHT_BROWSERS_PATH: ~/.cache/ms-playwright
+      PLAYWRIGHT_SKIP_BROWSER_GC: "1"
     steps:
     - name: Checkout code
       uses: actions/checkout@v5
@@ -594,7 +599,7 @@ jobs:
         E2E_AUTH_ROLES: customer
       run: |
         npm ci
-        npx playwright install chromium --with-deps
+        npx playwright install chromium
         npm run build
         mkdir -p ../logs
         npm run dev:e2e > ../logs/customer-web.log 2>&1 &
