@@ -151,7 +151,6 @@ jobs:
     timeout-minutes: 35
     env:
       DATABASE_URL: postgresql://postgres:postgres123@localhost:5434/uberfoods
-      PLAYWRIGHT_BROWSERS_PATH: /home/runner/.cache/ms-playwright
       PLAYWRIGHT_SKIP_BROWSER_GC: "1"
     services:
       postgres:
@@ -186,6 +185,12 @@ jobs:
       uses: actions/setup-node@v5
       with:
         node-version: '24'
+
+    - name: Configure Playwright browser path
+      run: |
+        echo "PLAYWRIGHT_BROWSERS_PATH=$HOME/.cache/ms-playwright" >> "$GITHUB_ENV"
+        mkdir -p "$HOME/.cache/ms-playwright"
+        echo "PLAYWRIGHT_BROWSERS_PATH=$HOME/.cache/ms-playwright"
 
     - name: Restore Playwright browsers cache
       id: playwright-cache
@@ -448,7 +453,6 @@ jobs:
     needs: api-verification
     timeout-minutes: 60
     env:
-      PLAYWRIGHT_BROWSERS_PATH: ~/.cache/ms-playwright
       PLAYWRIGHT_SKIP_BROWSER_GC: "1"
     steps:
     - name: Checkout code
@@ -460,6 +464,12 @@ jobs:
       uses: actions/setup-node@v5
       with:
         node-version: '24'
+
+    - name: Configure Playwright browser path
+      run: |
+        echo "PLAYWRIGHT_BROWSERS_PATH=$HOME/.cache/ms-playwright" >> "$GITHUB_ENV"
+        mkdir -p "$HOME/.cache/ms-playwright"
+        echo "PLAYWRIGHT_BROWSERS_PATH=$HOME/.cache/ms-playwright"
 
     - name: Restore Playwright browsers cache
       id: playwright-cache
