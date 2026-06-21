@@ -192,9 +192,9 @@ jobs:
       uses: actions/cache@v4
       with:
         path: ~/.cache/ms-playwright
-        key: ${{ runner.os }}-playwright-${{ hashFiles('frontend/customer-web/package-lock.json', 'frontend/customer-web/package.json') }}
+        key: playwright-browsers-v3-headless-shell-${{ runner.os }}-${{ hashFiles('frontend/customer-web/package-lock.json', 'frontend/customer-web/package.json') }}
         restore-keys: |
-          ${{ runner.os }}-playwright-
+          playwright-browsers-v3-headless-shell-${{ runner.os }}-
 
     - name: Verify Playwright Chromium installation
       timeout-minutes: 2
@@ -238,6 +238,20 @@ jobs:
         "$chromium_path" --version || "$chromium_path" --help >/dev/null
 
         echo "Playwright Chromium installation verification succeeded"
+
+        EXPECTED_HEADLESS_SHELL="$HOME/.cache/ms-playwright/chromium_headless_shell-1200/chrome-headless-shell-linux64/chrome-headless-shell"
+
+        if [ ! -x "$EXPECTED_HEADLESS_SHELL" ]; then
+          echo "Expected Playwright headless shell not found or not executable:"
+          echo "$EXPECTED_HEADLESS_SHELL"
+          echo "Available Playwright cache contents:"
+          find "$HOME/.cache/ms-playwright" -maxdepth 5 -type f | sort | head -300 || true
+          exit 1
+        fi
+
+        echo "Expected Playwright headless shell found:"
+        echo "$EXPECTED_HEADLESS_SHELL"
+        "$EXPECTED_HEADLESS_SHELL" --version
 
     - name: Setup backend for E2E
       working-directory: ./backend
@@ -452,9 +466,9 @@ jobs:
       uses: actions/cache@v4
       with:
         path: ~/.cache/ms-playwright
-        key: ${{ runner.os }}-playwright-${{ hashFiles('frontend/customer-web/package-lock.json', 'frontend/customer-web/package.json') }}
+        key: playwright-browsers-v3-headless-shell-${{ runner.os }}-${{ hashFiles('frontend/customer-web/package-lock.json', 'frontend/customer-web/package.json') }}
         restore-keys: |
-          ${{ runner.os }}-playwright-
+          playwright-browsers-v3-headless-shell-${{ runner.os }}-
 
     - name: Install Playwright browsers
       if: steps.playwright-cache.outputs.cache-hit != 'true'
@@ -509,6 +523,20 @@ jobs:
         echo "Playwright Chromium installation succeeded"
         ls -la ~/.cache/ms-playwright || true
 
+        EXPECTED_HEADLESS_SHELL="$HOME/.cache/ms-playwright/chromium_headless_shell-1200/chrome-headless-shell-linux64/chrome-headless-shell"
+
+        if [ ! -x "$EXPECTED_HEADLESS_SHELL" ]; then
+          echo "Expected Playwright headless shell not found or not executable:"
+          echo "$EXPECTED_HEADLESS_SHELL"
+          echo "Available Playwright cache contents:"
+          find "$HOME/.cache/ms-playwright" -maxdepth 5 -type f | sort | head -300 || true
+          exit 1
+        fi
+
+        echo "Expected Playwright headless shell found:"
+        echo "$EXPECTED_HEADLESS_SHELL"
+        "$EXPECTED_HEADLESS_SHELL" --version
+
     - name: Verify Playwright browsers
       working-directory: ./frontend/customer-web
       timeout-minutes: 2
@@ -551,7 +579,7 @@ jobs:
       uses: actions/cache/save@v4
       with:
         path: ~/.cache/ms-playwright
-        key: ${{ runner.os }}-playwright-${{ hashFiles('frontend/customer-web/package-lock.json') }}
+        key: playwright-browsers-v3-headless-shell-${{ runner.os }}-${{ hashFiles('frontend/customer-web/package-lock.json', 'frontend/customer-web/package.json') }}
 
   # Individual Frontend E2E Tests
   frontend-e2e:
