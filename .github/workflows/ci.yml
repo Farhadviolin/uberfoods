@@ -190,7 +190,7 @@ jobs:
       uses: actions/cache@v4
       with:
         path: ~/.cache/ms-playwright
-        key: ${{ runner.os }}-playwright-${{ hashFiles('frontend/customer-web/package-lock.json') }}
+        key: ${{ runner.os }}-playwright-${{ hashFiles('frontend/customer-web/package-lock.json', 'frontend/customer-web/package.json') }}
         restore-keys: |
           ${{ runner.os }}-playwright-
 
@@ -201,31 +201,36 @@ jobs:
 
         npm --prefix frontend/customer-web exec -- playwright --version
 
+        expected_chromium_path="$(
+          cd frontend/customer-web
+          node -e "const { chromium } = require('@playwright/test'); process.stdout.write(chromium.executablePath())"
+        )"
+
+        echo "Expected Chromium executable: $expected_chromium_path"
+
         echo "Restored Playwright browser cache:"
         find "$HOME/.cache/ms-playwright" -maxdepth 4 -type f | sort | head -200 || true
 
-        chromium_headless_shell_path="$(find "$HOME/.cache/ms-playwright" -path '*chromium_headless_shell-*/*/chrome-headless-shell' -type f | head -n 1)"
+        if [ -x "$expected_chromium_path" ]; then
+          "$expected_chromium_path" --version
+          echo "Playwright Chromium installation verification succeeded"
+          exit 0
+        fi
 
-        if [ -z "$chromium_headless_shell_path" ]; then
-          echo "No Playwright Chromium headless shell found in restored Playwright cache"
-          echo "Expected path pattern:"
-          echo "$HOME/.cache/ms-playwright/chromium_headless_shell-*/chrome-headless-shell-linux64/chrome-headless-shell"
+        echo "Expected Chromium executable not found after cache restore"
+        echo "Installing Chromium with Playwright to restore the exact revision..."
+        npm --prefix frontend/customer-web exec -- playwright install chromium
+        echo "Re-checking expected Chromium executable: $expected_chromium_path"
+
+        if [ ! -x "$expected_chromium_path" ]; then
+          echo "Expected Chromium executable is still missing or not executable: $expected_chromium_path"
           find "$HOME/.cache/ms-playwright" -maxdepth 6 -type f | sort | head -300 || true
           exit 1
         fi
 
-        echo "chromium headless shell executable: $chromium_headless_shell_path"
+        "$expected_chromium_path" --version
 
-        if [ ! -f "$chromium_headless_shell_path" ]; then
-          echo "Chromium headless shell path is not a file: $chromium_headless_shell_path"
-          exit 1
-        fi
-
-        chmod +x "$chromium_headless_shell_path" || true
-
-        "$chromium_headless_shell_path" --version
-
-        echo "Playwright Chromium headless shell installation verification succeeded"
+        echo "Playwright Chromium installation verification succeeded"
 
     - name: Setup backend for E2E
       working-directory: ./backend
@@ -437,7 +442,7 @@ jobs:
       uses: actions/cache@v4
       with:
         path: ~/.cache/ms-playwright
-        key: ${{ runner.os }}-playwright-${{ hashFiles('frontend/customer-web/package-lock.json') }}
+        key: ${{ runner.os }}-playwright-${{ hashFiles('frontend/customer-web/package-lock.json', 'frontend/customer-web/package.json') }}
         restore-keys: |
           ${{ runner.os }}-playwright-
 
@@ -447,8 +452,25 @@ jobs:
       timeout-minutes: 20
       run: |
         npm --prefix . exec -- playwright --version
-        npm --prefix . exec -- playwright install chromium
-        find "$HOME/.cache/ms-playwright" -path '*chromium_headless_shell-*/*/chrome-headless-shell' -type f -print
+
+        expected_chromium_path="$(
+          node -e "const { chromium } = require('@playwright/test'); process.stdout.write(chromium.executablePath())"
+        )"
+
+        echo "Expected Chromium executable: $expected_chromium_path"
+
+        if [ ! -x "$expected_chromium_path" ]; then
+          npm --prefix . exec -- playwright install chromium
+        fi
+
+        if [ ! -x "$expected_chromium_path" ]; then
+          echo "Expected Chromium executable is still missing or not executable: $expected_chromium_path"
+          find "$HOME/.cache/ms-playwright" -maxdepth 6 -type f | sort | head -300 || true
+          exit 1
+        fi
+
+        "$expected_chromium_path" --version
+        echo "Playwright Chromium installation succeeded"
         ls -la ~/.cache/ms-playwright || true
 
     - name: Verify Playwright browsers
@@ -458,29 +480,28 @@ jobs:
         set -euo pipefail
 
         npm exec -- playwright --version
-        npm exec -- playwright install --dry-run chromium || true
+
+        expected_chromium_path="$(
+          node -e "const { chromium } = require('@playwright/test'); process.stdout.write(chromium.executablePath())"
+        )"
+
+        echo "Expected Chromium executable: $expected_chromium_path"
 
         echo "Playwright browser cache:"
         find "$HOME/.cache/ms-playwright" -maxdepth 4 -type f | sort | head -200 || true
 
-        chromium_path="$(find "$HOME/.cache/ms-playwright" -type f -path '*/chrome-linux*/chrome' | head -n 1)"
+        if [ ! -x "$expected_chromium_path" ]; then
+          echo "Expected Chromium executable is missing or not executable: $expected_chromium_path"
+          npm exec -- playwright install chromium
+        fi
 
-        if [ -z "$chromium_path" ]; then
-          echo "No Chromium executable found in Playwright cache"
+        if [ ! -x "$expected_chromium_path" ]; then
+          echo "Expected Chromium executable is still missing or not executable: $expected_chromium_path"
           find "$HOME/.cache/ms-playwright" -maxdepth 6 -type f | sort | head -300 || true
           exit 1
         fi
 
-        echo "chromium executable: $chromium_path"
-
-        if [ ! -f "$chromium_path" ]; then
-          echo "Chromium path is not a file: $chromium_path"
-          exit 1
-        fi
-
-        chmod +x "$chromium_path" || true
-
-        "$chromium_path" --version
+        "$expected_chromium_path" --version
 
         echo "Playwright Chromium cache verification succeeded"
 
