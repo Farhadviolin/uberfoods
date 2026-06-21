@@ -219,10 +219,10 @@ jobs:
 
         chromium_path="$(
           find "$PW_CACHE_DIR" -type f \( \
-            -path "*/chrome-linux*/chrome" -o \
-            -path "*/chrome-linux*/headless_shell" -o \
+            -path "*/chromium_headless_shell-*/chrome-headless-shell-linux64/chrome-headless-shell" -o \
             -path "*/chromium_headless_shell-*/chrome-linux/headless_shell" -o \
-            -path "*/chromium_headless_shell-*/chrome-headless-shell-linux64/chrome-headless-shell" \
+            -path "*/chrome-linux*/chrome" -o \
+            -path "*/chrome-linux*/headless_shell" \
           \) | head -n 1
         )"
 
@@ -461,40 +461,51 @@ jobs:
       working-directory: ./frontend/customer-web
       timeout-minutes: 40
       run: |
+        set -euo pipefail
+
         npm ci
 
         ./node_modules/.bin/playwright --version
 
-        expected_chromium_path="$(
-          node -e "const { chromium } = require('playwright'); process.stdout.write(chromium.executablePath())"
+        normal_chromium_path="$(
+          node -e "const { chromium } = require('playwright'); process.stdout.write(chromium.executablePath())" || true
+        )"
+        echo "Playwright normal Chromium executable (informational): ${normal_chromium_path:-unset}"
+
+        headless_shell_path="$(
+          find "$HOME/.cache/ms-playwright" -type f \( \
+            -path "*/chromium_headless_shell-*/chrome-headless-shell-linux64/chrome-headless-shell" -o \
+            -path "*/chromium_headless_shell-*/chrome-linux/headless_shell" \
+          \) | head -n 1 || true
         )"
 
-        echo "Expected Chromium executable: $expected_chromium_path"
-
-        if [ ! -x "$expected_chromium_path" ]; then
-          ./node_modules/.bin/playwright install --only-shell chromium
+        if [ -n "$headless_shell_path" ]; then
+          echo "Existing chromium headless shell found: $headless_shell_path"
+          chmod +x "$headless_shell_path"
+          "$headless_shell_path" --version
+          exit 0
         fi
 
-        chromium_path="$expected_chromium_path"
+        echo "Chromium headless shell not found. Installing only chromium headless shell..."
+        timeout 15m ./node_modules/.bin/playwright install --only-shell chromium
 
-        if [ ! -x "$chromium_path" ]; then
-          chromium_path="$(
-            find "$HOME/.cache/ms-playwright" -type f \( \
-              -path "*/chrome-linux*/chrome" -o \
-              -path "*/chrome-linux*/headless_shell" -o \
-              -path "*/chromium_headless_shell-*/chrome-linux/headless_shell" -o \
-              -path "*/chromium_headless_shell-*/chrome-headless-shell-linux64/chrome-headless-shell" \
-            \) | head -n 1
-          )"
-        fi
+        headless_shell_path="$(
+          find "$HOME/.cache/ms-playwright" -type f \( \
+            -path "*/chromium_headless_shell-*/chrome-headless-shell-linux64/chrome-headless-shell" -o \
+            -path "*/chromium_headless_shell-*/chrome-linux/headless_shell" \
+          \) | head -n 1 || true
+        )"
 
-        if [ ! -x "$chromium_path" ]; then
-          echo "Expected Chromium executable is still missing or not executable: $expected_chromium_path"
-          find "$HOME/.cache/ms-playwright" -maxdepth 6 -type f | sort | head -300 || true
+        if [ -z "$headless_shell_path" ]; then
+          echo "Playwright chromium headless shell executable still not found after install"
+          echo "Cache contents:"
+          find "$HOME/.cache/ms-playwright" -maxdepth 5 -type f | sort | head -300 || true
           exit 1
         fi
 
-        "$chromium_path" --version
+        echo "chromium headless shell executable: $headless_shell_path"
+        chmod +x "$headless_shell_path"
+        "$headless_shell_path" --version
         echo "Playwright Chromium installation succeeded"
         ls -la ~/.cache/ms-playwright || true
 
@@ -508,35 +519,30 @@ jobs:
 
         ./node_modules/.bin/playwright --version
 
-        expected_chromium_path="$(
-          node -e "const { chromium } = require('playwright'); process.stdout.write(chromium.executablePath())"
+        normal_chromium_path="$(
+          node -e "const { chromium } = require('playwright'); process.stdout.write(chromium.executablePath())" || true
         )"
-
-        echo "Expected Chromium executable: $expected_chromium_path"
+        echo "Playwright normal Chromium executable (informational): ${normal_chromium_path:-unset}"
 
         echo "Playwright browser cache:"
         find "$HOME/.cache/ms-playwright" -maxdepth 4 -type f | sort | head -200 || true
 
-        if [ ! -x "$expected_chromium_path" ]; then
-          echo "Expected Chromium executable is missing or not executable: $expected_chromium_path"
-          ./node_modules/.bin/playwright install --only-shell chromium
-        fi
+        headless_shell_path="$(
+          find "$HOME/.cache/ms-playwright" -type f \( \
+            -path "*/chromium_headless_shell-*/chrome-headless-shell-linux64/chrome-headless-shell" -o \
+            -path "*/chromium_headless_shell-*/chrome-linux/headless_shell" \
+          \) | head -n 1 || true
+        )"
 
-        chromium_path="$expected_chromium_path"
-
-        if [ ! -x "$chromium_path" ]; then
-          chromium_path="$(
-            find "$HOME/.cache/ms-playwright" -type f \( -path "*/chrome-linux*/chrome" -o -path "*/chrome-linux*/headless_shell" \) | head -n 1
-          )"
-        fi
-
-        if [ ! -x "$chromium_path" ]; then
-          echo "Expected Chromium executable is still missing or not executable: $expected_chromium_path"
+        if [ -z "$headless_shell_path" ]; then
+          echo "Playwright chromium headless shell executable not found"
           find "$HOME/.cache/ms-playwright" -maxdepth 6 -type f | sort | head -300 || true
           exit 1
         fi
 
-        "$chromium_path" --version
+        echo "chromium headless shell executable: $headless_shell_path"
+        chmod +x "$headless_shell_path"
+        "$headless_shell_path" --version
 
         echo "Playwright Chromium cache verification succeeded"
 
