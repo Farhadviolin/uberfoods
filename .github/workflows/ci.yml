@@ -361,11 +361,6 @@ jobs:
         cat frontend/logs/driver-app.log || true
         exit 1
 
-    - name: Install Playwright Chromium for lifecycle
-      working-directory: ./frontend/customer-web
-      run: |
-        npm --prefix . exec -- playwright install chromium
-
     - name: Setup Authentication States
       working-directory: ./frontend/customer-web
       env:
