@@ -195,11 +195,35 @@ jobs:
           ${{ runner.os }}-playwright-
 
     - name: Verify Playwright Chromium installation
-      working-directory: ./frontend/customer-web
       timeout-minutes: 2
       run: |
+        set -euo pipefail
+
         npm exec -- playwright --version
-        node -e "const fs=require('fs'); const { chromium }=require('@playwright/test'); (async()=>{ const executablePath=chromium.executablePath(); console.log('chromium executable: '+executablePath); if(!executablePath){ throw new Error('Playwright returned an empty Chromium executable path'); } if(!fs.existsSync(executablePath)){ throw new Error('Chromium executable path does not exist: '+executablePath); } const stat=fs.statSync(executablePath); console.log('chromium mode: '+stat.mode.toString(8)); const browser=await chromium.launch({ headless: true }); await browser.close(); console.log('Playwright Chromium launch verification succeeded'); })().catch((error)=>{ console.error(error); process.exit(1); });"
+
+        echo "Restored Playwright browser cache:"
+        find "$HOME/.cache/ms-playwright" -maxdepth 4 -type f | sort | head -200 || true
+
+        chromium_path="$(find "$HOME/.cache/ms-playwright" -type f -path '*/chrome-linux*/chrome' | head -n 1)"
+
+        if [ -z "$chromium_path" ]; then
+          echo "No Chromium executable found in restored Playwright cache"
+          find "$HOME/.cache/ms-playwright" -maxdepth 6 -type f | sort | head -300 || true
+          exit 1
+        fi
+
+        echo "chromium executable: $chromium_path"
+
+        if [ ! -f "$chromium_path" ]; then
+          echo "Chromium path is not a file: $chromium_path"
+          exit 1
+        fi
+
+        chmod +x "$chromium_path" || true
+
+        "$chromium_path" --version
+
+        echo "Playwright Chromium installation verification succeeded"
 
     - name: Setup backend for E2E
       working-directory: ./backend
