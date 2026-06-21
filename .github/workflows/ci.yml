@@ -501,7 +501,7 @@ jobs:
         fi
 
         echo "Chromium headless shell not found. Installing only chromium headless shell..."
-        timeout 15m ./node_modules/.bin/playwright install --only-shell chromium
+        timeout 35m ./node_modules/.bin/playwright install --only-shell chromium
 
         headless_shell_path="$(
           find "$HOME/.cache/ms-playwright" -type f \( \
