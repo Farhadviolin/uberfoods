@@ -203,7 +203,7 @@ jobs:
 
         expected_chromium_path="$(
           cd frontend/customer-web
-          node -e "const { chromium } = require('@playwright/test'); process.stdout.write(chromium.executablePath())"
+          node -e "const { chromium } = require('playwright'); process.stdout.write(chromium.executablePath())"
         )"
 
         echo "Expected Chromium executable: $expected_chromium_path"
@@ -454,7 +454,7 @@ jobs:
         npm --prefix . exec -- playwright --version
 
         expected_chromium_path="$(
-          node -e "const { chromium } = require('@playwright/test'); process.stdout.write(chromium.executablePath())"
+          node -e "const { chromium } = require('playwright'); process.stdout.write(chromium.executablePath())"
         )"
 
         echo "Expected Chromium executable: $expected_chromium_path"
@@ -482,7 +482,7 @@ jobs:
         npm exec -- playwright --version
 
         expected_chromium_path="$(
-          node -e "const { chromium } = require('@playwright/test'); process.stdout.write(chromium.executablePath())"
+          node -e "const { chromium } = require('playwright'); process.stdout.write(chromium.executablePath())"
         )"
 
         echo "Expected Chromium executable: $expected_chromium_path"
