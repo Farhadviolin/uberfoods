@@ -451,7 +451,9 @@ jobs:
       working-directory: ./frontend/customer-web
       timeout-minutes: 20
       run: |
-        npm --prefix . exec -- playwright --version
+        npm ci
+
+        ./node_modules/.bin/playwright --version
 
         expected_chromium_path="$(
           node -e "const { chromium } = require('playwright'); process.stdout.write(chromium.executablePath())"
@@ -460,7 +462,7 @@ jobs:
         echo "Expected Chromium executable: $expected_chromium_path"
 
         if [ ! -x "$expected_chromium_path" ]; then
-          npm --prefix . exec -- playwright install chromium
+          ./node_modules/.bin/playwright install chromium
         fi
 
         if [ ! -x "$expected_chromium_path" ]; then
@@ -479,7 +481,9 @@ jobs:
       run: |
         set -euo pipefail
 
-        npm exec -- playwright --version
+        npm ci
+
+        ./node_modules/.bin/playwright --version
 
         expected_chromium_path="$(
           node -e "const { chromium } = require('playwright'); process.stdout.write(chromium.executablePath())"
@@ -492,7 +496,7 @@ jobs:
 
         if [ ! -x "$expected_chromium_path" ]; then
           echo "Expected Chromium executable is missing or not executable: $expected_chromium_path"
-          npm exec -- playwright install chromium
+          ./node_modules/.bin/playwright install chromium
         fi
 
         if [ ! -x "$expected_chromium_path" ]; then
