@@ -199,31 +199,33 @@ jobs:
       run: |
         set -euo pipefail
 
-        npm exec -- playwright --version
+        npm --prefix frontend/customer-web exec -- playwright --version
 
         echo "Restored Playwright browser cache:"
         find "$HOME/.cache/ms-playwright" -maxdepth 4 -type f | sort | head -200 || true
 
-        chromium_path="$(find "$HOME/.cache/ms-playwright" -type f -path '*/chrome-linux*/chrome' | head -n 1)"
+        chromium_headless_shell_path="$(find "$HOME/.cache/ms-playwright" -path '*chromium_headless_shell-*/*/chrome-headless-shell' -type f | head -n 1)"
 
-        if [ -z "$chromium_path" ]; then
-          echo "No Chromium executable found in restored Playwright cache"
+        if [ -z "$chromium_headless_shell_path" ]; then
+          echo "No Playwright Chromium headless shell found in restored Playwright cache"
+          echo "Expected path pattern:"
+          echo "$HOME/.cache/ms-playwright/chromium_headless_shell-*/chrome-headless-shell-linux64/chrome-headless-shell"
           find "$HOME/.cache/ms-playwright" -maxdepth 6 -type f | sort | head -300 || true
           exit 1
         fi
 
-        echo "chromium executable: $chromium_path"
+        echo "chromium headless shell executable: $chromium_headless_shell_path"
 
-        if [ ! -f "$chromium_path" ]; then
-          echo "Chromium path is not a file: $chromium_path"
+        if [ ! -f "$chromium_headless_shell_path" ]; then
+          echo "Chromium headless shell path is not a file: $chromium_headless_shell_path"
           exit 1
         fi
 
-        chmod +x "$chromium_path" || true
+        chmod +x "$chromium_headless_shell_path" || true
 
-        "$chromium_path" --version
+        "$chromium_headless_shell_path" --version
 
-        echo "Playwright Chromium installation verification succeeded"
+        echo "Playwright Chromium headless shell installation verification succeeded"
 
     - name: Setup backend for E2E
       working-directory: ./backend
@@ -366,7 +368,7 @@ jobs:
         echo "E2E_AUTH_ROLES=${E2E_AUTH_ROLES:-unset}"
         node --version
         npm --version
-        npx playwright --version || true
+        npm --prefix . exec -- playwright --version || true
         ls -la playwright || true
         ls -la playwright/.auth || true
 
@@ -444,8 +446,9 @@ jobs:
       working-directory: ./frontend/customer-web
       timeout-minutes: 20
       run: |
-        npm exec -- playwright --version
-        npm exec -- playwright install chromium
+        npm --prefix . exec -- playwright --version
+        npm --prefix . exec -- playwright install chromium
+        find "$HOME/.cache/ms-playwright" -path '*chromium_headless_shell-*/*/chrome-headless-shell' -type f -print
         ls -la ~/.cache/ms-playwright || true
 
     - name: Verify Playwright browsers
