@@ -27,11 +27,19 @@
 - [ ] `PAYPAL_CLIENT_ID`
 - [ ] `PAYPAL_CLIENT_SECRET`
 - [ ] `PAYPAL_WEBHOOK_ID`
+- [ ] `VITE_API_BASE_URL` (Customer Web)
+- [ ] `VITE_API_URL` (Admin/Restaurant/Driver)
 - [ ] `GOOGLE_MAPS_API_KEY`
 - [ ] `VAPID_PUBLIC_KEY`
 - [ ] `VAPID_PRIVATE_KEY`
 - [ ] `SMTP_HOST`
-- [ ] `SMTP_FROM`
+- [ ] `SMTP_USER`
+- [ ] `SMTP_PASSWORD`
+- [ ] `SMTP_FROM_EMAIL`
+- [ ] `SMTP_FROM_NAME`
+- [ ] `SENDGRID_API_KEY` (optional)
+- [ ] `SENDGRID_FROM_EMAIL` (optional)
+- [ ] `SENDGRID_FROM_NAME` (optional)
 
 ## Stripe Checklist
 
@@ -93,6 +101,8 @@
 - [ ] Drivers can be managed
 - [ ] Orders can be reviewed
 - [ ] Reports and exports work
+- [ ] PDF/reporting page opens without a 500 error
+- [ ] Export/download works if implemented
 
 ### Customer Test
 
