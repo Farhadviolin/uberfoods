@@ -29,10 +29,10 @@ function getImportMetaEnv(): any {
       return (globalThis as any).import.meta.env;
     }
     // Fallback for Node.js/CommonJS environments (Jest, etc.)
-    return process?.env ?? {};
+    return typeof process !== 'undefined' ? process.env : {};
   } catch {
     // Final fallback
-    return process?.env ?? {};
+    return typeof process !== 'undefined' ? process.env : {};
   }
 }
 
@@ -42,7 +42,7 @@ function isDevMode(): boolean {
   if (env.DEV !== undefined) {
     return env.DEV === true;
   }
-  return process.env.NODE_ENV !== 'production';
+  return (typeof process !== 'undefined' ? process.env.NODE_ENV : undefined) !== 'production';
 }
 
 // Verwende dynamische Konfiguration für verschiedene Umgebungen

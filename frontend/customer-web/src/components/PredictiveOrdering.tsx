@@ -277,8 +277,8 @@ export function PredictiveOrdering() {
           type: 'calendar-based',
           title: 'Regelmäßige Bestellung',
           description: `Letzte Bestellung war vor ${daysSinceLastOrder} Tagen. Wiederholen?`,
-          restaurant: lastOrder.restaurant,
-          dish: lastOrder.items[0]?.name || 'Letzte Bestellung',
+          restaurant: getRestaurantName(lastOrder.restaurant),
+          dish: getDishName(lastOrder.items?.[0]) || 'Letzte Bestellung',
           confidence: 0.70,
           action: () => handleReorder(lastOrder.id)
         });
@@ -336,7 +336,7 @@ export function PredictiveOrdering() {
                   dishId: item.dishId || item.dish?.id,
                   quantity: item.quantity || 1
                 }))
-                .filter((item): item is { dishId: string; quantity: number } => !!item.dishId);
+                .filter((item: { dishId?: string; quantity: number }): item is { dishId: string; quantity: number } => !!item.dishId);
 
               if (normalizedItems.length > 0) {
                 localStorage.setItem('reorder_intent', JSON.stringify({

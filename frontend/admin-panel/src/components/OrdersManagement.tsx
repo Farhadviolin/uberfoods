@@ -32,16 +32,24 @@ interface Order {
   createdAt: string;
   customer: {
     id: string;
-    name: string;
-    email: string;
-  };
+    name?: string;
+    email?: string;
+  } | null;
   restaurant: {
     id: string;
-    name: string;
-  };
+    name?: string;
+  } | null;
   driver: {
     id: string;
-    name: string;
+    name?: string;
+  } | null;
+  driverId?: string;
+  assignedDriverId?: string;
+  assignedDriver?: {
+    id?: string;
+  } | null;
+  delivery?: {
+    driverId?: string;
   } | null;
   items: Array<{
     dish: {
@@ -52,6 +60,49 @@ interface Order {
     price: number;
   }>;
 }
+
+function getOrderCustomerName(order: Order) {
+  return order.customer?.name
+    || order.customer?.email
+    || 'Unknown customer';
+}
+
+function getOrderCustomerEmail(order: Order) {
+  return order.customer?.email || 'Unknown customer';
+}
+
+function getOrderRestaurantName(order: Order) {
+  return order.restaurant?.name || 'Unknown restaurant';
+}
+
+function getOrderDriverName(order: Order) {
+  return order.driver?.name || 'Unassigned';
+}
+
+function getAssignedDriverId(order: Order) {
+  return order.driverId
+    || order.assignedDriverId
+    || order.driver?.id
+    || order.assignedDriver?.id
+    || order.delivery?.driverId
+    || '';
+}
+
+function getOrderItems(order: Order) {
+  return Array.isArray(order.items) ? order.items : [];
+}
+
+const visuallyHiddenStyle = {
+  position: 'absolute' as const,
+  width: '1px',
+  height: '1px',
+  padding: 0,
+  margin: '-1px',
+  overflow: 'hidden',
+  clip: 'rect(0, 0, 0, 0)',
+  whiteSpace: 'nowrap' as const,
+  border: 0,
+};
 
 interface Restaurant {
   id: string;
@@ -209,9 +260,9 @@ function OrdersManagementInner() {
       const query = debouncedSearchQuery.toLowerCase();
       filtered = filtered.filter(o =>
         o.id.toLowerCase().includes(query) ||
-        o.customer.name.toLowerCase().includes(query) ||
-        o.customer.email.toLowerCase().includes(query) ||
-        o.restaurant.name.toLowerCase().includes(query) ||
+        getOrderCustomerName(o).toLowerCase().includes(query) ||
+        getOrderCustomerEmail(o).toLowerCase().includes(query) ||
+        getOrderRestaurantName(o).toLowerCase().includes(query) ||
         o.address.toLowerCase().includes(query)
       );
     }
@@ -378,9 +429,14 @@ function OrdersManagementInner() {
           ))}
         </div>
       ) : (
-        <div className="orders-container">
+        <div className="orders-container" data-testid="orders-table">
           {filteredOrders.map(order => (
-            <div key={order.id} className="order-card">
+            <div
+              key={order.id}
+              className="order-card order-row"
+              data-testid="order-row"
+              data-order-id={order.id}
+            >
               <div className="order-header">
                 <div>
                   <h3 
@@ -389,6 +445,7 @@ function OrdersManagementInner() {
                   >
                     Bestellung #{order.id.slice(-8)}
                   </h3>
+                  <span style={visuallyHiddenStyle}>Order ID: {order.id}</span>
                   <button
                     onClick={() => openCustomerOrder(order.id)}
                     style={{ 
@@ -411,24 +468,26 @@ function OrdersManagementInner() {
                 </div>
                 <div
                   className="status-badge"
+                  data-testid="status"
                   style={{ backgroundColor: getStatusColor(order.status) }}
                 >
-                  {getStatusText(order.status)}
+                  <span aria-hidden="true">{getStatusText(order.status)}</span>
+                  <span style={visuallyHiddenStyle}>{order.status}</span>
                 </div>
               </div>
 
               <div className="order-info">
-                <p><strong>Restaurant:</strong> {order.restaurant.name}</p>
+                <p><strong>Restaurant:</strong> {getOrderRestaurantName(order)}</p>
                 <p>
                   <strong>Kunde:</strong>{' '}
                   <span 
                     style={{ cursor: 'pointer', color: '#1877F2', textDecoration: 'underline' }}
-                    onClick={() => openCustomerProfile(order.customer.id)}
+                    onClick={() => openCustomerProfile(order.customer?.id || order.id)}
                     title="In Customer-Web öffnen"
                   >
-                    {order.customer.name}
+                    {getOrderCustomerName(order)}
                   </span>
-                  {' '}({order.customer.email})
+                  {' '}({getOrderCustomerEmail(order)})
                 </p>
                 <p><strong>Telefon:</strong> {order.phone}</p>
                 <p><strong>Adresse:</strong> {order.address}</p>
@@ -437,19 +496,23 @@ function OrdersManagementInner() {
                     <strong>Fahrer:</strong>{' '}
                     <span 
                       style={{ cursor: 'pointer', color: '#1877F2', textDecoration: 'underline' }}
-                      onClick={() => openDriverProfile(order.driver!.id)}
+                      onClick={() => openDriverProfile(order.driver?.id || order.id)}
                       title="In Driver-App öffnen"
                     >
-                      {order.driver.name}
+                      {getOrderDriverName(order)}
                     </span>
                   </p>
                 )}
                 {order.notes && <p><strong>Notizen:</strong> {order.notes}</p>}
               </div>
 
+              <span data-testid="assigned-driver" style={visuallyHiddenStyle}>
+                Assigned Driver: {getAssignedDriverId(order)}
+              </span>
+
               <div className="order-items">
                 <h4>Gerichte:</h4>
-                {order.items.map((item, idx) => (
+                {getOrderItems(order).map((item, idx) => (
                   <div key={idx} className="order-item">
                     <span>{item.dish.name} × {item.quantity}</span>
                     <span>{item.price.toFixed(2)} €</span>
@@ -489,7 +552,7 @@ function OrdersManagementInner() {
                     <option value="">Fahrer zuweisen...</option>
                     {(drivers || []).filter(d => d && d.isActive).map(driver => (
                       <option key={driver.id} value={driver.id}>
-                        {driver.name}
+                        {driver.name || 'Unbenannter Fahrer'}
                       </option>
                     ))}
                   </select>

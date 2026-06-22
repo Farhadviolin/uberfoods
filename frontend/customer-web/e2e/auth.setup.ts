@@ -1,12 +1,161 @@
 import { test as setup, expect } from '@playwright/test';
+import { mkdirSync } from 'node:fs';
 import { testDataFactory } from '../../test-utils/test-data-factory';
+import { TestHelpers } from './test-helpers';
 
 const authFile = 'playwright/.auth';
+mkdirSync(authFile, { recursive: true });
+const LIFECYCLE_RUN_ID = process.env.GITHUB_RUN_ID || process.env.RUN_ID || `run_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+const LIFECYCLE_RUN_ATTEMPT = process.env.GITHUB_RUN_ATTEMPT || '1';
+
+type AuthRole = 'customer' | 'admin' | 'restaurant' | 'driver';
+type ApiLoginRole = Exclude<AuthRole, 'customer'>;
+
+const authRoles = new Set(
+  (process.env.E2E_AUTH_ROLES ?? 'customer')
+    .split(',')
+    .map((role) => role.trim())
+    .filter((role): role is AuthRole =>
+      ['customer', 'admin', 'restaurant', 'driver'].includes(role),
+    ),
+);
+
+console.log(`Creating auth state for roles: ${[...authRoles].join(',')}`);
+
+function registerAuthSetup(role: AuthRole, title: string, callback: any) {
+  if (authRoles.has(role)) {
+    setup(title, callback);
+    return;
+  }
+
+  console.log(`Skipping auth state for role ${role}`);
+}
+
+function normalizeApiLoginPayload(payload: any) {
+  const data = payload?.data ?? payload ?? {};
+  const accessToken = data.access_token ?? data.accessToken ?? data.token ?? null;
+  const refreshToken = data.refresh_token ?? data.refreshToken ?? null;
+  const user = data.user ?? {
+    id: data.id,
+    email: data.email,
+    name: data.name,
+    role: data.role ?? data.userType,
+    userType: data.userType,
+    restaurantId: data.restaurantId,
+    mustChangePassword: data.mustChangePassword,
+    isActive: data.isActive,
+    currentStatus: data.currentStatus,
+  };
+
+  return { accessToken, refreshToken, user, raw: data };
+}
+
+function createLifecycleCustomerCredentials() {
+  const token = `${LIFECYCLE_RUN_ID}.${LIFECYCLE_RUN_ATTEMPT}.${Date.now()}.${Math.random().toString(36).slice(2, 8)}`;
+  return {
+    email: `customer.lifecycle.${token}@example.test`,
+    password: `customer.${token}`,
+    name: `Lifecycle Customer ${token}`,
+    phone: '+43 123 456 789',
+    address: 'Test Street 123, 1010 Vienna',
+  };
+}
+
+async function createStorageStateViaApi({
+  page,
+  browser,
+  role,
+  appUrl,
+  email,
+  password,
+  storagePath,
+}: {
+  page: any;
+  browser: any;
+  role: ApiLoginRole;
+  appUrl: string;
+  email: string;
+  password: string;
+  storagePath: string;
+}) {
+  const response = await page.request.post(`${appUrl.replace(/\/$/, '')}/api/auth/login`, {
+    data: role === 'admin'
+      ? { email, password, userType: 'admin' }
+      : role === 'restaurant'
+        ? { email, password, userType: 'restaurant' }
+        : { email, password, userType: 'driver' },
+  });
+
+  if (!response.ok()) {
+    const bodyText = await response.text().catch(() => '');
+    throw new Error(`API login failed for ${role}: ${response.status()} ${response.statusText()} ${bodyText}`);
+  }
+
+  const payload = normalizeApiLoginPayload(await response.json().catch(() => ({})));
+  if (!payload.accessToken) {
+    throw new Error(`API login for ${role} returned no access token`);
+  }
+
+  if (role === 'restaurant') {
+    payload.user = {
+      ...payload.user,
+      status: payload.user?.status ?? 'ACTIVE',
+      currentStatus: payload.user?.currentStatus ?? 'ACTIVE',
+      isActive: payload.user?.isActive ?? true,
+    };
+  }
+
+  const context = await browser.newContext();
+  const pageForOrigin = await context.newPage();
+  await pageForOrigin.goto(`${appUrl.replace(/\/$/, '')}/`, { waitUntil: 'domcontentloaded' });
+
+  await pageForOrigin.evaluate(({ role, accessToken, refreshToken, user }) => {
+    const jsonUser = JSON.stringify(user);
+
+    const writeLocal = (key: string, value: string) => localStorage.setItem(key, value);
+    const writeSession = (key: string, value: string) => sessionStorage.setItem(key, value);
+
+    if (role === 'admin') {
+      writeSession('uberfoods_auth_token', accessToken);
+      writeSession('uberfoods_auth_user', jsonUser);
+      if (refreshToken) writeSession('uberfoods_auth_refresh_token', refreshToken);
+      writeSession('access_token', accessToken);
+      writeSession('auth_token', accessToken);
+      if (refreshToken) writeSession('refresh_token', refreshToken);
+      writeSession('user', jsonUser);
+    } else if (role === 'restaurant') {
+      writeLocal('restaurant_token', accessToken);
+      writeLocal('restaurant_user', jsonUser);
+      if (refreshToken) writeLocal('restaurant_refresh_token', refreshToken);
+      writeLocal('access_token', accessToken);
+      writeLocal('auth_token', accessToken);
+      if (refreshToken) writeLocal('refresh_token', refreshToken);
+      writeLocal('user', jsonUser);
+      const restaurantId = user?.id || user?.restaurantId;
+      if (restaurantId) {
+        writeLocal('restaurant_id', restaurantId);
+        writeLocal(`restaurant_onboarding_done_${restaurantId}`, 'true');
+      }
+    } else {
+      writeLocal('driver_token', accessToken);
+      writeLocal('driver_user', jsonUser);
+      if (refreshToken) writeLocal('driver_refresh_token', refreshToken);
+      writeLocal('access_token', accessToken);
+      writeLocal('auth_token', accessToken);
+      if (refreshToken) writeLocal('refresh_token', refreshToken);
+      writeLocal('user', jsonUser);
+    }
+  }, { role, accessToken: payload.accessToken, refreshToken: payload.refreshToken, user: payload.user });
+
+  await context.storageState({ path: storagePath });
+  await context.close();
+}
 
 // Setup authentication state for each role
-setup('authenticate as customer', async ({ page, context }) => {
-  const customer = testDataFactory.getTestCustomer();
+registerAuthSetup('customer', 'authenticate as customer', async ({ page, context }) => {
   const urls = testDataFactory.getFrontendUrls();
+  const loginRoute = '/api/auth/customer/login';
+  const customer = createLifecycleCustomerCredentials();
 
   // Add request/response logging for debugging (SECURITY: mask sensitive data)
   page.on('request', (r) => {
@@ -44,6 +193,15 @@ setup('authenticate as customer', async ({ page, context }) => {
   console.log(`✅ SPA routing configured - proceeding with login flow`);
 
   console.log(`🚀 Proceeding with authentication setup...`);
+  console.log(`🧪 Lifecycle customer credential email: ${customer.email}`);
+
+  await TestHelpers.registerCustomer(page, customer, urls.customer);
+  await page.context().clearCookies();
+  await page.evaluate(() => {
+    localStorage.clear();
+    sessionStorage.clear();
+  });
+
   await page.goto(`${urls.customer}/login`);
 
   // Page loaded, proceeding with login
@@ -72,8 +230,7 @@ setup('authenticate as customer', async ({ page, context }) => {
   const respPromise = page.waitForResponse((resp) => {
     const url = resp.url();
     return resp.request().method() === 'POST'
-      && url.includes('/api/auth')
-      && url.includes('/login');
+      && new URL(url).pathname === loginRoute;
   }, { timeout: 15000 });
 
   await Promise.all([
@@ -82,45 +239,52 @@ setup('authenticate as customer', async ({ page, context }) => {
   ]);
 
   const resp = await respPromise;
-  console.log('[LOGIN RESPONSE]', resp.status(), '***URL_MASKED***');
+  const route = new URL(resp.url()).pathname;
+  console.log('[LOGIN RESPONSE]', resp.status(), route, customer.email);
 
   // VALIDATION: Check API contract compliance (accept success, auth failure, and server errors)
   expect(resp.status()).toBeGreaterThanOrEqual(200);
   // Allow 2xx success, 4xx auth failure, and 5xx server errors (for test environments)
   expect(resp.status()).toBeLessThan(600);
 
+  const bodyText = await resp.text().catch(() => '');
   let data;
   try {
-    data = await resp.json();
+    data = bodyText ? JSON.parse(bodyText) : {};
   } catch (e) {
     // If JSON parsing fails, create empty data object
     data = {};
   }
 
-  // If login succeeds, validate the response structure
-  if (resp.status() < 300) {
-    expect(data).toEqual(expect.objectContaining({
-      access_token: expect.any(String),
-      user: expect.any(Object),
-      refresh_token: expect.any(String)
-    }));
-    expect(data.user).toEqual(expect.objectContaining({
-      id: expect.any(String),
+  if (resp.status() >= 300) {
+    console.error('[LOGIN FAILED DEBUG]', {
+      status: resp.status(),
+      route,
       email: customer.email,
-      role: 'customer'
-    }));
-
-    // Store auth state for reuse
-    await page.context().storageState({ path: 'playwright/.auth/customer.json' });
-  } else {
-    // Auth failed, but routing worked - create empty auth state
-    console.log('⚠️ Auth failed but routing works - creating empty auth state');
-    await page.context().storageState({ path: 'playwright/.auth/customer.json' });
+      body: bodyText,
+    });
+    throw new Error(`Customer UI login failed with status ${resp.status()}`);
   }
 
+  const normalized = normalizeApiLoginPayload(data);
+  if (customer.address) {
+    normalized.user = {
+      ...normalized.user,
+      address: normalized.user?.address ?? customer.address,
+    };
+  }
+
+  expect(normalized.accessToken).toEqual(expect.any(String));
+  expect(normalized.refreshToken).toEqual(expect.any(String));
+  expect(normalized.user).toEqual(expect.objectContaining({
+    id: expect.any(String),
+    email: customer.email,
+    role: 'customer'
+  }));
+
   // SECURITY: Log token presence but NOT the actual tokens
-  const accessTokenPrefix = data.access_token ? data.access_token.substring(0, 10) + '...' : 'MISSING';
-  const refreshTokenPrefix = data.refresh_token ? data.refresh_token.substring(0, 10) + '...' : 'MISSING';
+  const accessTokenPrefix = normalized.accessToken ? normalized.accessToken.substring(0, 10) + '...' : 'MISSING';
+  const refreshTokenPrefix = normalized.refreshToken ? normalized.refreshToken.substring(0, 10) + '...' : 'MISSING';
 
   console.log('✅ API response validated - contract compliant');
   console.log('🔐 Tokens received - access:', accessTokenPrefix, 'refresh:', refreshTokenPrefix);
@@ -171,86 +335,69 @@ setup('authenticate as customer', async ({ page, context }) => {
   }
 
   // Save authentication state
+  await page.evaluate(({ accessToken, refreshToken, user }) => {
+    const jsonUser = JSON.stringify(user);
+    localStorage.setItem('customer_token', accessToken);
+    localStorage.setItem('customer_user', jsonUser);
+    localStorage.setItem('access_token', accessToken);
+    localStorage.setItem('auth_token', accessToken);
+    localStorage.setItem('user', jsonUser);
+    if (refreshToken) {
+      localStorage.setItem('customer_refresh_token', refreshToken);
+      localStorage.setItem('refresh_token', refreshToken);
+    }
+  }, {
+    accessToken: normalized.accessToken,
+    refreshToken: normalized.refreshToken,
+    user: normalized.user,
+  });
   await page.context().storageState({ path: `${authFile}/customer.json` });
 });
 
-setup('authenticate as restaurant', async ({ page, context }) => {
+registerAuthSetup('restaurant', 'authenticate as restaurant', async ({ page, context }) => {
   const urls = testDataFactory.getFrontendUrls();
   setup.skip(!urls.restaurant, "RESTAURANT_URL not set – skipping restaurant auth setup");
 
   const restaurant = testDataFactory.getTestRestaurant();
-
-  await page.goto(`${urls.restaurant}/login`);
-  await page.locator('input[type="email"]').fill(restaurant.email);
-  await page.locator('input[type="password"]').fill(restaurant.password);
-  // Wait for login API response and successful redirect
-  const loginResponsePromise = page.waitForResponse(
-    response => response.url().includes('/api/auth/login') && response.status() === 200,
-    { timeout: 10000 }
-  );
-
-  await page.locator('button[type="submit"], button:has-text("Login")').click();
-
-  // Wait for login API response
-  await loginResponsePromise;
-
-  // Wait for successful login redirect
-  await expect(page).toHaveURL(/.*(dashboard|home)/i);
-
-  // Save authentication state
-  await page.context().storageState({ path: `${authFile}/restaurant.json` });
+  await createStorageStateViaApi({
+    page,
+    browser: page.context().browser(),
+    role: 'restaurant',
+    appUrl: urls.restaurant,
+    email: process.env.E2E_RESTAURANT_EMAIL || restaurant.email,
+    password: process.env.E2E_RESTAURANT_PASSWORD || restaurant.password,
+    storagePath: `${authFile}/restaurant.json`,
+  });
 });
 
-setup('authenticate as driver', async ({ page, context }) => {
+registerAuthSetup('driver', 'authenticate as driver', async ({ page, context }) => {
   const urls = testDataFactory.getFrontendUrls();
   setup.skip(!urls.driver, "DRIVER_URL not set – skipping driver auth setup");
 
   const driver = testDataFactory.getTestDriver();
-
-  await page.goto(`${urls.driver}/login`);
-  await page.locator('input[type="email"]').fill(driver.email);
-  await page.locator('input[type="password"]').fill(driver.password);
-  // Wait for login API response and successful redirect
-  const loginResponsePromise = page.waitForResponse(
-    response => response.url().includes('/api/auth/login') && response.status() === 200,
-    { timeout: 10000 }
-  );
-
-  await page.locator('button[type="submit"], button:has-text("Login")').click();
-
-  // Wait for login API response
-  await loginResponsePromise;
-
-  // Wait for successful login redirect
-  await expect(page).toHaveURL(/.*(dashboard|home)/i);
-
-  // Save authentication state
-  await page.context().storageState({ path: `${authFile}/driver.json` });
+  await createStorageStateViaApi({
+    page,
+    browser: page.context().browser(),
+    role: 'driver',
+    appUrl: urls.driver,
+    email: process.env.E2E_DRIVER_EMAIL || driver.email,
+    password: process.env.E2E_DRIVER_PASSWORD || driver.password,
+    storagePath: `${authFile}/driver.json`,
+  });
 });
 
-setup('authenticate as admin', async ({ page, context }) => {
+registerAuthSetup('admin', 'authenticate as admin', async ({ page, context }) => {
   const urls = testDataFactory.getFrontendUrls();
   setup.skip(!urls.admin, "ADMIN_URL not set – skipping admin auth setup");
 
   const admin = testDataFactory.getTestAdmin();
-
-  await page.goto(`${urls.admin}/login`);
-  await page.locator('input[type="email"]').fill(admin.email);
-  await page.locator('input[type="password"]').fill(admin.password);
-  // Wait for login API response and successful redirect
-  const loginResponsePromise = page.waitForResponse(
-    response => response.url().includes('/api/auth/login') && response.status() === 200,
-    { timeout: 10000 }
-  );
-
-  await page.locator('button[type="submit"], button:has-text("Login")').click();
-
-  // Wait for login API response
-  await loginResponsePromise;
-
-  // Wait for successful login redirect
-  await expect(page).toHaveURL(/.*(dashboard|home)/i);
-
-  // Save authentication state
-  await page.context().storageState({ path: `${authFile}/admin.json` });
+  await createStorageStateViaApi({
+    page,
+    browser: page.context().browser(),
+    role: 'admin',
+    appUrl: urls.admin,
+    email: process.env.E2E_ADMIN_EMAIL || admin.email,
+    password: process.env.E2E_ADMIN_PASSWORD || admin.password,
+    storagePath: `${authFile}/admin.json`,
+  });
 });

@@ -23,7 +23,7 @@ const __dirname = dirname(__filename);
 const ROOT_DIR = join(__dirname, '..');
 
 const FRONTEND_APP = 'admin-panel';
-const BACKEND_PORT = '3001';
+const BACKEND_PORT = '3000';
 const FRONTEND_PORT = '3002';
 const DB_CONTAINER = 'postgres-e2e';
 
@@ -206,13 +206,14 @@ async function startBackend() {
 async function startFrontend() {
   log(`🌐 Starting ${FRONTEND_APP} frontend...`);
 
-  const frontendProcess = spawn('node', [join(ROOT_DIR, 'frontend', FRONTEND_APP, 'node_modules', 'vite', 'bin', 'vite.js'), '--mode', 'e2e', '--host', 'localhost', '--port', FRONTEND_PORT], {
+  const frontendProcess = spawn('node', [join(ROOT_DIR, 'frontend', FRONTEND_APP, 'node_modules', 'vite', 'bin', 'vite.js'), '--mode', 'e2e', '--host', '127.0.0.1', '--port', FRONTEND_PORT], {
     cwd: join(ROOT_DIR, 'frontend', FRONTEND_APP),
     stdio: ['pipe', 'pipe', 'pipe'],
     env: {
       ...process.env,
       FORCE_COLOR: '1',
-      VITE_API_URL: `http://localhost:${BACKEND_PORT}` // Direct connection to E2E backend
+      VITE_API_URL: `http://localhost:${BACKEND_PORT}`, // Direct connection to E2E backend
+      VITE_E2E_ORCHESTRATED: '1'
     },
     shell: false
   });
@@ -235,17 +236,18 @@ async function runPlaywrightTests() {
   log('🎭 Running Playwright E2E tests...');
 
   const success = runCommand(
-    'npx playwright test --project=chromium',
+    'npx playwright test --project=chromium --workers=1',
     join(ROOT_DIR, 'frontend', FRONTEND_APP),
     'Run Playwright tests',
     {
       env: {
-        BASE_URL: `http://localhost:${FRONTEND_PORT}`,
-        TEST_ADMIN_EMAIL: process.env.E2E_ADMIN_EMAIL || 'admin@uberfoods.com',
-        TEST_ADMIN_PASSWORD: process.env.E2E_ADMIN_PASSWORD || 'admin123',
-        E2E_RUN_AUTH: 'true',
-        E2E_RUN_API: 'false',
-        E2E_ORCHESTRATED: '1' // Disable Playwright webServer since run-e2e orchestrates
+      BASE_URL: `http://localhost:${FRONTEND_PORT}`,
+      E2E_API_URL: `http://localhost:${BACKEND_PORT}`,
+      TEST_ADMIN_EMAIL: process.env.E2E_ADMIN_EMAIL || 'admin@uberfoods.com',
+      TEST_ADMIN_PASSWORD: process.env.E2E_ADMIN_PASSWORD || 'admin123',
+      E2E_RUN_AUTH: 'true',
+      E2E_RUN_API: 'true',
+      E2E_ORCHESTRATED: '1' // Disable Playwright webServer since run-e2e orchestrates
       }
     }
   );
@@ -308,15 +310,15 @@ async function main() {
 
     if (testSuccess) {
       log('🎉 E2E tests passed!', 'success');
-      process.exit(0);
+      process.exitCode = 0;
     } else {
       log('❌ E2E tests failed', 'error');
-      process.exit(1);
+      process.exitCode = 1;
     }
 
   } catch (error) {
     log(`💥 E2E pipeline failed: ${error.message}`, 'error');
-    process.exit(1);
+    process.exitCode = 1;
   } finally {
     await cleanup();
   }

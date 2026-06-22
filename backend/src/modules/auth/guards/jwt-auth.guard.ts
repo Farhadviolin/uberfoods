@@ -14,6 +14,8 @@ interface UserPayload {
   email?: string;
   role?: string;
   status?: string;
+  currentStatus?: string;
+  isActive?: boolean;
   exp?: number;
   [key: string]: unknown;
 }
@@ -90,6 +92,7 @@ export class JwtAuthGuard extends AuthGuard("jwt") {
       "/api/promotions/public",
       // ✅ Push Notification Public Key - öffentlich (VAPID Public Key)
       "/api/drivers/push/public-key",
+      "/api/drivers/subscription/tiers",
     ];
 
     // ✅ Development mode: Skip authentication for development
@@ -116,10 +119,13 @@ export class JwtAuthGuard extends AuthGuard("jwt") {
 
     // In Development: Only bypass for non-driver endpoints. Never bypass in E2E.
     const isE2E = nodeEnv === "e2e";
+    const isAdminEndpoint = requestPath.startsWith("/api/admin");
     if (
       !isE2E &&
       (allowDevAuth || nodeEnv !== "production") &&
-      !isDriverEndpoint
+      !devToken &&
+      !isDriverEndpoint &&
+      !isAdminEndpoint
     ) {
       this.logger.debug(
         `🔓 Dev Mode: Bypassing authentication for ${request.url}`,
@@ -163,7 +169,8 @@ export class JwtAuthGuard extends AuthGuard("jwt") {
       if (
         !isE2EBypass &&
         (allowDevAuth || nodeEnv !== "production") &&
-        !isDriverEndpoint
+        !isDriverEndpoint &&
+        !requestPath.startsWith("/api/admin")
       ) {
         this.logger.debug(
           `🔓 Dev Mode: JWT validation failed, but allowing as admin: ${err?.message || info?.message || "Unknown error"}`,
@@ -192,7 +199,8 @@ export class JwtAuthGuard extends AuthGuard("jwt") {
     }
 
     // Check if user is active (skip in dev mode, or for drivers in E2E testing)
-    const userStatus = user.currentStatus || user.status;
+    const userStatus =
+      user.currentStatus || user.status || (user.isActive === true ? "ACTIVE" : undefined);
     const skipStatusCheck =
       allowDevAuth || (nodeEnv !== "production" && user.role === "driver");
     if (

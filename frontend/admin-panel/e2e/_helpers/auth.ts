@@ -3,45 +3,79 @@ import { expect, Page } from '@playwright/test';
 export async function loginAsAdmin(page: Page): Promise<void> {
   await page.goto('/', { waitUntil: 'domcontentloaded' });
 
-  // Wait for the page to stabilize - either login form or admin shell should appear
-  // This handles the case where AuthContext is still loading
-  await page.waitForFunction(() => {
-    const hasForm = document.querySelector('form') !== null;
-    const hasAdminShell = document.querySelector('[data-testid="admin-shell"]') !== null;
-    const hasLoadingSpinner = document.querySelector('.loading-spinner, [class*="loading"], [class*="spinner"]') !== null;
+  const loginForm = page.locator('form[aria-label="Login-Formular"]');
+  const adminShell = page.locator('[data-testid="admin-shell"]');
+  const loadingSpinner = page.locator('[role="status"], .loading-spinner-container, .loading-spinner').first();
 
-    // Debug logging (will appear in Playwright output)
-    if (!hasForm && !hasAdminShell && !hasLoadingSpinner) {
-      console.log('Auth Debug: No form, no admin shell, no loading spinner found on page');
-      console.log('Auth Debug: Page title:', document.title);
-      console.log('Auth Debug: Body classes:', document.body.className);
-      console.log('Auth Debug: First few elements:', Array.from(document.body.children).slice(0, 3).map(el => el.tagName + '.' + el.className).join(', '));
+  const readinessDeadline = Date.now() + 20_000;
+  let lastState = 'none';
+
+  while (Date.now() < readinessDeadline) {
+    const shellVisible = await adminShell.isVisible({ timeout: 500 }).catch(() => false);
+    if (shellVisible) {
+      console.log('Auth Debug: Already logged in - admin shell visible');
+      return;
     }
 
-    return hasForm || hasAdminShell || hasLoadingSpinner;
-  }, { timeout: 20_000 });
+    const formVisible = await loginForm.isVisible({ timeout: 500 }).catch(() => false);
+    if (formVisible) {
+      console.log('Auth Debug: Login form is visible, proceeding with login');
+      break;
+    }
 
-  // If we're already logged in (admin shell is visible), we're done
-  const adminShell = page.locator('[data-testid="admin-shell"]');
-  if (await adminShell.isVisible({ timeout: 2000 }).catch(() => false)) {
-    console.log('Auth Debug: Already logged in - admin shell visible');
-    return;
+    const spinnerVisible = await loadingSpinner.isVisible({ timeout: 500 }).catch(() => false);
+    if (spinnerVisible) {
+      lastState = 'spinner';
+      await page.waitForTimeout(250);
+      continue;
+    }
+
+    lastState = 'blank';
+    await page.waitForTimeout(250);
   }
 
-  // Check if there's a loading spinner (AuthContext still loading)
-  const loadingSpinner = page.locator('.loading-spinner, [class*="loading"], [class*="spinner"]').first();
+  if (!(await loginForm.isVisible({ timeout: 1000 }).catch(() => false))) {
+    const bodyText = await page.locator('body').innerText().catch(() => '');
+    const forms = await page.locator('form').evaluateAll(nodes =>
+      nodes.map(node => (node as HTMLFormElement).getAttribute('aria-label') || node.outerHTML.slice(0, 300))
+    ).catch(() => []);
+    const inputs = await page.locator('input').evaluateAll(nodes =>
+      nodes.map(node => {
+        const el = node as HTMLInputElement;
+        return `${el.name || '(no-name)'}|${el.type || '(no-type)'}|${el.placeholder || '(no-placeholder)'}`;
+      })
+    ).catch(() => []);
+    const buttons = await page.locator('button').evaluateAll(nodes =>
+      nodes.map(node => {
+        const el = node as HTMLButtonElement;
+        return `${el.getAttribute('aria-label') || el.textContent?.trim() || '(no-label)'}`;
+      })
+    ).catch(() => []);
+    const testIds = await page.locator('[data-testid]').evaluateAll(nodes =>
+      nodes.map(node => (node as HTMLElement).getAttribute('data-testid')).filter(Boolean)
+    ).catch(() => []);
+    const storageKeys = await page.evaluate(() => ({
+      localStorage: Object.keys(localStorage),
+      sessionStorage: Object.keys(sessionStorage),
+    })).catch(() => ({ localStorage: [], sessionStorage: [] }));
+
+    console.log('Auth Debug: Admin login state did not appear in time');
+    console.log('Auth Debug: URL:', page.url());
+    console.log('Auth Debug: Title:', await page.title().catch(() => ''));
+    console.log('Auth Debug: Body text:', bodyText.slice(0, 500));
+    console.log('Auth Debug: Forms:', forms.join(' || ') || '(none)');
+    console.log('Auth Debug: Inputs:', inputs.join(' || ') || '(none)');
+    console.log('Auth Debug: Buttons:', buttons.join(' || ') || '(none)');
+    console.log('Auth Debug: data-testid values:', testIds.join(', ') || '(none)');
+    console.log('Auth Debug: localStorage keys:', storageKeys.localStorage.join(', ') || '(none)');
+    console.log('Auth Debug: sessionStorage keys:', storageKeys.sessionStorage.join(', ') || '(none)');
+    console.log('Auth Debug: Last observed state:', lastState);
+    throw new Error('Admin login UI did not become ready within 20s');
+  }
+
   if (await loadingSpinner.isVisible({ timeout: 1000 }).catch(() => false)) {
     console.log('Auth Debug: Loading spinner visible, waiting for it to disappear');
     await loadingSpinner.waitFor({ state: 'hidden', timeout: 15_000 });
-  }
-
-  // Now wait for the login form to be visible
-  const loginForm = page.locator('form');
-  if (await loginForm.isVisible({ timeout: 2000 }).catch(() => false)) {
-    console.log('Auth Debug: Login form is visible, proceeding with login');
-  } else {
-    console.log('Auth Debug: Login form not visible, waiting...');
-    await loginForm.waitFor({ timeout: 10_000 });
   }
 
   await page.fill('[name="email"]', 'admin@uberfoods.com');

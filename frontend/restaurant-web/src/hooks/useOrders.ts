@@ -62,8 +62,11 @@ export function useRestaurantOrders(restaurantId: string | null) {
     },
     enabled: !!rid,
     staleTime: 30 * 1000,
+    refetchOnMount: "always",
+    refetchOnReconnect: "always",
+    refetchOnWindowFocus: "always",
     refetchInterval: 30 * 1000,
-    placeholderData: [],
+    placeholderData: [], 
     retry: false,
   });
 }
@@ -224,14 +227,10 @@ export function useUpdateOrderStatus() {
       orderId,
       id,
       status,
-      version,
-      estimatedReadyTime,
     }: {
       orderId?: string;
       id?: string;
       status: string;
-      version?: number;
-      estimatedReadyTime?: string;
     }) => {
       if (!rid) {
         throw new Error("Kein Restaurant ausgewählt");
@@ -242,24 +241,38 @@ export function useUpdateOrderStatus() {
       }
       const body: {
         status: string;
-        version?: number;
-        estimatedReadyTime?: string;
       } = {
         status,
       };
-      if (version !== undefined) {
-        body.version = version;
-      }
-      if (estimatedReadyTime) {
-        body.estimatedReadyTime = estimatedReadyTime;
-      }
       return api
-        .put(`/restaurants/${rid}/orders/${targetId}/status`, body)
+        .patch(`/orders/${targetId}/status`, body)
         .then((res) => res.data);
     },
-    onSuccess: (_, variables) => {
+    onSuccess: (updatedOrder: Order, variables) => {
       const targetId = (variables as any).orderId || (variables as any).id;
-      queryClient.invalidateQueries({ queryKey: ["orders"] });
+      const requestedStatus = (variables as any).status;
+      if (targetId && requestedStatus) {
+        try {
+          localStorage.setItem(
+            `restaurant_order_status_${targetId}`,
+            requestedStatus,
+          );
+        } catch {
+          // ignore storage errors in non-browser/test environments
+        }
+      }
+      queryClient.setQueryData<Order[]>(["orders", rid], (orders = []) =>
+        orders.map((order) =>
+          order.id === targetId
+            ? {
+                ...order,
+                ...updatedOrder,
+                ...(requestedStatus ? { status: requestedStatus } : {}),
+              }
+            : order,
+        ),
+      );
+      queryClient.invalidateQueries({ queryKey: ["orders", rid] });
       if (targetId) {
         queryClient.invalidateQueries({ queryKey: ["order", targetId] });
         queryClient.invalidateQueries({

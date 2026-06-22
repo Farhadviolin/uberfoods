@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { useMemo } from 'react';
 import { api } from '../utils/api';
+import type { Dish } from '../types';
 
 interface Restaurant {
   id: string;
@@ -15,6 +16,7 @@ interface Restaurant {
   imageUrl?: string;
   address: string;
   phone: string;
+  dishes?: Dish[];
 }
 
 interface UseRestaurantsOptions {
@@ -78,6 +80,7 @@ export const useRestaurants = (options: UseRestaurantsOptions = {}) => {
       imageUrl: restaurant.imageUrl,
       address: restaurant.address,
       phone: restaurant.phone,
+      dishes: restaurant.dishes || restaurant.menuItems || [],
     }));
 
     return normalizedRestaurants;

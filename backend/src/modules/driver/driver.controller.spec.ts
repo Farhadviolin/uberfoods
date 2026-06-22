@@ -7,6 +7,10 @@ import { PermissionGuard } from '../auth/guards/permission.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { WebSocketGateway } from '../websocket/websocket.gateway';
 import { PrismaService } from '../../prisma/prisma.service';
+import { SmartAcceptanceService } from './smart-acceptance.service';
+import { RouteOptimizationService } from './route-optimization.service';
+import { PerformanceTrackingService } from './performance-tracking.service';
+import { SubscriptionService } from './subscription.service';
 
 describe('DriverController', () => {
   let controller: DriverController;
@@ -25,6 +29,37 @@ describe('DriverController', () => {
             getOrderStatistics: jest.fn(),
             getFinancialBalance: jest.fn(),
             getPerformanceScore: jest.fn(),
+            updateStatus: jest.fn(),
+          },
+        },
+        {
+          provide: SmartAcceptanceService,
+          useValue: {
+            getSettings: jest.fn(),
+            updateSettings: jest.fn(),
+            evaluateOrder: jest.fn(),
+          },
+        },
+        {
+          provide: RouteOptimizationService,
+          useValue: {
+            optimizeRoute: jest.fn(),
+            getActiveRoutes: jest.fn(),
+          },
+        },
+        {
+          provide: PerformanceTrackingService,
+          useValue: {
+            getPerformance: jest.fn(),
+            getAdvancedPerformance: jest.fn(),
+          },
+        },
+        {
+          provide: SubscriptionService,
+          useValue: {
+            getSubscription: jest.fn(),
+            upgradeSubscription: jest.fn(),
+            cancelSubscription: jest.fn(),
           },
         },
         {

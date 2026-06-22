@@ -67,7 +67,7 @@ const statusOrder: Record<string, number> = {
 };
 
 export function OrderTracking() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { id } = useParams<{ id: string }>();
   const [order, setOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(true);
@@ -83,7 +83,7 @@ export function OrderTracking() {
     try {
       setLoading(true);
       setError(null);
-      const response = await api.get(`/orders/customer/${orderId}`);
+      const response = await api.get(`/orders/${orderId}`);
       setOrder(response.data);
     } catch (err: unknown) {
       const axiosError = err as AxiosErrorWithResponse;
@@ -109,7 +109,7 @@ export function OrderTracking() {
     user?.id || null,
     (updatedOrder) => {
       if (updatedOrder.id === id) {
-        setOrder(updatedOrder);
+        setOrder(updatedOrder as unknown as Order);
         // Push-Notification bei Status-Änderung
         NotificationService.showOrderUpdate(
           updatedOrder.id,
@@ -134,14 +134,14 @@ export function OrderTracking() {
       setLoading(true);
       // Wenn eingeloggt, normale Anfrage
       if (user) {
-        const response = await api.get(`/orders/customer/${orderId}`);
+        const response = await api.get(`/orders/${orderId}`);
         setOrder(response.data);
         setError(null);
       } else {
         // Wenn nicht eingeloggt, prüfe ob E-Mail in LocalStorage gespeichert ist
         const savedGuestEmail = localStorage.getItem(`guest_order_${orderId}`);
         if (savedGuestEmail) {
-          const response = await api.get(`/orders/customer/${orderId}?email=${encodeURIComponent(savedGuestEmail)}`);
+          const response = await api.get(`/orders/${orderId}?email=${encodeURIComponent(savedGuestEmail)}`);
           setOrder(response.data);
           setError(null);
           setGuestEmail(savedGuestEmail);
@@ -176,7 +176,7 @@ export function OrderTracking() {
 
     try {
       setLoading(true);
-      const response = await api.get(`/orders/customer/${id}?email=${encodeURIComponent(guestEmail)}`);
+      const response = await api.get(`/orders/${id}?email=${encodeURIComponent(guestEmail)}`);
       setOrder(response.data);
       setError(null);
       setShowGuestEmailInput(false);
@@ -273,7 +273,7 @@ export function OrderTracking() {
   const isCancelled = order.status === 'CANCELLED';
 
   return (
-    <div>
+    <div data-testid="order-tracking-page">
       <Link to="/orders" className="fb-back-button">← {t('common.back')} {t('order.title')}</Link>
 
       {showCancelModal && (

@@ -30,12 +30,12 @@ export interface OperatingHours {
 export interface Restaurant {
   id: string;
   name: string;
-  description: string;
-  imageUrl: string;
+  description?: string;
+  imageUrl?: string;
   address: string;
   rating?: number;
   distance?: number;
-  dishes: Dish[];
+  dishes?: Dish[];
   phone?: string;
   email?: string;
   isActive?: boolean;
@@ -67,6 +67,7 @@ export interface PlannedMeal {
   restaurantName: string;
   dishIds: string[];
   notes?: string;
+  restaurant?: Pick<Restaurant, 'id' | 'name' | 'imageUrl'>;
 }
 
 export interface ApiError {
@@ -88,6 +89,7 @@ export interface AxiosErrorWithResponse extends Error {
       }>;
     };
     status?: number;
+    headers?: Record<string, unknown>;
   };
   request?: unknown;
   config?: unknown;

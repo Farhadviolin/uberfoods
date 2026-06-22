@@ -131,7 +131,7 @@ export function PartnerApply() {
         payload.driverInfo = {
           licenseClass: form.driver.licenseClass,
           vehicleType: form.driver.vehicleType,
-          availabilityNote: form.driver.availability,
+          availability: form.driver.availability,
         };
       }
       if (form.role === 'restaurant') {

@@ -159,19 +159,19 @@ export const logInfo = (message: string, context?: string) => {
  * Development-only logging - wird in Production nicht ausgeführt
  */
 export const devLog = (message: string, ...args: unknown[]) => {
-  if (process.env.NODE_ENV === 'development') {
+  if (typeof process !== 'undefined' && process.env.NODE_ENV === 'development') {
     console.log(`[DEV] ${message}`, ...args);
   }
 };
 
 export const devWarn = (message: string, ...args: unknown[]) => {
-  if (process.env.NODE_ENV === 'development') {
+  if (typeof process !== 'undefined' && process.env.NODE_ENV === 'development') {
     console.warn(`[DEV] ${message}`, ...args);
   }
 };
 
 export const devError = (message: string, ...args: unknown[]) => {
-  if (process.env.NODE_ENV === 'development') {
+  if (typeof process !== 'undefined' && process.env.NODE_ENV === 'development') {
     console.error(`[DEV] ${message}`, ...args);
   }
 };

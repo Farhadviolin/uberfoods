@@ -34,12 +34,12 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
-          node-version: 20
+          node-version: '24'
           cache: 'npm'
 
       - name: Install dependencies
@@ -74,7 +74,7 @@ jobs:
 
       - name: Upload test artifacts
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: customer-e2e-artifacts-${{ github.run_id }}
           path: |
@@ -85,7 +85,7 @@ jobs:
 
       - name: Upload test videos (on failure)
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: customer-e2e-videos-${{ github.run_id }}
           path: frontend/customer-web/test-results/**/videos/**
@@ -165,12 +165,12 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
-          node-version: 20
+          node-version: '24'
           cache: 'npm'
 
       - name: Install dependencies
@@ -184,7 +184,7 @@ jobs:
 
       - name: Upload Windows artifacts
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: customer-e2e-windows-${{ github.run_id }}
           path: |

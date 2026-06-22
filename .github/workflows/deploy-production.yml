@@ -31,15 +31,15 @@ jobs:
       id-token: write
 
     outputs:
-      backend-image: ${{ steps.build-backend.outputs.image }}
-      customer-web-image: ${{ steps.build-customer-web.outputs.image }}
-      driver-app-image: ${{ steps.build-driver-app.outputs.image }}
-      restaurant-web-image: ${{ steps.build-restaurant-web.outputs.image }}
-      admin-panel-image: ${{ steps.build-admin-panel.outputs.image }}
+      backend-image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/backend@${{ steps.build-backend.outputs.digest }}
+      customer-web-image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/customer-web@${{ steps.build-customer-web.outputs.digest }}
+      driver-app-image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/driver-app@${{ steps.build-driver-app.outputs.digest }}
+      restaurant-web-image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/restaurant-web@${{ steps.build-restaurant-web.outputs.digest }}
+      admin-panel-image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/admin-panel@${{ steps.build-admin-panel.outputs.digest }}
 
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
 
     - name: Setup Docker buildx
       uses: docker/setup-buildx-action@v3
@@ -135,7 +135,7 @@ jobs:
 
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
 
     - name: Setup kubectl
       uses: azure/setup-kubectl@v3
@@ -197,9 +197,11 @@ jobs:
     steps:
     - name: Notify Success
       if: needs.deploy.result == 'success'
+      env:
+        DEPLOY_ENVIRONMENT: ${{ github.event.inputs.environment || 'production' }}
       run: |
         curl -X POST -H 'Content-type: application/json' \
-        --data '{"text":"🚀 UberFoods Production Deployment Successful! 🎉\nVersion: ${{ github.ref_name }}\nEnvironment: ${{ github.event.inputs.environment || '\''production'\'' }}"}' \
+        --data '{"text":"🚀 UberFoods Production Deployment Successful! 🎉\nVersion: ${{ github.ref_name }}\nEnvironment: '"$DEPLOY_ENVIRONMENT"'"}' \
         ${{ secrets.SLACK_WEBHOOK_URL }}
 
     - name: Notify Failure

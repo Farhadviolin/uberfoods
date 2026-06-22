@@ -6,7 +6,7 @@
     "dev": "vite",
     "build": "vite build",
     "build:analyze": "ANALYZE=true vite build",
-    "preview": "vite preview",
+    "preview": "vite preview --host 0.0.0.0 --port 4175",
     "lint": "eslint src --ext .ts,.tsx",
     "lint:fix": "eslint src --ext .ts,.tsx --fix",
     "test": "jest",

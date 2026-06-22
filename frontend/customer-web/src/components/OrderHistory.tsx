@@ -78,7 +78,7 @@ export function OrderHistory() {
       if (axiosError.response?.status === 404 || axiosError.response?.status === 400) {
         try {
           // Hole Bestelldetails für Warenkorb
-          const orderResponse = await api.get(`/orders/customer/${order.id}`);
+          const orderResponse = await api.get(`/orders/${order.id}`);
           const orderDetails = orderResponse.data;
 
           // Erstelle Warenkorb aus Bestellung
@@ -140,7 +140,7 @@ export function OrderHistory() {
         </div>
       ) : (
         <div className="orders-list">
-          {ordersData.map(order => (
+          {(ordersData as Order[]).map((order: Order) => (
             <Link 
               key={order.id} 
               to={`/orders/${order.id}`}
@@ -168,7 +168,7 @@ export function OrderHistory() {
               </div>
               
               <div className="order-items">
-                {order.items.slice(0, 3).map((item, idx) => (
+                {order.items.slice(0, 3).map((item, idx: number) => (
                   <div key={idx} className="order-item-preview">
                     {item.dish.imageUrl && (
                       <img 

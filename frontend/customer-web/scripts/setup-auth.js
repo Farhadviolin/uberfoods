@@ -5,9 +5,17 @@
  * This script runs the auth.setup.ts tests to create storageState files
  */
 
-const { execSync } = require('child_process');
+const { execFileSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
+
+const projectRoot = path.join(__dirname, '..');
+const playwrightBin = path.join(
+  projectRoot,
+  'node_modules',
+  '.bin',
+  process.platform === 'win32' ? 'playwright.cmd' : 'playwright'
+);
 
 const authDir = path.join(__dirname, '..', 'playwright', '.auth');
 
@@ -17,12 +25,23 @@ if (!fs.existsSync(authDir)) {
 }
 
 console.log('🔐 Setting up authentication states for E2E tests...');
+console.log('Auth setup cwd:', projectRoot);
+console.log(
+  'Auth setup @playwright/test version:',
+  require(path.join(projectRoot, 'node_modules', '@playwright', 'test', 'package.json')).version
+);
+console.log(
+  'Auth setup playwright-core version:',
+  require(path.join(projectRoot, 'node_modules', 'playwright-core', 'package.json')).version
+);
+console.log('Auth setup playwright binary:', playwrightBin);
 
 try {
   // Run auth setup tests
-  execSync('npx playwright test auth.setup.ts --reporter=line', {
+  execFileSync(playwrightBin, ['test', 'auth.setup.ts', '--reporter=line'], {
     stdio: 'inherit',
-    cwd: path.join(__dirname, '..')
+    cwd: projectRoot,
+    env: process.env
   });
 
   console.log('✅ Authentication states created successfully!');

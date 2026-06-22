@@ -1,5 +1,5 @@
 import { screen, fireEvent, waitFor } from '@testing-library/react';
-import { renderHook, act } from '@testing-library/react-hooks';
+import { renderHook, act } from '@testing-library/react';
 import { render } from '../../test-utils';
 import { useCart } from '../../contexts/CartContext';
 import { CartProvider } from '../../contexts/CartContext';

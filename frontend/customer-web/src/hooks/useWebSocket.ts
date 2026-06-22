@@ -357,8 +357,9 @@ export function useWebSocket(
         
         // Deaktiviere Reconnection, um weitere Verbindungsversuche zu verhindern
         try {
-          if (socket.io) {
-            socket.io.reconnect(false);
+          const ioManager = socket.io as any;
+          if (ioManager) {
+            ioManager.reconnect(false);
           }
         } catch (error) {
           // Ignoriere Fehler wenn io nicht verfügbar ist
@@ -366,16 +367,17 @@ export function useWebSocket(
         
         // Prüfe Verbindungsstatus vor disconnect
         const isConnected = socket.connected;
-        const hasIO = socket.io !== undefined && socket.io !== null;
-        const isConnecting = hasIO && (socket.io.connecting || socket.io.reconnecting);
+        const ioManager = socket.io as any;
+        const hasIO = ioManager !== undefined && ioManager !== null;
+        const isConnecting = hasIO && (ioManager.connecting || ioManager.reconnecting);
         
         // Prüfe ob Transport wirklich aktiv ist
-        const hasActiveTransport = hasIO && socket.io.engine && socket.io.engine.transport && socket.io.engine.transport.readyState === 'open';
+        const hasActiveTransport = hasIO && ioManager.engine && ioManager.engine.transport && ioManager.engine.transport.readyState === 'open';
         
         // Nur disconnect wenn Verbindung wirklich etabliert ist UND Transport aktiv
         if (isConnected && hasActiveTransport) {
           try {
-            if (socket.connected && socket.io?.engine?.transport?.readyState === 'open') {
+            if (socket.connected && ioManager?.engine?.transport?.readyState === 'open') {
               socket.disconnect();
             }
           } catch (error) {
@@ -383,10 +385,10 @@ export function useWebSocket(
           }
         } else if (isConnecting && hasIO) {
           try {
-            if (socket.io.engine && socket.io.engine.close) {
-              socket.io.engine.close();
-            } else if (socket.io.disconnect) {
-              socket.io.disconnect();
+            if (ioManager.engine && ioManager.engine.close) {
+              ioManager.engine.close();
+            } else if (ioManager.disconnect) {
+              ioManager.disconnect();
             }
           } catch (error) {
             // Ignoriere Fehler beim Schließen einer Verbindung im Aufbau

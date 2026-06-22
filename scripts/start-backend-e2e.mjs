@@ -6,7 +6,7 @@
  */
 
 import { execSync, spawn } from 'child_process';
-import { readFileSync, existsSync, writeFileSync } from 'fs';
+import { readFileSync, existsSync, mkdirSync, writeFileSync } from 'fs';
 import { resolve, dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 
@@ -39,29 +39,52 @@ function log(message, type = 'info') {
   console.log(`[${timestamp}] ${prefix} ${message}`);
 }
 
+function maskDatabaseUrl(databaseUrl) {
+  if (!databaseUrl) {
+    return 'NOT SET';
+  }
+
+  try {
+    const url = new URL(databaseUrl);
+    if (url.password) {
+      url.password = '***';
+    }
+    return url.toString();
+  } catch {
+    return 'SET (invalid URL format)';
+  }
+}
+
 async function main() {
   log('Starting Backend E2E service...');
 
   try {
     // 1. Load E2E environment variables
     const envPath = join(backendRoot, '.env.e2e');
-    if (!existsSync(envPath)) {
-      log(`Error: .env.e2e not found at ${envPath}`, 'error');
-      process.exit(1);
+    let e2eEnvVars = {};
+
+    if (existsSync(envPath)) {
+      log(`Loading .env.e2e from ${envPath}`);
+      e2eEnvVars = parseEnvFile(envPath);
+      Object.assign(process.env, e2eEnvVars);
+      log(`Loaded ${Object.keys(e2eEnvVars).length} environment variables`);
+    } else if (process.env.CI === 'true') {
+      log('No .env.e2e found; using CI environment variables.');
+    } else {
+      throw new Error(
+        '.env.e2e not found. Create backend/.env.e2e locally from .env.e2e.example or use CI environment variables.'
+      );
     }
-    log(`Loading .env.e2e from ${envPath}`);
-    const e2eEnvVars = parseEnvFile(envPath);
-    Object.assign(process.env, e2eEnvVars);
-    log(`Loaded ${Object.keys(e2eEnvVars).length} environment variables`);
 
     // E2E-only logging of effective environment
     const envEffectiveLog = join(repoRoot, 'artifacts', 'e2e-customer', 'env-effective.log');
+    mkdirSync(dirname(envEffectiveLog), { recursive: true });
     const envLog = [
       `Timestamp: ${new Date().toISOString()}`,
       `NODE_ENV: ${process.env.NODE_ENV}`,
-      `DATABASE_URL: ${process.env.DATABASE_URL}`,
+      `DATABASE_URL: ${maskDatabaseUrl(process.env.DATABASE_URL)}`,
       `DEFAULT_DRIVER_PASSWORD: ${process.env.DEFAULT_DRIVER_PASSWORD ? 'SET' : 'NOT SET'}`,
-      `Env files loaded: .env.e2e (${Object.keys(e2eEnvVars).length} vars)`,
+      `Environment source: ${existsSync(envPath) ? '.env.e2e' : 'CI process environment'}`,
       `---`
     ].join('\n');
 
@@ -76,7 +99,7 @@ async function main() {
     const mainFile = join(backendRoot, 'dist', 'main.e2e.js');
     if (!existsSync(mainFile)) {
       log('Building backend application...');
-      execSync('npm run build', {
+      execSync('npm run build:e2e', {
         cwd: backendRoot,
         stdio: 'inherit',
         env: process.env

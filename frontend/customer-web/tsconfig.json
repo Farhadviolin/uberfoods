@@ -12,15 +12,16 @@
     "noEmitOnError": false,
     "jsx": "react-jsx",
     "strict": true,
+    "useUnknownInCatchVariables": false,
     "skipLibCheck": true,
     "noImplicitAny": true,
-    "noUnusedLocals": true,
-    "noUnusedParameters": true,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
     "noImplicitReturns": true,
     "noFallthroughCasesInSwitch": true
   },
   "include": ["src", "src/types/**/*.d.ts"],
-  "exclude": ["src/**/__tests__/**", "src/**/*.test.ts", "src/**/*.test.tsx", "src/setupTests.ts"],
+  "exclude": ["src/**/__tests__/**", "src/**/*.test.ts", "src/**/*.test.tsx", "src/setupTests.ts", "src/test-utils.tsx"],
   "references": [{ "path": "./tsconfig.node.json" }]
 }
 

@@ -1,10 +1,11 @@
 name: CI
 
 on:
+  workflow_dispatch:
   push:
-    branches: [ main, develop ]
+    branches: [ master, main, develop, release/uberfoods-rc1-production-readiness ]
   pull_request:
-    branches: [ main, develop ]
+    branches: [ master, main, develop, release/uberfoods-rc1-production-readiness ]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -14,6 +15,15 @@ jobs:
   # Backend API Verification
   api-verification:
     runs-on: ubuntu-latest
+    env:
+      ADMIN_TEST_EMAIL: ci-admin@example.test
+      ADMIN_TEST_PASSWORD: ci-admin-password-placeholder
+      CUSTOMER_TEST_EMAIL: ci-customer@example.test
+      CUSTOMER_TEST_PASSWORD: ci-customer-password-placeholder
+      DRIVER_TEST_EMAIL: ci-driver@example.test
+      DRIVER_TEST_PASSWORD: ci-driver-password-placeholder
+      RESTAURANT_TEST_EMAIL: ci-restaurant@example.test
+      RESTAURANT_TEST_PASSWORD: ci-restaurant-password-placeholder
     services:
       postgres:
         image: postgres:15
@@ -27,15 +37,26 @@ jobs:
           --health-retries 5
         ports:
           - 5434:5432
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
+      with:
+        submodules: false
 
     - name: Setup Node.js
-      uses: actions/setup-node@v4
+      uses: actions/setup-node@v5
       with:
-        node-version: '20'
+        node-version: '24'
         cache: 'npm'
         cache-dependency-path: 'backend/package-lock.json'
 
@@ -49,7 +70,7 @@ jobs:
 
     - name: Run database migrations
       working-directory: ./backend
-      run: npx prisma db push --schema=./prisma/schema.prisma
+      run: npx prisma migrate deploy --schema=./prisma/schema.prisma
       env:
         DATABASE_URL: postgresql://postgres:postgres123@localhost:5434/uberfoods
 
@@ -59,12 +80,43 @@ jobs:
       env:
         DATABASE_URL: postgresql://postgres:postgres123@localhost:5434/uberfoods
 
+    - name: Create test admin
+      working-directory: ./backend
+      run: node scripts/create-test-admin.js
+      env:
+        DATABASE_URL: postgresql://postgres:postgres123@localhost:5434/uberfoods
+
+    - name: Create test restaurant and dish
+      working-directory: ./backend
+      run: node scripts/create-test-restaurant.js
+      env:
+        DATABASE_URL: postgresql://postgres:postgres123@localhost:5434/uberfoods
+        RESTAURANT_TEST_NAME: CI Test Restaurant
+        RESTAURANT_TEST_EMAIL: ci-restaurant@example.test
+        RESTAURANT_TEST_PASSWORD: ci-restaurant-password-placeholder
+        RESTAURANT_TEST_ADDRESS: CI Test Street 1
+        DISH_TEST_NAME: CI Test Dish
+        DISH_TEST_PRICE: 1290
+
     - name: Start E2E backend
       working-directory: ./backend
       run: |
         npm run start:e2e &
         # Wait for backend to be ready (scripts handle their own health checks)
         sleep 20
+      env:
+        CI: true
+        NODE_ENV: test
+        PORT: 3000
+        DATABASE_URL: postgresql://postgres:postgres123@localhost:5434/uberfoods
+        REDIS_URL: redis://localhost:6379
+        JWT_SECRET: ci-jwt-secret-placeholder
+        JWT_EXPIRES_IN: 1h
+        STRIPE_SECRET_KEY: STRIPE_SECRET_KEY_PLACEHOLDER
+        STRIPE_WEBHOOK_SECRET: STRIPE_WEBHOOK_SECRET_PLACEHOLDER
+        PAYPAL_CLIENT_ID: PAYPAL_CLIENT_ID_PLACEHOLDER
+        PAYPAL_CLIENT_SECRET: PAYPAL_CLIENT_SECRET_PLACEHOLDER
+        ALLOWED_ORIGINS: http://localhost:3000,http://localhost:3001,http://localhost:3002,http://localhost:3003,http://localhost:3004
 
     - name: Run API verification scripts
       working-directory: ./backend
@@ -91,10 +143,17 @@ jobs:
           exit 1
         }
 
-  # UI-E2E Full Order Lifecycle Test
   ui-e2e-lifecycle:
     runs-on: ubuntu-latest
-    needs: api-verification
+    needs:
+      - api-verification
+      - playwright-browsers
+    timeout-minutes: 35
+    env:
+      DATABASE_URL: postgresql://postgres:postgres123@localhost:5434/uberfoods
+      PLAYWRIGHT_SKIP_BROWSER_GC: "1"
+      PLAYWRIGHT_USE_SYSTEM_CHROME: "1"
+      PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"
     services:
       postgres:
         image: postgres:15
@@ -108,70 +167,244 @@ jobs:
           --health-retries 5
         ports:
           - 5434:5432
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
+      with:
+        submodules: false
 
     - name: Setup Node.js
-      uses: actions/setup-node@v4
+      uses: actions/setup-node@v5
       with:
-        node-version: '20'
+        node-version: '24'
 
-    - name: Install Playwright
-      run: npx playwright install --with-deps
+    - name: Configure Playwright browser path
+      run: |
+        echo "PLAYWRIGHT_BROWSERS_PATH=$HOME/.cache/ms-playwright" >> "$GITHUB_ENV"
+        mkdir -p "$HOME/.cache/ms-playwright"
+        echo "PLAYWRIGHT_BROWSERS_PATH=$HOME/.cache/ms-playwright"
+
+    - name: Restore Playwright browsers cache
+      id: playwright-cache
+      uses: actions/cache@v4
+      with:
+        path: ~/.cache/ms-playwright
+        key: playwright-browsers-v3-headless-shell-${{ runner.os }}-${{ hashFiles('frontend/customer-web/package-lock.json', 'frontend/customer-web/package.json') }}
+        restore-keys: |
+          playwright-browsers-v3-headless-shell-${{ runner.os }}-
+
+    - name: Verify Playwright Chromium installation
+      timeout-minutes: 2
+      run: |
+        set -euo pipefail
+
+        echo "PLAYWRIGHT_BROWSERS_PATH=${PLAYWRIGHT_BROWSERS_PATH:-}"
+        npm --prefix frontend/customer-web exec -- playwright --version
+
+        chrome_path="$(command -v google-chrome || command -v google-chrome-stable || command -v chromium || command -v chromium-browser || true)"
+
+        if [ -z "$chrome_path" ]; then
+          echo "ERROR: No system Chrome/Chromium executable found on the GitHub runner."
+          echo "PATH=$PATH"
+          exit 1
+        fi
+
+        echo "System Chrome found: $chrome_path"
+        "$chrome_path" --version
+        echo "Playwright Chromium installation verification succeeded"
 
     - name: Setup backend for E2E
       working-directory: ./backend
       run: |
         npm ci
         npx prisma generate --schema=./prisma/schema.prisma
-        npx prisma db push --schema=./prisma/schema.prisma
+        npx prisma migrate deploy --schema=./prisma/schema.prisma
+        npm run prisma:seed
         node scripts/create-test-driver.js
         npm run start:e2e &
         sleep 20
         curl -f http://localhost:3000/api/health || (echo "Backend failed to start" && exit 1)
       env:
+        CI: true
+        NODE_ENV: test
+        PORT: 3000
         DATABASE_URL: postgresql://postgres:postgres123@localhost:5434/uberfoods
+        REDIS_URL: redis://localhost:6379
+        SEED_CUSTOMER_PASSWORD: test123
+        SEED_RESTAURANT_PASSWORD: restaurant123
+        SEED_DRIVER_PASSWORD: driver123
+        JWT_SECRET: ci-jwt-secret-placeholder
+        JWT_EXPIRES_IN: 1h
+        STRIPE_SECRET_KEY: STRIPE_SECRET_KEY_PLACEHOLDER
+        STRIPE_WEBHOOK_SECRET: STRIPE_WEBHOOK_SECRET_PLACEHOLDER
+        PAYPAL_CLIENT_ID: PAYPAL_CLIENT_ID_PLACEHOLDER
+        PAYPAL_CLIENT_SECRET: PAYPAL_CLIENT_SECRET_PLACEHOLDER
+        ALLOWED_ORIGINS: http://localhost:3000,http://localhost:3001,http://localhost:3002,http://localhost:3003,http://localhost:3004
 
     - name: Install frontend dependencies
       run: |
-        cd frontend
-        npm ci
-        cd customer-web && npm ci
-        cd ../admin-panel && npm ci
-        cd ../restaurant-web && npm ci
-        cd ../driver-app && npm ci
+        npm ci --prefix frontend/customer-web
+        npm ci --prefix frontend/admin-panel
+        npm ci --prefix frontend/restaurant-web
+        npm ci --prefix frontend/driver-app
 
     - name: Start all frontend apps
-      working-directory: ./frontend
       run: |
-        # Start all frontend apps
-        cd customer-web && npm run dev > ../logs/customer-web.log 2>&1 &
-        cd ../admin-panel && npm run dev:localhost > ../logs/admin-panel.log 2>&1 &
-        cd ../restaurant-web && npm run dev > ../logs/restaurant-web.log 2>&1 &
-        cd ../driver-app && npm run dev > ../logs/driver-app.log 2>&1 &
-        sleep 15
+        mkdir -p frontend/logs
+        wait_for_url() {
+          local name="$1"
+          local url="$2"
+          local log_file="$3"
+          local pid="$4"
 
-        # Verify all apps are running
-        curl -f http://localhost:3001 || (echo "Customer web failed" && exit 1)
-        curl -f http://localhost:3002 || (echo "Admin panel failed" && exit 1)
-        curl -f http://localhost:3003 || (echo "Restaurant web failed" && exit 1)
-        curl -f http://localhost:3004 || (echo "Driver app failed" && exit 1)
+          echo "Waiting for $name at $url"
+          for i in {1..60}; do
+            if curl -fsS "$url" >/dev/null 2>&1; then
+              echo "$name is ready at $url"
+              return 0
+            fi
+
+            if ! kill -0 "$pid" >/dev/null 2>&1; then
+              echo "$name process exited before becoming ready"
+              echo "===== $name log ====="
+              cat "$log_file" || true
+              return 1
+            fi
+
+            echo "waiting for $name at $url..."
+            sleep 2
+          done
+
+          echo "$name did not become ready at $url"
+          echo "===== $name log ====="
+          cat "$log_file" || true
+          return 1
+        }
+
+        npm run dev:e2e --prefix frontend/customer-web > frontend/logs/customer-web.log 2>&1 &
+        echo $! > frontend/logs/customer-web.pid
+
+        echo "Checking port 3002 before starting admin-panel"
+        (lsof -i :3002 || true)
+        (ss -ltnp | grep ':3002' || true)
+
+        npm run dev:fixed --prefix frontend/admin-panel > frontend/logs/admin-panel.log 2>&1 &
+        echo $! > frontend/logs/admin-panel.pid
+
+        npm run dev --prefix frontend/restaurant-web -- --host 0.0.0.0 --port 3003 > frontend/logs/restaurant-web.log 2>&1 &
+        echo $! > frontend/logs/restaurant-web.pid
+
+        npm run dev --prefix frontend/driver-app -- --host 0.0.0.0 --port 3004 > frontend/logs/driver-app.log 2>&1 &
+        echo $! > frontend/logs/driver-app.pid
+
+        wait_for_url "customer-web" "http://127.0.0.1:3102" "frontend/logs/customer-web.log" "$(cat frontend/logs/customer-web.pid)"
+        wait_for_url "admin-panel" "http://127.0.0.1:3002" "frontend/logs/admin-panel.log" "$(cat frontend/logs/admin-panel.pid)"
+        wait_for_url "restaurant-web" "http://127.0.0.1:3003" "frontend/logs/restaurant-web.log" "$(cat frontend/logs/restaurant-web.pid)"
+        wait_for_url "driver-app" "http://127.0.0.1:3004" "frontend/logs/driver-app.log" "$(cat frontend/logs/driver-app.pid)"
+
+    - name: Verify frontend readiness before auth setup
+      shell: bash
+      run: |
+        set -euo pipefail
+
+        echo "Verifying customer-web readiness before auth setup..."
+        for i in {1..30}; do
+          if curl -fsS http://127.0.0.1:3102/ >/dev/null 2>&1 && curl -fsS http://127.0.0.1:3102/login >/dev/null 2>&1; then
+            echo "customer-web is reachable for auth setup"
+            exit 0
+          fi
+          echo "customer-web not ready yet for auth setup attempt $i/30"
+          sleep 2
+        done
+
+        echo "customer-web did not become reachable before auth setup"
+        echo "===== HTTP checks ====="
+        for url in http://127.0.0.1:3102/ http://127.0.0.1:3102/login; do
+          echo "--- $url ---"
+          curl -fsS -D - "$url" -o /dev/null || true
+        done
+        echo "===== processes ====="
+        ps aux | grep -E "vite|node|npm" || true
+        echo "===== ports ====="
+        (ss -ltnp | grep -E ':3102|:3002|:3003|:3004' || true)
+        echo "===== customer-web log ====="
+        cat frontend/logs/customer-web.log || true
+        echo "===== admin-panel log ====="
+        cat frontend/logs/admin-panel.log || true
+        echo "===== restaurant-web log ====="
+        cat frontend/logs/restaurant-web.log || true
+        echo "===== driver-app log ====="
+        cat frontend/logs/driver-app.log || true
+        exit 1
 
     - name: Setup Authentication States
       working-directory: ./frontend/customer-web
-      run: npm run test:setup-auth
+      env:
+        RELEASE_GATE_MANAGED: true
+        CUSTOMER_URL: http://127.0.0.1:3102
+        E2E_AUTH_ROLES: customer,admin,restaurant,driver
+      shell: bash
+      run: |
+        set -euo pipefail
+
+        echo "Auth setup diagnostics"
+        pwd
+        echo "RELEASE_GATE_MANAGED=${RELEASE_GATE_MANAGED:-unset}"
+        echo "CUSTOMER_URL=${CUSTOMER_URL:-unset}"
+        echo "E2E_AUTH_ROLES=${E2E_AUTH_ROLES:-unset}"
+        node --version
+        npm --version
+        npm --prefix . exec -- playwright --version || true
+        ls -la playwright || true
+        ls -la playwright/.auth || true
+
+        set +e
+        npm run test:setup-auth 2>&1 | tee ../logs/setup-auth.log
+        AUTH_EXIT=${PIPESTATUS[0]}
+        set -e
+
+        if [ "$AUTH_EXIT" -ne 0 ]; then
+          echo "Auth setup failed with exit code $AUTH_EXIT"
+          echo "===== setup-auth.log ====="
+          cat ../logs/setup-auth.log || true
+          echo "===== playwright auth dir ====="
+          ls -la playwright/.auth || true
+          echo "===== ports ====="
+          (ss -ltnp | grep -E ':3102|:3002|:3003|:3004' || true)
+          echo "===== processes ====="
+          ps aux | grep -E "vite|node|npm" || true
+          echo "===== customer-web log ====="
+          cat ../logs/customer-web.log || true
+          echo "===== admin-panel log ====="
+          cat ../logs/admin-panel.log || true
+          echo "===== restaurant-web log ====="
+          cat ../logs/restaurant-web.log || true
+          echo "===== driver-app log ====="
+          cat ../logs/driver-app.log || true
+          exit "$AUTH_EXIT"
+        fi
 
     - name: Run Full Order Lifecycle UI-E2E Test
       working-directory: ./frontend/customer-web
-      run: RUN_ID=${{ github.run_id }}_${{ github.run_attempt }} npx playwright test full-order-lifecycle.spec.ts --reporter=line,html,junit
+      run: RUN_ID=${{ github.run_id }}_${{ github.run_attempt }} npx playwright test full-order-lifecycle.spec.ts --project=full-lifecycle --grep "Complete Order Lifecycle" --reporter=line,html,junit --workers=1 --retries=0 --timeout=900000 --global-timeout=1500000
       env:
         RUN_ID: ${{ github.run_id }}_${{ github.run_attempt }}
+        RELEASE_GATE_MANAGED: true
+        CUSTOMER_URL: http://127.0.0.1:3102
 
     - name: Upload UI-E2E test results
       if: always()
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v5
       with:
         name: ui-e2e-lifecycle-results
         path: |
@@ -180,10 +413,97 @@ jobs:
           frontend/logs/
         retention-days: 30
 
+  playwright-browsers:
+    runs-on: ubuntu-latest
+    needs: api-verification
+    timeout-minutes: 60
+    env:
+      PLAYWRIGHT_SKIP_BROWSER_GC: "1"
+      PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v5
+      with:
+        submodules: false
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v5
+      with:
+        node-version: '24'
+
+    - name: Configure Playwright browser path
+      run: |
+        echo "PLAYWRIGHT_BROWSERS_PATH=$HOME/.cache/ms-playwright" >> "$GITHUB_ENV"
+        mkdir -p "$HOME/.cache/ms-playwright"
+        echo "PLAYWRIGHT_BROWSERS_PATH=$HOME/.cache/ms-playwright"
+
+    - name: Restore Playwright browsers cache
+      id: playwright-cache
+      uses: actions/cache@v4
+      with:
+        path: ~/.cache/ms-playwright
+        key: playwright-browsers-v3-headless-shell-${{ runner.os }}-${{ hashFiles('frontend/customer-web/package-lock.json', 'frontend/customer-web/package.json') }}
+        restore-keys: |
+          playwright-browsers-v3-headless-shell-${{ runner.os }}-
+
+    - name: Verify system Chrome
+      working-directory: ./frontend/customer-web
+      run: |
+        set -euo pipefail
+
+        chrome_path="$(command -v google-chrome || command -v google-chrome-stable || command -v chromium || command -v chromium-browser || true)"
+
+        if [ -z "$chrome_path" ]; then
+          echo "ERROR: No system Chrome/Chromium executable found on the GitHub runner."
+          echo "PATH=$PATH"
+          exit 1
+        fi
+
+        echo "System Chrome found: $chrome_path"
+        "$chrome_path" --version
+        echo "System Chrome verification succeeded"
+
+    - name: Verify Playwright browsers
+      working-directory: ./frontend/customer-web
+      timeout-minutes: 2
+      run: |
+        set -euo pipefail
+
+        npm ci
+
+        ./node_modules/.bin/playwright --version
+
+        chrome_path="$(command -v google-chrome || command -v google-chrome-stable || command -v chromium || command -v chromium-browser || true)"
+
+        if [ -z "$chrome_path" ]; then
+          echo "ERROR: No system Chrome/Chromium executable found on the GitHub runner."
+          echo "PATH=$PATH"
+          exit 1
+        fi
+
+        echo "System Chrome found: $chrome_path"
+        "$chrome_path" --version
+
+        echo "Playwright Chromium cache verification succeeded"
+
+    - name: Save Playwright browsers cache
+      if: steps.playwright-cache.outputs.cache-hit != 'true'
+      uses: actions/cache/save@v4
+      with:
+        path: ~/.cache/ms-playwright
+        key: playwright-browsers-v3-headless-shell-${{ runner.os }}-${{ hashFiles('frontend/customer-web/package-lock.json', 'frontend/customer-web/package.json') }}
+
   # Individual Frontend E2E Tests
   frontend-e2e:
     runs-on: ubuntu-latest
-    needs: api-verification
+    needs:
+      - api-verification
+      - playwright-browsers
+    timeout-minutes: 45
+    env:
+      DATABASE_URL: postgresql://postgres:postgres123@localhost:5434/uberfoods
+      PLAYWRIGHT_SKIP_BROWSER_GC: "1"
+      PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"
     services:
       postgres:
         image: postgres:15
@@ -197,71 +517,213 @@ jobs:
           --health-retries 5
         ports:
           - 5434:5432
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
+      with:
+        submodules: false
 
     - name: Setup Node.js
-      uses: actions/setup-node@v4
+      uses: actions/setup-node@v5
       with:
-        node-version: '20'
+        node-version: '24'
 
-    - name: Install Playwright
-      run: npx playwright install --with-deps
+    - name: Configure Playwright browser path
+      run: |
+        echo "PLAYWRIGHT_BROWSERS_PATH=$HOME/.cache/ms-playwright" >> "$GITHUB_ENV"
+        mkdir -p "$HOME/.cache/ms-playwright"
+        echo "PLAYWRIGHT_BROWSERS_PATH=$HOME/.cache/ms-playwright"
+
+    - name: Restore Playwright browsers cache
+      uses: actions/cache@v4
+      with:
+        path: ~/.cache/ms-playwright
+        key: playwright-browsers-v3-headless-shell-${{ runner.os }}-${{ hashFiles('frontend/customer-web/package-lock.json', 'frontend/customer-web/package.json') }}
+        restore-keys: |
+          playwright-browsers-v3-headless-shell-${{ runner.os }}-
 
     - name: Setup backend for E2E
       working-directory: ./backend
       run: |
         npm ci
         npx prisma generate --schema=./prisma/schema.prisma
-        npx prisma db push --schema=./prisma/schema.prisma
+        npx prisma migrate deploy --schema=./prisma/schema.prisma
+        npm run prisma:seed
         npm run start:e2e &
         sleep 15
         curl -f http://localhost:3000/api/health || (echo "Backend failed to start" && exit 1)
       env:
-        DATABASE_URL: postgresql://postgres:3000/api/health:5434/uberfoods
+        CI: true
+        NODE_ENV: test
+        PORT: 3000
+        DATABASE_URL: postgresql://postgres:postgres123@localhost:5434/uberfoods
+        REDIS_URL: redis://localhost:6379
+        SEED_CUSTOMER_PASSWORD: test123
+        SEED_RESTAURANT_PASSWORD: restaurant123
+        SEED_DRIVER_PASSWORD: driver123
+        JWT_SECRET: ci-jwt-secret-placeholder
+        JWT_EXPIRES_IN: 1h
+        STRIPE_SECRET_KEY: STRIPE_SECRET_KEY_PLACEHOLDER
+        STRIPE_WEBHOOK_SECRET: STRIPE_WEBHOOK_SECRET_PLACEHOLDER
+        PAYPAL_CLIENT_ID: PAYPAL_CLIENT_ID_PLACEHOLDER
+        PAYPAL_CLIENT_SECRET: PAYPAL_CLIENT_SECRET_PLACEHOLDER
+        ALLOWED_ORIGINS: http://localhost:3000,http://localhost:3001,http://localhost:3002,http://localhost:3003,http://localhost:3004
 
-    - name: Run customer web E2E tests
+    - name: Customer Web - install dependencies
+      working-directory: ./frontend/customer-web
+      run: npm ci
+
+    - name: Customer Web - verify Playwright version
       working-directory: ./frontend/customer-web
       run: |
-        npm ci
-        npm run build
-        npm run preview &
-        sleep 10
-        npx playwright test --grep-invert "full-order-lifecycle"
+        npx playwright --version
+        echo "PLAYWRIGHT_BROWSERS_PATH=${PLAYWRIGHT_BROWSERS_PATH:-unset}"
+        command -v google-chrome || true
+        google-chrome --version || true
+
+    - name: Customer Web - verify cached Chromium
+      working-directory: ./frontend/customer-web
+      run: |
+        set -euo pipefail
+
+        echo "PLAYWRIGHT_BROWSERS_PATH=${PLAYWRIGHT_BROWSERS_PATH:-unset}"
+        echo "Checking Playwright cache..."
+        ls -la "$HOME/.cache/ms-playwright" 2>/dev/null || true
+
+        cached_chromium="$(
+          find "$HOME/.cache/ms-playwright" \
+            -type f \
+            \( -path "*/chrome-linux*/chrome" -o -path "*/chromium*/chrome-linux*/chrome" \) \
+            2>/dev/null | head -n 1 || true
+        )"
+
+        if [ -n "$cached_chromium" ] && [ -f "$cached_chromium" ]; then
+          chmod +x "$cached_chromium" || true
+          if [ -x "$cached_chromium" ]; then
+            echo "Using cached Chromium: $cached_chromium"
+            "$cached_chromium" --version
+            echo "PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=$cached_chromium" >> "$GITHUB_ENV"
+            echo "Chromium verification succeeded via Playwright cache"
+            exit 0
+          fi
+        fi
+
+        system_chrome="$(
+          command -v google-chrome ||
+          command -v google-chrome-stable ||
+          command -v chromium-browser ||
+          command -v chromium ||
+          true
+        )"
+
+        if [ -n "$system_chrome" ] && [ -x "$system_chrome" ]; then
+          echo "Using system Chrome: $system_chrome"
+          "$system_chrome" --version
+          echo "PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=$system_chrome" >> "$GITHUB_ENV"
+          echo "Chromium verification succeeded via system Chrome"
+          exit 0
+        fi
+
+        echo "ERROR: No executable Chromium or Chrome found"
+        find "$HOME/.cache/ms-playwright" -maxdepth 5 -type f 2>/dev/null | sort | head -200 || true
+        exit 1
+
+    - name: Customer Web - build
+      working-directory: ./frontend/customer-web
+      run: timeout 10m npm run build
+
+    - name: Customer Web - start E2E server
+      working-directory: ./frontend/customer-web
+      env:
+        RELEASE_GATE_MANAGED: true
+        CUSTOMER_URL: http://127.0.0.1:3102
+        E2E_AUTH_ROLES: customer
+      run: |
+        mkdir -p ../logs
+        npm run dev:e2e > ../logs/customer-web.log 2>&1 &
+        for i in {1..60}; do
+          if curl -fsS http://127.0.0.1:3102 >/dev/null; then
+            echo "customer-web is ready on 3102"
+            break
+          fi
+          echo "waiting for customer-web on 3102..."
+          sleep 2
+        done
+        if ! curl -fsS http://127.0.0.1:3102 >/dev/null; then
+          echo "Customer web failed"
+          cat ../logs/customer-web.log || true
+          exit 1
+        fi
+
+    - name: Customer Web - run E2E tests
+      working-directory: ./frontend/customer-web
+      env:
+        RELEASE_GATE_MANAGED: true
+        CUSTOMER_URL: http://127.0.0.1:3102
+        E2E_AUTH_ROLES: customer
+      run: timeout 10m npm run test:e2e:customer
 
     - name: Run admin panel unit tests
       working-directory: ./frontend/admin-panel
       run: |
         npm ci
         npm test -- --testPathPattern=SocialManagement.test.tsx --watchAll=false
-        if ($LASTEXITCODE -ne 0) {
-          Write-Error "Admin panel SocialManagement tests failed"
-          exit 1
-        }
 
     - name: Run admin panel E2E tests
       working-directory: ./frontend/admin-panel
+      env:
+        E2E_ORCHESTRATED: 1
       run: |
         npm ci
         npm run build
-        npm run preview &
-        sleep 10
-        npx playwright test
+        mkdir -p ../logs
+        npm run dev:e2e > ../logs/admin-panel.log 2>&1 &
+        for i in {1..60}; do
+          if curl -fsS http://127.0.0.1:3002 >/dev/null; then
+            echo "admin-panel is ready on 3002"
+            break
+          fi
+          echo "waiting for admin-panel on 3002..."
+          sleep 2
+        done
+        if ! curl -fsS http://127.0.0.1:3002 >/dev/null; then
+          echo "Admin panel failed"
+          cat ../logs/admin-panel.log || true
+          exit 1
+        fi
+        npx playwright test --reporter=list
+
+    - name: Upload admin panel E2E test results
+      if: failure()
+      uses: actions/upload-artifact@v5
+      with:
+        name: admin-panel-e2e-results
+        path: |
+          frontend/admin-panel/playwright-report/
+          frontend/admin-panel/test-results/
+          frontend/logs/admin-panel.log
+        retention-days: 30
 
     - name: Run driver app E2E tests
       working-directory: ./frontend/driver-app
       run: |
         npm ci
         npm run build
-        npm run preview &
-        sleep 10
         npx playwright test
 
     - name: Upload individual E2E test results
       if: always()
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v5
       with:
         name: e2e-test-results
         path: |
@@ -276,12 +738,12 @@ jobs:
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
 
     - name: Setup Node.js
-      uses: actions/setup-node@v4
+      uses: actions/setup-node@v5
       with:
-        node-version: '20'
+        node-version: '24'
 
     - name: Build backend
       working-directory: ./backend

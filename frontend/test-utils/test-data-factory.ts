@@ -68,7 +68,7 @@ export class TestDataFactory {
     return {
       id: this.generateId('customer', 'e2e'),
       email: process.env.E2E_CUSTOMER_EMAIL || 'customer@uberfoods.local',
-      password: 'test123',
+      password: 'customer123',
       name: 'Test Customer',
       phone: '+43 123 456 789',
       role: 'customer'
@@ -78,8 +78,8 @@ export class TestDataFactory {
   getTestRestaurant(): TestUser {
     return {
       id: this.generateId('restaurant', 'e2e'),
-      email: 'testrestaurant@example.com',
-      password: 'TestPassword123!',
+      email: 'restaurant@uberfoods.local',
+      password: 'restaurant123',
       name: 'Test Restaurant',
       phone: '+43 987 654 321',
       role: 'restaurant'
@@ -89,8 +89,8 @@ export class TestDataFactory {
   getTestDriver(): TestUser {
     return {
       id: this.generateId('driver', 'e2e'),
-      email: 'testdriver@example.com',
-      password: 'TestPassword123!',
+      email: 'driver@uberfoods.local',
+      password: 'driver123',
       name: 'Test Driver',
       phone: '+43 555 123 456',
       role: 'driver'
@@ -100,8 +100,8 @@ export class TestDataFactory {
   getTestAdmin(): TestUser {
     return {
       id: this.generateId('admin', 'e2e'),
-      email: 'testadmin@example.com',
-      password: 'TestPassword123!',
+      email: 'admin@uberfoods.com',
+      password: 'admin123',
       name: 'Test Admin',
       phone: '+43 111 222 333',
       role: 'admin'
@@ -195,10 +195,12 @@ export class TestDataFactory {
   // Frontend URLs
   getFrontendUrls() {
     return {
-      customer: process.env.BASE_URL || process.env.CUSTOMER_URL || 'http://127.0.0.1:3002',
-      restaurant: process.env.RESTAURANT_URL || '',
-      driver: process.env.DRIVER_URL || '',
-      admin: process.env.ADMIN_URL || ''
+      // Customer-only E2E runs the customer web app on its dedicated port.
+      // Prefer CUSTOMER_URL so we don't accidentally point at another frontend.
+      customer: process.env.CUSTOMER_URL || process.env.BASE_URL || 'http://127.0.0.1:3102',
+      restaurant: process.env.RESTAURANT_URL || 'http://127.0.0.1:3003',
+      driver: process.env.DRIVER_URL || 'http://127.0.0.1:3004',
+      admin: process.env.ADMIN_URL || 'http://127.0.0.1:3002'
     };
   }
 

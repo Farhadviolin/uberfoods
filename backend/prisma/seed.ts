@@ -26,7 +26,10 @@ async function main() {
   const hashedRestaurantPassword = await bcrypt.hash(restaurantPassword, 10);
   const restaurant1 = await prisma.restaurant.upsert({
     where: { email: 'restaurant@uberfoods.local' },
-    update: {},
+    update: {
+      isActive: true,
+      status: 'OPEN',
+    },
     create: {
       name: 'Pizza Palace',
       description: 'Die beste Pizza der Stadt! Frische Zutaten und traditionelle Rezepte.',
@@ -42,7 +45,10 @@ async function main() {
 
   const restaurant2 = await prisma.restaurant.upsert({
     where: { email: 'burger-kingdom@example.com' },
-    update: {},
+    update: {
+      isActive: true,
+      status: 'OPEN',
+    },
     create: {
       name: 'Burger Kingdom',
       description: 'Saftige Burger und frische Pommes. Perfekt für den großen Hunger!',
@@ -57,7 +63,10 @@ async function main() {
 
   const restaurant3 = await prisma.restaurant.upsert({
     where: { email: 'sushi-master@example.com' },
-    update: {},
+    update: {
+      isActive: true,
+      status: 'OPEN',
+    },
     create: {
       name: 'Sushi Master',
       description: 'Frisches Sushi und japanische Küche. Authentisch und lecker!',

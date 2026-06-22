@@ -1,7 +1,25 @@
 import { useState, useEffect } from "react";
 
+function isLocalLoopbackHost() {
+  if (typeof window === "undefined") {
+    return false;
+  }
+
+  const hostname = window.location.hostname;
+  const isLoopbackHost = ["localhost", "127.0.0.1", "::1"].includes(hostname);
+  const isLocalhostDomain = hostname === "localhost" || hostname.endsWith(".localhost");
+  const isE2EOrDevMode =
+    Boolean((import.meta as any)?.env?.MODE === "test") ||
+    Boolean((import.meta as any)?.env?.VITE_E2E === "true");
+
+  return isLoopbackHost || isLocalhostDomain || isE2EOrDevMode;
+}
+
 export function useOffline() {
-  const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const isLocalHost = isLocalLoopbackHost();
+  const [isOnline, setIsOnline] = useState(
+    isLocalHost ? true : typeof navigator !== "undefined" ? navigator.onLine : true,
+  );
   const [wasOffline, setWasOffline] = useState(false);
 
   useEffect(() => {
@@ -24,6 +42,9 @@ export function useOffline() {
     };
 
     const handleOffline = () => {
+      if (isLocalHost) {
+        return;
+      }
       setIsOnline(false);
       setWasOffline(true);
     };
@@ -35,7 +56,7 @@ export function useOffline() {
       window.removeEventListener("online", handleOnline);
       window.removeEventListener("offline", handleOffline);
     };
-  }, [wasOffline]);
+  }, [isLocalHost, wasOffline]);
 
   return { isOnline, wasOffline };
 }

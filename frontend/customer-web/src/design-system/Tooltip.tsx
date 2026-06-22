@@ -7,7 +7,7 @@ import './Tooltip.css';
 export type TooltipPosition = 'top' | 'bottom' | 'left' | 'right' | 'auto';
 export type TooltipVariant = 'default' | 'dark' | 'light';
 
-export interface TooltipProps extends HTMLAttributes<HTMLDivElement> {
+export interface TooltipProps extends Omit<HTMLAttributes<HTMLDivElement>, 'content'> {
   content: ReactNode;
   position?: TooltipPosition;
   variant?: TooltipVariant;
@@ -126,6 +126,7 @@ export function Tooltip({
         window.removeEventListener('scroll', handleScroll, true);
       };
     }
+    return undefined;
   }, [isVisible]);
 
   useEffect(() => {

@@ -7,7 +7,17 @@ import { PrismaService } from "../../../prisma/prisma.service";
 interface JWTPayload {
   sub?: string;
   role?: string;
+  email?: string;
+  type?: string;
   [key: string]: unknown;
+}
+
+function getRequiredJwtSecret(configService: ConfigService): string {
+  const secret = configService.get<string>("JWT_SECRET");
+  if (!secret) {
+    throw new Error("JWT_SECRET environment variable is required but not set");
+  }
+  return secret;
 }
 
 @Injectable()
@@ -21,28 +31,44 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
-      secretOrKey:
-        configService.get<string>("JWT_SECRET") || "fallback-secret-key",
+      secretOrKey: getRequiredJwtSecret(configService),
     });
   }
 
   async validate(payload: JWTPayload) {
-    const { sub: userId, role } = payload;
-
-    // ✅ Development mode: Überspringe DB-Abfrage und gib Admin-User zurück
-    const allowDevAuth = this.configService.get("ALLOW_DEV_AUTH") === "true";
+    const { sub: userId, role, email, type } = payload;
     const nodeEnv = this.configService.get("NODE_ENV") || "development";
+    const allowDevAuth = this.configService.get("ALLOW_DEV_AUTH") === "true";
 
-    // In production or for driver role: Always validate JWT via DB
+    const typeUpper = type?.toUpperCase();
+    const roleUpper = role?.toUpperCase();
+
+    // ADMIN: immer DB-Validierung, kein Dev-Fallback
+    if (typeUpper === "ADMIN" || roleUpper === "ADMIN" || roleUpper === "SUPER_ADMIN") {
+      if (!userId) {
+        throw new UnauthorizedException("Invalid admin token (missing sub)");
+      }
+      const admin = await this.prisma.admin.findUnique({ where: { id: userId } });
+      if (!admin) {
+        throw new UnauthorizedException("Admin not found");
+      }
+      return {
+        ...admin,
+        id: admin.id,
+        sub: admin.id,
+        email: admin.email ?? email,
+        role: roleUpper || String(admin.role).toUpperCase(),
+        type: "ADMIN",
+      };
+    }
+
+    // Andere Rollen: bisherige Logik beibehalten, inkl. Dev-Fallback
     const requireDbValidation =
       nodeEnv === "production" || !allowDevAuth || role === "driver";
     if (requireDbValidation) {
-      // Production mode: Always require valid JWT
       let user;
       try {
-        if (role === "admin") {
-          user = await this.prisma.admin.findUnique({ where: { id: userId } });
-        } else if (role === "restaurant") {
+        if (role === "restaurant") {
           user = await this.prisma.restaurant.findUnique({
             where: { id: userId },
           });
@@ -58,7 +84,18 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
           throw new UnauthorizedException("User not found");
         }
 
-        return { ...user, role };
+        return {
+          ...user,
+          id: user.id,
+          sub: user.id,
+          email: user.email ?? email,
+          role,
+          type: type ?? "CUSTOMER",
+          currentStatus:
+            role === "restaurant"
+              ? "ACTIVE"
+              : (user as { currentStatus?: string }).currentStatus,
+        };
       } catch (error) {
         this.logger.warn(
           `JWT validation failed for user ${userId}:`,
@@ -68,11 +105,13 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       }
     }
 
-    // Development mode: Skip DB for non-driver roles
+    // Development mode: Skip DB nur für Nicht-Admin-Rollen
     return {
-      id: userId || "dev-admin-123",
-      email: "admin@uberfoods.com",
-      role: role || "admin",
+      id: userId || "dev-user-123",
+      sub: userId || "dev-user-123",
+      email,
+      role: role || "customer",
+      type: type || "CUSTOMER",
       status: "ACTIVE",
       isActive: true,
     };

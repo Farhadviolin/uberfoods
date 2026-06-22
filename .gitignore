@@ -39,7 +39,7 @@ uploads/
 *.sqlite
 
 # Prisma
-backend/prisma/migrations/
+# Keep migrations tracked for CI/production; ignore only generated runtime artifacts elsewhere.
 
 # Coverage
 coverage/
@@ -61,10 +61,19 @@ deps_temp_*/
 # Temporary files
 *.tmp
 *.temp
+tmp.*.yml
+tmp.compose.effective.yml
+tmp.smoke.effective.yml
 
 # E2E artifacts and summaries
 tmp/summary-*.json
 artifacts/
+test-results/
+playwright-report/
+**/test-results/
+**/playwright-report/
+*.trace
+*.webm
 
 # Snyk Security Extension - AI Rules (auto-generated)
 .cursor/rules/snyk_rules.mdc

@@ -1,5 +1,11 @@
 import { defineConfig, devices } from '@playwright/test';
 
+const useSystemChrome = process.env.PLAYWRIGHT_USE_SYSTEM_CHROME === '1';
+const chromeDevice = {
+  ...devices['Desktop Chrome'],
+  ...(useSystemChrome ? { channel: 'chrome' as const } : {}),
+};
+
 export default defineConfig({
   testDir: './e2e',
   fullyParallel: false, // STRICT: Sequential for deterministic results
@@ -26,14 +32,17 @@ export default defineConfig({
     {
       name: 'setup',
       testMatch: 'auth.setup.ts',
-      use: { ...devices['Desktop Chrome'] },
+      use: {
+        ...chromeDevice,
+        video: 'off',
+      },
     },
 
     // Main test suite with authenticated sessions
     {
       name: 'chromium',
       use: {
-        ...devices['Desktop Chrome'],
+        ...chromeDevice,
         storageState: 'playwright/.auth/customer.json'
       },
       dependencies: ['setup'],
@@ -45,7 +54,7 @@ export default defineConfig({
       testDir: './e2e',
       testMatch: '**/*.customer.spec.ts',
       use: {
-        ...devices['Desktop Chrome'],
+        ...chromeDevice,
         // storageState: 'playwright/.auth/customer.json' // Disabled for E2E fix
       },
       // dependencies: ['setup'], // Disabled for E2E fix
@@ -56,7 +65,7 @@ export default defineConfig({
       testDir: './e2e',
       testMatch: '**/*.restaurant.spec.ts',
       use: {
-        ...devices['Desktop Chrome'],
+        ...chromeDevice,
         storageState: 'playwright/.auth/restaurant.json'
       },
       dependencies: ['setup'],
@@ -67,7 +76,7 @@ export default defineConfig({
       testDir: './e2e',
       testMatch: '**/*.driver.spec.ts',
       use: {
-        ...devices['Desktop Chrome'],
+        ...chromeDevice,
         storageState: 'playwright/.auth/driver.json'
       },
       dependencies: ['setup'],
@@ -78,7 +87,7 @@ export default defineConfig({
       testDir: './e2e',
       testMatch: '**/*.admin.spec.ts',
       use: {
-        ...devices['Desktop Chrome'],
+        ...chromeDevice,
         storageState: 'playwright/.auth/admin.json'
       },
       dependencies: ['setup'],
@@ -89,7 +98,7 @@ export default defineConfig({
       name: 'full-lifecycle',
       testDir: './e2e',
       testMatch: 'full-order-lifecycle.spec.ts',
-      use: { ...devices['Desktop Chrome'] },
+      use: { ...chromeDevice },
       dependencies: ['setup'], // Still depends on setup to ensure auth states exist
     },
 

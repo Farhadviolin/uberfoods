@@ -283,7 +283,7 @@ export function SupportTickets() {
           <Select
             label={t('supportTickets.priority')}
             value={formData.priority}
-            onChange={(value) => setFormData({ ...formData, priority: value as Ticket['priority'] })}
+            onChange={(event) => setFormData({ ...formData, priority: event.target.value as Ticket['priority'] })}
             options={[
               { value: 'low', label: t('supportTickets.priority.low') },
               { value: 'medium', label: t('supportTickets.priority.medium') },

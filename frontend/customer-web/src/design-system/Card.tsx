@@ -26,7 +26,7 @@ export const Card = forwardRef<HTMLDivElement, CardProps>(
           className
         )}
         whileHover={hover ? { y: -2, transition: { duration: 0.2 } } : {}}
-        {...props}
+        {...(props as any)}
       >
         {header && <div className="card-modern-header">{header}</div>}
         <div className="card-modern-body">{children}</div>

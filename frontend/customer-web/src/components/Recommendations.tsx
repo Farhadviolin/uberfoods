@@ -21,7 +21,7 @@ export function Recommendations() {
 
     // Analysiere Bestellhistorie
     const orderCounts = new Map<string, number>();
-    orders.forEach((order) => {
+    orders.forEach((order: { restaurant?: { id?: string } }) => {
       const restaurantId = order.restaurant?.id;
       if (restaurantId) {
         orderCounts.set(restaurantId, (orderCounts.get(restaurantId) || 0) + 1);

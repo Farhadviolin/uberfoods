@@ -50,6 +50,7 @@ export function Toast({
 
       return () => clearTimeout(timer);
     }
+    return undefined;
   }, [duration, onClose]);
 
   return (

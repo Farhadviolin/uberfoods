@@ -1,14 +1,15 @@
-// Unterstützt sowohl Vite (import.meta.env) als auch Jest/Node (process.env)
-const rawImport = (globalThis as any)["import"];
-const viteEnv = rawImport?.meta?.env ?? {
-  VITE_API_URL: process.env.VITE_API_URL || "http://localhost:3000",
+// Supports Vite in the browser and guarded process.env access in Jest/Node.
+const nodeEnv =
+  typeof process !== "undefined" && process.env ? process.env : {};
+const viteEnv = import.meta.env ?? {
+  VITE_API_URL: nodeEnv.VITE_API_URL || "http://localhost:3000",
   VITE_WS_URL:
-    process.env.VITE_WS_URL ||
-    process.env.VITE_API_URL ||
+    nodeEnv.VITE_WS_URL ||
+    nodeEnv.VITE_API_URL ||
     "http://localhost:3000",
-  VITE_APP_NAME: process.env.VITE_APP_NAME || "UberFoods Restaurant",
-  DEV: process.env.NODE_ENV !== "production",
-  PROD: process.env.NODE_ENV === "production",
+  VITE_APP_NAME: nodeEnv.VITE_APP_NAME || "UberFoods Restaurant",
+  DEV: nodeEnv.NODE_ENV !== "production",
+  PROD: nodeEnv.NODE_ENV === "production",
 };
 
 const validateUrl = (url: string, name: string) => {

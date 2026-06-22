@@ -2,8 +2,8 @@ import { motion, HTMLMotionProps } from 'framer-motion';
 import { tokens } from './tokens';
 import './Button.css';
 
-export type ButtonVariant = 'primary' | 'secondary' | 'success' | 'warning' | 'error' | 'ghost' | 'outline';
-export type ButtonSize = 'sm' | 'md' | 'lg';
+export type ButtonVariant = 'primary' | 'secondary' | 'success' | 'warning' | 'error' | 'danger' | 'ghost' | 'outline';
+export type ButtonSize = 'sm' | 'md' | 'lg' | 'small' | 'medium' | 'large';
 
 interface ButtonProps extends Omit<HTMLMotionProps<'button'>, 'size'> {
   variant?: ButtonVariant;
@@ -27,7 +27,9 @@ export function Button({
   disabled,
   ...props
 }: ButtonProps) {
-  const baseClasses = `btn btn-${variant} btn-${size} ${fullWidth ? 'btn-full-width' : ''} ${className}`;
+  const normalizedSize = size === 'small' ? 'sm' : size === 'medium' ? 'md' : size === 'large' ? 'lg' : size;
+  const normalizedVariant = variant === 'danger' ? 'error' : variant;
+  const baseClasses = `btn btn-${normalizedVariant} btn-${normalizedSize} ${fullWidth ? 'btn-full-width' : ''} ${className}`;
 
   return (
     <motion.button

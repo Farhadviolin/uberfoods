@@ -37,6 +37,21 @@ export class DriverEndpointsController {
     return this.getAvailableOrdersImpl();
   }
 
+  @Get("orders/active")
+  @ApiOperation({ summary: "Get active orders for driver" })
+  @ApiResponse({ status: 200, description: "Active orders retrieved" })
+  async getActiveOrders(): Promise<unknown> {
+    return this.getActiveOrdersImpl();
+  }
+
+  /** Alias for driver-app: GET /drivers/:driverId/orders/active (driverId from path; ignored for MVP) */
+  @Get(":driverId/orders/active")
+  @ApiOperation({ summary: "Get active orders (alias with driverId in path)" })
+  @ApiResponse({ status: 200, description: "Active orders retrieved" })
+  async getActiveOrdersByDriverId(@Param("driverId") _driverId: string): Promise<unknown> {
+    return this.getActiveOrdersImpl();
+  }
+
   private async getAvailableOrdersImpl(): Promise<unknown> {
     try {
       const orders = await this.prisma.order.findMany({
@@ -65,6 +80,38 @@ export class DriverEndpointsController {
       return orders;
     } catch (error) {
       this.logger.error(`Failed to get available orders: ${error.message}`);
+      throw error;
+    }
+  }
+
+  private async getActiveOrdersImpl(): Promise<unknown> {
+    try {
+      const orders = await this.prisma.order.findMany({
+        where: {
+          driverId: { not: null },
+          status: { in: ["ACCEPTED", "PICKED_UP", "IN_TRANSIT"] },
+        },
+        include: {
+          customer: {
+            select: { id: true, name: true, phone: true },
+          },
+          restaurant: {
+            select: { id: true, name: true, address: true },
+          },
+          items: {
+            include: {
+              dish: {
+                select: { id: true, name: true, price: true },
+              },
+            },
+          },
+        },
+        orderBy: { createdAt: "desc" },
+        take: 50,
+      });
+      return orders;
+    } catch (error) {
+      this.logger.error(`Failed to get active orders: ${error.message}`);
       throw error;
     }
   }

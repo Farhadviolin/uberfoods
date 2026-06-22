@@ -63,6 +63,7 @@ interface OptimizationQuery {
 interface AuthenticatedRequest {
   user?: {
     id: string;
+    sub?: string;
     email?: string;
     [key: string]: unknown;
   };
@@ -99,6 +100,13 @@ interface Order {
   id: string;
   priority?: string;
   [key: string]: unknown;
+}
+
+function normalizeStatusFilter(value: unknown): string | undefined {
+  if (Array.isArray(value)) {
+    return value.filter((item) => typeof item === "string").join(",");
+  }
+  return typeof value === "string" ? value : undefined;
 }
 
 interface PayPalOrder {
@@ -259,6 +267,7 @@ export class OrderController {
       customerId?: string;
       driverId?: string;
       status?: string;
+      "status[]"?: string | string[];
       // New cursor-based pagination
       cursor?: string;
       limit?: string;
@@ -268,6 +277,10 @@ export class OrderController {
     },
   ) {
     try {
+      const normalizedQuery = {
+        ...query,
+        status: normalizeStatusFilter(query.status ?? query["status[]"]),
+      };
       // Check if using new cursor-based pagination
       if (query.cursor !== undefined || query.direction !== undefined) {
         // Use new keyset pagination
@@ -281,7 +294,7 @@ export class OrderController {
           restaurantId: query.restaurantId,
           customerId: query.customerId,
           driverId: query.driverId,
-          status: query.status,
+          status: normalizedQuery.status,
         };
 
         const result = await this.orderService.findAllWithCursor(
@@ -302,7 +315,7 @@ export class OrderController {
         };
 
         const result = await this.orderService.findAll(
-          query,
+          normalizedQuery,
           paginationOptions,
         );
         return result;
@@ -332,6 +345,16 @@ export class OrderController {
         };
       }
     }
+  }
+
+  @Get("my")
+  @UseGuards(JwtAuthGuard)
+  async getCurrentCustomerOrders(@Request() req: AuthenticatedRequest) {
+    const customerId = req.user?.id || req.user?.sub;
+    if (!customerId) {
+      throw new BadRequestException("Customer ID not found");
+    }
+    return this.orderService.findAll({ customerId });
   }
 
   @Get("customer/my-orders")

@@ -95,7 +95,14 @@ export function Payment({ orderId, amount, onSuccess = () => {}, onCancel = () =
         await api.post(`/orders/${orderId}/payment`, requestData);
       } else {
         // Neue Zahlungsmethode
-        const requestData: { paymentMethod: string; cardNumber?: string; expiryDate?: string; cvv?: string; billingAddress?: string; email?: string } = {
+        const requestData: {
+          paymentMethod: string;
+          email?: string;
+          cardData?: typeof cardData;
+          sepaData?: typeof sepaData;
+          bankTransferData?: typeof bankTransferData;
+          sofortData?: Record<string, never>;
+        } = {
           paymentMethod: paymentMethod,
         };
         // E-Mail für Guest-Orders hinzufügen
@@ -380,7 +387,8 @@ export function Payment({ orderId, amount, onSuccess = () => {}, onCancel = () =
                   onClick={async () => {
                     try {
                       // Prüfe ob Apple Pay verfügbar ist
-                      if (!window.ApplePaySession || !window.ApplePaySession.canMakePayments()) {
+                      const ApplePaySessionCtor = window.ApplePaySession;
+                      if (!ApplePaySessionCtor || !ApplePaySessionCtor.canMakePayments()) {
                         setError(t('payment.applePayNotAvailable'));
                         return;
                       }
@@ -395,7 +403,7 @@ export function Payment({ orderId, amount, onSuccess = () => {}, onCancel = () =
                       const response = await api.post(`/orders/${orderId}/payment/apple-pay`, applePayData);
                       
                       if (response.data.paymentRequest) {
-                        const session = new window.ApplePaySession(3, response.data.paymentRequest);
+                        const session = new ApplePaySessionCtor(3, response.data.paymentRequest);
                         
                         session.onvalidatemerchant = async (event) => {
                           try {
@@ -423,10 +431,10 @@ export function Payment({ orderId, amount, onSuccess = () => {}, onCancel = () =
                               completeData.email = email;
                             }
                             await api.post(`/orders/${orderId}/payment/apple-pay/complete`, completeData);
-                            session.completePayment(window.ApplePaySession.STATUS_SUCCESS);
+                            session.completePayment(ApplePaySessionCtor.STATUS_SUCCESS);
                             onSuccess();
                           } catch (err) {
-                            session.completePayment(window.ApplePaySession.STATUS_FAILURE);
+                            session.completePayment(ApplePaySessionCtor.STATUS_FAILURE);
                             setError(t('payment.applePayPaymentError'));
                             setLoading(false);
                           }

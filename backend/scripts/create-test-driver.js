@@ -1,22 +1,16 @@
 const { PrismaClient } = require('@prisma/client');
-const { Pool } = require('pg');
-const { PrismaPg } = require('@prisma/adapter-pg');
 const bcrypt = require('bcrypt');
 
 async function createTestDriver() {
-  const databaseUrl = process.env.DATABASE_URL;
-  if (!databaseUrl) {
+  if (!process.env.DATABASE_URL) {
     throw new Error('DATABASE_URL environment variable is not set!');
   }
 
-  const pool = new Pool({ connectionString: databaseUrl });
-  const adapter = new PrismaPg(pool);
-  const prisma = new PrismaClient({
-    adapter,
-    log: ['error', 'warn'],
-  });
+  const prisma = new PrismaClient({ log: ['error', 'warn'] });
 
   try {
+    await prisma.$connect();
+
     const testDriverPassword = process.env.TEST_DRIVER_PASSWORD || 'password123';
 
     // Hash the password
@@ -36,12 +30,13 @@ async function createTestDriver() {
 
     console.log('Test driver created:', driver.id);
     console.log('Email: testdriver@example.com');
-    console.log('Password: password123');
-  } catch (error) {
-    console.error('Error creating test driver:', error);
+    console.log('Password: [configured test password]');
   } finally {
     await prisma.$disconnect();
   }
 }
 
-createTestDriver();
+createTestDriver().catch((error) => {
+  console.error('Failed to create test driver:', error);
+  process.exitCode = 1;
+});

@@ -49,6 +49,10 @@ interface OrderWithRelations {
   } | null;
   items?: Array<unknown>;
   metadata?: Record<string, unknown>;
+  assignmentLogs?: Array<{
+    driverId: string;
+    createdAt: Date;
+  }>;
 }
 
 interface OrderFilters {
@@ -56,6 +60,28 @@ interface OrderFilters {
   customerId?: string;
   driverId?: string;
   status?: string;
+}
+
+function normalizeStatusWhere(status?: string) {
+  if (!status) return undefined;
+  const statuses = status
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+  if (statuses.length === 0) return undefined;
+  return statuses.length === 1 ? statuses[0] : { in: statuses };
+}
+
+function applyAssignedDriverId<T extends { driverId?: string | null; assignmentLogs?: Array<{ driverId: string; createdAt: Date }> }>(
+  order: T,
+) {
+  return {
+    ...order,
+    driverId:
+      order.driverId ||
+      order.assignmentLogs?.[0]?.driverId ||
+      null,
+  };
 }
 
 interface OrderModifications {
@@ -109,7 +135,8 @@ export class OrderService {
     if (filters.restaurantId) where.restaurantId = filters.restaurantId;
     if (filters.customerId) where.customerId = filters.customerId;
     if (filters.driverId) where.driverId = filters.driverId;
-    if (filters.status) where.status = filters.status;
+    const normalizedStatus = normalizeStatusWhere(filters.status);
+    if (normalizedStatus) where.status = normalizedStatus;
 
     // Cursor-basierte Filter für Keyset Pagination
     if (cursor) {
@@ -377,7 +404,8 @@ export class OrderService {
     if (filters?.restaurantId) where.restaurantId = filters.restaurantId;
     if (filters?.customerId) where.customerId = filters.customerId;
     if (filters?.driverId) where.driverId = filters.driverId;
-    if (filters?.status) where.status = filters.status;
+    const normalizedStatus = normalizeStatusWhere(filters?.status);
+    if (normalizedStatus) where.status = normalizedStatus as any;
 
     try {
       const pagination = QueryOptimizer.normalizePagination(paginationOptions);
@@ -400,10 +428,27 @@ export class OrderService {
           createdAt: true,
           restaurantId: true,
           customerId: true,
+          driverId: true,
           priority: true,
           estimatedDeliveryTime: true,
+          customer: {
+            select: { id: true, name: true, email: true, phone: true },
+          },
           restaurant: {
             select: { id: true, name: true, imageUrl: true },
+          },
+          driver: {
+            select: { id: true, name: true, phone: true },
+          },
+          assignmentLogs: {
+            take: 1,
+            orderBy: { createdAt: "desc" },
+            select: { driverId: true, createdAt: true },
+          },
+          items: {
+            include: {
+              dish: { select: { name: true, price: true } },
+            },
           },
         },
       });
@@ -445,10 +490,27 @@ export class OrderService {
             createdAt: true,
             restaurantId: true,
             customerId: true,
+            driverId: true,
             priority: true,
             estimatedDeliveryTime: true,
+            customer: {
+              select: { id: true, name: true, email: true, phone: true },
+            },
             restaurant: {
               select: { id: true, name: true, imageUrl: true },
+            },
+            driver: {
+              select: { id: true, name: true, phone: true },
+            },
+            assignmentLogs: {
+              take: 1,
+              orderBy: { createdAt: "desc" },
+              select: { driverId: true, createdAt: true },
+            },
+            items: {
+              include: {
+                dish: { select: { name: true, price: true } },
+              },
             },
           },
         });
@@ -545,6 +607,11 @@ export class OrderService {
           driver: {
             select: { id: true, name: true, phone: true },
           },
+          assignmentLogs: {
+            take: 1,
+            orderBy: { createdAt: "desc" },
+            select: { driverId: true, createdAt: true },
+          },
         },
       });
 
@@ -560,7 +627,7 @@ export class OrderService {
       }
 
       const result: KeysetPaginationResult<OrderWithRelations> = {
-        data: data as unknown as OrderWithRelations[],
+        data: data.map((order) => applyAssignedDriverId(order)) as unknown as OrderWithRelations[],
         nextCursor,
         hasMore,
       };
@@ -607,6 +674,11 @@ export class OrderService {
         customer: true,
         restaurant: true,
         driver: true,
+        assignmentLogs: {
+          take: 1,
+          orderBy: { createdAt: "desc" },
+          select: { driverId: true, createdAt: true },
+        },
         items: {
           include: {
             dish: true,
@@ -622,8 +694,9 @@ export class OrderService {
     }
 
     // Cache for 1 minute (order details change frequently)
-    this.cacheService.set(cacheKey, order, 60000);
-    return order;
+    const normalizedOrder = applyAssignedDriverId(order);
+    this.cacheService.set(cacheKey, normalizedOrder, 60000);
+    return normalizedOrder;
   }
 
   async create(data: {

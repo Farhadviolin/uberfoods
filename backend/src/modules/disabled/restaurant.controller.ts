@@ -221,7 +221,7 @@ export class RestaurantController {
   @Throttle({ default: { limit: 20, ttl: 60000 } }) // 20 requests per minute for update operations
   @UseGuards(JwtAuthGuard)
   async update(@Param("id") id: string, @Body() data: UpdateRestaurantDto) {
-    return this.restaurantService.update(id, data);
+    return this.restaurantService.update(id, data as any);
   }
 
   @Delete(":id")
@@ -367,9 +367,13 @@ export class RestaurantController {
   @UseGuards(JwtAuthGuard)
   async updateCapacity(
     @Param("id") id: string,
-    @Body() body: { capacity?: number; [key: string]: unknown },
+    @Body()
+    body: { capacity?: number; maxCapacity?: number; currentCapacity?: number },
   ) {
-    return this.restaurantService.updateCapacity(id, body);
+    return this.restaurantService.updateCapacity(id, {
+      maxCapacity: body.maxCapacity ?? body.capacity ?? 0,
+      currentCapacity: body.currentCapacity,
+    });
   }
 
   @Post(":id/capacity/reserve")
@@ -610,7 +614,7 @@ export class RestaurantController {
             Object.assign(result, flatten(item, `${prefix}${key}[${index}].`));
           });
         } else if (typeof obj[key] === "object" && obj[key] !== null) {
-          Object.assign(result, flatten(obj[key], `${prefix}${key}.`));
+          Object.assign(result, flatten(obj[key] as CSVData, `${prefix}${key}.`));
         } else {
           result[`${prefix}${key}`] = obj[key];
         }

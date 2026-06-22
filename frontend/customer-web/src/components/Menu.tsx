@@ -15,7 +15,7 @@ interface Restaurant {
   id: string;
   name: string;
   description: string;
-  imageUrl: string;
+  imageUrl?: string;
   address: string;
   dishes: Dish[];
 }
@@ -25,7 +25,7 @@ interface Dish {
   name: string;
   description: string;
   price: number;
-  imageUrl: string;
+  imageUrl?: string | null;
   category: string;
   isAvailable: boolean;
 }
@@ -110,21 +110,30 @@ export function Menu() {
         address: '123 Main St, Berlin',
         dishes: [
           {
-            id: 'dish_001',
-            name: 'Margherita Pizza',
-            description: 'Classic pizza with tomatoes, mozzarella and basil',
-            price: 12.99,
+            id: 'dish-pizza-margherita',
+            name: 'Pizza Margherita',
+            description: 'Klassische Pizza mit Tomaten, Mozzarella und Basilikum',
+            price: 8.50,
             imageUrl: null,
             category: 'Pizza',
             isAvailable: true
           },
           {
-            id: 'dish_002',
-            name: 'Cheeseburger',
-            description: 'Juicy beef patty with cheese',
-            price: 10.99,
+            id: 'dish-pizza-pepperoni',
+            name: 'Pizza Pepperoni',
+            description: 'Scharfe Salami, Käse und Tomatensauce',
+            price: 10.50,
             imageUrl: null,
-            category: 'Burgers',
+            category: 'Pizza',
+            isAvailable: true
+          },
+          {
+            id: 'dish-pizza-hawaii',
+            name: 'Pizza Hawaii',
+            description: 'Schinken, Ananas und Käse',
+            price: 11.00,
+            imageUrl: null,
+            category: 'Pizza',
             isAvailable: true
           }
         ]

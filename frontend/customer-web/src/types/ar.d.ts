@@ -39,12 +39,22 @@ interface ApplePayPaymentAuthorizedEvent {
   payment: ApplePayPayment;
 }
 
+interface ApplePayValidateMerchantEvent {
+  validationURL: string;
+}
+
 interface ApplePaySession {
-  STATUS_SUCCESS: number;
-  STATUS_FAILURE: number;
   completePayment(status: number): void;
+  completeMerchantValidation(merchantSession: unknown): void;
   abort(): void;
+  begin(): void;
+  onvalidatemerchant: ((event: ApplePayValidateMerchantEvent) => void | Promise<void>) | null;
   onpaymentauthorized: (event: ApplePayPaymentAuthorizedEvent) => void | Promise<void>;
+}
+
+declare namespace ApplePayJS {
+  type ApplePayPayment = globalThis.ApplePayPayment;
+  type ApplePayPaymentAuthorizedEvent = globalThis.ApplePayPaymentAuthorizedEvent;
 }
 
 interface Window {

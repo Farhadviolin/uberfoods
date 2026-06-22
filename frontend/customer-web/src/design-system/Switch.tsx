@@ -6,15 +6,22 @@ import './Switch.css';
 export type SwitchSize = 'sm' | 'md' | 'lg';
 export type SwitchColor = 'primary' | 'success' | 'warning' | 'error';
 
-export interface SwitchProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 'size' | 'type'> {
+export interface SwitchProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 'size' | 'type' | 'onChange'> {
   size?: SwitchSize;
   color?: SwitchColor;
   label?: ReactNode;
   className?: string;
+  onChange?: InputHTMLAttributes<HTMLInputElement>['onChange'];
+  onCheckedChange?: (checked: boolean) => void;
 }
 
 export const Switch = forwardRef<HTMLInputElement, SwitchProps>(
-  ({ size = 'md', color = 'primary', label, className, checked, disabled, ...props }, ref) => {
+  ({ size = 'md', color = 'primary', label, className, checked, disabled, onChange, onCheckedChange, ...props }, ref) => {
+    const handleChange: React.ChangeEventHandler<HTMLInputElement> = (event) => {
+      onChange?.(event);
+      onCheckedChange?.(event.currentTarget.checked);
+    };
+
     return (
       <label
         className={clsx(
@@ -32,6 +39,7 @@ export const Switch = forwardRef<HTMLInputElement, SwitchProps>(
           className="switch-input"
           checked={checked}
           disabled={disabled}
+          onChange={handleChange}
           role="switch"
           aria-checked={checked}
           {...props}

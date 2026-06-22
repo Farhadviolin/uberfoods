@@ -47,7 +47,8 @@ export function sanitizeUrl(
     const privateHosts = ['localhost', '127.0.0.1', '0.0.0.0', '::1'];
 
     // In Production keine privaten Hosts oder abweichenden Hosts zulassen
-    if (globalThis.import?.meta?.env?.PROD) {
+    const importMetaEnv = (globalThis as any).import?.meta?.env;
+    if (importMetaEnv?.PROD) {
       if (
         privateHosts.includes(hostname) ||
         hostname.startsWith('192.168.') ||
@@ -70,7 +71,7 @@ export function sanitizeUrl(
     }
 
     // Optional: Whitelist externer Hosts per ENV oder Parameter
-    const allowedHostsEnv = globalThis.import?.meta?.env?.VITE_ALLOWED_EXTERNAL_HOSTS || '';
+    const allowedHostsEnv = importMetaEnv?.VITE_ALLOWED_EXTERNAL_HOSTS || '';
     const envHosts = allowedHostsEnv.split(',').map((h: string) => h.trim().toLowerCase()).filter(Boolean);
     const hostWhitelist = allowedHosts && allowedHosts.length > 0 ? allowedHosts.map(h => h.toLowerCase()) : envHosts;
     if (hostWhitelist.length > 0 && hostWhitelist.includes(hostname)) {

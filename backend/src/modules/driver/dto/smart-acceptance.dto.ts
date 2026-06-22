@@ -11,6 +11,28 @@ import {
 } from "class-validator";
 import { Type } from "class-transformer";
 
+export class AcceptanceScoreDto {
+  @IsNumber()
+  @Min(0)
+  @Max(100)
+  earnings: number;
+
+  @IsNumber()
+  @Min(0)
+  @Max(100)
+  distance: number;
+
+  @IsNumber()
+  @Min(0)
+  @Max(100)
+  rating: number;
+
+  @IsNumber()
+  @Min(0)
+  @Max(100)
+  time: number;
+}
+
 export class SmartAcceptanceSettingsDto {
   @IsBoolean()
   enabled: boolean;
@@ -42,28 +64,6 @@ export class SmartAcceptanceSettingsDto {
   @ValidateNested()
   @Type(() => AcceptanceScoreDto)
   acceptanceScore: AcceptanceScoreDto;
-}
-
-export class AcceptanceScoreDto {
-  @IsNumber()
-  @Min(0)
-  @Max(100)
-  earnings: number;
-
-  @IsNumber()
-  @Min(0)
-  @Max(100)
-  distance: number;
-
-  @IsNumber()
-  @Min(0)
-  @Max(100)
-  rating: number;
-
-  @IsNumber()
-  @Min(0)
-  @Max(100)
-  time: number;
 }
 
 export class SmartAcceptanceResponseDto {

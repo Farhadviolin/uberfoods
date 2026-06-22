@@ -14,7 +14,7 @@ function getImportMetaEnv(): any {
     return import.meta?.env ?? {};
   } catch {
     // Fallback for Node.js/CommonJS environments (Jest, etc.)
-    return process?.env ?? {};
+    return typeof process !== 'undefined' ? process.env : {};
   }
 }
 

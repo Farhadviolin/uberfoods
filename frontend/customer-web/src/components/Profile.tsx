@@ -7,7 +7,7 @@ import './Profile.css';
 
 export function Profile() {
   const { t } = useTranslation();
-  const { user, logout } = useAuth();
+  const { user, logout, updateUser } = useAuth();
   const [formData, setFormData] = useState({
     name: user?.name || '',
     phone: user?.phone || '',
@@ -34,10 +34,51 @@ export function Profile() {
     setLoading(true);
 
     try {
-      await api.put(`/customers/${user?.id}`, formData);
+      const response = await api.put('/customers/profile', {
+        ...formData,
+        userId: user?.id,
+      });
+
+      const savedCustomer = response.data as Partial<{
+        id: string;
+        email: string;
+        name: string;
+        phone: string;
+        address?: string | null;
+        role?: string;
+        token?: string;
+        accessToken?: string;
+        refreshToken?: string;
+      }>;
+
+      let storedCustomer: Record<string, unknown> = {};
+      try {
+        const storedCustomerRaw = window.localStorage.getItem('customer_user');
+        storedCustomer = storedCustomerRaw ? JSON.parse(storedCustomerRaw) as Record<string, unknown> : {};
+      } catch {
+        storedCustomer = {};
+      }
+
+      const normalizedSavedAddress =
+        typeof savedCustomer.address === 'string' && savedCustomer.address.trim().length > 0
+          ? savedCustomer.address.trim()
+          : typeof formData.address === 'string' && formData.address.trim().length > 0
+            ? formData.address.trim()
+            : typeof storedCustomer.address === 'string'
+              ? storedCustomer.address.trim()
+              : '';
+
+      const nextCustomerUser = {
+        ...storedCustomer,
+        ...savedCustomer,
+        address: normalizedSavedAddress,
+      };
+
+      updateUser(nextCustomerUser as Partial<{ name: string; phone: string; address?: string }>);
+      window.localStorage.setItem('customer_user', JSON.stringify(nextCustomerUser));
+      window.localStorage.setItem('customer_profile_address', normalizedSavedAddress);
+      window.localStorage.setItem('customer_profile_address_backup', normalizedSavedAddress);
       setSuccess(t('profile.updateSuccess'));
-      // Reload user data
-      window.location.reload();
     } catch (err: unknown) {
       const axiosError = err as { response?: { data?: { message?: string } } };
       setError(axiosError.response?.data?.message || t('profile.updateError'));
@@ -81,6 +122,7 @@ export function Profile() {
             <label>{t('auth.name')}</label>
             <input
               type="text"
+              data-testid="profile-name-input"
               value={formData.name}
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
               required
@@ -102,6 +144,7 @@ export function Profile() {
             <label>{t('auth.phone')}</label>
             <input
               type="tel"
+              data-testid="profile-phone-input"
               value={formData.phone}
               onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
               required
@@ -112,13 +155,14 @@ export function Profile() {
             <label>{t('profile.address')}</label>
             <input
               type="text"
+              data-testid="profile-address-input"
               value={formData.address}
               onChange={(e) => setFormData({ ...formData, address: e.target.value })}
               placeholder={t('auth.addressPlaceholder')}
             />
           </div>
 
-          <button type="submit" disabled={loading} className="save-button">
+          <button type="submit" data-testid="profile-save-button" disabled={loading} className="save-button">
             {loading ? t('profile.saving') : t('profile.save')}
           </button>
         </form>

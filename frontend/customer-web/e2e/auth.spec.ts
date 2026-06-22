@@ -1,12 +1,12 @@
-import { test, expect } from './test-helpers';
+import { test, expect, testUsers } from './test-helpers';
 
 test.describe('Authentication', () => {
   test('should allow user to login', async ({ page }) => {
     await page.goto('/login');
 
     // Fill login form
-    await page.fill('[data-testid="email-input"]', 'test@example.com');
-    await page.fill('[data-testid="password-input"]', 'password123');
+    await page.fill('[data-testid="email-input"]', testUsers.customer.email);
+    await page.fill('[data-testid="password-input"]', testUsers.customer.password);
 
     // Submit form
     await page.click('[data-testid="login-button"]');
@@ -79,8 +79,8 @@ test.describe('Authentication', () => {
   test('should persist login state', async ({ page, context }) => {
     // Login first
     await page.goto('/login');
-    await page.fill('[data-testid="email-input"]', 'test@example.com');
-    await page.fill('[data-testid="password-input"]', 'password123');
+    await page.fill('[data-testid="email-input"]', testUsers.customer.email);
+    await page.fill('[data-testid="password-input"]', testUsers.customer.password);
     await page.click('[data-testid="login-button"]');
     await expect(page).toHaveURL('/dashboard');
 

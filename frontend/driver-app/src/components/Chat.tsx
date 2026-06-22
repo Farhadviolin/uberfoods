@@ -182,7 +182,7 @@ export function Chat({ order, onClose }: ChatProps) {
 
   const sendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newMessage.trim() || !driver || !socket) return;
+    if (!newMessage.trim() || !driver) return;
 
     // Client-side validation
     const trimmedMessage = newMessage.trim();
@@ -196,7 +196,7 @@ export function Chat({ order, onClose }: ChatProps) {
 
     try {
       // Try WebSocket first (real-time, faster)
-      if (socket.connected) {
+      if (socket?.connected) {
         // Set up error handler for this specific message
         const errorHandler = (error: any) => {
           const errorMessage = error.message || 'Unbekannter Fehler';
@@ -399,6 +399,7 @@ export function Chat({ order, onClose }: ChatProps) {
           }}
           placeholder={t('chat.placeholder')}
           className="chat-input"
+          data-testid="chat-message-input"
           disabled={loading}
           maxLength={5000}
         />
@@ -407,7 +408,7 @@ export function Chat({ order, onClose }: ChatProps) {
             {newMessage.length} / 5000 {t('chat.characters')}
           </div>
         )}
-        <button type="submit" className="chat-send" disabled={!newMessage.trim() || loading || newMessage.length > 5000}>
+        <button type="submit" className="chat-send" data-testid="chat-send-button" disabled={!newMessage.trim() || loading || newMessage.length > 5000}>
           📤
         </button>
       </form>

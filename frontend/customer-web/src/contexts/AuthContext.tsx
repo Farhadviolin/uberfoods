@@ -1,5 +1,12 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import api from '../utils/api';
+import {
+  CUSTOMER_PROFILE_ADDRESS_KEYS,
+  extractAddressString,
+  mergeCustomerUserWithPreservedAddress,
+  parseMaybeJson,
+  readStoredCustomerProfileAddress as readStoredCustomerProfileAddressValue,
+} from '../utils/address';
 
 interface User {
   id: string;
@@ -14,12 +21,68 @@ interface InitialAuthState {
   token: string | null;
 }
 
+function normalizeAuthPayload(payload: unknown) {
+  const data = (payload as { data?: unknown })?.data ?? payload ?? {};
+  const normalizedData = data as Record<string, unknown>;
+  const accessToken =
+    (normalizedData.access_token as string | undefined)
+    ?? (normalizedData.accessToken as string | undefined)
+    ?? (normalizedData.token as string | undefined)
+    ?? null;
+  const refreshToken =
+    (normalizedData.refresh_token as string | undefined)
+    ?? (normalizedData.refreshToken as string | undefined)
+    ?? null;
+  const user = (normalizedData.user as User | undefined) ?? {
+    id: normalizedData.id as string,
+    email: normalizedData.email as string,
+    name: normalizedData.name as string,
+    phone: normalizedData.phone as string,
+    address: normalizedData.address as string | undefined,
+  };
+
+  return { accessToken, refreshToken, user };
+}
+
+function normalizeStoredAddress(value: unknown): string | undefined {
+  const parsed = parseMaybeJson(value);
+  const extracted = extractAddressString(parsed);
+  return extracted.length > 0 ? extracted : undefined;
+}
+
+function readStoredCustomerProfileAddress(): string | undefined {
+  const storedAddress = readStoredCustomerProfileAddressValue();
+  return storedAddress.length > 0 ? storedAddress : undefined;
+}
+
+function persistCustomerProfileAddress(address: string | undefined) {
+  if (typeof address === 'string' && address.trim().length > 0) {
+    const normalized = address.trim();
+    for (const key of CUSTOMER_PROFILE_ADDRESS_KEYS) {
+      localStorage.setItem(key, normalized);
+    }
+    return;
+  }
+
+  const existingProfileAddress = readStoredCustomerProfileAddress();
+  if (!existingProfileAddress) {
+    for (const key of CUSTOMER_PROFILE_ADDRESS_KEYS) {
+      localStorage.removeItem(key);
+    }
+  }
+}
+
+function mergeCustomerUserForStorage(previousUser: unknown, nextUser: unknown) {
+  return mergeCustomerUserWithPreservedAddress(previousUser, nextUser);
+}
+
 interface AuthContextType {
   user: User | null;
   token: string | null;
   login: (email: string, password: string) => Promise<void>;
   register: (email: string, password: string, name: string, phone: string, address?: string) => Promise<void>;
   logout: () => void;
+  updateUser: (updates: Partial<User>) => void;
   isAuthenticated: boolean;
   loading: boolean;
 }
@@ -34,9 +97,21 @@ export function AuthProvider({ children, initialAuthState }: { children: ReactNo
   function logout() {
     localStorage.removeItem('customer_token');
     localStorage.removeItem('customer_user');
+    for (const key of CUSTOMER_PROFILE_ADDRESS_KEYS) {
+      localStorage.removeItem(key);
+    }
     delete api.defaults.headers.common['Authorization'];
     setToken(null);
     setUser(null);
+  }
+
+  function updateUser(updates: Partial<User>) {
+    setUser((current) => {
+      const nextUser = mergeCustomerUserForStorage(current, updates) as User;
+      localStorage.setItem('customer_user', JSON.stringify(nextUser));
+      persistCustomerProfileAddress(nextUser.address);
+      return nextUser;
+    });
   }
 
   useEffect(() => {
@@ -49,6 +124,7 @@ export function AuthProvider({ children, initialAuthState }: { children: ReactNo
       }
       if (initialAuthState.user) {
         localStorage.setItem('customer_user', JSON.stringify(initialAuthState.user));
+        persistCustomerProfileAddress(initialAuthState.user.address);
       }
       setLoading(false);
       return;
@@ -65,14 +141,20 @@ export function AuthProvider({ children, initialAuthState }: { children: ReactNo
             api.defaults.headers.common['Authorization'] = `Bearer ${storedToken}`;
           }
           const response = await api.get('/auth/customer/me');
+          const storedUserData = JSON.parse(storedUser) as Partial<User> | null;
+          const normalized = normalizeAuthPayload(response.data);
+          const mergedUser = mergeCustomerUserForStorage(storedUserData, normalized.user) as User;
           
           // Token ist gültig - setze User und Token
           setToken(storedToken);
-          setUser(response.data);
+          setUser(mergedUser);
+          localStorage.setItem('customer_user', JSON.stringify(mergedUser));
+          persistCustomerProfileAddress(mergedUser.address);
         } catch (error) {
           // Token ist ungültig oder abgelaufen - entferne ungültige Daten
           localStorage.removeItem('customer_token');
           localStorage.removeItem('customer_user');
+          localStorage.removeItem('customer_profile_address');
       if (api?.defaults?.headers?.common) {
         delete api.defaults.headers.common['Authorization'];
       }
@@ -97,15 +179,17 @@ export function AuthProvider({ children, initialAuthState }: { children: ReactNo
         password,
       });
 
-      const { access_token, ...userData } = response.data;
+      const { accessToken, user } = normalizeAuthPayload(response.data);
+      const mergedUser = mergeCustomerUserForStorage(localStorage.getItem('customer_user'), user) as User;
       
-      localStorage.setItem('customer_token', access_token);
-      localStorage.setItem('customer_user', JSON.stringify(userData));
+      localStorage.setItem('customer_token', accessToken ?? '');
+      localStorage.setItem('customer_user', JSON.stringify(mergedUser));
+      persistCustomerProfileAddress(mergedUser.address);
       
-      setToken(access_token);
-      setUser(userData);
+      setToken(accessToken);
+      setUser(mergedUser);
       if (api?.defaults?.headers?.common) {
-        api.defaults.headers.common['Authorization'] = `Bearer ${access_token}`;
+        api.defaults.headers.common['Authorization'] = `Bearer ${accessToken}`;
       }
     } catch (error: unknown) {
       const axiosError = error as { response?: { data?: { message?: string } } };
@@ -123,15 +207,17 @@ export function AuthProvider({ children, initialAuthState }: { children: ReactNo
         address,
       });
 
-      const { access_token, ...userData } = response.data;
+      const { accessToken, user } = normalizeAuthPayload(response.data);
+      const mergedUser = mergeCustomerUserForStorage(localStorage.getItem('customer_user'), user) as User;
       
-      localStorage.setItem('customer_token', access_token);
-      localStorage.setItem('customer_user', JSON.stringify(userData));
+      localStorage.setItem('customer_token', accessToken ?? '');
+      localStorage.setItem('customer_user', JSON.stringify(mergedUser));
+      persistCustomerProfileAddress(mergedUser.address);
       
-      setToken(access_token);
-      setUser(userData);
+      setToken(accessToken);
+      setUser(mergedUser);
       if (api?.defaults?.headers?.common) {
-        api.defaults.headers.common['Authorization'] = `Bearer ${access_token}`;
+        api.defaults.headers.common['Authorization'] = `Bearer ${accessToken}`;
       }
     } catch (error: unknown) {
       const axiosError = error as { response?: { data?: { message?: string } } };
@@ -147,6 +233,7 @@ export function AuthProvider({ children, initialAuthState }: { children: ReactNo
         login,
         register,
         logout,
+        updateUser,
         isAuthenticated: !!token,
         loading,
       }}
@@ -166,6 +253,7 @@ export function useAuth() {
       login: async () => {},
       register: async () => {},
       logout: () => {},
+      updateUser: () => {},
       isAuthenticated: false,
       loading: false,
     };

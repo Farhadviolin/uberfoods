@@ -2,6 +2,7 @@ import { test, expect } from '@playwright/test';
 
 test.describe('Offline-Funktionalität', () => {
   test.beforeEach(async ({ page }) => {
+    await page.context().setOffline(false);
     await page.goto('/');
     await page.evaluate(() => {
       localStorage.setItem('driver_token', 'mock-token');
@@ -14,14 +15,22 @@ test.describe('Offline-Funktionalität', () => {
     await page.reload();
   });
 
-  test('zeigt Offline-Indikator bei Netzwerkausfall', async ({ page }) => {
-    // Simuliere Offline-Status
-    await page.context().setOffline(true);
+  test.afterEach(async ({ context }) => {
+    await context.setOffline(false);
+  });
 
+  test('zeigt Offline-Indikator bei Netzwerkausfall', async ({ page }) => {
     await page.goto('/');
+    await expect(page.getByTestId('driver-dashboard')).toBeVisible();
+    // Simuliere Offline-Status erst nach erfolgreichem Laden der App
+    await page.context().setOffline(true);
+    await page.evaluate(() => {
+      window.dispatchEvent(new Event('offline'));
+    });
     
     // Warte auf Offline-Indikator
-    await expect(page.getByText(/offline|keine verbindung/i)).toBeVisible({ timeout: 5000 });
+    await expect(page.locator('.offline-indicator.offline')).toBeVisible({ timeout: 5000 });
+    await expect(page.locator('.offline-indicator.offline .offline-text').first()).toContainText(/offline/i);
   });
 
   test('queued Requests bei Offline-Status', async ({ page }) => {
@@ -31,8 +40,6 @@ test.describe('Offline-Funktionalität', () => {
     });
 
     await page.goto('/');
-    
-    // Setze Offline
     await page.context().setOffline(true);
 
     // Versuche Bestellung zu akzeptieren (wird gequeued)
@@ -46,12 +53,18 @@ test.describe('Offline-Funktionalität', () => {
   });
 
   test('synchronisiert Requests bei Wiederverbindung', async ({ page }) => {
-    // Starte offline
-    await page.context().setOffline(true);
     await page.goto('/');
+    await expect(page.getByTestId('driver-dashboard')).toBeVisible();
+    await page.context().setOffline(true);
+    await page.evaluate(() => {
+      window.dispatchEvent(new Event('offline'));
+    });
 
     // Setze wieder online
     await page.context().setOffline(false);
+    await page.evaluate(() => {
+      window.dispatchEvent(new Event('online'));
+    });
 
     // Warte auf Sync (wird automatisch durch offlineService getriggert)
     await page.waitForTimeout(2000);

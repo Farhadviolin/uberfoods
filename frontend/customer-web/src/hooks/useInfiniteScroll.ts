@@ -98,8 +98,9 @@ export function useInfiniteScroll(
         observerRef.current = null;
       }
       // Cleanup dummy element if it was created
-      if (elementRef.current && elementRef.current.parentNode === document.body && elementRef.current.style.display === 'none') {
-        document.body.removeChild(elementRef.current);
+      const element = elementRef.current as HTMLElement | null;
+      if (element && element.parentNode === document.body && element.style.display === 'none') {
+        document.body.removeChild(element);
       }
     };
   }, [threshold, rootMargin, enabled]);

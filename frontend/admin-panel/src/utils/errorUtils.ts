@@ -137,7 +137,7 @@ export const logError = (error: AppError | Error, context?: string): void => {
   }
 
   // In production, send to error monitoring service
-  if (process.env.NODE_ENV === 'production') {
+  if (typeof process !== 'undefined' && process.env.NODE_ENV === 'production') {
     // Send to monitoring service (Sentry, etc.)
     // This would be implemented based on your monitoring setup
   }

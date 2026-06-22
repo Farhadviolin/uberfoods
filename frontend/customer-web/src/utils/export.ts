@@ -93,7 +93,7 @@ export const exportToExcel = async <T extends Record<string, unknown>>(data: T[]
   // Auto-fit columns
   worksheet.columns.forEach(column => {
     let maxLength = 0;
-    column.eachCell({ includeEmpty: true }, cell => {
+    column.eachCell?.({ includeEmpty: true }, cell => {
       const cellValue = cell.value?.toString() || '';
       if (cellValue.length > maxLength) {
         maxLength = cellValue.length;

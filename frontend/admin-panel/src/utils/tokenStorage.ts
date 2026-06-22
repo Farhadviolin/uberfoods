@@ -7,7 +7,7 @@ function getImportMetaEnv(): any {
     return (globalThis as any).import.meta.env;
   }
   // Fallback for Node.js/CommonJS environments (Jest, etc.)
-  return process?.env ?? {};
+  return typeof process !== 'undefined' ? process.env : {};
 }
 
 const APP_KEY_PREFIX = getImportMetaEnv().VITE_STORAGE_PREFIX ?? 'uberfoods';

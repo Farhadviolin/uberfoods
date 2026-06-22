@@ -6,6 +6,13 @@ import { logError } from '../utils/errorReporting';
 import './SocialLogin.css';
 
 interface GoogleAuth {
+  load: (module: string, callback: () => void) => void;
+  auth2: {
+    init: (config: { client_id: string; scope?: string }) => void;
+    getAuthInstance: () => {
+      signIn: () => Promise<{ getAuthResponse: () => { id_token: string } }>;
+    };
+  };
   accounts: {
     oauth2: {
       initTokenClient: (config: { client_id: string; scope: string; callback: (response: { access_token: string }) => void }) => {
@@ -16,6 +23,7 @@ interface GoogleAuth {
 }
 
 interface FacebookSDK {
+  init: (config: { appId: string; cookie: boolean; xfbml: boolean; version: string }) => void;
   login: (callback: (response: { authResponse?: { accessToken: string } }) => void, options: { scope: string }) => void;
   api: (path: string, params: Record<string, string>, callback: (userInfo: { id: string; name: string; email?: string; picture?: { data?: { url?: string } } }) => void) => void;
 }
@@ -59,7 +67,7 @@ export function SocialLogin() {
       // Trigger login in context
       window.location.reload();
     } catch (error) {
-      logError(error, { component: 'SocialLogin', action: 'handleGoogleLogin', provider: 'google' });
+      logError(error, { component: 'SocialLogin', action: 'handleGoogleLogin', metadata: { provider: 'google' } });
       alert(t('auth.socialLoginFailed') || 'Social Login fehlgeschlagen');
     } finally {
       setLoading(null);
@@ -94,7 +102,7 @@ export function SocialLogin() {
               
               window.location.reload();
             } catch (error) {
-              logError(error, { component: 'SocialLogin', action: 'handleFacebookLogin', provider: 'facebook' });
+              logError(error, { component: 'SocialLogin', action: 'handleFacebookLogin', metadata: { provider: 'facebook' } });
               alert(t('auth.socialLoginFailed') || 'Social Login fehlgeschlagen');
             } finally {
               setLoading(null);
@@ -105,7 +113,7 @@ export function SocialLogin() {
         }
       }, { scope: 'email,public_profile' });
     } catch (error) {
-      logError(error, { component: 'SocialLogin', action: 'handleFacebookLogin', provider: 'facebook' });
+      logError(error, { component: 'SocialLogin', action: 'handleFacebookLogin', metadata: { provider: 'facebook' } });
       setLoading(null);
     }
   };
@@ -118,7 +126,7 @@ export function SocialLogin() {
       alert(t('auth.appleLoginNotAvailable') || 'Apple Login ist derzeit nicht verfügbar');
       setLoading(null);
     } catch (error) {
-      logError(error, { component: 'SocialLogin', action: 'handleAppleLogin', provider: 'apple' });
+      logError(error, { component: 'SocialLogin', action: 'handleAppleLogin', metadata: { provider: 'apple' } });
       setLoading(null);
     }
   };
@@ -192,7 +200,7 @@ function loadFacebookScript(): Promise<void> {
     window.fbAsyncInit = () => {
       const appId = import.meta.env.VITE_FACEBOOK_APP_ID;
       if (appId) {
-        window.FB.init({
+        window.FB?.init({
           appId,
           cookie: true,
           xfbml: true,

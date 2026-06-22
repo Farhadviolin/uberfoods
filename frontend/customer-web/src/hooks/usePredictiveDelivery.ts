@@ -26,12 +26,18 @@ export interface DeliveryPrediction {
 export interface DeliveryPattern {
   restaurantId: string;
   restaurantName: string;
+  restaurant?: string;
   totalOrders: number;
   averageEstimatedTime: number;
   averageActualTime: number;
+  averageDeliveryTime?: number;
+  bestDeliveryTime?: string;
+  peakHours?: number[];
   accuracy: number;
   reliability: string;
 }
+
+export type HistoricalPattern = DeliveryPattern;
 
 export interface PredictDeliveryData {
   restaurantId: string;
@@ -76,7 +82,14 @@ export function useDeliveryPatterns() {
       }
       try {
         const response = await api.get('/analytics/delivery-patterns');
-        return response.data as DeliveryPattern[];
+        const patterns = response.data as DeliveryPattern[];
+        return patterns.map((pattern) => ({
+          ...pattern,
+          restaurant: pattern.restaurant ?? pattern.restaurantName,
+          averageDeliveryTime: pattern.averageDeliveryTime ?? pattern.averageActualTime ?? pattern.averageEstimatedTime,
+          bestDeliveryTime: pattern.bestDeliveryTime ?? pattern.reliability,
+          peakHours: pattern.peakHours ?? [],
+        }));
       } catch (error: unknown) {
         const axiosError = error as AxiosErrorWithResponse;
         if (axiosError.response?.status === 401 || axiosError.response?.status === 403) {

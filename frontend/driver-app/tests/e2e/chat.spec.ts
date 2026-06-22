@@ -3,8 +3,7 @@ import { test, expect } from '@playwright/test';
 test.describe('Chat-Funktionalität', () => {
   test.beforeEach(async ({ page }) => {
     // Mock Login
-    await page.goto('/');
-    await page.evaluate(() => {
+    await page.addInitScript(() => {
       localStorage.setItem('driver_token', 'mock-token');
       localStorage.setItem('driver_user', JSON.stringify({
         id: 'driver-123',
@@ -12,19 +11,18 @@ test.describe('Chat-Funktionalität', () => {
         email: 'driver@test.com',
       }));
     });
-    await page.reload();
   });
 
   test('öffnet Chat für Bestellung', async ({ page }) => {
-    await page.route('**/api/orders/driver/driver-123', async (route) => {
+    await page.route('**/api/drivers/driver-123/orders/available', async (route) => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify([
           {
             id: 'order-1',
-            status: 'IN_TRANSIT',
-            driverId: 'driver-123',
+            status: 'READY_FOR_PICKUP',
+            driverId: null,
             totalAmount: 25.50,
             restaurant: { name: 'Test Restaurant', address: 'Test St. 1' },
             customer: { name: 'Test Customer', phone: '+49123456789' },
@@ -45,24 +43,25 @@ test.describe('Chat-Funktionalität', () => {
     });
 
     await page.goto('/');
+    await expect(page.getByTestId('driver-dashboard')).toBeVisible();
     await page.waitForSelector('text=Test Restaurant', { timeout: 5000 });
 
     const chatButton = page.getByRole('button', { name: /chat/i }).first();
     await chatButton.click();
 
-    await expect(page.getByPlaceholderText(/chat.placeholder/i)).toBeVisible();
+    await expect(page.getByTestId('chat-message-input')).toBeVisible();
   });
 
   test('sendet Chat-Nachricht', async ({ page }) => {
-    await page.route('**/api/orders/driver/driver-123', async (route) => {
+    await page.route('**/api/drivers/driver-123/orders/available', async (route) => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify([
           {
             id: 'order-1',
-            status: 'IN_TRANSIT',
-            driverId: 'driver-123',
+            status: 'READY_FOR_PICKUP',
+            driverId: null,
             totalAmount: 25.50,
             restaurant: { name: 'Test Restaurant', address: 'Test St. 1' },
             customer: { name: 'Test Customer', phone: '+49123456789' },
@@ -90,16 +89,35 @@ test.describe('Chat-Funktionalität', () => {
       }
     });
 
+    await page.route('**/api/chat/message', async (route) => {
+      if (route.request().method() === 'POST') {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            id: 'chat-message-1',
+            orderId: 'order-1',
+            senderId: 'driver-123',
+            senderType: 'driver',
+            message: 'Test message',
+            timestamp: new Date().toISOString(),
+            read: false,
+          }),
+        });
+      }
+    });
+
     await page.goto('/');
+    await expect(page.getByTestId('driver-dashboard')).toBeVisible();
     await page.waitForSelector('text=Test Restaurant', { timeout: 5000 });
 
     const chatButton = page.getByRole('button', { name: /chat/i }).first();
     await chatButton.click();
 
-    const messageInput = page.getByPlaceholderText(/chat.placeholder/i);
+    const messageInput = page.getByTestId('chat-message-input');
     await messageInput.fill('Test message');
 
-    const sendButton = page.getByRole('button', { name: /chat.send/i });
+    const sendButton = page.getByTestId('chat-send-button');
     await sendButton.click();
 
     await expect(messageInput).toHaveValue('');

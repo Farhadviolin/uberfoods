@@ -1,6 +1,12 @@
+import { existsSync } from 'node:fs';
 import { defineConfig, devices } from '@playwright/test';
 
 const ORCH = process.env.E2E_ORCHESTRATED === '1';
+const ciChromiumExecutablePath =
+  process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH ||
+  (process.env.CI && existsSync('/usr/bin/google-chrome')
+    ? '/usr/bin/google-chrome'
+    : undefined);
 
 export default defineConfig({
   testDir: './e2e',
@@ -8,7 +14,7 @@ export default defineConfig({
     baseURL: 'http://127.0.0.1:3002',
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
-    video: 'retain-on-failure',
+    video: 'off',
   },
   webServer: ORCH
     ? undefined
@@ -26,5 +32,15 @@ export default defineConfig({
           reuseExistingServer: !process.env.CI,
         },
       ],
-  projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
+  projects: [
+    {
+      name: 'chromium',
+      use: {
+        ...devices['Desktop Chrome'],
+        launchOptions: ciChromiumExecutablePath
+          ? { executablePath: ciChromiumExecutablePath }
+          : undefined,
+      },
+    },
+  ],
 });

@@ -1,7 +1,8 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../contexts/AuthContext';
+import { useCart } from '../contexts/CartContext';
 import { useGeocodeAddress } from '../hooks/useGeocoding';
 import api from '../utils/api';
 import { Payment } from './Payment';
@@ -9,6 +10,10 @@ import { PromoCodeInput } from './PromoCodeInput';
 import { extractErrorMessage } from '../utils/errorHandler';
 import { logDebug } from '../utils/errorReporting';
 import { handleKeyboardButton } from '../utils/accessibility';
+import {
+  CUSTOMER_PROFILE_ADDRESS_KEYS,
+  resolveCheckoutAddressFromStorage,
+} from '../utils/address';
 import './Cart.css';
 
 interface Dish {
@@ -34,10 +39,10 @@ interface CartItem {
 }
 
 interface CartProps {
-  cart: CartItem[];
-  restaurant: Restaurant;
-  updateQuantity: (dishId: string, quantity: number) => void;
-  onClearCart: () => void;
+  cart?: CartItem[];
+  restaurant?: Restaurant;
+  updateQuantity?: (dishId: string, quantity: number) => void;
+  onClearCart?: () => void;
 }
 
 export function Cart({ cart, restaurant, updateQuantity, onClearCart }: CartProps) {
@@ -64,7 +69,49 @@ export function Cart({ cart, restaurant, updateQuantity, onClearCart }: CartProp
     address: '',
   });
   const { user } = useAuth();
+  const cartContext = useCart();
   const navigate = useNavigate();
+
+  const markCheckoutProbe = useCallback((patch: Record<string, unknown>) => {
+    if (typeof window === 'undefined') return;
+    const probe = (window as unknown as { __checkoutSubmitProbe?: Record<string, unknown> }).__checkoutSubmitProbe;
+    if (!probe) return;
+    (window as unknown as { __checkoutSubmitProbe?: Record<string, unknown> }).__checkoutSubmitProbe = {
+      ...probe,
+      ...patch,
+    };
+  }, []);
+
+  const effectiveCart = cart ?? cartContext.items.map(item => ({
+    dish: {
+      id: item.dishId,
+      name: item.name,
+      price: item.price,
+    },
+    quantity: item.quantity,
+  }));
+  const effectiveRestaurant = restaurant ?? {
+    id: cartContext.restaurantId || 'unknown',
+    name: t('cart.title'),
+  };
+  const effectiveUpdateQuantity = updateQuantity ?? ((dishId: string, quantity: number) => {
+    const current = cartContext.items.find(item => item.dishId === dishId);
+    if (!current) return;
+    if (quantity <= 0) {
+      cartContext.removeItem(dishId);
+      return;
+    }
+    if (quantity > current.quantity) {
+      for (let i = 0; i < quantity - current.quantity; i++) {
+        cartContext.increaseQuantity(dishId);
+      }
+    } else if (quantity < current.quantity) {
+      for (let i = 0; i < current.quantity - quantity; i++) {
+        cartContext.decreaseQuantity(dishId);
+      }
+    }
+  });
+  const effectiveClearCart = onClearCart ?? cartContext.clearCart;
 
   // Geocode user address or guest address using the hook
   const addressToGeocode = user?.address || guestInfo.address || '';
@@ -72,19 +119,19 @@ export function Cart({ cart, restaurant, updateQuantity, onClearCart }: CartProp
 
   // Memoize subtotal calculation
   const subtotal = useMemo(
-    () => cart.reduce((sum, item) => sum + item.dish.price * item.quantity, 0),
-    [cart]
+    () => effectiveCart.reduce((sum, item) => sum + item.dish.price * item.quantity, 0),
+    [effectiveCart]
   );
 
   // Lade Delivery Fee und Min Order Amount
   useEffect(() => {
     const loadDeliveryInfo = async () => {
       const address = user?.address || guestInfo.address;
-      if (!address || !restaurant.id) return;
+      if (!address || !effectiveRestaurant.id) return;
 
       try {
         // Validiere Min Order Amount
-        const minOrderResponse = await api.post(`/restaurants/${restaurant.id}/validate-min-order`, {
+        const minOrderResponse = await api.post(`/restaurants/${effectiveRestaurant.id}/validate-min-order`, {
           subtotal,
         });
         
@@ -97,7 +144,7 @@ export function Cart({ cart, restaurant, updateQuantity, onClearCart }: CartProp
         const customerLocation = geocodeData?.coordinates || { lat: 0, lng: 0 };
 
         // Berechne Delivery Fee mit echten Koordinaten
-        const deliveryFeeResponse = await api.post(`/restaurants/${restaurant.id}/delivery-fee`, {
+        const deliveryFeeResponse = await api.post(`/restaurants/${effectiveRestaurant.id}/delivery-fee`, {
           subtotal,
           customerLocation,
         });
@@ -108,7 +155,7 @@ export function Cart({ cart, restaurant, updateQuantity, onClearCart }: CartProp
         }
 
         // Geschätzte Lieferzeit
-        const deliveryTimeResponse = await api.post(`/restaurants/${restaurant.id}/estimated-delivery-time`, {
+        const deliveryTimeResponse = await api.post(`/restaurants/${effectiveRestaurant.id}/estimated-delivery-time`, {
           customerLocation,
         });
 
@@ -128,7 +175,7 @@ export function Cart({ cart, restaurant, updateQuantity, onClearCart }: CartProp
     };
 
     loadDeliveryInfo();
-  }, [subtotal, restaurant.id, user?.address, guestInfo.address, geocodeData, deliverySpeed]);
+  }, [subtotal, effectiveRestaurant.id, user?.address, guestInfo.address, geocodeData, deliverySpeed]);
   
   // Memoize discount calculation
   const discountAmount = useMemo(() => {
@@ -146,8 +193,56 @@ export function Cart({ cart, restaurant, updateQuantity, onClearCart }: CartProp
     [subtotal, discountAmount, deliveryFee, serviceFee]
   );
 
+  const resolveCustomerId = useCallback(() => {
+    const candidateValues = [
+      user && typeof user === 'object' ? (user as { customerId?: unknown; customer?: { id?: unknown }; id?: unknown }).customerId : undefined,
+      user && typeof user === 'object' ? (user as { customerId?: unknown; customer?: { id?: unknown }; id?: unknown }).customer?.id : undefined,
+      user?.id,
+    ];
+
+    const runtimeCandidates = candidateValues
+      .filter((value): value is string => typeof value === 'string' && value.trim().length > 0);
+
+    if (runtimeCandidates.length > 0) {
+      return runtimeCandidates[0].trim();
+    }
+
+    try {
+      const storedUserRaw = localStorage.getItem('customer_user');
+      if (storedUserRaw) {
+        const storedUser = JSON.parse(storedUserRaw) as {
+          customerId?: unknown;
+          customer?: { id?: unknown };
+          id?: unknown;
+        };
+        const storedCandidate = [
+          storedUser.customerId,
+          storedUser.customer?.id,
+          storedUser.id,
+        ].find((value): value is string => typeof value === 'string' && value.trim().length > 0);
+        if (storedCandidate) {
+          return storedCandidate.trim();
+        }
+      }
+    } catch {
+      // ignore storage parse issues and fall through to error
+    }
+
+    return '';
+  }, [user]);
+
   const placeOrder = useCallback(async () => {
-    if (cart.length === 0) {
+    markCheckoutProbe({ placeOrderCalled: true });
+    const checkoutSubmitResolution = resolveCheckoutAddressFromStorage({
+      authAddress: user?.address,
+      customerUserRaw: typeof window === 'undefined' ? null : window.localStorage.getItem('customer_user'),
+      customerProfileAddressRawEntries: typeof window === 'undefined'
+        ? []
+        : CUSTOMER_PROFILE_ADDRESS_KEYS.map((key) => ({ key, raw: window.localStorage.getItem(key) })),
+    });
+
+    if (effectiveCart.length === 0) {
+      markCheckoutProbe({ guard: 'empty-cart' });
       setError(t('cart.emptyError'));
       return;
     }
@@ -155,11 +250,40 @@ export function Cart({ cart, restaurant, updateQuantity, onClearCart }: CartProp
     // Guest-Checkout Validierung
     if (!user) {
       if (!guestInfo.name || !guestInfo.email || !guestInfo.phone || !guestInfo.address) {
+        markCheckoutProbe({ guard: 'missing-guest-fields' });
         setError(t('cart.guestFieldsError'));
         return;
       }
     } else {
-      if (!user.address) {
+      const resolvedEffectiveAddress = checkoutSubmitResolution.address;
+      const checkoutSubmitDiagnostics = {
+        contextUserAddress: user?.address ?? null,
+        storedCustomerUserRaw: typeof window !== 'undefined'
+          ? window.localStorage.getItem('customer_user')
+          : null,
+        storedCustomerProfileAddressRaw: typeof window !== 'undefined'
+          ? CUSTOMER_PROFILE_ADDRESS_KEYS.map((key) => window.localStorage.getItem(key)).filter((value): value is string => value !== null)
+          : [],
+        resolvedEffectiveAddress,
+        resolvedAddressSource: checkoutSubmitResolution.source,
+        resolvedAddressPresent: Boolean(resolvedEffectiveAddress),
+        resolvedAddressLength: resolvedEffectiveAddress.length,
+        profileAddressRawType: checkoutSubmitResolution.profileAddressRawType,
+        profileAddressKeys: checkoutSubmitResolution.profileAddressKeys,
+        customerUserAddressPresent: checkoutSubmitResolution.customerUserAddressPresent,
+      };
+      console.log('checkoutResolvedAddressBeforeGuard', checkoutSubmitDiagnostics);
+      console.log('checkoutSubmitResolution', checkoutSubmitDiagnostics);
+      if (!resolvedEffectiveAddress) {
+        markCheckoutProbe({
+          guard: 'missing-user-address',
+          contextUserAddress: user?.address ?? null,
+          storedCustomerUserRaw: typeof window === 'undefined'
+            ? null
+            : window.localStorage.getItem('customer_user'),
+          resolvedEffectiveAddress,
+          resolvedAddressSource: checkoutSubmitResolution.source,
+        });
         setError(t('cart.addressRequiredError'));
         return;
       }
@@ -167,47 +291,99 @@ export function Cart({ cart, restaurant, updateQuantity, onClearCart }: CartProp
 
     // Prüfe Mindestbestellwert
     if (minOrderMissing > 0) {
+      markCheckoutProbe({ guard: 'minimum-order-missing', minOrderMissing });
       setError(`Mindestbestellwert von ${minOrderAmount.toFixed(2)}€ nicht erreicht. Noch ${minOrderMissing.toFixed(2)}€ fehlen.`);
       return;
     }
 
+    markCheckoutProbe({ beforeApiPost: true, apiPostUrl: '/orders/customer' });
     setLoading(true);
     setError(null);
 
     try {
+      const customerId = resolveCustomerId();
+      const resolvedEffectiveAddress = checkoutSubmitResolution.address;
+      const normalizedItems = effectiveCart.map(item => ({
+        dishId: item.dish.id,
+        quantity: item.quantity,
+        ...(item.modifications ? { modifications: item.modifications } : {}),
+        ...(item.specialInstructions ? { specialInstructions: item.specialInstructions } : {}),
+      }));
       const order = {
-        restaurantId: restaurant.id,
-        items: cart.map(item => ({
-          dishId: item.dish.id,
-          quantity: item.quantity,
-          price: item.dish.price,
-        })),
-        totalAmount,
-        address: user?.address || guestInfo.address,
+        customerId,
+        restaurantId: effectiveRestaurant.id,
+        items: normalizedItems,
+        address: resolvedEffectiveAddress,
+        deliveryAddress: resolvedEffectiveAddress,
         phone: user?.phone || guestInfo.phone,
-        email: user?.email || guestInfo.email,
-        name: user?.name || guestInfo.name,
         notes: '',
-        promotionCode: promoCode || undefined,
-        isGuest: !user,
-        deliverySpeed: deliverySpeed, // Standard oder Priorität
-        estimatedDeliveryTime: estimatedDeliveryTime || null,
+        promotionId: promoCode || undefined,
+        deliveryFee,
       };
 
+      const forbiddenPayloadKeysPresent = [
+        'totalAmount',
+        'email',
+        'name',
+        'isGuest',
+        'deliverySpeed',
+        'estimatedDeliveryTime',
+      ].filter((key) => Object.prototype.hasOwnProperty.call(order, key));
+
+        logDebug('Checkout order payload summary', {
+          component: 'Cart',
+          action: 'placeOrder',
+          metadata: {
+            customerIdPresent: Boolean(customerId),
+            customerIdType: typeof customerId,
+            itemCount: order.items.length,
+            itemKeys: order.items[0] ? Object.keys(order.items[0]) : [],
+            forbiddenPayloadKeysPresent,
+            hasAddress: Boolean(order.address),
+            hasPhone: Boolean(order.phone),
+            hasPromotionId: Boolean(order.promotionId),
+            hasDeliveryFee: typeof order.deliveryFee === 'number',
+            resolvedAddressSource: checkoutSubmitResolution.source,
+            resolvedAddressPresent: Boolean(resolvedEffectiveAddress),
+            resolvedAddressLength: resolvedEffectiveAddress.length,
+          },
+        });
+
+      if (!customerId || typeof customerId !== 'string') {
+        throw new Error('Cannot place order without customerId');
+      }
+
       const response = await api.post('/orders/customer', order);
+      markCheckoutProbe({ apiPostCalled: true });
       setOrderId(response.data.id);
       setShowPayment(true);
     } catch (err: unknown) {
+      const axiosError = err as {
+        response?: { status?: number; statusText?: string; data?: unknown };
+        config?: { url?: string };
+      };
+      logDebug('Checkout order request failed', {
+        component: 'Cart',
+        action: 'placeOrder',
+        metadata: {
+          status: axiosError.response?.status ?? null,
+          statusText: axiosError.response?.statusText ?? null,
+          url: axiosError.config?.url ?? null,
+          body: typeof axiosError.response?.data === 'string'
+            ? (axiosError.response.data as string).slice(0, 500)
+            : JSON.stringify(axiosError.response?.data ?? null).slice(0, 500),
+        },
+      });
       setError(extractErrorMessage(err) || t('cart.orderError'));
     } finally {
       setLoading(false);
     }
-  }, [cart, user, guestInfo, restaurant.id, totalAmount, promoCode, minOrderMissing, minOrderAmount, deliverySpeed, estimatedDeliveryTime, t]);
+  }, [effectiveCart, user, guestInfo, effectiveRestaurant.id, promoCode, minOrderMissing, minOrderAmount, deliveryFee, logDebug, t, resolveCustomerId]);
 
   const handlePaymentSuccess = useCallback(() => {
     // Warenkorb leeren
-    onClearCart();
-    localStorage.removeItem(`cart_${restaurant.id}`);
+    effectiveClearCart();
+    localStorage.removeItem(`cart_${effectiveRestaurant.id}`);
     setShowPayment(false);
     // Zur Bestellverfolgung navigieren
     if (orderId) {
@@ -217,12 +393,18 @@ export function Cart({ cart, restaurant, updateQuantity, onClearCart }: CartProp
       }
       navigate(`/orders/${orderId}`);
     }
-  }, [onClearCart, restaurant.id, orderId, navigate, user, guestInfo.email]);
+  }, [effectiveClearCart, effectiveRestaurant.id, orderId, navigate, user, guestInfo.email]);
 
   const handlePaymentCancel = useCallback(() => {
     setShowPayment(false);
     setOrderId(null);
   }, []);
+
+  const handleCheckoutSubmit = useCallback((event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    markCheckoutProbe({ handleCheckoutSubmitCalled: true });
+    void placeOrder();
+  }, [markCheckoutProbe, placeOrder]);
 
   return (
     <>
@@ -237,7 +419,7 @@ export function Cart({ cart, restaurant, updateQuantity, onClearCart }: CartProp
       )}
       <div className="cart" data-testid="cart">
         <h3>{t('cart.title')}</h3>
-        {cart.length === 0 ? (
+        {effectiveCart.length === 0 ? (
         <div className="cart-empty">
           <div style={{ fontSize: '48px', marginBottom: '12px' }}>🛒</div>
           <p style={{ color: '#65676B', fontSize: '15px' }}>{t('cart.empty')}</p>
@@ -246,7 +428,7 @@ export function Cart({ cart, restaurant, updateQuantity, onClearCart }: CartProp
         <>
           {error && <div className="error-message">{error}</div>}
           
-          {cart.map(item => (
+          {effectiveCart.map(item => (
             <div key={item.dish.id} className="cart-item">
               <div className="cart-item-info">
                 <strong>{item.dish.name}</strong>
@@ -256,8 +438,8 @@ export function Cart({ cart, restaurant, updateQuantity, onClearCart }: CartProp
               </div>
               <div className="cart-item-actions">
                 <button
-                  onClick={() => updateQuantity(item.dish.id, item.quantity - 1)}
-                  onKeyDown={(e) => handleKeyboardButton(e, () => updateQuantity(item.dish.id, item.quantity - 1))}
+                  onClick={() => effectiveUpdateQuantity(item.dish.id, item.quantity - 1)}
+                  onKeyDown={(e) => handleKeyboardButton(e, () => effectiveUpdateQuantity(item.dish.id, item.quantity - 1))}
                   className="quantity-btn"
                   aria-label={t('cart.decreaseQuantity', { dish: item.dish.name })}
                 >
@@ -265,8 +447,8 @@ export function Cart({ cart, restaurant, updateQuantity, onClearCart }: CartProp
                 </button>
                 <span className="quantity" aria-label={t('cart.currentQuantity', { quantity: item.quantity })}>{item.quantity}</span>
                 <button
-                  onClick={() => updateQuantity(item.dish.id, item.quantity + 1)}
-                  onKeyDown={(e) => handleKeyboardButton(e, () => updateQuantity(item.dish.id, item.quantity + 1))}
+                  onClick={() => effectiveUpdateQuantity(item.dish.id, item.quantity + 1)}
+                  onKeyDown={(e) => handleKeyboardButton(e, () => effectiveUpdateQuantity(item.dish.id, item.quantity + 1))}
                   className="quantity-btn"
                   aria-label={t('cart.increaseQuantity', { dish: item.dish.name })}
                 >
@@ -277,7 +459,7 @@ export function Cart({ cart, restaurant, updateQuantity, onClearCart }: CartProp
           ))}
           
           <PromoCodeInput
-            restaurantId={restaurant.id}
+            restaurantId={effectiveRestaurant.id}
             subtotal={subtotal}
             onCodeApplied={(code, discountValue, discountTypeValue, promoId) => {
               setPromoCode(code);
@@ -377,7 +559,8 @@ export function Cart({ cart, restaurant, updateQuantity, onClearCart }: CartProp
             </div>
           </div>
 
-          {!user && (
+          <form onSubmit={handleCheckoutSubmit} className="checkout-submit-form">
+            {!user && (
             <div className="guest-checkout-form" style={{ marginTop: '20px', padding: '16px', background: 'var(--bg-secondary, #F0F2F5)', borderRadius: '8px' }}>
               <h4 style={{ marginBottom: '16px', fontSize: '16px', fontWeight: 600 }}>Gast-Bestellung</h4>
               <div className="form-group" style={{ marginBottom: '12px' }}>
@@ -428,13 +611,14 @@ export function Cart({ cart, restaurant, updateQuantity, onClearCart }: CartProp
           )}
 
           <button
-            onClick={placeOrder}
+            type="submit"
             className="order-button"
             disabled={loading}
             data-testid="checkout-button"
           >
             {loading ? t('cart.placingOrder') : t('cart.placeOrder')}
           </button>
+          </form>
 
           {!user && (
             <p className="login-hint" style={{ marginTop: '12px', fontSize: '14px', textAlign: 'center', color: '#65676B' }}>

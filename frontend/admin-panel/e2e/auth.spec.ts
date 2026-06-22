@@ -20,9 +20,11 @@ test.describe('Authentication', () => {
     // Der Titel kann je nach Build variieren (z.B. "UberFoods - Admin Panel")
     await expect(page).toHaveTitle(/UberFoods/i);
 
-    // Use more specific selectors with explicit waits
-    const emailInput = page.locator('input[type="email"]');
-    const passwordInput = page.locator('input[type="password"]');
+    const loginForm = page.locator('form[aria-label="Login-Formular"]');
+    const emailInput = page.locator('[name="email"]');
+    const passwordInput = page.locator('[name="password"]');
+
+    await expect(loginForm).toBeVisible({ timeout: 10_000 });
 
     await expect(emailInput).toBeVisible({ timeout: 10000 });
     await expect(passwordInput).toBeVisible({ timeout: 10000 });
@@ -35,8 +37,9 @@ test.describe('Authentication', () => {
   test('should show error on invalid login', async ({ page }) => {
     if (!runAuthFlows) test.skip();
 
-    await page.fill('input[type="email"]', 'invalid@example.com');
-    await page.fill('input[type="password"]', 'wrongpassword');
+    await expect(page.locator('form[aria-label="Login-Formular"]')).toBeVisible({ timeout: 10_000 });
+    await page.fill('[name="email"]', 'invalid@example.com');
+    await page.fill('[name="password"]', 'wrongpassword');
     await page.click('button[type="submit"]');
     
     // Wait for error message
@@ -59,10 +62,12 @@ test.describe('Authentication', () => {
     await page.waitForLoadState('networkidle');
 
     // Fill form with explicit waits
-    const emailInput = page.locator('input[type="email"]');
-    const passwordInput = page.locator('input[type="password"]');
+    const loginForm = page.locator('form[aria-label="Login-Formular"]');
+    const emailInput = page.locator('[name="email"]');
+    const passwordInput = page.locator('[name="password"]');
     const submitButton = page.locator('button[type="submit"]');
 
+    await expect(loginForm).toBeVisible({ timeout: 10_000 });
     await emailInput.waitFor({ state: 'visible', timeout: 10000 });
     await passwordInput.waitFor({ state: 'visible', timeout: 10000 });
     await submitButton.waitFor({ state: 'visible', timeout: 10000 });

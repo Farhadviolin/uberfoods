@@ -1,8 +1,20 @@
 import { test as base, Page, BrowserContext } from '@playwright/test';
+import { randomUUID } from 'node:crypto';
 import { testDataFactory, TestUser } from '../../test-utils/test-data-factory';
 
 // Generate unique run ID for test isolation
-const RUN_ID = process.env.RUN_ID || `run_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+const RUN_ID = process.env.RUN_ID
+  || process.env.GITHUB_RUN_ID
+  || `run_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+const RUN_ATTEMPT = process.env.GITHUB_RUN_ATTEMPT || '1';
+
+type CustomerCredentials = {
+  email: string;
+  password: string;
+  name: string;
+  phone: string;
+  address?: string;
+};
 
 // Extended test fixture with authentication helpers and runId
 export const test = base.extend<{
@@ -46,6 +58,18 @@ export const test = base.extend<{
 
 // Helper functions for common test operations
 export class TestHelpers {
+  static createCustomerCredentials() {
+    const uniqueEmail = `customer.lifecycle.${RUN_ID}.${RUN_ATTEMPT}.${Date.now()}.${Math.random().toString(36).slice(2, 8)}.${randomUUID()}@example.test`;
+    const password = 'customer123';
+    return {
+      email: uniqueEmail,
+      password,
+      name: 'Test Customer',
+      phone: '+43 123 456 789',
+      address: undefined as string | undefined,
+    };
+  }
+
   static async waitForStablePage(page: Page, timeout = 5000) {
     await page.waitForLoadState('networkidle', { timeout });
     await page.waitForTimeout(500);
@@ -59,26 +83,79 @@ export class TestHelpers {
     await page.waitForURL(/.*(dashboard|home)/i);
   }
 
-  static async registerCustomer(page: Page, user: TestUser, appUrl: string) {
-    await page.goto(`${appUrl}/register`);
-
-    // Wait for register API response
+  static async registerCustomer(page: Page, user: CustomerCredentials, appUrl: string) {
+    const registerUrl = `${appUrl}/register`;
+    console.log('[customer-e2e] register navigation', { appUrl, registerUrl, apiBaseUrl: process.env.API_BASE_URL || process.env.VITE_API_BASE_URL || 'unset' });
+    await page.goto(registerUrl, { waitUntil: 'domcontentloaded' });
+    const registerRoute = '/api/auth/customer/register';
     const registerResponsePromise = page.waitForResponse(
-      response => response.url().includes('/api/auth/register') && response.status() === 201,
-      { timeout: 10000 }
+      response => response.request().method() === 'POST'
+        && new URL(response.url()).pathname === registerRoute,
+      { timeout: 15000 }
     );
 
-    await page.locator('input[name="firstName"]').fill('Test');
-    await page.locator('input[name="lastName"]').fill('Customer');
-    await page.locator('input[type="email"]').fill(user.email);
-    await page.locator('input[type="password"]').fill(user.password);
-    await page.locator('input[name="phone"]').fill(user.phone);
+    const credentials = {
+      email: user.email,
+      password: user.password,
+      name: user.name ?? 'Test Customer',
+      phone: user.phone ?? '+43 123 456 789',
+      address: user.address,
+    };
+
+    await page.locator('input[type="text"], input[name="name"]').first().fill(credentials.name);
+    await page.locator('input[type="email"]').fill(credentials.email);
+    await page.locator('input[type="tel"], input[name="phone"]').first().fill(credentials.phone);
+    await page.locator('input[type="password"]').first().fill(credentials.password);
+    await page.locator('input[type="password"]').nth(1).fill(credentials.password);
     await page.locator('button[type="submit"], button:has-text("Register")').click();
 
-    // Wait for register API response
-    await registerResponsePromise;
+    const registerResponse = await registerResponsePromise;
+    if (registerResponse.status() !== 201) {
+      const body = await registerResponse.text().catch(() => '');
+      const normalizedBody = body.toLowerCase();
+      const isAlreadyExists = (registerResponse.status() === 401 || registerResponse.status() === 409)
+        && normalizedBody.includes('already exists');
 
-    await page.waitForURL(/.*(dashboard|home|verify)/i);
+      console.error('[REGISTER FAILED DEBUG]', {
+        status: registerResponse.status(),
+        route: registerUrl,
+        email: credentials.email,
+        body,
+      });
+
+      if (isAlreadyExists) {
+        console.warn('[REGISTER FALLBACK] Customer already exists, attempting login with the same credentials');
+        await TestHelpers.loginCustomer(page, credentials, appUrl);
+        return credentials;
+      }
+
+      throw new Error(`Customer register failed: ${registerResponse.status()} ${registerResponse.statusText()} ${body}`);
+    }
+
+    return credentials;
+  }
+
+  static async loginCustomer(page: Page, credentials: Pick<CustomerCredentials, 'email' | 'password'>, appUrl: string) {
+    if (!page.url().includes('/login')) {
+      await page.goto(`${appUrl}/login`, { waitUntil: 'domcontentloaded' });
+    }
+
+    const loginResponsePromise = page.waitForResponse((response) =>
+      response.request().method() === 'POST'
+        && response.url().includes('/api/auth/customer/login'),
+      { timeout: 15000 },
+    );
+
+    await page.locator('input[type="email"]').fill(credentials.email);
+    await page.locator('input[type="password"]').fill(credentials.password);
+    await page.locator('button[type="submit"], button:has-text("Login")').click();
+
+    const response = await loginResponsePromise;
+    if (!response.ok()) {
+      const body = await response.text().catch(() => '');
+      throw new Error(`Customer login failed: ${response.status()} ${response.statusText()} ${body}`);
+    }
+    return response;
   }
 
   static getSelectors() {

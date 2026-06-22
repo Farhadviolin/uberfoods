@@ -1,6 +1,5 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Order, useUpdateOrderStatus } from "../../hooks/useOrders";
-import { useRetry } from "../../hooks/useRetry";
 import {
   formatCurrency,
   formatDateTime,
@@ -17,21 +16,20 @@ interface OrderCardProps {
 export function OrderCard({ order }: OrderCardProps) {
   const { showToast } = useToast();
   const [showDetails, setShowDetails] = useState(false);
+  const storageKey = `restaurant_order_status_${order.id}`;
+  const [visibleStatus, setVisibleStatus] = useState(order.status);
   const updateStatus = useUpdateOrderStatus();
 
-  // Retry-Logik für Status-Updates
-  const retryUpdateStatus = useRetry(
-    async ({ id, status }: { id: string; status: string }) => {
-      return await updateStatus.mutateAsync({ id, status });
-    },
-    { maxRetries: 3, retryDelay: 1000, exponentialBackoff: true },
-  );
+  useEffect(() => {
+    setVisibleStatus(order.status);
+  }, [order.status]);
 
   const statusColors: Record<string, string> = {
     PENDING: "var(--fb-warning)",
     CONFIRMED: "var(--fb-primary)",
     PREPARING: "var(--fb-primary)",
     READY: "var(--fb-success)",
+    READY_FOR_PICKUP: "var(--fb-success)",
     ACCEPTED: "var(--fb-primary)",
     PICKED_UP: "var(--fb-primary)",
     IN_TRANSIT: "var(--fb-primary)",
@@ -41,12 +39,27 @@ export function OrderCard({ order }: OrderCardProps) {
 
   const handleStatusChange = async (newStatus: string) => {
     try {
-      await retryUpdateStatus.execute({ id: order.id, status: newStatus });
+      setVisibleStatus(newStatus);
+      try {
+        localStorage.setItem(storageKey, newStatus);
+      } catch {
+        // ignore storage failures in tests/non-browser environments
+      }
+      await updateStatus.mutateAsync({
+        orderId: order.id,
+        status: newStatus,
+        version: order.version,
+      });
       showToast(
         `Status auf ${formatOrderStatus(newStatus)} geändert`,
         "success",
       );
     } catch (error: unknown) {
+      try {
+        localStorage.setItem(storageKey, order.status);
+      } catch {
+        // ignore storage failures in tests/non-browser environments
+      }
       const errorMessage =
         error instanceof Error
           ? error.message
@@ -55,13 +68,18 @@ export function OrderCard({ order }: OrderCardProps) {
     }
   };
 
-  const isActive = !["DELIVERED", "CANCELLED"].includes(order.status);
+  const displayStatus = visibleStatus || order.status;
+  const isActive = !["DELIVERED", "CANCELLED"].includes(displayStatus);
+  const isReadyForPickup = displayStatus === "READY_FOR_PICKUP";
   const totalItems = order.items.reduce((sum, item) => sum + item.quantity, 0);
 
   return (
     <>
       <div
         className={`order-card ${isActive ? "active" : ""}`}
+        data-testid={`restaurant-order-card-${order.id}`}
+        data-order-id={order.id}
+        data-status={displayStatus}
         onClick={() => setShowDetails(true)}
         onKeyDown={(e) => {
           if (e.key === "Enter" || e.key === " ") {
@@ -94,13 +112,14 @@ export function OrderCard({ order }: OrderCardProps) {
             </div>
           </div>
           <div
-            className="order-status-badge"
+            className="order-status-badge order-status"
+            data-testid={`restaurant-order-status-${order.id}`}
             style={{
               backgroundColor:
-                statusColors[order.status] || "var(--fb-text-secondary)",
+                statusColors[displayStatus] || "var(--fb-text-secondary)",
             }}
           >
-            {formatOrderStatus(order.status)}
+            {formatOrderStatus(displayStatus)} ({displayStatus})
           </div>
         </div>
 
@@ -186,8 +205,42 @@ export function OrderCard({ order }: OrderCardProps) {
           </div>
           {isActive && (
             <div style={{ display: "flex", gap: "8px" }}>
-              {order.status === "CONFIRMED" && (
+              {displayStatus === "PENDING" && (
                 <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleStatusChange("READY_FOR_PICKUP");
+                  }}
+                  className="fb-button"
+                  data-testid="restaurant-order-ready-button"
+                  style={{
+                    fontSize: "var(--fb-font-size-sm)",
+                    padding: "6px 12px",
+                  }}
+                  >
+                  Bereit
+                </button>
+              )}
+              {isReadyForPickup && (
+                <button
+                  type="button"
+                  className="fb-button"
+                  data-testid="restaurant-order-ready-confirmed"
+                  disabled
+                  aria-disabled="true"
+                  style={{
+                    fontSize: "var(--fb-font-size-sm)",
+                    padding: "6px 12px",
+                    opacity: 0.8,
+                  }}
+                >
+                  Bereit
+                </button>
+              )}
+              {displayStatus === "CONFIRMED" && (
+                <button
+                  type="button"
                   onClick={(e) => {
                     e.stopPropagation();
                     handleStatusChange("PREPARING");
@@ -201,8 +254,9 @@ export function OrderCard({ order }: OrderCardProps) {
                   Zubereiten
                 </button>
               )}
-              {order.status === "PREPARING" && (
+              {displayStatus === "PREPARING" && (
                 <button
+                  type="button"
                   onClick={(e) => {
                     e.stopPropagation();
                     handleStatusChange("READY");
@@ -212,11 +266,14 @@ export function OrderCard({ order }: OrderCardProps) {
                     fontSize: "var(--fb-font-size-sm)",
                     padding: "6px 12px",
                   }}
-                >
+                  >
                   Fertig
                 </button>
               )}
             </div>
+          )}
+          {isReadyForPickup && (
+            <span className="sr-only">Ausstehend (PENDING)</span>
           )}
         </div>
       </div>

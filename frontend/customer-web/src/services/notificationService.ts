@@ -167,6 +167,7 @@ export class NotificationService {
     }
 
     try {
+      const subscription = this.pushSubscription;
       const successful = await this.pushSubscription.unsubscribe();
       if (successful) {
         this.pushSubscription = null;
@@ -175,11 +176,11 @@ export class NotificationService {
           await fetch(`${config.apiUrl}/notifications/unsubscribe`, {
             method: 'POST',
             headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(this.pushSubscription),
-          });
-        } catch (error) {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(subscription),
+        });
+      } catch (error) {
           logError(error as Error, { component: 'NotificationService', action: 'unsubscribeFromPush', metadata: { step: 'notify-backend' } });
         }
       }
@@ -242,7 +243,7 @@ export class NotificationService {
     return subscription !== null;
   }
 
-  private static urlBase64ToUint8Array(base64String: string): Uint8Array {
+  private static urlBase64ToUint8Array(base64String: string): ArrayBuffer {
     const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
     const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
 
@@ -252,7 +253,7 @@ export class NotificationService {
     for (let i = 0; i < rawData.length; ++i) {
       outputArray[i] = rawData.charCodeAt(i);
     }
-    return outputArray;
+    return outputArray.buffer.slice(0);
   }
 
   static async getSubscription(): Promise<PushSubscription | null> {
