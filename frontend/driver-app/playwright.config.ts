@@ -1,3 +1,4 @@
+import { existsSync } from 'node:fs';
 import { defineConfig, devices } from '@playwright/test';
 
 // Mock TransformStream for Node.js environment
@@ -8,6 +9,12 @@ if (typeof globalThis.TransformStream === 'undefined') {
     }
   };
 }
+
+const ciChromiumExecutablePath =
+  process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH ||
+  (process.env.CI && existsSync('/usr/bin/google-chrome')
+    ? '/usr/bin/google-chrome'
+    : undefined);
 
 export default defineConfig({
   testDir: './tests/e2e',
@@ -28,7 +35,12 @@ export default defineConfig({
   projects: [
     {
       name: 'chromium',
-      use: { ...devices['Desktop Chrome'] },
+      use: {
+        ...devices['Desktop Chrome'],
+        launchOptions: ciChromiumExecutablePath
+          ? { executablePath: ciChromiumExecutablePath }
+          : undefined,
+      },
     },
   ],
   webServer: process.env.E2E_ORCHESTRATED ? undefined : {
