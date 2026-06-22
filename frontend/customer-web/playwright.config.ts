@@ -32,7 +32,10 @@ export default defineConfig({
     {
       name: 'setup',
       testMatch: 'auth.setup.ts',
-      use: { ...chromeDevice },
+      use: {
+        ...chromeDevice,
+        video: 'off',
+      },
     },
 
     // Main test suite with authenticated sessions
