@@ -52,9 +52,9 @@ PAYPAL_CLIENT_SECRET=your-paypal-client-secret
 SMTP_HOST=smtp.gmail.com
 SMTP_PORT=587
 SMTP_USER=your-email@gmail.com
-SMTP_PASS=your-app-password
-FROM_EMAIL=noreply@uberfoods.com
-SUPPORT_EMAIL=support@uberfoods.com
+SMTP_PASSWORD=your-app-password
+SMTP_FROM_EMAIL=noreply@uberfoods.com
+SMTP_FROM_NAME=UberFoods
 VAPID_PUBLIC_KEY=your-vapid-public-key
 VAPID_PRIVATE_KEY=your-vapid-private-key
 SUPPORT_PHONE=+43-1-234-5678
@@ -62,13 +62,19 @@ SUPPORT_PHONE=+43-1-234-5678
 
 #### Admin Panel (admin-panel)
 ```
-VITE_API_BASE_URL=https://your-backend-service.onrender.com/api
-VITE_APP_TITLE=UberFoods Admin Panel
+VITE_API_URL=https://your-backend-service.onrender.com/api
+VITE_WS_URL=wss://your-backend-service.onrender.com
+VITE_APP_NAME=UberFoods Admin Panel
+VITE_CUSTOMER_WEB_URL=https://customer-web.onrender.com
+VITE_DRIVER_APP_URL=https://driver-app.onrender.com
+VITE_RESTAURANT_WEB_URL=https://restaurant-web.onrender.com
 ```
 
 #### Customer Web (customer-web)
 ```
 VITE_API_BASE_URL=https://your-backend-service.onrender.com/api
+VITE_WS_URL=wss://your-backend-service.onrender.com
+VITE_APP_NAME=UberFoods
 VITE_STRIPE_PUBLISHABLE_KEY=STRIPE_PUBLISHABLE_KEY_PLACEHOLDER_...
 VITE_GOOGLE_MAPS_API_KEY=your-google-maps-api-key
 VITE_ENABLE_SOCIAL_FEATURES=true
@@ -81,15 +87,22 @@ VITE_ENABLE_GEOCODING=true
 
 #### Restaurant Web (restaurant-web)
 ```
-VITE_API_BASE_URL=https://your-backend-service.onrender.com/api
+VITE_API_URL=https://your-backend-service.onrender.com/api
+VITE_WS_URL=wss://your-backend-service.onrender.com
 VITE_APP_NAME=UberFoods Restaurant
+VITE_ALLOWED_EXTERNAL_HOSTS=customer-web.onrender.com,admin-panel.onrender.com
 ```
 
 #### Driver App (driver-app)
 ```
-VITE_API_BASE_URL=https://your-backend-service.onrender.com/api
+VITE_API_URL=https://your-backend-service.onrender.com/api
+VITE_WS_URL=wss://your-backend-service.onrender.com
+VITE_APP_NAME=UberFoods Driver
 VITE_GOOGLE_MAPS_API_KEY=your-google-maps-api-key
 VITE_APP_VERSION=1.0.0
+VITE_TOMTOM_API_KEY=your-tomtom-api-key
+VITE_TRAFFIC_API_URL=https://your-traffic-api.example.com
+VITE_ALLOW_SIMULATION=false
 ```
 
 ### 3. Database Setup
@@ -171,7 +184,7 @@ curl -I https://your-driver-app.onrender.com
 - Verify Node.js version compatibility (currently set to Node 20)
 
 #### Frontend Build Fails
-- Check that `VITE_API_BASE_URL` is correctly set
+- Check that the correct app-specific API variable is set (`VITE_API_BASE_URL` for customer-web, `VITE_API_URL` for admin-panel/restaurant-web/driver-app)
 - Verify build commands are working locally first
 
 #### Database Connection Issues

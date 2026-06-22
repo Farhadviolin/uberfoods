@@ -31,7 +31,9 @@
 - [ ] `VAPID_PUBLIC_KEY`
 - [ ] `VAPID_PRIVATE_KEY`
 - [ ] `SMTP_HOST`
-- [ ] `SMTP_FROM`
+- [ ] `SMTP_PASSWORD`
+- [ ] `SMTP_FROM_EMAIL`
+- [ ] `SMTP_FROM_NAME`
 
 ## Stripe Checklist
 

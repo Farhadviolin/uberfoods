@@ -1,101 +1,111 @@
 # Environment Variables Matrix - UberFoods Production Deployment
 
+This matrix reflects the current runtime names used by the application and deployment manifests.
+Legacy names may still appear in old logs or historical notes, but they should be treated as deprecated.
+
 ## Backend Service (backend-web)
 
-### Required Environment Variables
+| Variable | Scope | Required | Notes |
+|---|---|---:|---|
+| `DATABASE_URL` | runtime | yes | PostgreSQL connection string |
+| `JWT_SECRET` | runtime | yes | JWT signing secret |
+| `JWT_REFRESH_SECRET` | runtime | yes | Refresh-token signing secret |
+| `NODE_ENV` | runtime | yes | Must be `production` in production |
+| `PORT` | runtime | yes | Render assigns this automatically |
+| `REDIS_URL` | runtime | yes | Redis connection string |
+| `ALLOWED_ORIGINS` | runtime | yes | Comma-separated frontend origins |
+| `SENTRY_DSN` | runtime | no | Optional error tracking |
+| `STRIPE_SECRET_KEY` | runtime | yes | Stripe secret key |
+| `STRIPE_WEBHOOK_SECRET` | runtime | yes | Stripe webhook signing secret |
+| `PAYPAL_CLIENT_ID` | runtime | yes | PayPal client ID |
+| `PAYPAL_CLIENT_SECRET` | runtime | yes | PayPal client secret |
+| `PAYPAL_ENVIRONMENT` | runtime | yes | `sandbox` or `live` |
+| `SMTP_HOST` | runtime | yes | SMTP server hostname |
+| `SMTP_PORT` | runtime | yes | SMTP port |
+| `SMTP_USER` | runtime | yes | SMTP username |
+| `SMTP_PASSWORD` | runtime | yes | SMTP password |
+| `SMTP_FROM_EMAIL` | runtime | yes | Sender email address |
+| `SMTP_FROM_NAME` | runtime | yes | Sender display name |
+| `SENDGRID_API_KEY` | runtime | no | Only if SendGrid is used |
+| `SENDGRID_FROM_EMAIL` | runtime | no | SendGrid sender email |
+| `SENDGRID_FROM_NAME` | runtime | no | SendGrid sender name |
+| `VAPID_PUBLIC_KEY` | runtime | no | Push notifications |
+| `VAPID_PRIVATE_KEY` | runtime | no | Push notifications |
+| `DEFAULT_DRIVER_PASSWORD` | seed/dev | no | Never set in production |
+| `SEED_ADMIN_*` | seed/dev | no | Never set in production |
+| `SEED_CUSTOMER_*` | seed/dev | no | Never set in production |
+| `SEED_RESTAURANT_*` | seed/dev | no | Never set in production |
+| `SEED_DRIVER_*` | seed/dev | no | Never set in production |
 
-#### Critical (Application will fail to start without these)
-- `DATABASE_URL` - PostgreSQL connection string (e.g., `postgresql://user:pass@host:port/db`)
-- `JWT_SECRET` - Secret key for JWT token signing (minimum 32 characters)
-- `JWT_REFRESH_SECRET` - Secret key for refresh token signing (minimum 32 characters)
+Legacy names you may still see in older docs/logs:
 
-#### Essential (Required for production functionality)
-- `NODE_ENV` - Must be set to `production`
-- `PORT` - Server port (Render provides this automatically)
-- `REDIS_URL` - Redis connection URL for caching and WebSocket adapter
-- `ALLOWED_ORIGINS` - Comma-separated list of allowed CORS origins (production frontend URLs)
-- `SENTRY_DSN` - Sentry DSN for error tracking (optional but recommended)
-
-#### Payment & External Services
-- `STRIPE_SECRET_KEY` - Stripe secret key for payment processing
-- `STRIPE_WEBHOOK_SECRET` - Stripe webhook secret for payment confirmation
-- `PAYPAL_CLIENT_ID` - PayPal client ID
-- `PAYPAL_CLIENT_SECRET` - PayPal client secret
-- `PAYPAL_ENVIRONMENT` - `sandbox` or `live`
-
-#### Email & Communication
-- `SMTP_HOST` - SMTP server hostname
-- `SMTP_PORT` - SMTP server port
-- `SMTP_USER` - SMTP authentication username
-- `SMTP_PASS` - SMTP authentication password
-- `FROM_EMAIL` - Default from email address
-- `SUPPORT_EMAIL` - Support contact email
-
-#### Push Notifications
-- `VAPID_PUBLIC_KEY` - VAPID public key for push notifications
-- `VAPID_PRIVATE_KEY` - VAPID private key for push notifications
-
-#### Development/Test Variables (DO NOT SET in production)
-- `DEFAULT_DRIVER_PASSWORD` - Only for development seeding
-- `SEED_ADMIN_*` - Only for development seeding
-- `SEED_CUSTOMER_*` - Only for development seeding
-- `SEED_RESTAURANT_*` - Only for development seeding
-- `SEED_DRIVER_*` - Only for development seeding
+- `SMTP_PASS` → deprecated in favor of `SMTP_PASSWORD`
+- `FROM_EMAIL` → deprecated in favor of `SMTP_FROM_EMAIL`
+- `SUPPORT_EMAIL` → deprecated; use the runtime mail sender fields above
 
 ## Frontend Services
 
-All frontend services are built with Vite and deployed as static sites.
+All frontends are built with Vite and deployed as static sites. Their variables are build-time inputs.
 
-### Build-time Environment Variables (VITE_* prefix)
+### Customer Web (`frontend/customer-web`)
 
-#### Required for all frontends
-- `VITE_API_BASE_URL` - Backend API base URL (e.g., `https://your-backend.onrender.com/api`)
+| Variable | Required | Notes |
+|---|---:|---|
+| `VITE_API_BASE_URL` | yes | Backend API base URL, including `/api` |
+| `VITE_WS_URL` | yes | WebSocket URL |
+| `VITE_APP_NAME` | yes | Display name |
+| `VITE_STRIPE_PUBLISHABLE_KEY` | no | Stripe publishable key |
+| `VITE_GOOGLE_MAPS_API_KEY` | no | Maps key |
+| `VITE_ENABLE_SOCIAL_FEATURES` | no | Feature flag |
+| `VITE_ENABLE_VOICE_ASSISTANT` | no | Feature flag |
+| `VITE_ENABLE_GAMIFICATION` | no | Feature flag |
+| `VITE_ENABLE_ANALYTICS` | no | Feature flag |
+| `VITE_ENABLE_NOTIFICATIONS` | no | Feature flag |
+| `VITE_ENABLE_GEOCODING` | no | Feature flag |
 
-#### Admin Panel (admin-panel)
-- `VITE_APP_TITLE` - Application title (optional, defaults to "UberFoods Admin")
-- `VITE_SKIP_AUTH` - Set to `true` to skip authentication in development (NEVER in production)
-- `VITE_DEV_AUTH_TOKEN` - Development authentication token (NEVER in production)
+### Admin Panel (`frontend/admin-panel`)
 
-#### Customer Web (customer-web)
-- `VITE_STRIPE_PUBLISHABLE_KEY` - Stripe publishable key for frontend payment processing
-- `VITE_GOOGLE_MAPS_API_KEY` - Google Maps API key for location services
-- `VITE_ENABLE_SOCIAL_FEATURES` - `true`/`false` to enable social features
-- `VITE_ENABLE_VOICE_ASSISTANT` - `true`/`false` to enable voice assistant
-- `VITE_ENABLE_GAMIFICATION` - `true`/`false` to enable gamification
-- `VITE_ENABLE_ANALYTICS` - `true`/`false` to enable analytics
-- `VITE_ENABLE_NOTIFICATIONS` - `true`/`false` to enable push notifications
-- `VITE_ENABLE_GEOCODING` - `true`/`false` to enable geocoding features
+| Variable | Required | Notes |
+|---|---:|---|
+| `VITE_API_URL` | yes | Backend API base URL |
+| `VITE_WS_URL` | yes | WebSocket URL |
+| `VITE_APP_NAME` | yes | Display name |
+| `VITE_CUSTOMER_WEB_URL` | yes | Customer-web base URL |
+| `VITE_DRIVER_APP_URL` | yes | Driver-app base URL |
+| `VITE_RESTAURANT_WEB_URL` | yes | Restaurant-web base URL |
+| `VITE_SKIP_AUTH` | no | Development only |
+| `VITE_DEV_AUTH_TOKEN` | no | Development only |
 
-#### Restaurant Web (restaurant-web)
-- `VITE_APP_NAME` - Application name (optional)
+### Restaurant Web (`frontend/restaurant-web`)
 
-#### Driver App (driver-app)
-- `VITE_GOOGLE_MAPS_API_KEY` - Google Maps API key for navigation
-- `VITE_APP_VERSION` - Application version (optional)
+| Variable | Required | Notes |
+|---|---:|---|
+| `VITE_API_URL` | yes | Backend API base URL |
+| `VITE_WS_URL` | yes | WebSocket URL |
+| `VITE_APP_NAME` | yes | Display name |
+| `VITE_ALLOWED_EXTERNAL_HOSTS` | no | Optional host allow-list |
 
-## Deployment Notes
+### Driver App (`frontend/driver-app`)
 
-### Environment Variable Security
-- Never commit actual values to version control
-- Use Render's environment variable management for production
-- Rotate secrets regularly
-- Use different values for staging/production environments
+| Variable | Required | Notes |
+|---|---:|---|
+| `VITE_API_URL` | yes | Backend API base URL |
+| `VITE_WS_URL` | yes | WebSocket URL |
+| `VITE_APP_NAME` | yes | Display name |
+| `VITE_GOOGLE_MAPS_API_KEY` | no | Maps key |
+| `VITE_TOMTOM_API_KEY` | no | Routing/traffic key |
+| `VITE_TRAFFIC_API_URL` | no | Optional traffic API endpoint |
+| `VITE_ALLOW_SIMULATION` | no | Development/testing only |
 
-### Build vs Runtime Variables
-- `VITE_*` variables are embedded in the built JavaScript bundle
-- Regular variables (without VITE_ prefix) are server-side only
-- Frontend can only access VITE_ prefixed variables
+### Build vs Runtime Notes
 
-### Database Considerations
-- `DATABASE_URL` should point to a production PostgreSQL instance
-- Ensure connection pooling is configured appropriately
-- Database should be in the same region as the application for performance
+- `VITE_*` variables are embedded in the frontend bundle during build.
+- Non-`VITE_` variables are backend/runtime-only.
+- Customer Web intentionally uses `VITE_API_BASE_URL`.
+- Admin Panel, Restaurant Web, and Driver App intentionally use `VITE_API_URL`.
 
-### Redis Considerations
-- `REDIS_URL` should point to a production Redis instance
-- Consider using managed Redis services (Render provides this)
-- Redis is required for WebSocket functionality and caching
+### CORS / Origin Notes
 
-### CORS Configuration
-- `ALLOWED_ORIGINS` should include all production frontend URLs
-- Format: `https://customer-web.onrender.com,https://admin-panel.onrender.com,https://restaurant-web.onrender.com,https://driver-app.onrender.com`
+`ALLOWED_ORIGINS` should include all production frontend URLs, for example:
+
+`https://customer-web.onrender.com,https://admin-panel.onrender.com,https://restaurant-web.onrender.com,https://driver-app.onrender.com`

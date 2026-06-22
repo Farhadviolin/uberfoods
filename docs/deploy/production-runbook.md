@@ -53,9 +53,9 @@ PAYPAL_ENVIRONMENT=live
 SMTP_HOST=your-smtp-host
 SMTP_PORT=587
 SMTP_USER=your-smtp-user
-SMTP_PASS=your-smtp-password
-FROM_EMAIL=noreply@yourdomain.com
-SUPPORT_EMAIL=support@yourdomain.com
+SMTP_PASSWORD=your-smtp-password
+SMTP_FROM_EMAIL=noreply@yourdomain.com
+SMTP_FROM_NAME=UberFoods
 VAPID_PUBLIC_KEY=your-vapid-public-key
 VAPID_PRIVATE_KEY=your-vapid-private-key
 SUPPORT_PHONE=+1234567890
@@ -66,21 +66,33 @@ Each frontend service needs:
 
 ```bash
 # Admin Panel
-VITE_API_BASE_URL=https://your-backend-service.onrender.com/api
-VITE_APP_TITLE=UberFoods Admin Panel
+VITE_API_URL=https://your-backend-service.onrender.com/api
+VITE_WS_URL=wss://your-backend-service.onrender.com
+VITE_APP_NAME=UberFoods Admin Panel
+VITE_CUSTOMER_WEB_URL=https://customer-web.onrender.com
+VITE_DRIVER_APP_URL=https://driver-app.onrender.com
+VITE_RESTAURANT_WEB_URL=https://restaurant-web.onrender.com
 
 # Customer Web
 VITE_API_BASE_URL=https://your-backend-service.onrender.com/api
+VITE_WS_URL=wss://your-backend-service.onrender.com
+VITE_APP_NAME=UberFoods
 VITE_STRIPE_PUBLISHABLE_KEY=STRIPE_PUBLISHABLE_KEY_PLACEHOLDER_...
 VITE_GOOGLE_MAPS_API_KEY=your-google-maps-key
 
 # Restaurant Web
-VITE_API_BASE_URL=https://your-backend-service.onrender.com/api
+VITE_API_URL=https://your-backend-service.onrender.com/api
+VITE_WS_URL=wss://your-backend-service.onrender.com
 VITE_APP_NAME=UberFoods Restaurant
 
 # Driver App
-VITE_API_BASE_URL=https://your-backend-service.onrender.com/api
+VITE_API_URL=https://your-backend-service.onrender.com/api
+VITE_WS_URL=wss://your-backend-service.onrender.com
+VITE_APP_NAME=UberFoods Driver
 VITE_GOOGLE_MAPS_API_KEY=your-google-maps-key
+VITE_TOMTOM_API_KEY=your-tomtom-api-key
+VITE_TRAFFIC_API_URL=https://your-traffic-api.example.com
+VITE_ALLOW_SIMULATION=false
 ```
 
 ### Step 3: Deploy
@@ -137,7 +149,7 @@ See `docs/deploy/env-matrix.md` for complete list of required environment variab
 - Check Render logs for specific errors
 
 #### Frontend Shows API Errors
-- Verify `VITE_API_BASE_URL` points to correct backend URL
+- Verify the app-specific frontend API variable points to the correct backend URL (`VITE_API_BASE_URL` for customer-web, `VITE_API_URL` for admin-panel/restaurant-web/driver-app)
 - Check CORS configuration (`ALLOWED_ORIGINS`)
 
 #### Database Migration Fails

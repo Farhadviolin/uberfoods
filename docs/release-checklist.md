@@ -66,9 +66,13 @@ PAYPAL_WEBHOOK_ID=your_paypal_webhook_id
 
 ### Frontend Production Variables (REQUIRED)
 ```bash
-# API Configuration
+# Customer Web
+VITE_API_BASE_URL=https://api.yourdomain.com/api
+
+# Admin Panel / Restaurant Web / Driver App
 VITE_API_URL=https://api.yourdomain.com
 VITE_WS_URL=wss://api.yourdomain.com
+VITE_APP_NAME=UberFoods
 
 # Google Maps (CRITICAL)
 VITE_GOOGLE_MAPS_API_KEY=your_google_maps_production_key

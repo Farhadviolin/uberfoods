@@ -20,10 +20,10 @@
 ### Frontend Services (Static Sites)
 All frontends use Vite React framework with `dist/` output directory:
 
-1. **admin-panel**: ✅ Static Site, `dist/` output, VITE_API_BASE_URL from backend-web
-2. **customer-web**: ✅ Static Site, `dist/` output, VITE_API_BASE_URL from backend-web
-3. **restaurant-web**: ✅ Static Site, `dist/` output, VITE_API_BASE_URL from backend-web
-4. **driver-app**: ✅ Static Site, `dist/` output, VITE_API_BASE_URL from backend-web
+1. **admin-panel**: ✅ Static Site, `dist/` output, `VITE_API_URL` from backend-web
+2. **customer-web**: ✅ Static Site, `dist/` output, `VITE_API_BASE_URL` from backend-web
+3. **restaurant-web**: ✅ Static Site, `dist/` output, `VITE_API_URL` from backend-web
+4. **driver-app**: ✅ Static Site, `dist/` output, `VITE_API_URL` from backend-web
 
 ## Security Scan Results
 - **Tracked .env files**: 0 hits ✅
