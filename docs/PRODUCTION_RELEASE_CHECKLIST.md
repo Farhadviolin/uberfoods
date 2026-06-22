@@ -57,6 +57,7 @@
 - [ ] Seed succeeds on a clean database
 - [ ] Test accounts are available after seed
 - [ ] Backups are configured before production migration
+- [x] Prisma migration path verified via CI run `27956851051`; production deployment path uses `prisma migrate deploy`.
 
 ## Redis Checklist
 

@@ -37,6 +37,19 @@ All frontends use Vite React framework with `dist/` output directory:
 - **driver-app**: ✅ Build successful (368 modules, 7.37s)
 - **restaurant-web**: ✅ Build successful (1786 modules, 15.04s)
 
+## P0 Evidence: Prisma migrations and fresh database readiness
+
+- Reference CI run: `27956851051`
+- Result: `success`
+- `api-verification` executed `Run database migrations` successfully.
+- Test data creation completed after migrations.
+- Backend E2E startup completed successfully after migrations.
+- Production deployment path uses `npx prisma migrate deploy`.
+- `render.yaml` build command includes `npx prisma migrate deploy`.
+- GitHub Actions use `npx prisma migrate deploy --schema=./prisma/schema.prisma`.
+- `prisma db push` is not used in the production Render/CI deployment path.
+- Conclusion: P0 migration path is accepted for staging readiness; production remains subject to real staging deployment evidence.
+
 ## Render Configuration Validation
 - **render.yaml**: ✅ All services properly configured
 - **Prisma**: ✅ Migrate deploy configured, no production seeding
