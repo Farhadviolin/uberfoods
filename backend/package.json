@@ -6,6 +6,7 @@
   "private": true,
   "license": "MIT",
   "scripts": {
+    "prebuild": "npm run prisma:generate",
     "build": "tsc -p tsconfig.build.json",
     "build:e2e": "tsc -p tsconfig.build.e2e.json",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
