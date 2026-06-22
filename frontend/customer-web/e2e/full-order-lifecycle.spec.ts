@@ -3219,7 +3219,6 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
           });
 
           let addToCartButtons = await openRestaurantMenuForCartRepair();
-          const attemptedAddButtonIndexes = new Set<number>();
 
           for (let attempt = 1; attempt <= 3; attempt += 1) {
             if (remainingFinalSubmitRestoreMs() <= 0) {
@@ -3280,7 +3279,7 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
             })).catch(() => []);
             const preferredKeywords = ['Pizza Margherita', 'Pizza Pepperoni', 'Pizza Hawaii'];
             const candidateIndexes = buttonTexts
-              .filter((button) => !button.disabled && !attemptedAddButtonIndexes.has(button.index))
+              .filter((button) => !button.disabled)
               .sort((a, b) => {
                 const aScore = preferredKeywords.findIndex((keyword) => a.text.includes(keyword));
                 const bScore = preferredKeywords.findIndex((keyword) => b.text.includes(keyword));
@@ -3294,7 +3293,6 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
                 continue;
               }
 
-              attemptedAddButtonIndexes.add(buttonIndex);
               await button.scrollIntoViewIfNeeded({ timeout: boundedFinalSubmitTimeout(1000) }).catch(() => null);
               await button.click({ timeout: boundedFinalSubmitTimeout(1500) }).catch(async () => {
                 await customerPage.mouse.click(0, 0).catch(() => null);
