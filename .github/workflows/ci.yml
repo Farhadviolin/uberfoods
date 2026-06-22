@@ -496,10 +496,14 @@ jobs:
   # Individual Frontend E2E Tests
   frontend-e2e:
     runs-on: ubuntu-latest
-    needs: api-verification
+    needs:
+      - api-verification
+      - playwright-browsers
     timeout-minutes: 45
     env:
       DATABASE_URL: postgresql://postgres:postgres123@localhost:5434/uberfoods
+      PLAYWRIGHT_SKIP_BROWSER_GC: "1"
+      PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"
     services:
       postgres:
         image: postgres:15
@@ -533,6 +537,20 @@ jobs:
       uses: actions/setup-node@v5
       with:
         node-version: '24'
+
+    - name: Configure Playwright browser path
+      run: |
+        echo "PLAYWRIGHT_BROWSERS_PATH=$HOME/.cache/ms-playwright" >> "$GITHUB_ENV"
+        mkdir -p "$HOME/.cache/ms-playwright"
+        echo "PLAYWRIGHT_BROWSERS_PATH=$HOME/.cache/ms-playwright"
+
+    - name: Restore Playwright browsers cache
+      uses: actions/cache@v4
+      with:
+        path: ~/.cache/ms-playwright
+        key: playwright-browsers-v3-headless-shell-${{ runner.os }}-${{ hashFiles('frontend/customer-web/package-lock.json', 'frontend/customer-web/package.json') }}
+        restore-keys: |
+          playwright-browsers-v3-headless-shell-${{ runner.os }}-
 
     - name: Setup backend for E2E
       working-directory: ./backend
@@ -573,15 +591,24 @@ jobs:
         command -v google-chrome || true
         google-chrome --version || true
 
-    - name: Customer Web - install and verify Chromium
+    - name: Customer Web - verify cached Chromium
       working-directory: ./frontend/customer-web
       run: |
-        echo "Before Chromium installation"
+        set -euo pipefail
+
         echo "PLAYWRIGHT_BROWSERS_PATH=${PLAYWRIGHT_BROWSERS_PATH:-unset}"
         find "$HOME/.cache/ms-playwright" -maxdepth 4 -type f 2>/dev/null | sort | head -100 || true
-        timeout 10m npx playwright install chromium
-        echo "After Chromium installation"
-        find "$HOME/.cache/ms-playwright" -maxdepth 4 -type f 2>/dev/null | sort | head -100 || true
+
+        chromium_path="$(node -e "const { chromium } = require('@playwright/test'); process.stdout.write(chromium.executablePath())")"
+        echo "Expected Chromium executable: $chromium_path"
+
+        if [ ! -x "$chromium_path" ]; then
+          echo "ERROR: Cached Chromium executable is missing or not executable: $chromium_path"
+          exit 1
+        fi
+
+        "$chromium_path" --version
+        echo "Cached Chromium verification succeeded"
 
     - name: Customer Web - build
       working-directory: ./frontend/customer-web
