@@ -729,19 +729,21 @@ export class OrderController {
 
       const paymentIntent = await this.paymentService.createPaymentIntent(
         orderId,
-        order.totalAmount,
-        "eur",
+        customerId,
+        "CARD",
       );
       return {
         clientSecret: paymentIntent.clientSecret,
         paymentIntentId: paymentIntent.paymentIntentId,
+        amount: paymentIntent.amount,
+        currency: paymentIntent.currency,
       };
     } else if (body.paymentMethod === "sofort") {
       // Sofortüberweisung - create payment intent and return redirect URL
       const paymentIntent = await this.paymentService.createPaymentIntent(
         orderId,
-        order.totalAmount,
-        "eur",
+        customerId,
+        "SOFORT",
       );
 
       // Generate Sofort redirect URL (in production, this would call Sofort API)
@@ -751,6 +753,8 @@ export class OrderController {
       return {
         clientSecret: paymentIntent.clientSecret,
         paymentIntentId: paymentIntent.paymentIntentId,
+        amount: paymentIntent.amount,
+        currency: paymentIntent.currency,
         redirectUrl: redirectUrl,
       };
     } else if (body.paymentMethod === "paypal") {
@@ -905,8 +909,8 @@ export class OrderController {
     // Create payment intent for Sofort
     const paymentIntent = await this.paymentService.createPaymentIntent(
       orderId,
-      order.totalAmount,
-      "eur",
+      customerId,
+      "SOFORT",
     );
 
     // Generate Sofort redirect URL

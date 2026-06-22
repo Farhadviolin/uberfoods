@@ -1,8 +1,30 @@
-import { Injectable } from "@nestjs/common";
+import {
+  BadRequestException,
+  Injectable,
+  InternalServerErrorException,
+  Optional,
+} from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import { PaymentStatus } from "@prisma/client";
 import Stripe from "stripe";
+import { PrismaService } from "../../prisma/prisma.service";
+
+type PaymentIntentResult = {
+  clientSecret: string;
+  paymentIntentId: string;
+  amount: number;
+  currency: string;
+};
 
 @Injectable()
 export class PaymentService {
+  private stripeClient?: Stripe;
+
+  constructor(
+    @Optional() private readonly prisma?: PrismaService,
+    @Optional() private readonly configService?: ConfigService,
+  ) {}
+
   // Minimal implementation for test compatibility
   async processPayment(): Promise<any> {
     return { success: true };
@@ -22,10 +44,110 @@ export class PaymentService {
 
   async createPaymentIntent(
     orderId: string,
-    amount: number,
-    currency: string,
-  ): Promise<any> {
-    return { id: "pi_test", client_secret: "secret" };
+    customerId?: string,
+    paymentMethodType = "CARD",
+  ): Promise<PaymentIntentResult> {
+    const prisma = this.requirePrisma();
+    const order = await prisma.order.findUnique({
+      where: { id: orderId },
+      select: {
+        id: true,
+        customerId: true,
+        totalAmount: true,
+        status: true,
+        paymentStatus: true,
+      },
+    });
+
+    if (!order) {
+      throw new BadRequestException("Order not found");
+    }
+
+    if (customerId && order.customerId !== customerId) {
+      throw new BadRequestException("Not authorized to pay this order");
+    }
+
+    if (!Number.isFinite(order.totalAmount) || order.totalAmount <= 0) {
+      throw new BadRequestException("Order amount must be greater than zero");
+    }
+
+    if (["CANCELLED", "DELIVERED"].includes(order.status)) {
+      throw new BadRequestException("Order is not payable");
+    }
+
+    if (
+      order.paymentStatus === PaymentStatus.COMPLETED ||
+      order.paymentStatus === PaymentStatus.REFUNDED
+    ) {
+      throw new BadRequestException("Order is already paid");
+    }
+
+    const amount = Math.round(order.totalAmount * 100);
+    if (amount <= 0) {
+      throw new BadRequestException("Order amount must be greater than zero");
+    }
+
+    const currency = "eur";
+    const stripe = this.getStripeClient();
+
+    try {
+      const paymentIntent = await stripe.paymentIntents.create({
+        amount,
+        currency,
+        automatic_payment_methods: {
+          enabled: true,
+        },
+        metadata: {
+          orderId: order.id,
+          customerId: customerId ?? order.customerId,
+          paymentMethodType,
+        },
+      });
+
+      await prisma.payment.create({
+        data: {
+          orderId: order.id,
+          customerId: customerId ?? order.customerId,
+          amount: order.totalAmount,
+          currency: currency.toUpperCase(),
+          status: PaymentStatus.PROCESSING,
+          paymentIntentId: paymentIntent.id,
+          paymentMethodType,
+          metadata: {
+            provider: "stripe",
+            orderId: order.id,
+            customerId: customerId ?? order.customerId,
+            paymentMethodType,
+            amount: order.totalAmount,
+            currency,
+          },
+        },
+      });
+
+      await prisma.order.update({
+        where: { id: order.id },
+        data: {
+          paymentStatus: PaymentStatus.PROCESSING,
+          paymentMethod: paymentMethodType,
+          transactionId: paymentIntent.id,
+        },
+      });
+
+      return {
+        clientSecret: paymentIntent.client_secret ?? "",
+        paymentIntentId: paymentIntent.id,
+        amount: order.totalAmount,
+        currency,
+      };
+    } catch (error) {
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
+
+      throw new InternalServerErrorException(
+        "Unable to create Stripe payment intent",
+      );
+    }
   }
 
   async createPayPalOrder(
@@ -41,7 +163,18 @@ export class PaymentService {
     customerId: string,
     data: any,
   ): Promise<any> {
-    return { id: "payment_record" };
+    const prisma = this.requirePrisma();
+    return prisma.payment.create({
+      data: {
+        orderId,
+        customerId,
+        amount: data.amount,
+        currency: (data.currency || "EUR").toUpperCase(),
+        status: data.status || PaymentStatus.PENDING,
+        paymentMethodType: data.paymentMethodType,
+        metadata: data,
+      },
+    });
   }
 
   async confirmPayment(orderId: string, paymentIntentId: string): Promise<any> {
@@ -94,5 +227,31 @@ export class PaymentService {
       invoiceId: invoice.id,
       customerId: invoice.customer,
     };
+  }
+
+  private requirePrisma(): PrismaService {
+    if (!this.prisma) {
+      throw new InternalServerErrorException("Database access is not available");
+    }
+
+    return this.prisma;
+  }
+
+  private getStripeClient(): Stripe {
+    if (this.stripeClient) {
+      return this.stripeClient;
+    }
+
+    const secretKey = this.configService?.get<string>("STRIPE_SECRET_KEY");
+    if (!secretKey) {
+      throw new InternalServerErrorException(
+        "Stripe secret key is not configured",
+      );
+    }
+
+    this.stripeClient = new Stripe(secretKey, {
+      apiVersion: "2025-10-29.clover",
+    });
+    return this.stripeClient;
   }
 }
