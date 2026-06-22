@@ -6,7 +6,7 @@ import { config } from './config';
 import './index.css';
 import { logger } from './utils/logger';
 
-const safeProcessEnv = typeof process !== 'undefined' ? process.env : undefined;
+const safeProcessEnv = typeof process !== 'undefined' ? process.env : {};
 
 // Sentry Error-Tracking Initialisierung (optional)
 if (config.sentryDsn && config.sentryDsn.trim() !== '') {

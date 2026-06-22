@@ -1,9 +1,11 @@
 import { logger } from './utils/logger';
 
+function getNodeEnv(): Record<string, string | undefined> {
+  return typeof process !== 'undefined' ? (process.env as Record<string, string | undefined>) : {};
+}
+
 // Helper function to safely access import.meta.env
 function getImportMetaEnv(): any {
-  const safeProcessEnv = typeof process !== 'undefined' ? process.env : undefined;
-
   // Check if we're in a Vite environment with import.meta
   if (typeof globalThis !== 'undefined' && (globalThis as any).import?.meta?.env) {
     return (globalThis as any).import.meta.env;
@@ -15,10 +17,10 @@ function getImportMetaEnv(): any {
       return (globalThis as any).import.meta.env;
     }
     // Fallback for Node.js/CommonJS environments (Jest, etc.)
-    return safeProcessEnv ?? {};
+    return getNodeEnv();
   } catch {
     // Final fallback
-    return safeProcessEnv ?? {};
+    return getNodeEnv();
   }
 }
 

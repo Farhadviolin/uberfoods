@@ -2,8 +2,7 @@
  * Error utilities for consistent error handling across the Restaurant Web app
  */
 
-// Node.js process global for environment checks
-declare const process: any;
+const nodeProcess = typeof process !== "undefined" ? process : undefined;
 
 /**
  * Normalisiert Backend-Message-Format (string | string[]) zu string
@@ -258,7 +257,7 @@ export const logError = (error: AppError | Error, context?: string): void => {
   }
 
   // In production, send to error monitoring service
-  if (process.env.NODE_ENV === "production") {
+  if (nodeProcess?.env?.NODE_ENV === "production") {
     // Send to monitoring service (Sentry, etc.)
     // This would be implemented based on your monitoring setup
   }

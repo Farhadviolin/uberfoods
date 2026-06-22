@@ -18,8 +18,10 @@ const queryClient = new QueryClient({
   },
 });
 
-// Register Service Worker for PWA support
-if ("serviceWorker" in navigator) {
+// Register Service Worker only when explicitly enabled.
+const enableServiceWorker =
+  import.meta.env.PROD && import.meta.env.VITE_ENABLE_SW === "true";
+if ("serviceWorker" in navigator && enableServiceWorker) {
   window.addEventListener("load", () => {
     navigator.serviceWorker
       .register("/service-worker.js")
