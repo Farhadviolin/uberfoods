@@ -483,47 +483,54 @@ jobs:
     - name: Install Playwright browsers
       if: steps.playwright-cache.outputs.cache-hit != 'true'
       working-directory: ./frontend/customer-web
-      timeout-minutes: 40
+      timeout-minutes: 55
       run: |
         set -euo pipefail
 
+        echo "PLAYWRIGHT_BROWSERS_PATH=$PLAYWRIGHT_BROWSERS_PATH"
+        echo "HOME=$HOME"
+        pwd
+        ls -la "$HOME/.cache" || true
+
+        headless_shell_path="$(
+          find "$PLAYWRIGHT_BROWSERS_PATH" -type f \( \
+            -path "*/chromium_headless_shell-*/chrome-headless-shell-linux64/chrome-headless-shell" -o \
+            -path "*/chromium_headless_shell-*/chrome-linux/headless_shell" -o \
+            -path "*/chrome-linux*/chrome" -o \
+            -path "*/chrome-linux*/headless_shell" \
+          \) 2>/dev/null | head -n 1 || true
+        )"
+
+        if [ -n "$headless_shell_path" ]; then
+          echo "Playwright Chromium already available from cache: $headless_shell_path"
+          chmod +x "$headless_shell_path"
+          "$headless_shell_path" --version
+          exit 0
+        fi
+
         npm ci
 
-        ./node_modules/.bin/playwright --version
+        npm --prefix frontend/customer-web exec -- playwright --version
 
         normal_chromium_path="$(
           node -e "const { chromium } = require('playwright'); process.stdout.write(chromium.executablePath())" || true
         )"
         echo "Playwright normal Chromium executable (informational): ${normal_chromium_path:-unset}"
 
-        headless_shell_path="$(
-          find "$HOME/.cache/ms-playwright" -type f \( \
-            -path "*/chromium_headless_shell-*/chrome-headless-shell-linux64/chrome-headless-shell" -o \
-            -path "*/chromium_headless_shell-*/chrome-linux/headless_shell" \
-          \) | head -n 1 || true
-        )"
-
-        if [ -n "$headless_shell_path" ]; then
-          echo "Existing chromium headless shell found: $headless_shell_path"
-          chmod +x "$headless_shell_path"
-          "$headless_shell_path" --version
-          exit 0
-        fi
-
         echo "Chromium headless shell not found. Installing only chromium headless shell..."
-        ./node_modules/.bin/playwright install --only-shell chromium
+        npm --prefix frontend/customer-web exec -- playwright install --only-shell chromium
 
         headless_shell_path="$(
-          find "$HOME/.cache/ms-playwright" -type f \( \
+          find "$PLAYWRIGHT_BROWSERS_PATH" -type f \( \
             -path "*/chromium_headless_shell-*/chrome-headless-shell-linux64/chrome-headless-shell" -o \
             -path "*/chromium_headless_shell-*/chrome-linux/headless_shell" \
-          \) | head -n 1 || true
+          \) 2>/dev/null | head -n 1 || true
         )"
 
         if [ -z "$headless_shell_path" ]; then
           echo "Playwright chromium headless shell executable still not found after install"
           echo "Cache contents:"
-          find "$HOME/.cache/ms-playwright" -maxdepth 5 -type f | sort | head -300 || true
+          find "$PLAYWRIGHT_BROWSERS_PATH" -maxdepth 5 -type f | sort | head -300 || true
           exit 1
         fi
 
@@ -531,15 +538,16 @@ jobs:
         chmod +x "$headless_shell_path"
         "$headless_shell_path" --version
         echo "Playwright Chromium installation succeeded"
-        ls -la ~/.cache/ms-playwright || true
+        ls -la "$PLAYWRIGHT_BROWSERS_PATH" || true
 
         EXPECTED_HEADLESS_SHELL="$HOME/.cache/ms-playwright/chromium_headless_shell-1200/chrome-headless-shell-linux64/chrome-headless-shell"
 
         if [ ! -x "$EXPECTED_HEADLESS_SHELL" ]; then
           echo "Expected Playwright headless shell not found or not executable:"
           echo "$EXPECTED_HEADLESS_SHELL"
+          echo "PLAYWRIGHT_BROWSERS_PATH=$PLAYWRIGHT_BROWSERS_PATH"
           echo "Available Playwright cache contents:"
-          find "$HOME/.cache/ms-playwright" -maxdepth 5 -type f | sort | head -300 || true
+          find "$PLAYWRIGHT_BROWSERS_PATH" -maxdepth 5 -type f | sort | head -300 || true
           exit 1
         fi
 
