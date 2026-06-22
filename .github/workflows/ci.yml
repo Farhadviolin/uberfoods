@@ -497,6 +497,7 @@ jobs:
   frontend-e2e:
     runs-on: ubuntu-latest
     needs: api-verification
+    timeout-minutes: 45
     env:
       DATABASE_URL: postgresql://postgres:postgres123@localhost:5434/uberfoods
     services:
@@ -533,9 +534,6 @@ jobs:
       with:
         node-version: '24'
 
-    - name: Install Playwright
-      run: npx playwright install chromium
-
     - name: Setup backend for E2E
       working-directory: ./backend
       run: |
@@ -563,16 +561,39 @@ jobs:
         PAYPAL_CLIENT_SECRET: PAYPAL_CLIENT_SECRET_PLACEHOLDER
         ALLOWED_ORIGINS: http://localhost:3000,http://localhost:3001,http://localhost:3002,http://localhost:3003,http://localhost:3004
 
-    - name: Run customer web E2E tests
+    - name: Customer Web - install dependencies
+      working-directory: ./frontend/customer-web
+      run: npm ci
+
+    - name: Customer Web - verify Playwright version
+      working-directory: ./frontend/customer-web
+      run: |
+        npx playwright --version
+        echo "PLAYWRIGHT_BROWSERS_PATH=${PLAYWRIGHT_BROWSERS_PATH:-unset}"
+        command -v google-chrome || true
+        google-chrome --version || true
+
+    - name: Customer Web - install and verify Chromium
+      working-directory: ./frontend/customer-web
+      run: |
+        echo "Before Chromium installation"
+        echo "PLAYWRIGHT_BROWSERS_PATH=${PLAYWRIGHT_BROWSERS_PATH:-unset}"
+        find "$HOME/.cache/ms-playwright" -maxdepth 4 -type f 2>/dev/null | sort | head -100 || true
+        timeout 10m npx playwright install chromium
+        echo "After Chromium installation"
+        find "$HOME/.cache/ms-playwright" -maxdepth 4 -type f 2>/dev/null | sort | head -100 || true
+
+    - name: Customer Web - build
+      working-directory: ./frontend/customer-web
+      run: timeout 10m npm run build
+
+    - name: Customer Web - start E2E server
       working-directory: ./frontend/customer-web
       env:
         RELEASE_GATE_MANAGED: true
         CUSTOMER_URL: http://127.0.0.1:3102
         E2E_AUTH_ROLES: customer
       run: |
-        npm ci
-        npx playwright install chromium
-        npm run build
         mkdir -p ../logs
         npm run dev:e2e > ../logs/customer-web.log 2>&1 &
         for i in {1..60}; do
@@ -588,7 +609,14 @@ jobs:
           cat ../logs/customer-web.log || true
           exit 1
         fi
-        npm run test:e2e:customer
+
+    - name: Customer Web - run E2E tests
+      working-directory: ./frontend/customer-web
+      env:
+        RELEASE_GATE_MANAGED: true
+        CUSTOMER_URL: http://127.0.0.1:3102
+        E2E_AUTH_ROLES: customer
+      run: timeout 10m npm run test:e2e:customer
 
     - name: Run admin panel unit tests
       working-directory: ./frontend/admin-panel
