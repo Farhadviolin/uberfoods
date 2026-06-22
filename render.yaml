@@ -37,11 +37,11 @@ services:
         value: 587
       - key: SMTP_USER
         sync: false # Set in Render dashboard
-      - key: SMTP_PASS
+      - key: SMTP_PASSWORD
         sync: false # Set in Render dashboard
-      - key: FROM_EMAIL
+      - key: SMTP_FROM_EMAIL
         sync: false # Set in Render dashboard
-      - key: SUPPORT_EMAIL
+      - key: SMTP_FROM_NAME
         sync: false # Set in Render dashboard
       - key: VAPID_PUBLIC_KEY
         sync: false # Set in Render dashboard
@@ -58,12 +58,12 @@ services:
     buildCommand: npm ci && npm run build
     staticPublishPath: ./dist
     envVars:
-      - key: VITE_API_BASE_URL
+      - key: VITE_API_URL
         fromService:
           type: web
           name: backend-web
           property: host
-      - key: VITE_APP_TITLE
+      - key: VITE_APP_NAME
         value: UberFoods Admin Panel
 
   # Customer Web Static Site
@@ -104,7 +104,7 @@ services:
     buildCommand: npm ci && npm run build
     staticPublishPath: ./dist
     envVars:
-      - key: VITE_API_BASE_URL
+      - key: VITE_API_URL
         fromService:
           type: web
           name: backend-web
@@ -120,7 +120,7 @@ services:
     buildCommand: npm ci && npm run build
     staticPublishPath: ./dist
     envVars:
-      - key: VITE_API_BASE_URL
+      - key: VITE_API_URL
         fromService:
           type: web
           name: backend-web

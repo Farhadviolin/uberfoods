@@ -98,6 +98,14 @@ class EnvironmentVariables {
   @IsString()
   SMTP_PASSWORD?: string;
 
+  @IsOptional()
+  @IsString()
+  SMTP_FROM_EMAIL?: string;
+
+  @IsOptional()
+  @IsString()
+  SMTP_FROM_NAME?: string;
+
   // Cloud Storage - AWS S3
   @IsOptional()
   @IsString()
