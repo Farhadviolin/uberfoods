@@ -152,6 +152,8 @@ jobs:
     env:
       DATABASE_URL: postgresql://postgres:postgres123@localhost:5434/uberfoods
       PLAYWRIGHT_SKIP_BROWSER_GC: "1"
+      PLAYWRIGHT_USE_SYSTEM_CHROME: "1"
+      PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"
     services:
       postgres:
         image: postgres:15
@@ -206,57 +208,20 @@ jobs:
       run: |
         set -euo pipefail
 
-        PW_CACHE_DIR="${PLAYWRIGHT_BROWSERS_PATH:-$HOME/.cache/ms-playwright}"
-        PW_CACHE_DIR="${PW_CACHE_DIR/#\~/$HOME}"
-
         echo "PLAYWRIGHT_BROWSERS_PATH=${PLAYWRIGHT_BROWSERS_PATH:-}"
-        echo "Resolved Playwright cache dir: $PW_CACHE_DIR"
-
-        if [ ! -d "$PW_CACHE_DIR" ]; then
-          echo "Playwright cache directory does not exist yet: $PW_CACHE_DIR"
-          mkdir -p "$PW_CACHE_DIR"
-        fi
-
         npm --prefix frontend/customer-web exec -- playwright --version
 
-        echo "Cache directory listing:"
-        find "$PW_CACHE_DIR" -maxdepth 4 -type f | head -n 100 || true
+        chrome_path="$(command -v google-chrome || command -v google-chrome-stable || command -v chromium || command -v chromium-browser || true)"
 
-        chromium_path="$(
-          find "$PW_CACHE_DIR" -type f \( \
-            -path "*/chromium_headless_shell-*/chrome-headless-shell-linux64/chrome-headless-shell" -o \
-            -path "*/chromium_headless_shell-*/chrome-linux/headless_shell" -o \
-            -path "*/chrome-linux*/chrome" -o \
-            -path "*/chrome-linux*/headless_shell" \
-          \) | head -n 1
-        )"
-
-        if [ -z "$chromium_path" ]; then
-          echo "No Chromium executable found in $PW_CACHE_DIR"
-          echo "Available Playwright cache content:"
-          find "$PW_CACHE_DIR" -maxdepth 5 -print || true
+        if [ -z "$chrome_path" ]; then
+          echo "ERROR: No system Chrome/Chromium executable found on the GitHub runner."
+          echo "PATH=$PATH"
           exit 1
         fi
 
-        echo "Chromium executable: $chromium_path"
-        chmod +x "$chromium_path" || true
-        "$chromium_path" --version || "$chromium_path" --help >/dev/null
-
+        echo "System Chrome found: $chrome_path"
+        "$chrome_path" --version
         echo "Playwright Chromium installation verification succeeded"
-
-        EXPECTED_HEADLESS_SHELL="$HOME/.cache/ms-playwright/chromium_headless_shell-1200/chrome-headless-shell-linux64/chrome-headless-shell"
-
-        if [ ! -x "$EXPECTED_HEADLESS_SHELL" ]; then
-          echo "Expected Playwright headless shell not found or not executable:"
-          echo "$EXPECTED_HEADLESS_SHELL"
-          echo "Available Playwright cache contents:"
-          find "$HOME/.cache/ms-playwright" -maxdepth 5 -type f | sort | head -300 || true
-          exit 1
-        fi
-
-        echo "Expected Playwright headless shell found:"
-        echo "$EXPECTED_HEADLESS_SHELL"
-        "$EXPECTED_HEADLESS_SHELL" --version
 
     - name: Setup backend for E2E
       working-directory: ./backend
@@ -454,6 +419,7 @@ jobs:
     timeout-minutes: 60
     env:
       PLAYWRIGHT_SKIP_BROWSER_GC: "1"
+      PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"
     steps:
     - name: Checkout code
       uses: actions/checkout@v5
@@ -480,80 +446,22 @@ jobs:
         restore-keys: |
           playwright-browsers-v3-headless-shell-${{ runner.os }}-
 
-    - name: Install Playwright browsers
-      if: steps.playwright-cache.outputs.cache-hit != 'true'
+    - name: Verify system Chrome
       working-directory: ./frontend/customer-web
-      timeout-minutes: 55
       run: |
         set -euo pipefail
 
-        echo "PLAYWRIGHT_BROWSERS_PATH=$PLAYWRIGHT_BROWSERS_PATH"
-        echo "HOME=$HOME"
-        pwd
-        ls -la "$HOME/.cache" || true
+        chrome_path="$(command -v google-chrome || command -v google-chrome-stable || command -v chromium || command -v chromium-browser || true)"
 
-        headless_shell_path="$(
-          find "$PLAYWRIGHT_BROWSERS_PATH" -type f \( \
-            -path "*/chromium_headless_shell-*/chrome-headless-shell-linux64/chrome-headless-shell" -o \
-            -path "*/chromium_headless_shell-*/chrome-linux/headless_shell" -o \
-            -path "*/chrome-linux*/chrome" -o \
-            -path "*/chrome-linux*/headless_shell" \
-          \) 2>/dev/null | head -n 1 || true
-        )"
-
-        if [ -n "$headless_shell_path" ]; then
-          echo "Playwright Chromium already available from cache: $headless_shell_path"
-          chmod +x "$headless_shell_path"
-          "$headless_shell_path" --version
-          exit 0
-        fi
-
-        npm ci
-
-        npm --prefix frontend/customer-web exec -- playwright --version
-
-        normal_chromium_path="$(
-          node -e "const { chromium } = require('playwright'); process.stdout.write(chromium.executablePath())" || true
-        )"
-        echo "Playwright normal Chromium executable (informational): ${normal_chromium_path:-unset}"
-
-        echo "Chromium headless shell not found. Installing only chromium headless shell..."
-        npm --prefix frontend/customer-web exec -- playwright install --only-shell chromium
-
-        headless_shell_path="$(
-          find "$PLAYWRIGHT_BROWSERS_PATH" -type f \( \
-            -path "*/chromium_headless_shell-*/chrome-headless-shell-linux64/chrome-headless-shell" -o \
-            -path "*/chromium_headless_shell-*/chrome-linux/headless_shell" \
-          \) 2>/dev/null | head -n 1 || true
-        )"
-
-        if [ -z "$headless_shell_path" ]; then
-          echo "Playwright chromium headless shell executable still not found after install"
-          echo "Cache contents:"
-          find "$PLAYWRIGHT_BROWSERS_PATH" -maxdepth 5 -type f | sort | head -300 || true
+        if [ -z "$chrome_path" ]; then
+          echo "ERROR: No system Chrome/Chromium executable found on the GitHub runner."
+          echo "PATH=$PATH"
           exit 1
         fi
 
-        echo "chromium headless shell executable: $headless_shell_path"
-        chmod +x "$headless_shell_path"
-        "$headless_shell_path" --version
-        echo "Playwright Chromium installation succeeded"
-        ls -la "$PLAYWRIGHT_BROWSERS_PATH" || true
-
-        EXPECTED_HEADLESS_SHELL="$HOME/.cache/ms-playwright/chromium_headless_shell-1200/chrome-headless-shell-linux64/chrome-headless-shell"
-
-        if [ ! -x "$EXPECTED_HEADLESS_SHELL" ]; then
-          echo "Expected Playwright headless shell not found or not executable:"
-          echo "$EXPECTED_HEADLESS_SHELL"
-          echo "PLAYWRIGHT_BROWSERS_PATH=$PLAYWRIGHT_BROWSERS_PATH"
-          echo "Available Playwright cache contents:"
-          find "$PLAYWRIGHT_BROWSERS_PATH" -maxdepth 5 -type f | sort | head -300 || true
-          exit 1
-        fi
-
-        echo "Expected Playwright headless shell found:"
-        echo "$EXPECTED_HEADLESS_SHELL"
-        "$EXPECTED_HEADLESS_SHELL" --version
+        echo "System Chrome found: $chrome_path"
+        "$chrome_path" --version
+        echo "System Chrome verification succeeded"
 
     - name: Verify Playwright browsers
       working-directory: ./frontend/customer-web
@@ -565,30 +473,16 @@ jobs:
 
         ./node_modules/.bin/playwright --version
 
-        normal_chromium_path="$(
-          node -e "const { chromium } = require('playwright'); process.stdout.write(chromium.executablePath())" || true
-        )"
-        echo "Playwright normal Chromium executable (informational): ${normal_chromium_path:-unset}"
+        chrome_path="$(command -v google-chrome || command -v google-chrome-stable || command -v chromium || command -v chromium-browser || true)"
 
-        echo "Playwright browser cache:"
-        find "$HOME/.cache/ms-playwright" -maxdepth 4 -type f | sort | head -200 || true
-
-        headless_shell_path="$(
-          find "$HOME/.cache/ms-playwright" -type f \( \
-            -path "*/chromium_headless_shell-*/chrome-headless-shell-linux64/chrome-headless-shell" -o \
-            -path "*/chromium_headless_shell-*/chrome-linux/headless_shell" \
-          \) | head -n 1 || true
-        )"
-
-        if [ -z "$headless_shell_path" ]; then
-          echo "Playwright chromium headless shell executable not found"
-          find "$HOME/.cache/ms-playwright" -maxdepth 6 -type f | sort | head -300 || true
+        if [ -z "$chrome_path" ]; then
+          echo "ERROR: No system Chrome/Chromium executable found on the GitHub runner."
+          echo "PATH=$PATH"
           exit 1
         fi
 
-        echo "chromium headless shell executable: $headless_shell_path"
-        chmod +x "$headless_shell_path"
-        "$headless_shell_path" --version
+        echo "System Chrome found: $chrome_path"
+        "$chrome_path" --version
 
         echo "Playwright Chromium cache verification succeeded"
 
