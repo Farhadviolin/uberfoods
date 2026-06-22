@@ -62,11 +62,26 @@ STRIPE_PUBLISHABLE_KEY=STRIPE_PUBLISHABLE_KEY_PLACEHOLDER
 PAYPAL_CLIENT_ID=your_paypal_client_id
 PAYPAL_CLIENT_SECRET=your_paypal_client_secret
 PAYPAL_WEBHOOK_ID=your_paypal_webhook_id
+
+# Email (runtime keys)
+SMTP_HOST=your-smtp-host
+SMTP_PORT=587
+SMTP_USER=your-smtp-user
+SMTP_PASSWORD=your-smtp-password
+SMTP_FROM_EMAIL=noreply@yourdomain.com
+SMTP_FROM_NAME=UberFoods
+
+# Optional SendGrid runtime keys
+SENDGRID_API_KEY=your_sendgrid_api_key
+SENDGRID_FROM_EMAIL=noreply@yourdomain.com
+SENDGRID_FROM_NAME=UberFoods
 ```
 
 ### Frontend Production Variables (REQUIRED)
 ```bash
 # API Configuration
+# Customer Web uses VITE_API_BASE_URL; Admin/Restaurant/Driver continue to use VITE_API_URL
+VITE_API_BASE_URL=https://api.yourdomain.com/api
 VITE_API_URL=https://api.yourdomain.com
 VITE_WS_URL=wss://api.yourdomain.com
 
@@ -160,6 +175,8 @@ npx playwright test --project=full-lifecycle --repeat-each=10
 - [ ] Monitor all active orders
 - [ ] View order details
 - [ ] Override order status if needed
+- [ ] Open reporting/PDF area without a 500 error
+- [ ] Download/export works if the feature is implemented
 
 ## 🚀 Deployment Steps
 

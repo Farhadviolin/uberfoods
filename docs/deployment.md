@@ -113,7 +113,7 @@ services:
       context: ./frontend/customer-web
       dockerfile: Dockerfile.prod
     environment:
-      - VITE_API_URL=${VITE_API_URL}
+      - VITE_API_BASE_URL=${VITE_API_BASE_URL}
     depends_on:
       - api
     networks:

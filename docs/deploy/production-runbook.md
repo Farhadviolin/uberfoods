@@ -53,9 +53,13 @@ PAYPAL_ENVIRONMENT=live
 SMTP_HOST=your-smtp-host
 SMTP_PORT=587
 SMTP_USER=your-smtp-user
-SMTP_PASS=your-smtp-password
-FROM_EMAIL=noreply@yourdomain.com
-SUPPORT_EMAIL=support@yourdomain.com
+SMTP_PASSWORD=your-smtp-password
+SMTP_FROM_EMAIL=noreply@yourdomain.com
+SMTP_FROM_NAME=UberFoods
+# Optional alternative if SendGrid is used instead of SMTP:
+# SENDGRID_API_KEY=your-sendgrid-api-key
+# SENDGRID_FROM_EMAIL=noreply@yourdomain.com
+# SENDGRID_FROM_NAME=UberFoods
 VAPID_PUBLIC_KEY=your-vapid-public-key
 VAPID_PRIVATE_KEY=your-vapid-private-key
 SUPPORT_PHONE=+1234567890
@@ -66,7 +70,7 @@ Each frontend service needs:
 
 ```bash
 # Admin Panel
-VITE_API_BASE_URL=https://your-backend-service.onrender.com/api
+VITE_API_URL=https://your-backend-service.onrender.com/api
 VITE_APP_TITLE=UberFoods Admin Panel
 
 # Customer Web
@@ -75,11 +79,11 @@ VITE_STRIPE_PUBLISHABLE_KEY=STRIPE_PUBLISHABLE_KEY_PLACEHOLDER_...
 VITE_GOOGLE_MAPS_API_KEY=your-google-maps-key
 
 # Restaurant Web
-VITE_API_BASE_URL=https://your-backend-service.onrender.com/api
+VITE_API_URL=https://your-backend-service.onrender.com/api
 VITE_APP_NAME=UberFoods Restaurant
 
 # Driver App
-VITE_API_BASE_URL=https://your-backend-service.onrender.com/api
+VITE_API_URL=https://your-backend-service.onrender.com/api
 VITE_GOOGLE_MAPS_API_KEY=your-google-maps-key
 ```
 
@@ -122,6 +126,10 @@ Base URL: https://your-backend-service.onrender.com
 1. **Backend Health**: Visit `https://your-backend-service.onrender.com/api/health`
 2. **Frontend Access**: Test each frontend URL loads correctly
 3. **API Connectivity**: Check browser dev tools for successful API calls
+4. **Admin Reporting/PDF**: Open the admin reporting/export area and verify it loads without a 500 error
+5. **Admin Reporting/PDF Export**: Trigger a PDF/download export if the feature is implemented
+
+> If reporting/PDF export is not yet implemented in a given environment, keep it as a manual verification item and do not mark it as fully green.
 
 ## Environment Variables Reference
 

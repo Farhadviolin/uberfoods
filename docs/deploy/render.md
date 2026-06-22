@@ -52,9 +52,13 @@ PAYPAL_CLIENT_SECRET=your-paypal-client-secret
 SMTP_HOST=smtp.gmail.com
 SMTP_PORT=587
 SMTP_USER=your-email@gmail.com
-SMTP_PASS=your-app-password
-FROM_EMAIL=noreply@uberfoods.com
-SUPPORT_EMAIL=support@uberfoods.com
+SMTP_PASSWORD=your-app-password
+SMTP_FROM_EMAIL=noreply@uberfoods.com
+SMTP_FROM_NAME=UberFoods
+# Optional alternative if you send via SendGrid instead of SMTP:
+# SENDGRID_API_KEY=your-sendgrid-api-key
+# SENDGRID_FROM_EMAIL=noreply@uberfoods.com
+# SENDGRID_FROM_NAME=UberFoods
 VAPID_PUBLIC_KEY=your-vapid-public-key
 VAPID_PRIVATE_KEY=your-vapid-private-key
 SUPPORT_PHONE=+43-1-234-5678
@@ -62,7 +66,7 @@ SUPPORT_PHONE=+43-1-234-5678
 
 #### Admin Panel (admin-panel)
 ```
-VITE_API_BASE_URL=https://your-backend-service.onrender.com/api
+VITE_API_URL=https://your-backend-service.onrender.com/api
 VITE_APP_TITLE=UberFoods Admin Panel
 ```
 
@@ -81,13 +85,13 @@ VITE_ENABLE_GEOCODING=true
 
 #### Restaurant Web (restaurant-web)
 ```
-VITE_API_BASE_URL=https://your-backend-service.onrender.com/api
+VITE_API_URL=https://your-backend-service.onrender.com/api
 VITE_APP_NAME=UberFoods Restaurant
 ```
 
 #### Driver App (driver-app)
 ```
-VITE_API_BASE_URL=https://your-backend-service.onrender.com/api
+VITE_API_URL=https://your-backend-service.onrender.com/api
 VITE_GOOGLE_MAPS_API_KEY=your-google-maps-api-key
 VITE_APP_VERSION=1.0.0
 ```
@@ -160,6 +164,13 @@ curl -I https://your-customer-web.onrender.com
 curl -I https://your-restaurant-web.onrender.com
 curl -I https://your-driver-app.onrender.com
 ```
+
+### 8. Manual Reporting/PDF Smoke Check
+
+- Open the Admin reporting / PDF area after deployment.
+- Verify the page loads without a 500 error.
+- Trigger an export/download if the feature is implemented.
+- If reporting or PDF export is not yet fully implemented, record it as a manual verification item rather than marking it green.
 
 ## Troubleshooting
 

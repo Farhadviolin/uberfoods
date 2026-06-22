@@ -24,12 +24,16 @@
 - `PAYPAL_ENVIRONMENT` - `sandbox` or `live`
 
 #### Email & Communication
+- `SENDGRID_API_KEY` - SendGrid API key for transactional emails
+- `SENDGRID_FROM_EMAIL` - Default SendGrid from email address
+- `SENDGRID_FROM_NAME` - Default SendGrid from display name
 - `SMTP_HOST` - SMTP server hostname
 - `SMTP_PORT` - SMTP server port
 - `SMTP_USER` - SMTP authentication username
-- `SMTP_PASS` - SMTP authentication password
-- `FROM_EMAIL` - Default from email address
-- `SUPPORT_EMAIL` - Support contact email
+- `SMTP_PASSWORD` - SMTP authentication password
+- `SMTP_FROM_EMAIL` - Default SMTP from email address
+- `SMTP_FROM_NAME` - Default SMTP from display name
+- `SUPPORT_PHONE` - Support hotline / contact number
 
 #### Push Notifications
 - `VAPID_PUBLIC_KEY` - VAPID public key for push notifications
@@ -48,8 +52,11 @@ All frontend services are built with Vite and deployed as static sites.
 
 ### Build-time Environment Variables (VITE_* prefix)
 
-#### Required for all frontends
+#### Required for customer-web
 - `VITE_API_BASE_URL` - Backend API base URL (e.g., `https://your-backend.onrender.com/api`)
+
+#### Required for admin-panel, restaurant-web, driver-app
+- `VITE_API_URL` - Backend API base URL (e.g., `https://your-backend.onrender.com/api`)
 
 #### Admin Panel (admin-panel)
 - `VITE_APP_TITLE` - Application title (optional, defaults to "UberFoods Admin")
