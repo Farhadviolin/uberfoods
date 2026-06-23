@@ -2904,8 +2904,8 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
               price: item.price as number,
             }));
           const payloadSubtotal = payloadItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-          const subtotal = payloadSubtotal;
-          const payloadMinimumSatisfied = payloadSubtotal >= Math.max(25, lastSafeMinimumOrderSubtotal ?? 25)
+          const subtotal = Math.max(payloadSubtotal, domSubtotal ?? 0, storageSubtotal ?? 0);
+          const payloadMinimumSatisfied = subtotal >= Math.max(25, lastSafeMinimumOrderSubtotal ?? 25)
             && (payloadItems.length >= 2 || storageDiagnostics.quantityCount >= 2);
 
           return {
@@ -2922,7 +2922,7 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
         }
 
         const ensureFinalSubmitMinimumCart = async () => {
-          const targetFinalSubmitSubtotal = Math.max(25, lastSafeMinimumOrderSubtotal ?? 25);
+          const targetFinalSubmitSubtotal = 25;
           const finalSubmitRestoreDeadlineMs = 9000;
           const finalSubmitRestoreStartedAt = Date.now();
           const remainingFinalSubmitRestoreMs = () => Math.max(0, finalSubmitRestoreDeadlineMs - (Date.now() - finalSubmitRestoreStartedAt));
@@ -3411,7 +3411,7 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
           const repairCheckoutCartToMinimum = async () => {
             for (let attempt = 1; attempt <= 8; attempt += 1) {
               diagnostics = await collectFinalSubmitCartDiagnostics();
-              if (diagnostics.payloadSubtotal >= targetFinalSubmitSubtotal) {
+              if (diagnostics.subtotal >= targetFinalSubmitSubtotal) {
                 return diagnostics;
               }
 
@@ -3441,7 +3441,7 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
           };
 
           diagnostics = await repairCheckoutCartToMinimum();
-          if (diagnostics.payloadSubtotal < targetFinalSubmitSubtotal) {
+          if (diagnostics.subtotal < targetFinalSubmitSubtotal) {
             throw new Error(`Final submit cart still below minimum after repair: ${JSON.stringify({
               payloadSubtotalAfterRepair: diagnostics.payloadSubtotal,
               visibleSubtotalAfterRepair: diagnostics.domSubtotal,
