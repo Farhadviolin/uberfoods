@@ -1,88 +1,131 @@
+#################################################################
+# UberFoods Web Staging Render Blueprint
+# Safe template only: no real secrets, no production domains.
+#################################################################
+
+databases:
+  - name: uberfoods-staging-postgres
+    databaseName: uberfoods_staging
+    user: uberfoods_staging
+    region: frankfurt
+    plan: basic-1gb
+    ipAllowList: []
+
 services:
-  # Backend API Service
+  - type: keyvalue
+    name: uberfoods-staging-redis
+    region: frankfurt
+    plan: starter
+    ipAllowList: []
+    persistenceMode: off
+    maxmemoryPolicy: allkeys-lru
+
   - type: web
-    name: backend-web
+    name: uberfoods-backend-staging
     runtime: node
     rootDir: backend
-    buildCommand: npm ci && npm run build && npx prisma migrate deploy
+    region: frankfurt
+    plan: starter
+    branch: master
+    autoDeployTrigger: checksPass
+    healthCheckPath: /api/health
+    buildCommand: npm ci && npm run build
+    preDeployCommand: npm run prisma:migrate:deploy
     startCommand: npm run start:prod
     envVars:
       - key: NODE_ENV
         value: production
+      - key: PORT
+        value: 3000
       - key: DATABASE_URL
-        sync: false # Set in Render dashboard
-      - key: JWT_SECRET
-        sync: false # Set in Render dashboard
-      - key: JWT_REFRESH_SECRET
-        sync: false # Set in Render dashboard
+        fromDatabase:
+          name: uberfoods-staging-postgres
+          property: connectionString
       - key: REDIS_URL
-        sync: false # Set in Render dashboard (or use Render Redis addon)
-      - key: ALLOWED_ORIGINS
-        sync: false # Set in Render dashboard with frontend URLs
-      - key: SENTRY_DSN
-        sync: false # Optional: Set in Render dashboard
-      - key: STRIPE_SECRET_KEY
-        sync: false # Set in Render dashboard
-      - key: STRIPE_WEBHOOK_SECRET
-        sync: false # Set in Render dashboard
-      - key: PAYPAL_CLIENT_ID
-        sync: false # Set in Render dashboard
-      - key: PAYPAL_CLIENT_SECRET
-        sync: false # Set in Render dashboard
-      - key: PAYPAL_ENVIRONMENT
-        value: live
-      - key: SMTP_HOST
-        sync: false # Set in Render dashboard
-      - key: SMTP_PORT
-        value: 587
-      - key: SMTP_USER
-        sync: false # Set in Render dashboard
-      - key: SMTP_PASSWORD
-        sync: false # Set in Render dashboard
-      - key: SMTP_FROM_EMAIL
-        sync: false # Set in Render dashboard
-      - key: SMTP_FROM_NAME
-        value: UberFoods
-      - key: VAPID_PUBLIC_KEY
-        sync: false # Set in Render dashboard
-      - key: VAPID_PRIVATE_KEY
-        sync: false # Set in Render dashboard
-      - key: SUPPORT_PHONE
-        sync: false # Set in Render dashboard
-
-  # Admin Panel Static Site
-  - type: web
-    name: admin-panel
-    runtime: static
-    rootDir: frontend/admin-panel
-    buildCommand: npm ci && npm run build
-    staticPublishPath: ./dist
-    envVars:
-      - key: VITE_API_URL
         fromService:
-          type: web
-          name: backend-web
-          property: host
-      - key: VITE_APP_TITLE
-        value: UberFoods Admin Panel
+          name: uberfoods-staging-redis
+          type: keyvalue
+          property: connectionString
+      - key: JWT_SECRET
+        sync: false
+      - key: JWT_REFRESH_SECRET
+        sync: false
+      - key: ALLOWED_ORIGINS
+        value: https://uberfoods-customer-web-staging.onrender.com,https://uberfoods-admin-panel-staging.onrender.com,https://uberfoods-restaurant-web-staging.onrender.com,https://uberfoods-driver-app-staging.onrender.com
+      - key: FRONTEND_CUSTOMER_URL
+        value: https://uberfoods-customer-web-staging.onrender.com
+      - key: FRONTEND_ADMIN_URL
+        value: https://uberfoods-admin-panel-staging.onrender.com
+      - key: FRONTEND_RESTAURANT_URL
+        value: https://uberfoods-restaurant-web-staging.onrender.com
+      - key: FRONTEND_DRIVER_URL
+        value: https://uberfoods-driver-app-staging.onrender.com
+      - key: STRIPE_SECRET_KEY
+        sync: false
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: false
+      - key: STRIPE_PRICE_BASIC
+        sync: false
+      - key: STRIPE_PRICE_PRO
+        sync: false
+      - key: STRIPE_PRICE_FULLTIME
+        sync: false
+      - key: STRIPE_PRICE_ENTERPRISE
+        sync: false
+      - key: PAYPAL_CLIENT_ID
+        sync: false
+      - key: PAYPAL_CLIENT_SECRET
+        sync: false
+      - key: PAYPAL_WEBHOOK_ID
+        sync: false
+      - key: PAYPAL_MODE
+        value: sandbox
+      - key: APPLE_MERCHANT_ID
+        sync: false
+      - key: GOOGLE_PAY_MERCHANT_ID
+        sync: false
+      - key: SENDGRID_API_KEY
+        sync: false
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        sync: false
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASSWORD
+        sync: false
+      - key: SMTP_FROM_EMAIL
+        sync: false
+      - key: SMTP_FROM_NAME
+        sync: false
+      - key: VAPID_PUBLIC_KEY
+        sync: false
+      - key: VAPID_PRIVATE_KEY
+        sync: false
+      - key: SUPPORT_PHONE
+        sync: false
 
-  # Customer Web Static Site
   - type: web
-    name: customer-web
+    name: uberfoods-customer-web-staging
     runtime: static
     rootDir: frontend/customer-web
+    branch: master
+    autoDeployTrigger: checksPass
     buildCommand: npm ci && npm run build
     staticPublishPath: ./dist
     envVars:
       - key: VITE_API_BASE_URL
-        fromService:
-          type: web
-          name: backend-web
-          property: host
+        value: https://uberfoods-backend-staging.onrender.com/api
+      - key: VITE_WS_URL
+        value: https://uberfoods-backend-staging.onrender.com
+      - key: VITE_APP_ENV
+        value: staging
+      - key: VITE_APP_NAME
+        value: UberFoods Customer
       - key: VITE_STRIPE_PUBLISHABLE_KEY
-        sync: false # Set in Render dashboard
+        sync: false
       - key: VITE_GOOGLE_MAPS_API_KEY
-        sync: false # Set in Render dashboard
+        sync: false
       - key: VITE_ENABLE_SOCIAL_FEATURES
         value: true
       - key: VITE_ENABLE_VOICE_ASSISTANT
@@ -95,48 +138,77 @@ services:
         value: true
       - key: VITE_ENABLE_GEOCODING
         value: true
+      - key: VITE_SENTRY_DSN
+        sync: false
+      - key: VITE_SENTRY_ENVIRONMENT
+        value: staging
 
-  # Restaurant Web Static Site
   - type: web
-    name: restaurant-web
+    name: uberfoods-admin-panel-staging
+    runtime: static
+    rootDir: frontend/admin-panel
+    branch: master
+    autoDeployTrigger: checksPass
+    buildCommand: npm ci && npm run build
+    staticPublishPath: ./dist
+    envVars:
+      - key: VITE_API_URL
+        value: https://uberfoods-backend-staging.onrender.com/api
+      - key: VITE_WS_URL
+        value: https://uberfoods-backend-staging.onrender.com
+      - key: VITE_APP_NAME
+        value: UberFoods Admin
+      - key: VITE_APP_TITLE
+        value: UberFoods Admin Panel
+      - key: VITE_SKIP_AUTH
+        value: false
+      - key: VITE_DEV_AUTH_TOKEN
+        sync: false
+      - key: VITE_SENTRY_DSN
+        sync: false
+      - key: VITE_SENTRY_ENVIRONMENT
+        value: staging
+
+  - type: web
+    name: uberfoods-restaurant-web-staging
     runtime: static
     rootDir: frontend/restaurant-web
+    branch: master
+    autoDeployTrigger: checksPass
     buildCommand: npm ci && npm run build
     staticPublishPath: ./dist
     envVars:
       - key: VITE_API_URL
-        fromService:
-          type: web
-          name: backend-web
-          property: host
+        value: https://uberfoods-backend-staging.onrender.com/api
+      - key: VITE_WS_URL
+        value: https://uberfoods-backend-staging.onrender.com
       - key: VITE_APP_NAME
         value: UberFoods Restaurant
+      - key: VITE_SENTRY_DSN
+        sync: false
+      - key: VITE_SENTRY_ENVIRONMENT
+        value: staging
 
-  # Driver App Static Site
   - type: web
-    name: driver-app
+    name: uberfoods-driver-app-staging
     runtime: static
     rootDir: frontend/driver-app
+    branch: master
+    autoDeployTrigger: checksPass
     buildCommand: npm ci && npm run build
     staticPublishPath: ./dist
     envVars:
       - key: VITE_API_URL
-        fromService:
-          type: web
-          name: backend-web
-          property: host
+        value: https://uberfoods-backend-staging.onrender.com/api
+      - key: VITE_WS_URL
+        value: https://uberfoods-backend-staging.onrender.com
+      - key: VITE_APP_NAME
+        value: UberFoods Driver
       - key: VITE_GOOGLE_MAPS_API_KEY
-        sync: false # Set in Render dashboard
+        sync: false
       - key: VITE_APP_VERSION
         value: 1.0.0
-
-# Optional: Add databases (uncomment and configure as needed)
-# databases:
-#   - name: uberfoods-db
-#     databaseName: uberfoods_prod
-#     user: uberfoods
-#     plan: free # Upgrade to paid plan for production
-#
-#   - name: uberfoods-redis
-#     redisName: uberfoods_cache
-#     plan: free # Upgrade to paid plan for production
+      - key: VITE_SENTRY_DSN
+        sync: false
+      - key: VITE_SENTRY_ENVIRONMENT
+        value: staging

@@ -342,7 +342,92 @@ curl -I https://driver-app-staging.onrender.com
 - Erzeugung einer neuen `render.yaml`: nicht noetig
 - Empfehlung: vorhandene Blueprint-Struktur verwenden und Secrets sowie Origins im Hosting-Provider setzen
 
-## 17. Entscheidung
+## 17. Render Blueprint
+
+Die Datei `render.yaml` ist die deklarative Staging-Vorlage fuer Render. Sie definiert
+die PostgreSQL-Datenbank, den Redis-Key-Value-Service, das Backend und die vier Web-Frontends
+als getrennte Services. Die Datei ist absichtlich so aufgebaut, dass keine echten Geheimnisse,
+keine Produktionsdomains und keine produktiven Zugangsdaten im Repository landen.
+
+### Verwendung von `render.yaml`
+
+- Die Datei wird als Blueprint in Render importiert.
+- Render legt daraus die Staging-Services mit den dort beschriebenen Build-, Start- und
+  Publish-Einstellungen an.
+- Backend und Frontends bleiben getrennt deploybar, damit sich einzelne Services einzeln
+  untersuchen und neu ausrollen lassen.
+- Die Frontends verwenden die vorhandenen Vite-Builds und publizieren nur ihren `dist`-Ordner.
+
+### Manuell in Render zu setzende Secrets
+
+Folgende Werte duerfen nicht im Repo stehen und muessen in Render manuell gesetzt werden:
+
+- `JWT_SECRET`
+- `JWT_REFRESH_SECRET`
+- `STRIPE_SECRET_KEY`
+- `STRIPE_WEBHOOK_SECRET`
+- `STRIPE_PRICE_BASIC`
+- `STRIPE_PRICE_PRO`
+- `STRIPE_PRICE_FULLTIME`
+- `STRIPE_PRICE_ENTERPRISE`
+- `PAYPAL_CLIENT_ID`
+- `PAYPAL_CLIENT_SECRET`
+- `PAYPAL_WEBHOOK_ID`
+- `APPLE_MERCHANT_ID`
+- `GOOGLE_PAY_MERCHANT_ID`
+- `SENDGRID_API_KEY`
+- `SMTP_HOST`
+- `SMTP_PORT`
+- `SMTP_USER`
+- `SMTP_PASSWORD`
+- `SMTP_FROM_EMAIL`
+- `SMTP_FROM_NAME`
+- `VAPID_PUBLIC_KEY`
+- `VAPID_PRIVATE_KEY`
+- `SUPPORT_PHONE`
+- `VITE_STRIPE_PUBLISHABLE_KEY`
+- `VITE_GOOGLE_MAPS_API_KEY`
+- `VITE_DEV_AUTH_TOKEN`
+- `VITE_SENTRY_DSN`
+
+### Variablen, die nicht im Repo stehen duerfen
+
+- Alle produktiven Secrets, Token und Passwoerter
+- Reale Produktionsdomains oder Produktions-API-URLs
+- Echte `.env`-Dateien fuer Staging oder Produktion
+- Persistente Zugangsdaten fuer Drittanbieter in Klartext
+
+### Prisma-Migration auf Staging
+
+- Die Blueprint-Datei fuehrt die Migration nicht blind aus.
+- Der dokumentierte Weg ist: Staging-Deployment anlegen, Backend starten, dann die Migration
+  kontrolliert gegen die Staging-Datenbank ausfuehren.
+- In Render ist dafuer der `preDeployCommand` vorgesehen; er sollte nur nach Pruefung des
+  Zielsystems und der kompatiblen Backend-Version laufen.
+- Vor einem neuen Staging-Rollout sollte immer geprueft werden, ob neue Schema-Aenderungen
+  bereits mit den App-Artefakten kompatibel sind.
+
+### Healthcheck und Smoke-Test nach Deployment
+
+- Der Backend-Healthcheck laeuft ueber `GET /api/health`.
+- Ein erfolgreiches Render-Deployment gilt erst dann als belastbar, wenn Backend und alle vier
+  Web-Frontends erreichbar sind.
+- Nach dem Rollout sollten mindestens diese Pruefungen laufen:
+  - Backend-Healthcheck
+  - Customer-Web erreichbar
+  - Admin-Panel erreichbar
+  - Restaurant-Web erreichbar
+  - Driver-App erreichbar
+  - Ein kurzer Login- oder Ladepfad pro Frontend
+  - Der Full-Order-Lifecycle-Smoke-Test gegen die Staging-API
+
+### Ergaenzende Sicherheitsregeln
+
+- `sync: false` bleibt die Standardwahl fuer alle Geheimnisse im Blueprint.
+- CORS muss nur die vier Staging-Origins erlauben.
+- WebSocket- und API-URLs sollen auf Staging-Hosts zeigen, nie auf Produktionsziele.
+
+## 18. Entscheidung
 
 - Web-Staging-ready: ja
 - Production-ready: nein
