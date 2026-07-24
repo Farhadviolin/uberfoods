@@ -1,4 +1,4 @@
-import { INestApplication, ValidationPipe } from "@nestjs/common";
+import { INestApplication, Logger, ValidationPipe } from "@nestjs/common";
 import { Test, TestingModule } from "@nestjs/testing";
 import * as bcrypt from "bcrypt";
 import * as request from "supertest";
@@ -87,6 +87,55 @@ describe("UF-AUDIT-006 driver order security over HTTP", () => {
     );
 
     expect(availableRoutes).toHaveLength(1);
+  });
+
+  it("persists SecurityAuditInterceptor events in PostgreSQL without relation errors", async () => {
+    const loggerError = jest.spyOn(Logger.prototype, "error");
+
+    await loginDriver(seed.driverA.email);
+
+    let entries: Array<{
+      action: string;
+      actor_id: string;
+      entity_type: string;
+      payload: Record<string, unknown>;
+    }> = [];
+    for (let attempt = 0; attempt < 20 && entries.length === 0; attempt += 1) {
+      entries = await prisma.$queryRaw`
+        SELECT action, actor_id, entity_type, payload
+        FROM audit_ledger
+        WHERE action = 'auth.failure'
+          AND entity_type = 'security'
+          AND payload->>'path' = '/api/auth/driver/login'
+        ORDER BY created_at DESC
+        LIMIT 1
+      `;
+      if (entries.length === 0) {
+        await new Promise((resolve) => setTimeout(resolve, 25));
+      }
+    }
+
+    expect(entries).toHaveLength(1);
+    expect(entries[0].actor_id).toBe("auth-monitor");
+    expect(entries[0].entity_type).toBe("security");
+    expect(entries[0].payload).toEqual(
+      expect.objectContaining({
+        method: "POST",
+        path: "/api/auth/driver/login",
+      }),
+    );
+    const serialized = JSON.stringify(entries[0].payload);
+    expect(serialized).not.toMatch(
+      /Bearer|password|authorization|cookie|secret|token/i,
+    );
+    expect(
+      loggerError.mock.calls.some((call) =>
+        call.some((value) =>
+          String(value).includes('relation "audit_ledger" does not exist'),
+        ),
+      ),
+    ).toBe(false);
+    loggerError.mockRestore();
   });
 
   it("rejects unauthenticated driver order requests without leaking data", async () => {

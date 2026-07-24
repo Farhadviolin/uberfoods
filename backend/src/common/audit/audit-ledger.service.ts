@@ -57,7 +57,7 @@ export class AuditLedgerService {
         entity_type, entity_id, payload, prev_hash, hash
       ) VALUES (
         ${entryId}, NOW(), ${actorType}, ${actorId}, ${action},
-        ${entityType}, ${entityId}, ${JSON.stringify(canonicalPayload)}, ${prevHash}, ${hash}
+        ${entityType}, ${entityId}, CAST(${JSON.stringify(canonicalPayload)} AS JSONB), ${prevHash}, ${hash}
       )
     `;
 
@@ -71,8 +71,9 @@ export class AuditLedgerService {
   private async getLatestEntry(): Promise<AuditEntry | null> {
     const prismaClient = this.prisma;
     const results = await prismaClient.$queryRaw<AuditEntry[]>`
-      SELECT id, created_at, actor_type, actor_id, action,
-             entity_type, entity_id, payload, prev_hash, hash
+      SELECT id, created_at AS "createdAt", actor_type AS "actorType",
+             actor_id AS "actorId", action, entity_type AS "entityType",
+             entity_id AS "entityId", payload, prev_hash AS "prevHash", hash
       FROM audit_ledger
       ORDER BY created_at DESC
       LIMIT 1
@@ -92,8 +93,9 @@ export class AuditLedgerService {
   }> {
     const prismaClient = this.prisma;
     const entries = await prismaClient.$queryRaw<AuditEntry[]>`
-      SELECT id, created_at, actor_type, actor_id, action,
-             entity_type, entity_id, payload, prev_hash, hash
+      SELECT id, created_at AS "createdAt", actor_type AS "actorType",
+             actor_id AS "actorId", action, entity_type AS "entityType",
+             entity_id AS "entityId", payload, prev_hash AS "prevHash", hash
       FROM audit_ledger
       ORDER BY created_at ASC
     `;

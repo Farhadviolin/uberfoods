@@ -747,6 +747,24 @@ model AuditLog {
   @@map("audit_logs")
 }
 
+model AuditLedger {
+  id         String   @id
+  createdAt  DateTime @default(now()) @map("created_at")
+  actorType  String   @map("actor_type")
+  actorId    String   @map("actor_id")
+  action     String
+  entityType String   @map("entity_type")
+  entityId   String   @map("entity_id")
+  payload    Json
+  prevHash   String   @map("prev_hash")
+  hash       String
+
+  @@index([createdAt])
+  @@index([actorId, createdAt])
+  @@index([entityType, entityId])
+  @@map("audit_ledger")
+}
+
 model Setting {
   key         String   @id
   value       String
