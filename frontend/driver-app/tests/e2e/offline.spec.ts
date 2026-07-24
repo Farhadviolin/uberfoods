@@ -3,8 +3,7 @@ import { test, expect } from '@playwright/test';
 test.describe('Offline-Funktionalität', () => {
   test.beforeEach(async ({ page }) => {
     await page.context().setOffline(false);
-    await page.goto('/');
-    await page.evaluate(() => {
+    await page.addInitScript(() => {
       localStorage.setItem('driver_token', 'mock-token');
       localStorage.setItem('driver_user', JSON.stringify({
         id: 'driver-123',
@@ -12,7 +11,14 @@ test.describe('Offline-Funktionalität', () => {
         email: 'driver@test.com',
       }));
     });
-    await page.reload();
+    await page.route('**/api/drivers/driver-123/orders/active', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify([]),
+      });
+    });
+    await page.goto('/');
   });
 
   test.afterEach(async ({ context }) => {

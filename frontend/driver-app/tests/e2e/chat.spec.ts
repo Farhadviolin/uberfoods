@@ -11,6 +11,13 @@ test.describe('Chat-Funktionalität', () => {
         email: 'driver@test.com',
       }));
     });
+    await page.route('**/api/drivers/driver-123/orders/active', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify([]),
+      });
+    });
   });
 
   test('öffnet Chat für Bestellung', async ({ page }) => {
