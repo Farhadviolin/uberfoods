@@ -53,6 +53,7 @@ describe("OrderService", () => {
         totalAmount: 25.99,
         customerId: "c1",
         restaurantId: "r1",
+        driverId: null,
       };
       (prisma.order.findUnique as any).mockResolvedValueOnce(mockOrder);
 
@@ -60,6 +61,22 @@ describe("OrderService", () => {
 
       expect(result).toEqual(mockOrder);
       expect(prisma.order.findUnique).toHaveBeenCalled();
+    });
+
+    it("gibt eine zugewiesene driverId unverändert zurück", async () => {
+      const mockOrder = {
+        id: "o2",
+        status: "ACCEPTED",
+        totalAmount: 25.99,
+        customerId: "c1",
+        restaurantId: "r1",
+        driverId: "driver-1",
+      };
+      (prisma.order.findUnique as any).mockResolvedValueOnce(mockOrder);
+
+      const result = await service.findOne("o2");
+
+      expect(result).toEqual(mockOrder);
     });
 
     it("wirft NotFoundException wenn Order nicht existiert", async () => {

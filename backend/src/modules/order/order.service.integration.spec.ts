@@ -1,13 +1,13 @@
-import { Test, TestingModule } from '@nestjs/testing';
-import { OrderService } from './order.service';
-import { PrismaService } from '../../prisma/prisma.service';
-import { CacheService } from '../../common/cache/cache.service';
-import { MetricsService } from '../../common/services/metrics.service';
-import { WebhookService } from './webhook.service';
-import { ModuleRef } from '@nestjs/core';
-import { NotFoundException, BadRequestException } from '@nestjs/common';
+import { Test, TestingModule } from "@nestjs/testing";
+import { OrderService } from "./order.service";
+import { PrismaService } from "../../prisma/prisma.service";
+import { CacheService } from "../../common/cache/cache.service";
+import { MetricsService } from "../../common/services/metrics.service";
+import { WebhookService } from "./webhook.service";
+import { ModuleRef } from "@nestjs/core";
+import { NotFoundException, BadRequestException } from "@nestjs/common";
 
-describe('OrderService (Integration)', () => {
+describe("OrderService (Integration)", () => {
   let service: OrderService;
   let prisma: PrismaService;
 
@@ -88,15 +88,15 @@ describe('OrderService (Integration)', () => {
     jest.clearAllMocks();
   });
 
-  describe('findAll', () => {
-    it('should return paginated orders', async () => {
+  describe("findAll", () => {
+    it("should return paginated orders", async () => {
       const mockOrders = [
         {
-          id: '1',
-          status: 'PENDING',
-          totalAmount: 25.50,
-          customer: { id: 'c1', name: 'John Doe', email: 'john@example.com' },
-          restaurant: { id: 'r1', name: 'Pizza Paradise' },
+          id: "1",
+          status: "PENDING",
+          totalAmount: 25.5,
+          customer: { id: "c1", name: "John Doe", email: "john@example.com" },
+          restaurant: { id: "r1", name: "Pizza Paradise" },
         },
       ];
 
@@ -110,7 +110,7 @@ describe('OrderService (Integration)', () => {
       expect(mockPrismaService.order.findMany).toHaveBeenCalled();
     });
 
-    it('should handle empty result', async () => {
+    it("should handle empty result", async () => {
       mockPrismaService.order.findMany.mockResolvedValue([]);
       mockPrismaService.order.count.mockResolvedValue(0);
 
@@ -121,97 +121,118 @@ describe('OrderService (Integration)', () => {
     });
   });
 
-  describe('findOne', () => {
-    it('should return order by id', async () => {
+  describe("findOne", () => {
+    it("should return order by id", async () => {
       const mockOrder = {
-        id: '1',
-        status: 'PENDING',
-        totalAmount: 25.50,
-        customer: { id: 'c1', name: 'John Doe', email: 'john@example.com' },
-        restaurant: { id: 'r1', name: 'Pizza Paradise' },
+        id: "1",
+        status: "PENDING",
+        totalAmount: 25.5,
+        customer: { id: "c1", name: "John Doe", email: "john@example.com" },
+        restaurant: { id: "r1", name: "Pizza Paradise" },
+        driverId: null,
         driver: null,
         items: [],
       };
 
       mockPrismaService.order.findUnique.mockResolvedValue(mockOrder);
 
-      const result = await service.findOne('1');
+      const result = await service.findOne("1");
 
       expect(result).toEqual(mockOrder);
       expect(mockPrismaService.order.findUnique).toHaveBeenCalledWith({
-        where: { id: '1' },
+        where: { id: "1" },
         include: expect.any(Object),
       });
     });
 
-    it('should throw NotFoundException if order not found', async () => {
+    it("should preserve assigned driverId", async () => {
+      const mockOrder = {
+        id: "2",
+        status: "ACCEPTED",
+        totalAmount: 25.5,
+        customer: { id: "c1", name: "John Doe", email: "john@example.com" },
+        restaurant: { id: "r1", name: "Pizza Paradise" },
+        driverId: "driver-1",
+        driver: { id: "driver-1", name: "Jane Driver" },
+        items: [],
+      };
+
+      mockPrismaService.order.findUnique.mockResolvedValue(mockOrder);
+
+      const result = await service.findOne("2");
+
+      expect(result).toEqual(mockOrder);
+    });
+
+    it("should throw NotFoundException if order not found", async () => {
       mockPrismaService.order.findUnique.mockResolvedValue(null);
 
-      await expect(service.findOne('nonexistent')).rejects.toThrow(NotFoundException);
+      await expect(service.findOne("nonexistent")).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 
-  describe('create', () => {
-    it('should create new order', async () => {
+  describe("create", () => {
+    it("should create new order", async () => {
       const createDto = {
-        customerId: 'c1',
-        restaurantId: 'r1',
-        items: [{ dishId: 'd1', quantity: 2 }],
-        totalAmount: 25.50,
+        customerId: "c1",
+        restaurantId: "r1",
+        items: [{ dishId: "d1", quantity: 2 }],
+        totalAmount: 25.5,
       };
 
-      const mockDishes = [
-        { id: 'd1', price: 12.75, isAvailable: true },
-      ];
+      const mockDishes = [{ id: "d1", price: 12.75, isAvailable: true }];
 
       const mockCreatedOrder = {
-        id: 'order_new',
+        id: "order_new",
         ...createDto,
-        status: 'PENDING',
+        status: "PENDING",
         createdAt: new Date(),
       };
 
       mockPrismaService.dish.findMany.mockResolvedValue(mockDishes);
-      mockPrismaService.customer.findUnique.mockResolvedValue({ id: 'c1' });
-      mockPrismaService.restaurant.findUnique.mockResolvedValue({ id: 'r1' });
+      mockPrismaService.customer.findUnique.mockResolvedValue({ id: "c1" });
+      mockPrismaService.restaurant.findUnique.mockResolvedValue({ id: "r1" });
       mockPrismaService.order.create.mockResolvedValue(mockCreatedOrder);
 
       const result = await service.create(createDto);
 
-      expect(result.id).toBe('order_new');
+      expect(result.id).toBe("order_new");
       expect(mockPrismaService.order.create).toHaveBeenCalled();
     });
-
   });
 
-  describe('updateStatus', () => {
-    it('should update order status', async () => {
+  describe("updateStatus", () => {
+    it("should update order status", async () => {
       const mockOrder = {
-        id: '1',
-        status: 'PENDING',
+        id: "1",
+        status: "PENDING",
       };
 
       const mockUpdatedOrder = {
         ...mockOrder,
-        status: 'CONFIRMED',
+        status: "CONFIRMED",
       };
 
       mockPrismaService.order.findUnique.mockResolvedValue(mockOrder);
       mockPrismaService.order.update.mockResolvedValue(mockUpdatedOrder);
 
-      const result = await service.updateStatus('1', 'CONFIRMED');
+      const result = await service.updateStatus("1", "CONFIRMED");
 
-      expect(result.status).toBe('CONFIRMED');
+      expect(result.status).toBe("CONFIRMED");
       expect(mockPrismaService.order.update).toHaveBeenCalledWith({
-        where: { id: '1' },
-        data: { status: 'CONFIRMED' },
+        where: { id: "1" },
+        data: { status: "CONFIRMED" },
       });
     });
 
-    it('should throw if order not found', async () => {
+    it("should throw if order not found", async () => {
       mockPrismaService.order.findUnique.mockResolvedValue(null);
 
-      await expect(service.updateStatus('nonexistent', 'CONFIRMED')).rejects.toThrow(NotFoundException);
+      await expect(
+        service.updateStatus("nonexistent", "CONFIRMED"),
+      ).rejects.toThrow(NotFoundException);
     });
   });
 });
