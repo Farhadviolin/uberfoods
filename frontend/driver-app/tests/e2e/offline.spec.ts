@@ -30,6 +30,7 @@ test.describe('Offline-Funktionalität', () => {
     await expect(page.getByTestId('driver-dashboard')).toBeVisible();
     // Simuliere Offline-Status erst nach erfolgreichem Laden der App
     await page.context().setOffline(true);
+    await page.waitForFunction(() => navigator.onLine === false);
     await page.evaluate(() => {
       window.dispatchEvent(new Event('offline'));
     });
@@ -62,6 +63,7 @@ test.describe('Offline-Funktionalität', () => {
     await page.goto('/');
     await expect(page.getByTestId('driver-dashboard')).toBeVisible();
     await page.context().setOffline(true);
+    await page.waitForFunction(() => navigator.onLine === false);
     await page.evaluate(() => {
       window.dispatchEvent(new Event('offline'));
     });
