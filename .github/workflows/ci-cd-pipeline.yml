@@ -262,12 +262,14 @@ jobs:
       - name: Run npm audit (Backend)
         run: |
           cd backend
-          npm audit --audit-level=moderate || true
+          npm audit --omit=dev --audit-level=high
+          npm audit --audit-level=high
 
       - name: Run npm audit (Frontend)
         run: |
           cd frontend/customer-web
-          npm audit --audit-level=moderate || true
+          npm audit --omit=dev --audit-level=high
+          npm audit --audit-level=high
 
   # Deploy to Staging (on develop branch)
   deploy-staging:

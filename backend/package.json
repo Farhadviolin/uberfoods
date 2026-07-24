@@ -117,7 +117,7 @@
     "multer": "^2.1.1",
     "nest-winston": "^1.10.2",
     "node-cache": "^5.1.2",
-    "nodemailer": "^8.0.10",
+    "nodemailer": "^9.0.3",
     "opossum": "^9.0.0",
     "passport": "^0.7.0",
     "passport-jwt": "^4.0.1",
@@ -170,6 +170,9 @@
     "typescript": "^5.2.2"
   },
   "overrides": {
+    "@nestjs/swagger": {
+      "js-yaml": "5.2.2"
+    },
     "glob": "^8.1.0",
     "inflight": "^1.0.6",
     "exceljs": {

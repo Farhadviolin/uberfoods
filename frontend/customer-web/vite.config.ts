@@ -1,13 +1,11 @@
 import { defineConfig, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
-import { splitVendorChunkPlugin } from 'vite';
 
 export default defineConfig(({ mode }) => ({
   // Ensure SPA semantics (history fallback behavior expected)
   appType: 'spa',
   plugins: [
     react(),
-    splitVendorChunkPlugin(),
     ...(mode === 'e2e' ? [spaFallbackE2E()] : []),
   ],
   server: {

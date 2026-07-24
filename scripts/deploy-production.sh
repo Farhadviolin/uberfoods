@@ -92,7 +92,8 @@ echo ""
 echo "🔒 Step 5: Security scan..."
 
 cd backend
-npm audit --audit-level=high || echo -e "${YELLOW}⚠️ Some security warnings${NC}"
+npm audit --omit=dev --audit-level=high
+npm audit --audit-level=high
 cd ..
 
 echo -e "${GREEN}✅ Security scan completed${NC}"

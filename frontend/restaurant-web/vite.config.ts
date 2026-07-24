@@ -1,6 +1,5 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
-import { splitVendorChunkPlugin } from 'vite';
 import { copyFileSync } from 'fs';
 import { resolve } from 'path';
 
@@ -22,18 +21,19 @@ const serviceWorkerPlugin = () => {
 export default defineConfig({
   plugins: [
     react(),
-    splitVendorChunkPlugin(),
     serviceWorkerPlugin(),
   ],
   build: {
     rollupOptions: {
       output: {
-        manualChunks: {
-          // Separate vendor chunks for better caching
-          vendor: ['react', 'react-dom', 'react-router-dom'],
-          ui: ['@tanstack/react-query', 'react-hook-form'],
-          utils: ['axios', 'date-fns'],
-          kitchen: ['socket.io-client'], // Kitchen display specific
+        manualChunks: (id) => {
+          if (!id.includes('node_modules')) return;
+          if (id.includes('socket.io-client')) return 'kitchen';
+          if (id.includes('@tanstack/react-query') || id.includes('react-hook-form')) return 'ui';
+          if (id.includes('axios') || id.includes('date-fns')) return 'utils';
+          if (id.includes('react') || id.includes('react-dom') || id.includes('react-router-dom')) {
+            return 'vendor';
+          }
         },
       },
     },
