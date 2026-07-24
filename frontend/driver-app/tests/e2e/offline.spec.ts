@@ -18,7 +18,13 @@ test.describe('Offline-Funktionalität', () => {
         body: JSON.stringify([]),
       });
     });
-    await page.goto('/');
+    await page.route('**/api/drivers/driver-123/orders/available', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify([]),
+      });
+    });
   });
 
   test.afterEach(async ({ context }) => {
