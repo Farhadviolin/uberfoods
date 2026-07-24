@@ -7,11 +7,13 @@ import { DatabaseModule } from "../../common/database/database.module";
 import { MetricsModule } from "../../common/services/metrics.module";
 import { PaymentModule } from "../payment/payment.module";
 import { CacheModule } from "../../common/cache/cache.module";
+import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
+import { RolesGuard } from "../auth/guards/roles.guard";
 
 @Module({
   imports: [DatabaseModule, PaymentModule, CacheModule, MetricsModule],
   controllers: [OrderController, DriverEndpointsController],
-  providers: [OrderService, WebhookService],
+  providers: [OrderService, WebhookService, JwtAuthGuard, RolesGuard],
   exports: [OrderService, WebhookService],
 })
 export class OrderModule {}

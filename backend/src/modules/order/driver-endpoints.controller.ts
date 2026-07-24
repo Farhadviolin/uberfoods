@@ -7,49 +7,65 @@ import {
   Param,
   UseGuards,
   BadRequestException,
+  ForbiddenException,
   Logger,
 } from "@nestjs/common";
 import { ApiTags, ApiOperation, ApiResponse } from "@nestjs/swagger";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
+import { RolesGuard } from "../auth/guards/roles.guard";
 import { GetUser } from "../auth/decorators/get-user.decorator";
+import { Roles } from "../../common/decorators/roles.decorator";
 import { PrismaService } from "../../prisma/prisma.service";
 
 @ApiTags("Driver")
 @Controller("drivers")
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles("DRIVER")
 export class DriverEndpointsController {
   private readonly logger = new Logger(DriverEndpointsController.name);
 
   constructor(private readonly prisma: PrismaService) {}
 
   @Get("orders/available")
-  // @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: "Get available orders for driver" })
   @ApiResponse({ status: 200, description: "Available orders retrieved" })
   async getAvailableOrders(): Promise<unknown> {
     return this.getAvailableOrdersImpl();
   }
 
-  /** Alias for driver-app: GET /drivers/:driverId/orders/available (driverId from JWT in app; param ignored for MVP) */
+  /** Alias for driver-app: GET /drivers/:driverId/orders/available */
   @Get(":driverId/orders/available")
-  @ApiOperation({ summary: "Get available orders (alias with driverId in path)" })
+  @ApiOperation({
+    summary: "Get available orders (alias with driverId in path)",
+  })
   @ApiResponse({ status: 200, description: "Available orders retrieved" })
-  async getAvailableOrdersByDriverId(@Param("driverId") _driverId: string): Promise<unknown> {
+  async getAvailableOrdersByDriverId(
+    @GetUser("id") authenticatedDriverId: string,
+    @Param("driverId") pathDriverId: string,
+  ): Promise<unknown> {
+    this.assertDriverIdentity(authenticatedDriverId, pathDriverId);
     return this.getAvailableOrdersImpl();
   }
 
   @Get("orders/active")
   @ApiOperation({ summary: "Get active orders for driver" })
   @ApiResponse({ status: 200, description: "Active orders retrieved" })
-  async getActiveOrders(): Promise<unknown> {
-    return this.getActiveOrdersImpl();
+  async getActiveOrders(
+    @GetUser("id") authenticatedDriverId: string,
+  ): Promise<unknown> {
+    return this.getActiveOrdersImpl(authenticatedDriverId);
   }
 
-  /** Alias for driver-app: GET /drivers/:driverId/orders/active (driverId from path; ignored for MVP) */
+  /** Alias for driver-app: GET /drivers/:driverId/orders/active */
   @Get(":driverId/orders/active")
   @ApiOperation({ summary: "Get active orders (alias with driverId in path)" })
   @ApiResponse({ status: 200, description: "Active orders retrieved" })
-  async getActiveOrdersByDriverId(@Param("driverId") _driverId: string): Promise<unknown> {
-    return this.getActiveOrdersImpl();
+  async getActiveOrdersByDriverId(
+    @GetUser("id") authenticatedDriverId: string,
+    @Param("driverId") pathDriverId: string,
+  ): Promise<unknown> {
+    this.assertDriverIdentity(authenticatedDriverId, pathDriverId);
+    return this.getActiveOrdersImpl(authenticatedDriverId);
   }
 
   private async getAvailableOrdersImpl(): Promise<unknown> {
@@ -84,11 +100,11 @@ export class DriverEndpointsController {
     }
   }
 
-  private async getActiveOrdersImpl(): Promise<unknown> {
+  private async getActiveOrdersImpl(driverId: string): Promise<unknown> {
     try {
       const orders = await this.prisma.order.findMany({
         where: {
-          driverId: { not: null },
+          driverId,
           status: { in: ["ACCEPTED", "PICKED_UP", "IN_TRANSIT"] },
         },
         include: {
@@ -133,10 +149,12 @@ export class DriverEndpointsController {
   @ApiOperation({ summary: "Accept an order (alias with driverId in path)" })
   @ApiResponse({ status: 200, description: "Order accepted successfully" })
   async acceptOrderWithDriverId(
-    @GetUser("id") driverId: string,
+    @GetUser("id") authenticatedDriverId: string,
+    @Param("driverId") pathDriverId: string,
     @Param("orderId") orderId: string,
   ) {
-    return this.acceptOrderImpl(driverId, orderId);
+    this.assertDriverIdentity(authenticatedDriverId, pathDriverId);
+    return this.acceptOrderImpl(authenticatedDriverId, orderId);
   }
 
   private async acceptOrderImpl(driverId: string, orderId: string) {
@@ -173,14 +191,33 @@ export class DriverEndpointsController {
   /** Alias for driver-app: PUT /drivers/:driverId/orders/:orderId/status */
   @Put(":driverId/orders/:orderId/status")
   @UseGuards(JwtAuthGuard)
-  @ApiOperation({ summary: "Update delivery status (alias with driverId in path)" })
+  @ApiOperation({
+    summary: "Update delivery status (alias with driverId in path)",
+  })
   @ApiResponse({ status: 200, description: "Status updated successfully" })
   async updateOrderStatusWithDriverId(
-    @GetUser("id") driverId: string,
+    @GetUser("id") authenticatedDriverId: string,
+    @Param("driverId") pathDriverId: string,
     @Param("orderId") orderId: string,
     @Body() body: { status: string },
   ) {
-    return this.updateOrderStatusImpl(driverId, orderId, body.status);
+    this.assertDriverIdentity(authenticatedDriverId, pathDriverId);
+    return this.updateOrderStatusImpl(
+      authenticatedDriverId,
+      orderId,
+      body.status,
+    );
+  }
+
+  private assertDriverIdentity(
+    authenticatedDriverId: string,
+    pathDriverId: string,
+  ): void {
+    if (!authenticatedDriverId || authenticatedDriverId !== pathDriverId) {
+      throw new ForbiddenException(
+        "Driver identity does not match authenticated user",
+      );
+    }
   }
 
   private async updateOrderStatusImpl(

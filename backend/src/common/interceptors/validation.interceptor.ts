@@ -14,10 +14,10 @@ export class ValidationInterceptor implements NestInterceptor {
   intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
     return next.handle().pipe(
       catchError((error) => {
-        if (error instanceof ValidationError || error?.response?.message) {
-          const messages = Array.isArray(error.response?.message)
-            ? error.response.message
-            : [error.response?.message || error.message];
+        if (error instanceof ValidationError) {
+          const messages = error.constraints
+            ? Object.values(error.constraints)
+            : ["Validation failed"];
 
           throw new BadRequestException({
             statusCode: 400,
