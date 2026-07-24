@@ -1,24 +1,50 @@
-import { renderHook } from '@testing-library/react';
-import { useAuth } from '../useAuth';
-import { renderWithProviders } from '../../test-utils';
+import { act, renderHook, waitFor } from '@testing-library/react';
+import { AuthProvider, useAuth } from '../../contexts/AuthContext';
+import api from '../../utils/api';
 
-// Mock the useAuth hook
-jest.mock('../useAuth', () => ({
-  useAuth: () => ({
-    user: { id: 'test-user', name: 'Test User' },
-    isAuthenticated: true,
-    login: jest.fn(),
-    logout: jest.fn(),
-  }),
-}));
+jest.mock('../../utils/api');
 
-describe('useAuth Hook', () => {
-  it('returns auth state', () => {
-    const { result } = renderHook(() => useAuth(), {
-      wrapper: renderWithProviders().wrapper,
-    });
+const mockedApi = api as jest.Mocked<typeof api>;
+const driver = {
+  id: 'driver-123',
+  name: 'Test Driver',
+  email: 'driver@test.com',
+};
 
-    expect(result.current.user).toEqual({ id: 'test-user', name: 'Test User' });
+describe('useAuth contract', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    delete mockedApi.defaults.headers.common.Authorization;
+    jest.clearAllMocks();
+  });
+
+  it('restores a persisted authenticated driver session', async () => {
+    localStorage.setItem('driver_token', 'persisted-token');
+    localStorage.setItem('driver_user', JSON.stringify(driver));
+
+    const { result } = renderHook(() => useAuth(), { wrapper: AuthProvider });
+
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.driver).toEqual(driver);
+    expect(result.current.token).toBe('persisted-token');
     expect(result.current.isAuthenticated).toBe(true);
+    expect(mockedApi.defaults.headers.common.Authorization).toBe('Bearer persisted-token');
+  });
+
+  it('clears persisted and in-memory authentication on logout', async () => {
+    localStorage.setItem('driver_token', 'persisted-token');
+    localStorage.setItem('driver_user', JSON.stringify(driver));
+
+    const { result } = renderHook(() => useAuth(), { wrapper: AuthProvider });
+    await waitFor(() => expect(result.current.isAuthenticated).toBe(true));
+
+    act(() => result.current.logout());
+
+    expect(result.current.driver).toBeNull();
+    expect(result.current.token).toBeNull();
+    expect(result.current.isAuthenticated).toBe(false);
+    expect(localStorage.getItem('driver_token')).toBeNull();
+    expect(localStorage.getItem('driver_user')).toBeNull();
+    expect(mockedApi.defaults.headers.common.Authorization).toBeUndefined();
   });
 });
