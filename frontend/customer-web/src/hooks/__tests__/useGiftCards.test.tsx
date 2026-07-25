@@ -1,4 +1,5 @@
 import React from 'react';
+import { waitFor } from '@testing-library/react';
 import { renderHook } from '../../test-utils';
 import {
   useGiftCards,
@@ -9,9 +10,18 @@ import {
 } from '../useGiftCards';
 import { AuthProvider } from '../../contexts/AuthContext';
 
+jest.mock('../../contexts/AuthContext', () => ({
+  ...jest.requireActual('../../contexts/AuthContext'),
+  useAuth: jest.fn(),
+}));
+const { useAuth: mockUseAuth } = jest.requireMock<typeof import('../../contexts/AuthContext')>('../../contexts/AuthContext');
+
 // Mock the API
-jest.mock('../../utils/api', () => require('../../utils/apiMock'));
-const mockApi = require('../../utils/apiMock');
+jest.mock('../../utils/api', () => ({
+  __esModule: true,
+  default: jest.requireActual<typeof import('../../utils/apiMock')>('../../utils/apiMock').default,
+}));
+const { default: mockApi } = jest.requireMock<typeof import('../../utils/apiMock')>('../../utils/api');
 
 // Mock localStorage
 const mockLocalStorage = {
@@ -25,6 +35,7 @@ Object.defineProperty(window, 'localStorage', { value: mockLocalStorage });
 describe('useGiftCards', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockUseAuth.mockReturnValue({ user: null, isAuthenticated: false });
   });
 
   it('returns empty data when user is not authenticated', async () => {
@@ -36,6 +47,7 @@ describe('useGiftCards', () => {
   });
 
   it('fetches gift cards when authenticated', async () => {
+    mockUseAuth.mockReturnValue({ user: { id: 'user-123' }, isAuthenticated: true });
     const mockData = {
       purchased: [
         {
@@ -88,6 +100,7 @@ describe('useActiveGiftCards', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockApi.get.mockReset();
+    mockUseAuth.mockReturnValue({ user: null, isAuthenticated: false });
   });
 
   it('returns empty array when not authenticated', async () => {
@@ -99,6 +112,7 @@ describe('useActiveGiftCards', () => {
   });
 
   it('fetches active gift cards', async () => {
+    mockUseAuth.mockReturnValue({ user: { id: 'user-123' }, isAuthenticated: true });
     const mockActiveCards = [
       {
         id: '1',
@@ -168,10 +182,12 @@ describe('useCheckGiftCardBalance', () => {
 describe('usePurchaseGiftCard', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockUseAuth.mockReturnValue({ user: null, isAuthenticated: false });
     mockApi.post.mockReset();
   });
 
   it('purchases gift card successfully', async () => {
+    mockUseAuth.mockReturnValue({ user: { id: 'user-123' }, isAuthenticated: true });
     const mockPurchaseData = {
       amount: 50,
       recipientEmail: 'friend@example.com',
@@ -210,10 +226,12 @@ describe('usePurchaseGiftCard', () => {
 describe('useRedeemGiftCard', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockUseAuth.mockReturnValue({ user: null, isAuthenticated: false });
     mockApi.post.mockReset();
   });
 
   it('redeems gift card successfully', async () => {
+    mockUseAuth.mockReturnValue({ user: { id: 'user-123' }, isAuthenticated: true });
     const mockResponse = { success: true, newBalance: 25 };
     mockApi.post.mockResolvedValueOnce({ data: mockResponse });
 
