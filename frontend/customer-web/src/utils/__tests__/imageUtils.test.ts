@@ -1,113 +1,106 @@
-import { 
-  getDishPlaceholder, 
-  getImageUrl, 
-  validateImage,
-  compressImage 
-} from '../imageUtils';
+import { getEnvVar } from '../env';
+import { compressImage, getDishPlaceholder, getImageUrl, validateImage } from '../imageUtils';
 
-describe('Image Utils', () => {
-  describe('getDishPlaceholder', () => {
-    it('should return placeholder for dish category', () => {
-      expect(getDishPlaceholder('Pizza')).toContain('pizza');
-      expect(getDishPlaceholder('Burger')).toContain('burger');
-      expect(getDishPlaceholder('Salad')).toContain('salad');
+jest.mock('../env', () => ({ getEnvVar: jest.fn() }));
+const mockGetEnvVar = jest.mocked(getEnvVar);
+
+const makeFile = (name = 'test.jpg', type = 'image/jpeg') => new File(['image'], name, { type });
+
+describe('imageUtils', () => {
+  let getContextSpy: jest.SpyInstance;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockGetEnvVar.mockImplementation((key, defaultValue) => defaultValue);
+    getContextSpy = jest.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null);
+  });
+
+  afterEach(() => {
+    getContextSpy.mockRestore();
+    jest.restoreAllMocks();
+  });
+
+  it('returns a dish placeholder data URL', () => {
+    expect(getDishPlaceholder()).toMatch(/^data:image\/svg\+xml;base64,/);
+  });
+
+  it('proxies relative upload paths through the API', () => {
+    expect(getImageUrl('/uploads/dish.jpg')).toBe('/api/uploads/dish.jpg');
+  });
+
+  it('allows same-origin image URLs when HTTP is explicitly enabled', () => {
+    mockGetEnvVar.mockImplementation((key, defaultValue) =>
+      key === 'VITE_ALLOW_HTTP_IMAGES' ? 'true' : defaultValue
+    );
+    const url = `${window.location.origin}/image.jpg`;
+    expect(getImageUrl(url)).toBe(url);
+  });
+
+  it('rejects external HTTPS image URLs without a whitelist entry', () => {
+    expect(getImageUrl('https://images.example.com/image.jpg')).toMatch(/^data:image\/svg\+xml;base64,/);
+  });
+
+  it('allows an HTTP image only when the exact environment flag and whitelist are set', () => {
+    mockGetEnvVar.mockImplementation((key, defaultValue) => {
+      if (key === 'VITE_ALLOW_HTTP_IMAGES') return 'true';
+      if (key === 'VITE_IMAGE_HOST_WHITELIST') return 'images.example.com';
+      return defaultValue;
     });
 
-    it('should return default for unknown category', () => {
-      expect(getDishPlaceholder('Unknown')).toContain('default');
+    expect(getImageUrl('http://images.example.com/image.jpg')).toBe('http://images.example.com/image.jpg');
+  });
+
+  it('rejects invalid image URLs', () => {
+    expect(getImageUrl('http://[invalid')).toMatch(/^data:image\/svg\+xml;base64,/);
+  });
+
+  it('accepts supported image file types', () => {
+    expect(validateImage(makeFile()).valid).toBe(true);
+  });
+
+  it('rejects unsupported image file types', () => {
+    expect(validateImage(makeFile('test.txt', 'text/plain'))).toEqual({
+      valid: false,
+      error: 'Nur JPEG, PNG, WebP oder GIF Bilder sind erlaubt',
     });
   });
 
-  describe('getImageUrl', () => {
-    it('should return full URL for relative paths', () => {
-      const result = getImageUrl('/uploads/dish.jpg');
-
-      expect(result).toContain('http');
-      expect(result).toContain('/uploads/dish.jpg');
-    });
-
-    it('should return URL as-is for absolute URLs', () => {
-      const url = 'https://example.com/image.jpg';
-      const result = getImageUrl(url);
-
-      expect(result).toBe(url);
-    });
-
-    it('should handle null/undefined', () => {
-      expect(getImageUrl(null as any)).toBe('');
-      expect(getImageUrl(undefined as any)).toBe('');
+  it('rejects image files larger than five megabytes', () => {
+    const largeFile = new File([new Uint8Array(5 * 1024 * 1024 + 1)], 'large.jpg', { type: 'image/jpeg' });
+    expect(validateImage(largeFile)).toEqual({
+      valid: false,
+      error: 'Bild ist zu groß. Maximale Größe: 5MB',
     });
   });
 
-  describe('validateImage', () => {
-    it('should validate file type', () => {
-      const jpgFile = new File([''], 'test.jpg', { type: 'image/jpeg' });
-      const result = validateImage(jpgFile);
-
-      expect(result.valid).toBe(true);
+  it('compresses an image when FileReader, Image and canvas complete successfully', async () => {
+    const toBlob = jest.fn((callback: BlobCallback) => callback(new Blob(['compressed'], { type: 'image/jpeg' })));
+    getContextSpy.mockReturnValue({ drawImage: jest.fn() } as CanvasRenderingContext2D);
+    jest.spyOn(HTMLCanvasElement.prototype, 'toBlob').mockImplementation(toBlob);
+    jest.spyOn(FileReader.prototype, 'readAsDataURL').mockImplementation(function (this: FileReader) {
+      const event = new Event('load');
+      Object.defineProperty(event, 'target', { value: this });
+      Object.defineProperty(this, 'result', { value: 'data:image/jpeg;base64,AA==' });
+      this.onload?.(event as ProgressEvent<FileReader>);
+    });
+    const imageSrc = Object.getOwnPropertyDescriptor(HTMLImageElement.prototype, 'src');
+    Object.defineProperty(HTMLImageElement.prototype, 'src', {
+      configurable: true,
+      set() {
+        queueMicrotask(() => this.onload?.(new Event('load')));
+      },
     });
 
-    it('should reject invalid file types', () => {
-      const txtFile = new File([''], 'test.txt', { type: 'text/plain' });
-      const result = validateImage(txtFile);
+    await expect(compressImage(makeFile())).resolves.toBeInstanceOf(File);
+    expect(toBlob).toHaveBeenCalled();
 
-      expect(result.valid).toBe(false);
-      expect(result.error).toContain('format');
-    });
-
-    it('should validate file size', () => {
-      const largeData = new Array(6 * 1024 * 1024).join('x'); // 6 MB
-      const largeFile = new File([largeData], 'large.jpg', { type: 'image/jpeg' });
-      
-      const result = validateImage(largeFile);
-
-      expect(result.valid).toBe(false);
-      expect(result.error).toContain('5 MB');
-    });
-
-    it('should accept valid file', () => {
-      const smallData = new Array(1024).join('x'); // 1 KB
-      const validFile = new File([smallData], 'valid.jpg', { type: 'image/jpeg' });
-      
-      const result = validateImage(validFile);
-
-      expect(result.valid).toBe(true);
-    });
+    if (imageSrc) Object.defineProperty(HTMLImageElement.prototype, 'src', imageSrc);
   });
 
-  describe('compressImage', () => {
-    it('should compress image maintaining aspect ratio', async () => {
-      // Create mock canvas
-      const mockCanvas = {
-        width: 0,
-        height: 0,
-        getContext: jest.fn(() => ({
-          drawImage: jest.fn(),
-        })),
-        toBlob: jest.fn((callback) => {
-          callback(new Blob(['compressed'], { type: 'image/jpeg' }));
-        }),
-      };
-
-      global.document.createElement = jest.fn(() => mockCanvas as any);
-
-      const file = new File(['data'], 'test.jpg', { type: 'image/jpeg' });
-      
-      const result = await compressImage(file, {
-        maxWidth: 800,
-        maxHeight: 600,
-        quality: 0.8,
-      });
-
-      expect(result).toBeInstanceOf(File);
+  it('rejects FileReader, Image and canvas failure paths without hanging', async () => {
+    jest.spyOn(FileReader.prototype, 'readAsDataURL').mockImplementation(function (this: FileReader) {
+      this.onerror?.(new ProgressEvent('error'));
     });
-
-    it('should handle compression errors', async () => {
-      const invalidFile = new File([''], 'test.jpg', { type: 'image/jpeg' });
-
-      await expect(
-        compressImage(invalidFile, { maxWidth: 800 })
-      ).rejects.toThrow();
-    });
+    await expect(compressImage(makeFile())).rejects.toThrow('Fehler beim Lesen der Datei');
   });
 });

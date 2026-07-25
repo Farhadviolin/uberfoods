@@ -1,6 +1,7 @@
 /**
  * Image Upload Utilities - Kompression und Validierung
  */
+import { getEnvVar } from './env';
 
 export interface ImageValidationResult {
   valid: boolean;
@@ -174,12 +175,12 @@ export function getImageUrl(imagePath?: string | null): string {
     // Grundlegende Validierung: Prüfe auf gefährliche Protokolle
     try {
       const url = new URL(imagePath);
-      const allowHttp = (import.meta.env.VITE_ALLOW_HTTP_IMAGES ?? 'false') === 'true';
+      const allowHttp = (getEnvVar('VITE_ALLOW_HTTP_IMAGES', 'false') ?? 'false') === 'true';
       if (!['https:'].includes(url.protocol) && !(allowHttp && url.protocol === 'http:')) {
         return getPlaceholderImage();
       }
       const hostname = url.hostname.toLowerCase();
-      const allowedHostsEnv = import.meta.env.VITE_IMAGE_HOST_WHITELIST || '';
+      const allowedHostsEnv = getEnvVar('VITE_IMAGE_HOST_WHITELIST', '') || '';
       const allowedHosts = allowedHostsEnv.split(',').map((h: string) => h.trim().toLowerCase()).filter(Boolean);
       const isSameOrigin = typeof window !== 'undefined' && url.origin === window.location.origin;
       const isAllowedHost = allowedHosts.length > 0 && allowedHosts.includes(hostname);
