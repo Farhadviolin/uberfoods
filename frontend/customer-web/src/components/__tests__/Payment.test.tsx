@@ -1,290 +1,203 @@
-import { screen, fireEvent, waitFor } from '@testing-library/react';
-import { render } from '../../test-utils';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { Payment } from '../Payment';
-import * as stripe from '@stripe/stripe-js';
+import api from '../../utils/api';
 
-// Mock Stripe
-jest.mock('@stripe/stripe-js', () => ({
-  loadStripe: jest.fn(() => Promise.resolve({
-    elements: jest.fn(() => ({
-      create: jest.fn(() => ({
-        mount: jest.fn(),
-        on: jest.fn(),
-        update: jest.fn(),
-      })),
-    })),
-    confirmCardPayment: jest.fn(),
-  })),
+interface StripeBoundaryProps {
+  orderId: string;
+  amount: number;
+  onSuccess: () => void;
+  onCancel: () => void;
+}
+
+const mockStripePayment = jest.fn(
+  ({ orderId, amount }: StripeBoundaryProps) => (
+    <div
+      data-testid="stripe-payment"
+      data-order-id={orderId}
+      data-amount={amount}
+    >
+      Stripe payment
+    </div>
+  )
+);
+
+jest.mock('../../utils/api');
+jest.mock('../StripePayment', () => ({
+  StripePayment: (props: StripeBoundaryProps) => mockStripePayment(props),
 }));
-
-// Mock the payment hooks
-jest.mock('../../hooks/useStripe', () => ({
-  useStripePayment: () => ({
-    createPaymentIntent: jest.fn().mockResolvedValue({
-      clientSecret: 'pi_test_secret',
-      id: 'pi_test_123',
-    }),
-    confirmPayment: jest.fn().mockResolvedValue({
-      success: true,
-      paymentIntentId: 'pi_test_123',
-    }),
+jest.mock('react-i18next', () => ({
+  useTranslation: () => ({
+    t: (key: string) => {
+      const translations: Record<string, string> = {
+        'payment.iban': 'IBAN',
+        'payment.invalidIban': 'Ungültige IBAN',
+        'payment.paypalRedirect': 'Sie werden zu PayPal weitergeleitet.',
+      };
+      return translations[key] || key;
+    },
   }),
 }));
-
-jest.mock('../../hooks/usePayPal', () => ({
-  usePayPalPayment: () => ({
-    createOrder: jest.fn().mockResolvedValue('paypal_order_123'),
-    onApprove: jest.fn(),
-  }),
-}));
-
 
 describe('Payment Component', () => {
-  const mockOrder = {
-    id: 'order123',
-    total: 25.98,
-    items: [
-      {
-        id: '1',
-        name: 'Test Dish',
-        price: 12.99,
-        quantity: 2,
-      },
-    ],
-  };
-
   const mockOnSuccess = jest.fn();
-  const mockOnError = jest.fn();
+  const mockOnCancel = jest.fn();
+  const mockApi = jest.mocked(api);
+
+  const renderPayment = async () => {
+    const result = render(
+      <Payment
+        orderId="order123"
+        amount={25.98}
+        onSuccess={mockOnSuccess}
+        onCancel={mockOnCancel}
+      />
+    );
+
+    await waitFor(() => {
+      expect(mockApi.get).toHaveBeenCalledWith('/customers/me/payment-methods');
+    });
+    return result;
+  };
 
   beforeEach(() => {
     jest.clearAllMocks();
+    mockApi.get.mockResolvedValue({ data: [] });
+    mockApi.post.mockReset();
   });
 
-  it('renders payment method selection', () => {
-    render(
-      <Payment
-        order={mockOrder}
-        onSuccess={mockOnSuccess}
-        onError={mockOnError}
-      />
-    );
+  it('renders payment method selection', async () => {
+    await renderPayment();
 
-    expect(screen.getByText('Select Payment Method')).toBeInTheDocument();
-    expect(screen.getByText('Credit Card')).toBeInTheDocument();
-    expect(screen.getByText('PayPal')).toBeInTheDocument();
-    expect(screen.getByText('Apple Pay')).toBeInTheDocument();
-    expect(screen.getByText('Google Pay')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 2, name: 'Zahlung' })).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { level: 3, name: 'Zahlungsmethode wählen' })
+    ).toBeInTheDocument();
+
+    for (const method of [
+      'Kreditkarte',
+      'PayPal',
+      'Apple Pay',
+      'SEPA Lastschrift',
+      'Überweisung',
+      'Sofortüberweisung',
+    ]) {
+      expect(screen.getByRole('button', { name: method })).toBeInTheDocument();
+    }
   });
 
-  it('displays order summary', () => {
-    render(
-      <Payment
-        order={mockOrder}
-        onSuccess={mockOnSuccess}
-        onError={mockOnError}
-      />
-    );
+  it('displays the order amount in euros', async () => {
+    await renderPayment();
 
-    expect(screen.getByText('Order Total: €25.98')).toBeInTheDocument();
-    expect(screen.getByText('Test Dish')).toBeInTheDocument();
-    expect(screen.getByText('2 x €12.99')).toBeInTheDocument();
+    expect(screen.getByText('Gesamtbetrag:')).toBeInTheDocument();
+    expect(screen.getByText('25.98 €')).toBeInTheDocument();
   });
 
-  it('shows Stripe card element when credit card selected', async () => {
-    render(
-      <Payment
-        order={mockOrder}
-        onSuccess={mockOnSuccess}
-        onError={mockOnError}
-      />
-    );
+  it('passes the current order contract to the Stripe boundary', async () => {
+    await renderPayment();
 
-    const creditCardButton = screen.getByText('Credit Card');
-    fireEvent.click(creditCardButton);
+    expect(mockStripePayment).toHaveBeenCalledWith(
+      expect.objectContaining({
+        orderId: 'order123',
+        amount: 25.98,
+        onSuccess: mockOnSuccess,
+        onCancel: mockOnCancel,
+      })
+    );
+    expect(screen.getByTestId('stripe-payment')).toHaveAttribute('data-order-id', 'order123');
+    expect(screen.getByTestId('stripe-payment')).toHaveAttribute('data-amount', '25.98');
+  });
+
+  it('handles a successful card payment once', async () => {
+    await renderPayment();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Jetzt bezahlen' }));
 
     await waitFor(() => {
-      expect(screen.getByText('Card Number')).toBeInTheDocument();
+      expect(screen.getByTestId('success-message')).toHaveTextContent('Zahlung erfolgreich!');
     });
-
-    expect(screen.getByText('Expiry Date')).toBeInTheDocument();
-    expect(screen.getByText('CVC')).toBeInTheDocument();
-  });
-
-  it('handles successful credit card payment', async () => {
-    render(
-      <Payment
-        order={mockOrder}
-        onSuccess={mockOnSuccess}
-        onError={mockOnError}
-      />
-    );
-
-    const creditCardButton = screen.getByText('Credit Card');
-    fireEvent.click(creditCardButton);
-
-    await waitFor(() => {
-      expect(screen.getByText('Pay €25.98')).toBeInTheDocument();
-    });
-
-    const payButton = screen.getByText('Pay €25.98');
-    fireEvent.click(payButton);
-
-    await waitFor(() => {
-      expect(mockOnSuccess).toHaveBeenCalledWith({
-        success: true,
-        paymentIntentId: 'pi_test_123',
-      });
-    });
+    expect(mockOnSuccess).toHaveBeenCalledTimes(1);
+    expect(mockOnCancel).not.toHaveBeenCalled();
+    expect(mockApi.post).not.toHaveBeenCalled();
   });
 
   it('handles PayPal payment flow', async () => {
-    render(
-      <Payment
-        order={mockOrder}
-        onSuccess={mockOnSuccess}
-        onError={mockOnError}
-      />
-    );
+    await renderPayment();
 
-    const paypalButton = screen.getByText('PayPal');
-    fireEvent.click(paypalButton);
+    const paypalMethod = screen.getByRole('button', { name: 'PayPal' });
+    fireEvent.click(paypalMethod);
+    expect(paypalMethod).toHaveClass('active');
 
-    await waitFor(() => {
-      expect(screen.getByText('Pay with PayPal')).toBeInTheDocument();
-    });
+    fireEvent.click(screen.getByRole('button', { name: 'Mit PayPal bezahlen' }));
 
-    const paypalPayButton = screen.getByText('Pay with PayPal');
-    fireEvent.click(paypalPayButton);
-
-    // PayPal flow would normally open a popup
-    // For testing, we just verify the button exists
-    expect(paypalPayButton).toBeInTheDocument();
+    expect(await screen.findByText('PayPal-Zahlung erfolgreich!')).toBeInTheDocument();
+    expect(mockOnSuccess).toHaveBeenCalledTimes(1);
+    expect(mockApi.post).not.toHaveBeenCalled();
   });
 
-  it('handles payment errors', async () => {
-    // Mock a failed payment
-    jest.doMock('../../hooks/useStripe', () => ({
-      useStripePayment: () => ({
-        createPaymentIntent: jest.fn().mockRejectedValue(new Error('Payment failed')),
-        confirmPayment: jest.fn(),
-      }),
-    }));
+  it('invokes cancellation without reporting payment success', async () => {
+    await renderPayment();
 
-    render(
-      <Payment
-        order={mockOrder}
-        onSuccess={mockOnSuccess}
-        onError={mockOnError}
-      />
-    );
+    fireEvent.click(screen.getByRole('button', { name: 'Abbrechen' }));
 
-    const creditCardButton = screen.getByText('Credit Card');
-    fireEvent.click(creditCardButton);
-
-    await waitFor(() => {
-      expect(screen.getByText('Pay €25.98')).toBeInTheDocument();
-    });
-
-    const payButton = screen.getByText('Pay €25.98');
-    fireEvent.click(payButton);
-
-    await waitFor(() => {
-      expect(mockOnError).toHaveBeenCalledWith(new Error('Payment failed'));
-    });
+    expect(mockOnCancel).toHaveBeenCalledTimes(1);
+    expect(mockOnSuccess).not.toHaveBeenCalled();
+    expect(mockApi.post).not.toHaveBeenCalled();
   });
 
-  it('shows loading state during payment', async () => {
-    // Mock a slow payment
-    jest.doMock('../../hooks/useStripe', () => ({
-      useStripePayment: () => ({
-        createPaymentIntent: jest.fn().mockImplementation(
-          () => new Promise(resolve => setTimeout(() => resolve({
-            clientSecret: 'pi_test_secret',
-            id: 'pi_test_123',
-          }), 1000))
-        ),
-        confirmPayment: jest.fn().mockImplementation(
-          () => new Promise(resolve => setTimeout(() => resolve({
-            success: true,
-            paymentIntentId: 'pi_test_123',
-          }), 1000))
-        ),
-      }),
-    }));
+  it('shows validation feedback for an invalid SEPA IBAN', async () => {
+    await renderPayment();
 
-    render(
-      <Payment
-        order={mockOrder}
-        onSuccess={mockOnSuccess}
-        onError={mockOnError}
-      />
-    );
+    fireEvent.click(screen.getByRole('button', { name: 'SEPA Lastschrift' }));
+    const iban = screen.getByRole('textbox', { name: 'IBAN' });
+    fireEvent.change(iban, { target: { value: 'invalid-iban' } });
 
-    const creditCardButton = screen.getByText('Credit Card');
-    fireEvent.click(creditCardButton);
-
-    await waitFor(() => {
-      expect(screen.getByText('Pay €25.98')).toBeInTheDocument();
-    });
-
-    const payButton = screen.getByText('Pay €25.98');
-    fireEvent.click(payButton);
-
-    expect(screen.getByText('Processing payment...')).toBeInTheDocument();
-
-    await waitFor(() => {
-      expect(mockOnSuccess).toHaveBeenCalled();
-    });
+    expect(screen.getByText('Ungültige IBAN')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Jetzt bezahlen' })).toBeDisabled();
+    expect(mockOnSuccess).not.toHaveBeenCalled();
+    expect(mockApi.post).not.toHaveBeenCalled();
   });
 
-  it('validates payment before submission', async () => {
-    render(
-      <Payment
-        order={mockOrder}
-        onSuccess={mockOnSuccess}
-        onError={mockOnError}
-      />
-    );
-
-    const creditCardButton = screen.getByText('Credit Card');
-    fireEvent.click(creditCardButton);
-
-    await waitFor(() => {
-      expect(screen.getByText('Pay €25.98')).toBeInTheDocument();
+  it('renders saved payment methods from the current API boundary', async () => {
+    mockApi.get.mockResolvedValue({
+      data: [{ id: 'saved-card', type: 'card', brand: 'visa', last4: '4242' }],
     });
 
-    const payButton = screen.getByText('Pay €25.98');
-    expect(payButton).toBeDisabled(); // Should be disabled without card details
+    await renderPayment();
+
+    const savedMethodToggle = await screen.findByRole('checkbox', {
+      name: 'Gespeicherte Zahlungsmethode verwenden',
+    });
+    fireEvent.click(savedMethodToggle);
+
+    expect(screen.getByRole('option', { name: 'VISA •••• 4242' })).toBeInTheDocument();
+    expect(mockApi.post).not.toHaveBeenCalled();
   });
 
-  it('allows adding tip', () => {
-    render(
-      <Payment
-        order={mockOrder}
-        onSuccess={mockOnSuccess}
-        onError={mockOnError}
-      />
-    );
+  it('shows the bank-transfer contract with the unchanged euro amount', async () => {
+    await renderPayment();
 
-    expect(screen.getByText('Add a tip')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Überweisung' }));
 
-    const tipButtons = screen.getAllByRole('button', { name: /€\d+\.\d+/ });
-    expect(tipButtons.length).toBeGreaterThan(0);
+    expect(
+      screen.getByText('Bitte überweisen Sie 25.98 € auf folgendes Konto:')
+    ).toBeInTheDocument();
+    expect(screen.getByText('Verwendungszweck: Bestellung order123')).toBeInTheDocument();
+    expect(mockApi.post).not.toHaveBeenCalled();
   });
 
-  it('calculates total with tip', () => {
-    render(
-      <Payment
-        order={mockOrder}
-        onSuccess={mockOnSuccess}
-        onError={mockOnError}
-      />
-    );
+  it('changes methods without triggering callbacks or payment requests', async () => {
+    await renderPayment();
 
-    const tipButton = screen.getByText('€3.00');
-    fireEvent.click(tipButton);
+    const sofort = screen.getByRole('button', { name: 'Sofortüberweisung' });
+    fireEvent.click(sofort);
 
-    expect(screen.getByText('Order Total: €28.98')).toBeInTheDocument();
+    expect(sofort).toHaveClass('active');
+    expect(
+      screen.getByRole('button', { name: '⚡ Mit Sofortüberweisung bezahlen' })
+    ).toBeInTheDocument();
+    expect(mockOnSuccess).not.toHaveBeenCalled();
+    expect(mockOnCancel).not.toHaveBeenCalled();
+    expect(mockApi.post).not.toHaveBeenCalled();
   });
 });
 

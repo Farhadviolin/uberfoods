@@ -1,7 +1,6 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import Payment from '../components/Payment';
-import React from 'react';
+import api from '../utils/api';
 
 // Mock i18n
 jest.mock('react-i18next', () => ({
@@ -18,45 +17,35 @@ jest.mock('react-i18next', () => ({
   }),
 }));
 
-// Mock dependencies
-jest.mock('../hooks/useStripe', () => ({
-  useStripe: () => ({
-    createPaymentIntent: jest.fn().mockResolvedValue({ clientSecret: 'test_secret' }),
-    confirmPayment: jest.fn().mockResolvedValue({ success: true }),
-  }),
+jest.mock('../utils/api');
+jest.mock('../components/StripePayment', () => ({
+  StripePayment: () => null,
 }));
 
-jest.mock('../hooks/usePayPal', () => ({
-  usePayPal: () => ({
-    createOrder: jest.fn().mockResolvedValue('paypal_order_id'),
-    captureOrder: jest.fn().mockResolvedValue({ success: true }),
-  }),
-}));
-
-const renderWithProviders = (component: React.ReactElement) => {
-  return render(
-    <QueryClientProvider client={queryClient}>
-      {component}
-    </QueryClientProvider>
-  );
-};
+const mockApi = jest.mocked(api);
 
 describe('Payment Component', () => {
   beforeEach(() => {
-    queryClient.clear();
+    jest.clearAllMocks();
+    mockApi.get.mockResolvedValue({ data: [] });
+    mockApi.post.mockReset();
   });
 
-  it('renders payment form correctly', () => {
-    renderWithProviders(<Payment orderId="test-order" amount={25.50} />);
+  it('renders payment form correctly', async () => {
+    render(<Payment orderId="test-order" amount={25.50} />);
 
     expect(screen.getByText('Zahlungsmethode wählen')).toBeInTheDocument();
     expect(screen.getByText('Kreditkarte')).toBeInTheDocument();
     expect(screen.getByText('PayPal')).toBeInTheDocument();
     expect(screen.getByText('Apple Pay')).toBeInTheDocument();
+    expect(screen.getByText('25.50 €')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(mockApi.get).toHaveBeenCalledWith('/customers/me/payment-methods');
+    });
   });
 
   it('handles card payment submission', async () => {
-    renderWithProviders(<Payment orderId="test-order" amount={25.50} />);
+    render(<Payment orderId="test-order" amount={25.50} />);
 
     const cardButton = screen.getByText('Kreditkarte');
     fireEvent.click(cardButton);
@@ -67,10 +56,11 @@ describe('Payment Component', () => {
     await waitFor(() => {
       expect(screen.getByText('Zahlung erfolgreich!')).toBeInTheDocument();
     });
+    expect(mockApi.post).not.toHaveBeenCalled();
   });
 
   it('validates IBAN for SEPA payments', async () => {
-    renderWithProviders(<Payment orderId="test-order" amount={25.50} />);
+    render(<Payment orderId="test-order" amount={25.50} />);
 
     // Switch to SEPA
     const sepaTab = screen.getByText('SEPA Lastschrift');
@@ -86,10 +76,11 @@ describe('Payment Component', () => {
     await waitFor(() => {
       expect(screen.getByText('Ungültige IBAN')).toBeInTheDocument();
     });
+    expect(mockApi.post).not.toHaveBeenCalled();
   });
 
   it('handles PayPal payment flow', async () => {
-    renderWithProviders(<Payment orderId="test-order" amount={25.50} />);
+    render(<Payment orderId="test-order" amount={25.50} />);
 
     const paypalButton = screen.getByText('PayPal');
     fireEvent.click(paypalButton);
@@ -100,6 +91,7 @@ describe('Payment Component', () => {
     await waitFor(() => {
       expect(screen.getByText('PayPal-Zahlung erfolgreich!')).toBeInTheDocument();
     });
+    expect(mockApi.post).not.toHaveBeenCalled();
   });
 });
 
