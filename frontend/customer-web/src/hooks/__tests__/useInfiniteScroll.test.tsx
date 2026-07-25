@@ -1,8 +1,8 @@
-import { screen, fireEvent, waitFor } from '@testing-library/react';
-import { render } from '../../test-utils';
+import { act, renderHook } from '@testing-library/react';
 import { useInfiniteScroll } from '../useInfiniteScroll';
 
 describe('useInfiniteScroll', () => {
+  const originalIntersectionObserver = global.IntersectionObserver;
   let mockIntersectionObserver: jest.Mock;
   let observeMock: jest.Mock;
   let disconnectMock: jest.Mock;
@@ -18,10 +18,11 @@ describe('useInfiniteScroll', () => {
     }));
 
     // Mock IntersectionObserver globally
-    global.IntersectionObserver = mockIntersectionObserver as any;
+    global.IntersectionObserver = mockIntersectionObserver as unknown as typeof IntersectionObserver;
   });
 
   afterEach(() => {
+    global.IntersectionObserver = originalIntersectionObserver;
     jest.clearAllMocks();
   });
 
