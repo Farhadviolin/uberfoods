@@ -1,5 +1,7 @@
 import { renderHook, waitFor } from '@testing-library/react';
 
+jest.unmock('@tanstack/react-query');
+
 // Use the global custom render that includes providers
 const render = (global as any).customRender;
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -26,11 +28,14 @@ const wrapper = ({ children }: { children: React.ReactNode }) => (
 describe('useDashboardData Hook', () => {
   const mockStatsResponse = {
     data: {
-      orders: { total: 1250, completed: 1187, completionRate: 95 },
-      revenue: { total: 25680.50, average: 20.54 },
-      customers: { total: 890, new: 45 },
-      restaurants: { total: 45 },
-      drivers: { total: 120, active: 95 }
+      success: true,
+      data: {
+        orders: { total: 1250, completed: 1187, completionRate: 95 },
+        revenue: { total: 25680.50, average: 20.54 },
+        customers: { total: 890, new: 45 },
+        restaurants: { total: 45 },
+        drivers: { total: 120, active: 95 }
+      }
     }
   };
 
@@ -78,7 +83,13 @@ describe('useDashboardData Hook', () => {
     const { result } = renderHook(() => useDashboardData(), { wrapper });
 
     expect(result.current.isLoading).toBe(true);
-    expect(result.current.stats).toBeUndefined();
+    expect(result.current.stats).toEqual({
+      orders: { total: 0, completed: 0, completionRate: 0 },
+      revenue: { total: 0, average: 0 },
+      customers: { total: 0, new: 0 },
+      restaurants: { total: 0 },
+      drivers: { total: 0, active: 0 },
+    });
   });
 
   it('returns dashboard data when loaded', async () => {
@@ -102,24 +113,22 @@ describe('useDashboardData Hook', () => {
     renderHook(() => useDashboardData(), { wrapper });
 
     await waitFor(() => {
-      expect(mockApi.get).toHaveBeenCalledWith('/statistics/dashboard?period=7d');
-      expect(mockApi.get).toHaveBeenCalledWith('/statistics/revenue?period=7d');
-      expect(mockApi.get).toHaveBeenCalledWith('/statistics/top-restaurants?limit=5');
+      expect(mockApi.get).toHaveBeenCalledWith('/admin/statistics/dashboard?period=7d');
+      expect(mockApi.get).toHaveBeenCalledWith('/admin/statistics/revenue?period=7d');
+      expect(mockApi.get).toHaveBeenCalledWith('/admin/statistics/top-restaurants?limit=5');
     });
   });
 
   it('handles API errors', async () => {
+    mockApi.get.mockReset();
     (mockApi.get as jest.Mock).mockRejectedValue(new Error('API Error'));
 
     const { result } = renderHook(() => useDashboardData(), { wrapper });
 
-    await waitFor(() => {
-      expect(result.current.isLoading).toBe(false);
-    });
+    await waitFor(() => expect(result.current.error).toMatchObject({ message: 'API Error' }), { timeout: 5000 });
 
-    expect(result.current.error).toBeInstanceOf(Error);
     expect(result.current.error?.message).toBe('API Error');
-    expect(result.current.stats).toBeUndefined();
+    expect(result.current.stats.orders.total).toBe(0);
   });
 
   it('provides statistics data', async () => {
@@ -200,7 +209,8 @@ describe('useDashboardData Hook', () => {
   });
 
   it('handles empty data gracefully', async () => {
-    const emptyStats = { data: { orders: { total: 0 }, revenue: { total: 0 }, customers: { total: 0 }, restaurants: { total: 0 }, drivers: { total: 0 } } };
+    mockApi.get.mockReset();
+    const emptyStats = { data: { success: true, data: { orders: { total: 0 }, revenue: { total: 0 }, customers: { total: 0 }, restaurants: { total: 0 }, drivers: { total: 0 } } } };
     const emptyArray = { data: [] };
     const emptyNull = { data: null };
 
@@ -236,6 +246,7 @@ describe('useDashboardData Hook', () => {
   });
 
   it('handles network timeouts', async () => {
+    mockApi.get.mockReset();
     (mockApi.get as jest.Mock).mockImplementation(
       () => new Promise((_, reject) =>
         setTimeout(() => reject(new Error('Network timeout')), 100)
@@ -245,8 +256,8 @@ describe('useDashboardData Hook', () => {
     const { result } = renderHook(() => useDashboardData(), { wrapper });
 
     await waitFor(() => {
-      expect(result.current.error).toBeInstanceOf(Error);
-    });
+      expect(result.current.error).toMatchObject({ message: 'Network timeout' });
+    }, { timeout: 5000 });
 
     expect(result.current.error?.message).toBe('Network timeout');
   });

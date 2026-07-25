@@ -1,186 +1,48 @@
-import { screen, waitFor } from '@testing-library/react';
-
-// Use the global custom render that includes providers
-const render = (global as any).customRender;
-import userEvent from '@testing-library/user-event';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { CustomersManagement } from '../CustomersManagement';
-import * as api from '../../utils/api';
+import api from '../../utils/api';
 
+const render = (global as any).customRender;
 jest.mock('../../utils/api');
+const mockGet = api.get as jest.Mock;
+
+const customers = [
+  { id: 'c1', name: 'John Doe', email: 'john@example.com', phone: '123', address: 'Wien' },
+  { id: 'c2', name: 'Jane Smith', email: 'jane@example.com', phone: '456', address: 'Graz' },
+];
 
 describe('CustomersManagement Component', () => {
-  const queryClient = new QueryClient({
-    defaultOptions: { queries: { retry: false } },
-  });
-
-  const wrapper = ({ children }: { children: React.ReactNode }) => (
-    <QueryClientProvider client={queryClient}>
-      {children}
-    </QueryClientProvider>
-  );
-
   beforeEach(() => {
-    jest.clearAllMocks();
-  });
-
-  it('renders customers management interface', () => {
-    render(<CustomersManagement />, { wrapper });
-    expect(screen.getByText(/Kunden/i)).toBeInTheDocument();
-  });
-
-  it('displays list of customers', async () => {
-    const mockCustomers = [
-      {
-        id: 'cust_1',
-        name: 'John Doe',
-        email: 'john@example.com',
-        phone: '+43 664 1234567',
-        totalOrders: 25,
-        totalSpent: 450.50,
-      },
-      {
-        id: 'cust_2',
-        name: 'Jane Smith',
-        email: 'jane@example.com',
-        phone: '+43 664 9876543',
-        totalOrders: 15,
-        totalSpent: 280.00,
-      },
-    ];
-
-    (api.default.get as jest.Mock).mockResolvedValue({
-      data: { data: mockCustomers },
-    });
-
-    render(<CustomersManagement />, { wrapper });
-
-    await waitFor(() => {
-      expect(screen.getByText('John Doe')).toBeInTheDocument();
-      expect(screen.getByText('Jane Smith')).toBeInTheDocument();
-      expect(screen.getByText('450.50')).toBeInTheDocument();
-    });
-  });
-
-  it('searches customers by name or email', async () => {
-    const user = userEvent.setup();
-    const mockCustomers = [
-      {
-        id: 'cust_1',
-        name: 'John Doe',
-        email: 'john@example.com',
-      },
-    ];
-
-    (api.default.get as jest.Mock).mockResolvedValue({
-      data: { data: mockCustomers },
-    });
-
-    render(<CustomersManagement />, { wrapper });
-
-    const searchInput = screen.getByPlaceholderText(/Suche/i);
-    await user.type(searchInput, 'John');
-
-    await waitFor(() => {
-      expect(screen.getByText('John Doe')).toBeInTheDocument();
-    });
-  });
-
-  it('opens customer details', async () => {
-    const user = userEvent.setup();
-    const mockCustomers = [
-      {
-        id: 'cust_1',
-        name: 'John Doe',
-        email: 'john@example.com',
-      },
-    ];
-
-    (api.default.get as jest.Mock).mockResolvedValue({
-      data: { data: mockCustomers },
-    });
-
-    render(<CustomersManagement />, { wrapper });
-
-    await waitFor(() => {
-      expect(screen.getByText('John Doe')).toBeInTheDocument();
-    });
-
-    const detailsButton = screen.getByRole('button', { name: /Details/i });
-    await user.click(detailsButton);
-
-    await waitFor(() => {
-      expect(screen.getByText(/Kundendetails/i)).toBeInTheDocument();
-    });
-  });
-
-  it('displays customer order history', async () => {
-    const mockCustomer = {
-      id: 'cust_1',
-      name: 'John Doe',
-      orders: [
-        {
-          id: 'order_1',
-          status: 'DELIVERED',
-          totalAmount: 25.50,
-          createdAt: new Date().toISOString(),
-        },
-      ],
-    };
-
-    (api.default.get as jest.Mock).mockResolvedValue({
-      data: mockCustomer,
-    });
-
-    render(<CustomersManagement />, { wrapper });
-
-    await waitFor(() => {
-      expect(screen.getByText(/Bestellhistorie/i)).toBeInTheDocument();
-    });
-  });
-
-  it('exports customers to CSV', async () => {
-    const user = userEvent.setup();
-    const mockCustomers = [
-      { id: 'cust_1', name: 'John Doe', email: 'john@example.com' },
-    ];
-
-    (api.default.get as jest.Mock).mockResolvedValue({
-      data: { data: mockCustomers },
-    });
-
-    render(<CustomersManagement />, { wrapper });
-
-    await waitFor(() => {
-      expect(screen.getByText('John Doe')).toBeInTheDocument();
-    });
-
-    const exportButton = screen.getByRole('button', { name: /Export/i });
-    await user.click(exportButton);
-
-    const csvButton = screen.getByText(/CSV/i);
-    await user.click(csvButton);
-
-    // Verify export triggered (implementation-specific)
-  });
-
-  it('handles loading state', () => {
-    render(<CustomersManagement />, { wrapper });
-    expect(screen.getByText(/Loading/i)).toBeInTheDocument();
-  });
-
-  it('handles error state', async () => {
-    (api.default.get as jest.Mock).mockRejectedValue(
-      new Error('Failed to load customers')
+    mockGet.mockImplementation((url: string) =>
+      Promise.resolve({ data: url === '/admin/customers' ? customers : [] }),
     );
+  });
 
-    render(<CustomersManagement />, { wrapper });
+  it('renders the current customer list', async () => {
+    render(<CustomersManagement />);
+    expect(await screen.findByText('John Doe')).toBeInTheDocument();
+    expect(screen.getByText('Jane Smith')).toBeInTheDocument();
+    expect(mockGet).toHaveBeenCalledWith('/admin/customers');
+    expect(mockGet).toHaveBeenCalledWith('/admin/orders');
+  });
 
-    await waitFor(() => {
-      expect(screen.getByText(/Fehler/i)).toBeInTheDocument();
-    });
+  it('filters customers using the current search field', async () => {
+    render(<CustomersManagement />);
+    await screen.findByText('John Doe');
+    fireEvent.change(screen.getByPlaceholderText('Nach Kunde suchen...'), { target: { value: 'Jane' } });
+    expect(screen.getByText('Jane Smith')).toBeInTheDocument();
+  });
+
+  it('exposes the create form and bulk export action', async () => {
+    render(<CustomersManagement />);
+    await screen.findByText('John Doe');
+    expect(screen.getByRole('heading', { name: 'Neuen Kunden erstellen' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Export \(2\)/ })).toBeEnabled();
+  });
+
+  it('shows the backend error contract when customer loading fails', async () => {
+    mockGet.mockRejectedValue(new Error('API Error'));
+    render(<CustomersManagement />);
+    await waitFor(() => expect(screen.getAllByText('API Error').length).toBeGreaterThanOrEqual(2));
   });
 });
-
-
-

@@ -99,6 +99,8 @@ export const config = {
   appName: getEnvVar('VITE_APP_NAME', 'UberFoods Admin'),
   isDevelopment: envConfig.DEV ?? true,
   isProduction: envConfig.PROD ?? false,
+  skipAuthEnabled: envConfig.VITE_SKIP_AUTH === 'true',
+  devAuthToken: envConfig.VITE_DEV_AUTH_TOKEN as string | undefined,
   // Other App URLs for Deep-Links
   customerWebUrl: validateAppUrl(getEnvVar('VITE_CUSTOMER_WEB_URL', 'http://localhost:3001'), 'Customer Web URL'),
   driverAppUrl: validateAppUrl(getEnvVar('VITE_DRIVER_APP_URL', 'http://localhost:3004'), 'Driver App URL'),

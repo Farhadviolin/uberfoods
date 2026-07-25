@@ -1,4 +1,6 @@
-import { screenHook, waitFor, act } from '@testing-library/react';
+import { renderHook, waitFor, act } from '@testing-library/react';
+
+jest.unmock('@tanstack/react-query');
 
 // Use the global custom render that includes providers
 const render = (global as any).customRender;
@@ -41,7 +43,7 @@ describe('useCustomers Hook', () => {
     ];
 
     (api.default.get as jest.Mock).mockResolvedValue({
-      data: { data: mockCustomers },
+      data: { success: true, data: mockCustomers },
     });
 
     const { result } = renderHook(() => useCustomers(), { wrapper });
@@ -56,7 +58,7 @@ describe('useCustomers Hook', () => {
 
   it('handles empty result', async () => {
     (api.default.get as jest.Mock).mockResolvedValue({
-      data: { data: [] },
+      data: { success: true, data: [] },
     });
 
     const { result } = renderHook(() => useCustomers(), { wrapper });
@@ -88,7 +90,7 @@ describe('useCustomers Hook', () => {
     ];
 
     (api.default.get as jest.Mock).mockResolvedValue({
-      data: { data: mockCustomers },
+      data: { success: true, data: mockCustomers },
     });
 
     const { result } = renderHook(() => useCustomers(), { wrapper });
@@ -113,18 +115,13 @@ describe('useCustomers Hook', () => {
       data: { data: mockCustomers },
     });
 
-    const { result } = renderHook(() => useCustomers({ search: 'John' }), { wrapper });
+    const { result } = renderHook(() => useCustomers('John'), { wrapper });
 
     await waitFor(() => {
       expect(result.current.isSuccess).toBe(true);
     });
 
-    expect(api.default.get).toHaveBeenCalledWith(
-      expect.any(String),
-      expect.objectContaining({
-        params: expect.objectContaining({ search: 'John' }),
-      })
-    );
+    expect(api.default.get).toHaveBeenCalledWith('/admin/customers?search=John');
   });
 });
 

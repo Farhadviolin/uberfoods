@@ -6,11 +6,13 @@ const renderWithProviders = (global as any).customRender;
 import { SupplierManagement } from '../SupplierManagement';
 import api from '../../utils/api';
 
+const mockShowToast = jest.fn();
+
 // Mock contexts
 jest.mock('../../contexts/ToastContext', () => ({
   ToastProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
   useToast: () => ({
-    showToast: jest.fn(),
+    showToast: mockShowToast,
   }),
 }));
 
@@ -196,7 +198,7 @@ describe('SupplierManagement', () => {
     });
 
     const user = userEvent.setup();
-    const toggleButton = screen.getByRole('button', { name: /Toggle/i });
+    const toggleButton = await screen.findByRole('button', { name: 'Supplier 1 Status umschalten' });
     await user.click(toggleButton);
 
     await waitFor(() => {

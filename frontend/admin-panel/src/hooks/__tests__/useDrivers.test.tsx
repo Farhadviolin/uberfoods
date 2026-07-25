@@ -1,9 +1,11 @@
-import { screenHook, waitFor, act } from '@testing-library/react';
+import { renderHook, waitFor, act } from '@testing-library/react';
+
+jest.unmock('@tanstack/react-query');
 
 // Use the global custom render that includes providers
 const render = (global as any).customRender;
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { useDrivers } from '../useDrivers';
+import { useActiveDrivers, useDrivers } from '../useDrivers';
 import * as api from '../../utils/api';
 
 jest.mock('../../utils/api');
@@ -32,12 +34,11 @@ describe('useDrivers Hook', () => {
         email: 'max@driver.com',
         isActive: true,
         location: { lat: 48.2082, lng: 16.3738 },
-        location: { lat: 48.2082, lng: 16.3738 },
       },
     ];
 
     (api.default.get as jest.Mock).mockResolvedValue({
-      data: { data: mockDrivers },
+      data: { success: true, data: mockDrivers },
     });
 
     const { result } = renderHook(() => useDrivers(), { wrapper });
@@ -52,19 +53,22 @@ describe('useDrivers Hook', () => {
 
   it('filters active drivers', async () => {
     (api.default.get as jest.Mock).mockResolvedValue({
-      data: { data: [] },
+      data: {
+        success: true,
+        data: [
+          { id: 'active', isActive: true },
+          { id: 'inactive', isActive: false },
+        ],
+      },
     });
 
-    const { result } = renderHook(() => useDrivers({ isActive: true }), { wrapper });
+    const { result } = renderHook(() => useActiveDrivers(), { wrapper });
 
     await waitFor(() => {
-      expect(api.default.get).toHaveBeenCalledWith(
-        expect.any(String),
-        expect.objectContaining({
-          params: expect.objectContaining({ isActive: true }),
-        })
-      );
+      expect(result.current.isSuccess).toBe(true);
     });
+    expect(api.default.get).toHaveBeenCalledWith('/admin/drivers');
+    expect(result.current.data).toEqual([{ id: 'active', isActive: true }]);
   });
 
   it('tracks driver location updates', async () => {
@@ -73,7 +77,7 @@ describe('useDrivers Hook', () => {
     ];
 
     (api.default.get as jest.Mock).mockResolvedValue({
-      data: { data: mockDrivers },
+      data: { success: true, data: mockDrivers },
     });
 
     const { result } = renderHook(() => useDrivers(), { wrapper });

@@ -16,6 +16,7 @@ import {
 import { BulkExportButton } from './BulkExportButton';
 import { openCustomerProfile, openCustomerOrder } from '../utils/navigation';
 import './CustomersManagement.css';
+import { config } from '../config';
 
 interface Order {
   id: string;
@@ -104,7 +105,7 @@ function CustomersManagementInner() {
       const response = await api.get('/admin/orders');
       setOrders(Array.isArray(response.data) ? response.data : []);
     } catch (err: unknown) {
-      if (import.meta.env.DEV) {
+      if (config.isDevelopment) {
         devError('Error fetching orders:', err);
       }
     }

@@ -202,6 +202,28 @@ jobs:
       working-directory: ./frontend/driver-app
       run: npm test -- --runInBand
 
+  admin-jest:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v5
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v5
+      with:
+        node-version: '24'
+        cache: 'npm'
+        cache-dependency-path: 'frontend/admin-panel/package-lock.json'
+
+    - name: Install admin panel dependencies
+      working-directory: ./frontend/admin-panel
+      run: npm ci
+
+    - name: Run complete admin panel Jest suite
+      working-directory: ./frontend/admin-panel
+      run: npm test -- --runInBand
+
   ui-e2e-lifecycle:
     runs-on: ubuntu-latest
     needs:
@@ -793,7 +815,7 @@ jobs:
   # Build and deploy checks
   build:
     runs-on: ubuntu-latest
-    needs: [dependency-audit, api-verification, driver-jest, ui-e2e-lifecycle, frontend-e2e]
+    needs: [dependency-audit, api-verification, driver-jest, admin-jest, ui-e2e-lifecycle, frontend-e2e]
 
     steps:
     - name: Checkout code

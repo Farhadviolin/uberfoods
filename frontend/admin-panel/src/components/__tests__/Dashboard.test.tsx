@@ -1,5 +1,7 @@
 import { screen, waitFor } from '@testing-library/react';
 
+jest.unmock('@tanstack/react-query');
+
 // Use the global custom render that includes providers
 const render = (global as any).customRender;
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -31,11 +33,13 @@ describe('Dashboard Component', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    queryClient.clear();
   });
 
-  it('renders dashboard title and welcome message', () => {
+  it('renders dashboard title and welcome message', async () => {
+    mockApiGet.mockResolvedValue({ data: {} });
     render(<Dashboard />, { wrapper });
-    expect(screen.getByText('Dashboard')).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Dashboard' })).toBeInTheDocument();
     expect(screen.getByText('Willkommen im Admin-Panel')).toBeInTheDocument();
   });
 
@@ -78,7 +82,7 @@ describe('Dashboard Component', () => {
     await waitFor(() => {
       expect(screen.getByText('Fehler beim Laden des Dashboards')).toBeInTheDocument();
       expect(screen.getByText('Erneut versuchen')).toBeInTheDocument();
-    });
+    }, { timeout: 5000 });
   });
 });
 

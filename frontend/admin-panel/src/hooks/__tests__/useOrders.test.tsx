@@ -1,4 +1,6 @@
-import { screenHook, waitFor } from '@testing-library/react';
+import { renderHook, waitFor } from '@testing-library/react';
+
+jest.unmock('@tanstack/react-query');
 
 // Use the global custom render that includes providers
 const render = (global as any).customRender;
@@ -31,7 +33,7 @@ describe('useOrders Hook', () => {
     ];
 
     (api.default.get as jest.Mock).mockResolvedValue({
-      data: { data: mockOrders },
+      data: { success: true, data: mockOrders },
     });
 
     const { result } = renderHook(() => useOrders(), { wrapper });
@@ -64,7 +66,7 @@ describe('useOrders Hook', () => {
     ];
 
     (api.default.get as jest.Mock).mockResolvedValue({
-      data: { data: mockOrders },
+      data: { success: true, data: mockOrders },
     });
 
     const { result } = renderHook(() => useOrders({ status: 'PENDING' }), { wrapper });
@@ -73,12 +75,7 @@ describe('useOrders Hook', () => {
       expect(result.current.isSuccess).toBe(true);
     });
 
-    expect(api.default.get).toHaveBeenCalledWith(
-      expect.stringContaining('/orders'),
-      expect.objectContaining({
-        params: expect.objectContaining({ status: 'PENDING' })
-      })
-    );
+    expect(api.default.get).toHaveBeenCalledWith('/orders?status=PENDING');
   });
 
   it('refetches on demand', async () => {
@@ -87,7 +84,7 @@ describe('useOrders Hook', () => {
     ];
 
     (api.default.get as jest.Mock).mockResolvedValue({
-      data: { data: mockOrders },
+      data: { success: true, data: mockOrders },
     });
 
     const { result } = renderHook(() => useOrders(), { wrapper });

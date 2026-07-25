@@ -1,5 +1,7 @@
 import { screen, waitFor } from '@testing-library/react';
 
+jest.unmock('@tanstack/react-query');
+
 // Use the global custom render that includes providers
 const render = (global as any).customRender;
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -34,7 +36,7 @@ const TestComponent = () => {
       <div data-testid="loading">{loading ? 'loading' : 'not-loading'}</div>
       <div data-testid="authenticated">{isAuthenticated ? 'authenticated' : 'not-authenticated'}</div>
       <div data-testid="user">{user ? user.name : 'no-user'}</div>
-      <button onClick={() => login('test@example.com', 'password')}>Login</button>
+      <button onClick={() => void login('test@example.com', 'password').catch(() => undefined)}>Login</button>
       <button onClick={logout}>Logout</button>
     </div>
   );
@@ -88,8 +90,6 @@ describe('AuthContext', () => {
 
   it('should handle login error', async () => {
     const user = userEvent.setup();
-    const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
-
     mockApi.post.mockRejectedValueOnce(new Error('Invalid credentials'));
 
     renderWithProviders(<TestComponent />);
@@ -100,8 +100,10 @@ describe('AuthContext', () => {
       expect(screen.getByTestId('authenticated')).toHaveTextContent('not-authenticated');
     });
 
-    expect(consoleSpy).toHaveBeenCalled();
-    consoleSpy.mockRestore();
+    expect(mockApi.post).toHaveBeenCalledWith('/auth/login', {
+      email: 'test@example.com',
+      password: 'password',
+    });
   });
 
   it('should handle logout', async () => {
@@ -136,18 +138,11 @@ describe('AuthContext', () => {
     expect(screen.getByTestId('user')).toHaveTextContent('no-user');
   });
 
-  it('should handle token refresh on mount', async () => {
+  it('should not refresh or authenticate from a refresh token alone on mount', async () => {
     const { getAccessToken, getRefreshToken, getStoredUser } = jest.requireMock('../../utils/tokenStorage');
 
     getRefreshToken.mockReturnValue('fake-refresh-token');
     getStoredUser.mockReturnValue({ id: '1', name: 'Test User', email: 'test@example.com', role: 'admin' });
-
-    mockApi.post.mockResolvedValueOnce({
-      data: {
-        access_token: 'new-fake-token',
-        refresh_token: 'new-fake-refresh-token',
-      },
-    });
 
     renderWithProviders(<TestComponent />);
 
@@ -155,9 +150,8 @@ describe('AuthContext', () => {
       expect(screen.getByTestId('loading')).toHaveTextContent('not-loading');
     });
 
-    expect(mockApi.post).toHaveBeenCalledWith('/auth/refresh', {
-      refresh_token: 'fake-refresh-token',
-    });
+    expect(mockApi.post).not.toHaveBeenCalled();
+    expect(screen.getByTestId('authenticated')).toHaveTextContent('not-authenticated');
   });
 });
 

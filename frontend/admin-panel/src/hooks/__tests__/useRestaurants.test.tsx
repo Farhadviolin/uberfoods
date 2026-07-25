@@ -1,9 +1,11 @@
-import { screenHook, waitFor } from '@testing-library/react';
+import { renderHook, waitFor } from '@testing-library/react';
+
+jest.unmock('@tanstack/react-query');
 
 // Use the global custom render that includes providers
 const render = (global as any).customRender;
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { useRestaurants } from '../useRestaurants';
+import { useActiveRestaurants, useRestaurants } from '../useRestaurants';
 import * as api from '../../utils/api';
 
 jest.mock('../../utils/api');
@@ -41,7 +43,7 @@ describe('useRestaurants Hook', () => {
     ];
 
     (api.default.get as jest.Mock).mockResolvedValue({
-      data: { data: mockRestaurants },
+      data: { success: true, data: mockRestaurants },
     });
 
     const { result } = renderHook(() => useRestaurants(), { wrapper });
@@ -61,26 +63,22 @@ describe('useRestaurants Hook', () => {
     ];
 
     (api.default.get as jest.Mock).mockResolvedValue({
-      data: { data: mockRestaurants },
+      data: { success: true, data: mockRestaurants },
     });
 
-    const { result } = renderHook(() => useRestaurants({ isActive: true }), { wrapper });
+    const { result } = renderHook(() => useActiveRestaurants(), { wrapper });
 
     await waitFor(() => {
       expect(result.current.isSuccess).toBe(true);
     });
 
-    expect(api.default.get).toHaveBeenCalledWith(
-      expect.any(String),
-      expect.objectContaining({
-        params: expect.objectContaining({ isActive: true }),
-      })
-    );
+    expect(api.default.get).toHaveBeenCalledWith('/admin/restaurants');
+    expect(result.current.data).toEqual([mockRestaurants[0]]);
   });
 
   it('handles empty result', async () => {
     (api.default.get as jest.Mock).mockResolvedValue({
-      data: { data: [] },
+      data: { success: true, data: [] },
     });
 
     const { result } = renderHook(() => useRestaurants(), { wrapper });
@@ -112,7 +110,7 @@ describe('useRestaurants Hook', () => {
     ];
 
     (api.default.get as jest.Mock).mockResolvedValue({
-      data: { data: mockRestaurants },
+      data: { success: true, data: mockRestaurants },
     });
 
     const { result } = renderHook(() => useRestaurants(), { wrapper });
@@ -128,35 +126,23 @@ describe('useRestaurants Hook', () => {
     expect(api.default.get).toHaveBeenCalledTimes(2);
   });
 
-  it('handles pagination', async () => {
+  it('uses the admin restaurants endpoint', async () => {
     const mockRestaurants = [
       { id: 'rest_1', name: 'Restaurant 1' },
     ];
 
     (api.default.get as jest.Mock).mockResolvedValue({
-      data: {
-        data: mockRestaurants,
-        pagination: {
-          page: 1,
-          limit: 20,
-          total: 50,
-          totalPages: 3,
-        },
-      },
+      data: { success: true, data: mockRestaurants },
     });
 
-    const { result } = renderHook(() => useRestaurants({ page: 1, limit: 20 }), { wrapper });
+    const { result } = renderHook(() => useRestaurants(), { wrapper });
 
     await waitFor(() => {
       expect(result.current.isSuccess).toBe(true);
     });
 
-    expect(api.default.get).toHaveBeenCalledWith(
-      expect.any(String),
-      expect.objectContaining({
-        params: expect.objectContaining({ page: 1, limit: 20 }),
-      })
-    );
+    expect(api.default.get).toHaveBeenCalledWith('/admin/restaurants');
+    expect(result.current.data).toEqual(mockRestaurants);
   });
 });
 

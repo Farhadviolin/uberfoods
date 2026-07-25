@@ -5,11 +5,13 @@ const renderWithProviders = (global as any).customRender;
 import { StatisticsCenter } from '../StatisticsCenter';
 import api from '../../utils/api';
 
+const mockShowToast = jest.fn();
+
 // Mock contexts to override global providers
 jest.mock('../../contexts/ToastContext', () => ({
   ToastProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
   useToast: () => ({
-    showToast: jest.fn(),
+    showToast: mockShowToast,
   }),
 }));
 
@@ -118,7 +120,7 @@ describe('StatisticsCenter', () => {
     });
 
     // Check that all blocks are displayed
-    expect(screen.getByText('Dashboard')).toBeInTheDocument();
+    expect(await screen.findByText('Dashboard')).toBeInTheDocument();
     expect(screen.getByText('Revenue (week)')).toBeInTheDocument();
     expect(screen.getByText('Top Restaurants')).toBeInTheDocument();
   });

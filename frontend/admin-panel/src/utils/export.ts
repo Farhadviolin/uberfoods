@@ -60,6 +60,7 @@ export const exportToPDF = (data: any[], filename: string, title: string) => {
   });
 
   doc.save(`${filename}_${new Date().toISOString().split('T')[0]}.pdf`);
+  return doc;
 };
 
 export const exportToExcel = async (data: any[], filename: string) => {
@@ -176,7 +177,7 @@ export const exportOrdersToPDF = (orders: any[]) => {
     'Gesamtbetrag': `${order.totalAmount.toFixed(2)} €`,
   }));
 
-  exportToPDF(pdfData, 'bestellungen', 'Bestellungen Übersicht');
+  return exportToPDF(pdfData, 'bestellungen', 'Bestellungen Übersicht');
 };
 
 export const exportRestaurantsToPDF = (restaurants: any[]) => {

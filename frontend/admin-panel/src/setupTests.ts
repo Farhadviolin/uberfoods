@@ -149,11 +149,6 @@ HTMLCanvasElement.prototype.getContext = jest.fn(function(contextType: string) {
 
 // Cleanup for async operations and timers
 afterEach(() => {
-  // Clear all timers
-  jest.clearAllTimers();
-  jest.runOnlyPendingTimers();
-
-  // Clear all mocks
   jest.clearAllMocks();
 
   // Force garbage collection if available (helps with open handles)
@@ -161,6 +156,3 @@ afterEach(() => {
     global.gc();
   }
 });
-
-// Setup fake timers globally for tests that need them
-jest.useFakeTimers();

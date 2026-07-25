@@ -106,7 +106,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // KRITISCH: Auto-Login NUR in Development und NUR wenn explizit aktiviert
     // In Production wird dies IMMER blockiert, auch wenn VITE_SKIP_AUTH gesetzt ist
     // STANDARD: Auto-Login ist DEAKTIVIERT - muss explizit mit VITE_SKIP_AUTH=true aktiviert werden
-    const skipAuthEnabled = import.meta.env.VITE_SKIP_AUTH === 'true';
+    const skipAuthEnabled = config.skipAuthEnabled;
     const isDevelopment = config.isDevelopment && !config.isProduction;
     
     // Auto-Login nur wenn explizit aktiviert UND in Development
@@ -116,7 +116,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       logger.warn('⚠️ Development-Modus aktiviert - VITE_SKIP_AUTH=true');
       logger.warn('⚠️ In Production wird dieser Modus automatisch deaktiviert!');
       
-      const devToken = import.meta.env.VITE_DEV_AUTH_TOKEN;
+      const devToken = config.devAuthToken;
       if (!devToken) {
         logger.error('❌ SECURITY: VITE_DEV_AUTH_TOKEN fehlt - Auto-Login deaktiviert');
         setLoading(false);

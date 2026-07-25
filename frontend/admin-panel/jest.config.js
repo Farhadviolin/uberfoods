@@ -1,6 +1,9 @@
 module.exports = {
   preset: 'ts-jest',
   testEnvironment: 'jsdom',
+  testEnvironmentOptions: {
+    customExportConditions: ['node', 'node-addons'],
+  },
   setupFilesAfterEnv: ['<rootDir>/src/setupTests.ts', '<rootDir>/src/setupTestRender.tsx'],
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/src/$1',
@@ -23,9 +26,7 @@ module.exports = {
     '/node_modules/',
     '/e2e/',
   ],
-  transformIgnorePatterns: [
-    'node_modules/(?!(@tanstack|@sentry|framer-motion|lucide-react|d3|chart\\.js|exceljs|jspdf|date-fns|uuid|axios)/)',
-  ],
+  transformIgnorePatterns: ['/node_modules/'],
   collectCoverageFrom: [
     'src/**/*.(ts|tsx)',
     '!src/**/*.d.ts',

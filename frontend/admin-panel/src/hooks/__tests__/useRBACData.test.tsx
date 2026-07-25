@@ -1,10 +1,11 @@
 import { renderHook, waitFor } from '@testing-library/react';
 
+jest.unmock('@tanstack/react-query');
+
 // Use the global custom render that includes providers
 const render = (global as any).customRender;
-import { QueryClientProvider } from '@tanstack/react-query';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ReactNode } from 'react';
-import { createTestQueryClient } from '../../setupTestRender';
 
 // Mock API before importing useRBACData
 jest.mock('../../utils/api', () => {
@@ -37,7 +38,12 @@ const mockedApi = api as jest.Mocked<typeof api>;
 
 const createWrapper = () => {
   // Create a new QueryClient for each test to avoid caching between tests
-  const queryClient = createTestQueryClient();
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: { retry: false, staleTime: 0, gcTime: 0 },
+      mutations: { retry: false },
+    },
+  });
 
   return ({ children }: { children: ReactNode }) => (
     <QueryClientProvider client={queryClient}>

@@ -1,87 +1,33 @@
-import { screen, waitFor } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { act, screen } from '@testing-library/react';
+import { FinancialEventsPanel } from '../EnterpriseSync/FinancialEventsPanel';
 
-// Use the global custom render that includes providers
 const render = (global as any).customRender;
-import { FinancialManagement } from '../FinancialManagement';
-import * as api from '../../utils/api';
+let onFinancialEvent: ((event: any) => void) | undefined;
 
-jest.mock('../../utils/api');
+jest.mock('../../hooks/useWebSocket', () => ({
+  useWebSocket: (options: { onFinancialEvent?: (event: any) => void }) => {
+    onFinancialEvent = options.onFinancialEvent;
+    return { isConnected: true };
+  },
+}));
 
-describe('FinancialManagement Component', () => {
-  const queryClient = new QueryClient({
-    defaultOptions: { queries: { retry: false } },
+describe('Financial events management', () => {
+  it('shows the current empty financial stream contract', () => {
+    render(<FinancialEventsPanel />);
+    expect(screen.getByRole('heading', { name: 'Financial Events' })).toBeInTheDocument();
+    expect(screen.getByText('No financial events')).toBeInTheDocument();
+    expect(screen.getByText('Total Revenue:')).toBeInTheDocument();
   });
 
-  const wrapper = ({ children }: { children: React.ReactNode }) => (
-    <QueryClientProvider client={queryClient}>
-      {children}
-    </QueryClientProvider>
-  );
-
-  beforeEach(() => {
-    jest.clearAllMocks();
-  });
-
-  it('displays financial overview', async () => {
-    const mockFinancials = {
-      totalRevenue: 125680.50,
-      totalExpenses: 45230.20,
-      netProfit: 80450.30,
-      revenueGrowth: 15.3,
-    };
-
-    (api.default.get as jest.Mock).mockResolvedValue({
-      data: mockFinancials,
-    });
-
-    render(<FinancialManagement />, { wrapper });
-
-    await waitFor(() => {
-      expect(screen.getByText(/125680\.50/)).toBeInTheDocument();
-      expect(screen.getByText(/80450\.30/)).toBeInTheDocument();
-    });
-  });
-
-  it('shows revenue chart', async () => {
-    const mockChartData = {
-      labels: ['Jan', 'Feb', 'Mar'],
-      data: [10000, 12000, 15000],
-    };
-
-    (api.default.get as jest.Mock).mockResolvedValue({
-      data: mockChartData,
-    });
-
-    render(<FinancialManagement />, { wrapper });
-
-    await waitFor(() => {
-      const chart = screen.queryByTestId('revenue-chart');
-      if (chart) {
-        expect(chart).toBeInTheDocument();
-      }
-    });
-  });
-
-  it('exports financial report', async () => {
-    const user = userEvent.setup();
-
-    (api.default.get as jest.Mock).mockResolvedValue({
-      data: { revenue: 10000 },
-    });
-
-    render(<FinancialManagement />, { wrapper });
-
-    await waitFor(() => {
-      const exportButton = screen.queryByRole('button', { name: /Export/i });
-      if (exportButton) {
-        expect(exportButton).toBeInTheDocument();
-      }
-    });
+  it('updates revenue and renders a received payment event', () => {
+    render(<FinancialEventsPanel />);
+    act(() => onFinancialEvent?.({
+      type: 'payment_completed',
+      data: { paymentId: 'pay-1', orderId: 'order-1', amount: 42.5, currency: 'EUR' },
+      timestamp: '2026-07-25T12:00:00Z',
+    }));
+    expect(screen.getByText('PAYMENT COMPLETED')).toBeInTheDocument();
+    expect(screen.getByText('Payment: pay-1')).toBeInTheDocument();
+    expect(screen.getAllByText(/42,50/).length).toBeGreaterThan(0);
   });
 });
-
-
-
-

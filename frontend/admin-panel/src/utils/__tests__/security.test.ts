@@ -1,15 +1,15 @@
-import { validateImageUrl, escapeHtmlAttribute, sanitizeInput } from '../security';
+import { validateImageUrl, escapeHtmlAttribute, sanitizeFilename } from '../security';
 
 describe('Security Utils', () => {
   describe('validateImageUrl', () => {
-    it('accepts valid HTTP URLs', () => {
-      expect(validateImageUrl('http://example.com/image.jpg')).toBe('http://example.com/image.jpg');
-      expect(validateImageUrl('https://example.com/image.png')).toBe('https://example.com/image.png');
+    it('accepts same-origin HTTP URLs and returns a safe relative path', () => {
+      expect(validateImageUrl('http://localhost/image.jpg')).toBe('/image.jpg');
+      expect(validateImageUrl('http://localhost/image.png?size=2')).toBe('/image.png?size=2');
     });
 
     it('accepts relative paths', () => {
       expect(validateImageUrl('/uploads/image.jpg')).toBe('/uploads/image.jpg');
-      expect(validateImageUrl('uploads/image.png')).toBe('uploads/image.png');
+      expect(validateImageUrl('uploads/image.png')).toBe('');
     });
 
     it('rejects javascript: URLs', () => {
@@ -20,9 +20,9 @@ describe('Security Utils', () => {
       expect(validateImageUrl('data:text/html,<script>alert(1)</script>')).toBe('');
     });
 
-    it('accepts safe data: URLs', () => {
+    it('rejects data URLs because image sources are limited to HTTP(S) or relative paths', () => {
       const dataUrl = 'data:image/png;base64,iVBORw0KGgoAAAANS...';
-      expect(validateImageUrl(dataUrl)).toBe(dataUrl);
+      expect(validateImageUrl(dataUrl)).toBe('');
     });
 
     it('rejects invalid input types', () => {
@@ -53,23 +53,22 @@ describe('Security Utils', () => {
     });
   });
 
-  describe('sanitizeInput', () => {
-    it('removes script tags', () => {
-      expect(sanitizeInput('<script>alert(1)</script>Hello')).toBe('Hello');
+  describe('sanitizeFilename', () => {
+    it('removes path traversal sequences', () => {
+      expect(sanitizeFilename('../../orders.csv')).toBe('--orders.csv');
     });
 
-    it('removes event handlers', () => {
-      expect(sanitizeInput('<div onclick="alert(1)">Test</div>')).not.toContain('onclick');
+    it('replaces path separators and removes reserved characters', () => {
+      expect(sanitizeFilename('reports\\2026/q?:*.pdf')).toBe('reports-2026-q.pdf');
     });
 
-    it('preserves safe HTML', () => {
-      expect(sanitizeInput('<p>Hello <b>World</b></p>')).toContain('Hello');
-      expect(sanitizeInput('<p>Hello <b>World</b></p>')).toContain('World');
+    it('preserves a safe filename', () => {
+      expect(sanitizeFilename('orders-2026.csv')).toBe('orders-2026.csv');
     });
 
     it('handles null/undefined', () => {
-      expect(sanitizeInput(null as any)).toBe('');
-      expect(sanitizeInput(undefined as any)).toBe('');
+      expect(sanitizeFilename(null as any)).toBe('file');
+      expect(sanitizeFilename(undefined as any, 'download')).toBe('download');
     });
   });
 });

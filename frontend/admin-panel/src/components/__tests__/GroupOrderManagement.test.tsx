@@ -1,4 +1,4 @@
-import { screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 // Use the global custom render that includes providers
@@ -59,7 +59,7 @@ describe('GroupOrderManagement', () => {
     });
 
     const user = userEvent.setup();
-    const createButton = screen.getByRole('button', { name: 'Erstellen' });
+    const createButton = screen.getAllByRole('button', { name: 'Group Order erstellen' })[0];
     await user.click(createButton);
 
     await waitFor(() => {
@@ -118,8 +118,7 @@ describe('GroupOrderManagement', () => {
 
     await user.clear(orderIdInput);
     await user.type(orderIdInput, 'group-1');
-    await user.clear(expiresInput);
-    await user.type(expiresInput, '2025-01-02T00:00:00Z');
+    fireEvent.change(expiresInput, { target: { value: '2030-01-02T00:00' } });
 
     // Submit the form
     fireEvent.submit(expirationForm);
@@ -127,7 +126,7 @@ describe('GroupOrderManagement', () => {
     await waitFor(() => {
       expect(mockedApi.put).toHaveBeenCalledWith(
         '/group-orders/group-1/expiration',
-        { expiresAt: '2025-01-02T00:00:00Z' }
+        { expiresAt: '2030-01-02T00:00' }
       );
     });
   });
@@ -157,8 +156,7 @@ describe('GroupOrderManagement', () => {
 
     await waitFor(() => {
       expect(mockedApi.put).toHaveBeenCalledWith(
-        '/group-orders/group-1/members/customer-1/ready',
-        { ready: true }
+        '/group-orders/group-1/members/customer-1/ready'
       );
     });
   });

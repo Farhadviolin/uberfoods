@@ -2,6 +2,7 @@
  * Security Utilities - XSS & SSRF Prevention
  */
 import { logger } from './logger';
+import { config } from '../config';
 
 /**
  * Validiert und sanitized eine URL für sichere Verwendung
@@ -37,7 +38,7 @@ export function sanitizeUrl(
     }
 
     // Prüfe auf localhost/private IPs (nur in Production)
-    if (import.meta.env.PROD) {
+    if (config.isProduction) {
       const hostname = parsedUrl.hostname.toLowerCase();
       const privateHosts = ['localhost', '127.0.0.1', '0.0.0.0', '::1'];
       if (privateHosts.includes(hostname) || hostname.startsWith('192.168.') || hostname.startsWith('10.')) {
@@ -105,7 +106,7 @@ export function escapeHtmlAttribute(value: string | null | undefined): string {
  * Validiert eine Image-URL
  */
 export function validateImageUrl(url: string | null | undefined): string {
-  if (!url) {
+  if (!url || typeof url !== 'string') {
     return '';
   }
   
