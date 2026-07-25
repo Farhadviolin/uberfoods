@@ -15,6 +15,10 @@ import { Modal } from '../design-system/Modal';
 import { useToast } from '../contexts/ToastContext';
 import { FileText, Download, Eye, Calendar, DollarSign, Filter } from 'lucide-react';
 import { sanitizeFilename, sanitizeUrl } from '../utils/security';
+import {
+  formatCurrency as formatCurrencyValue,
+  formatDate as formatDateValue,
+} from '../utils/formatters';
 import './Invoices.css';
 
 interface Invoice {
@@ -180,21 +184,17 @@ export function Invoices() {
 
 
   const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
     const locale = i18n.language === 'de' ? 'de-DE' : 'en-US';
-    return new Intl.DateTimeFormat(locale, {
+    return formatDateValue(dateString, locale, {
       year: 'numeric',
       month: 'short',
       day: 'numeric',
-    }).format(date);
+    });
   };
 
   const formatCurrency = (amount: number) => {
     const locale = i18n.language === 'de' ? 'de-DE' : 'en-US';
-    return new Intl.NumberFormat(locale, {
-      style: 'currency',
-      currency: 'EUR',
-    }).format(amount);
+    return formatCurrencyValue(amount, locale);
   };
 
   const getStatusColor = (status: Invoice['status']): BadgeVariant => {

@@ -24,6 +24,15 @@ describe('Formatter Utils', () => {
     it('should round to 2 decimals', () => {
       expect(formatCurrency(10.999)).toBe('€11.00');
     });
+
+    it('should format large values', () => {
+      expect(formatCurrency(1000000)).toBe('€1,000,000.00');
+    });
+
+    it('should reject non-finite financial values', () => {
+      expect(() => formatCurrency(Number.NaN)).toThrow(RangeError);
+      expect(() => formatCurrency(Number.POSITIVE_INFINITY)).toThrow(RangeError);
+    });
   });
 
   describe('formatDate', () => {
@@ -31,15 +40,14 @@ describe('Formatter Utils', () => {
       const date = new Date('2025-12-11T15:30:00Z');
       const result = formatDate(date);
 
-      expect(result).toContain('11');
-      expect(result).toContain('12');
-      expect(result).toContain('2025');
+      expect(result).toBe('11.12.2025');
+      expect(date.toISOString()).toBe('2025-12-11T15:30:00.000Z');
     });
 
     it('should handle date strings', () => {
       const result = formatDate('2025-12-11T15:30:00Z');
 
-      expect(result).toContain('11');
+      expect(result).toBe('11.12.2025');
     });
 
     it('should handle invalid dates', () => {
@@ -63,6 +71,11 @@ describe('Formatter Utils', () => {
     it('should handle zero', () => {
       expect(formatDistance(0)).toBe('0 m');
     });
+
+    it('should reject negative and non-finite distances', () => {
+      expect(() => formatDistance(-1)).toThrow(RangeError);
+      expect(() => formatDistance(Number.NaN)).toThrow(RangeError);
+    });
   });
 
   describe('formatDuration', () => {
@@ -79,6 +92,11 @@ describe('Formatter Utils', () => {
     it('should handle zero', () => {
       expect(formatDuration(0)).toBe('0 min');
     });
+
+    it('should reject negative and fractional durations', () => {
+      expect(() => formatDuration(-1)).toThrow(RangeError);
+      expect(() => formatDuration(1.5)).toThrow(RangeError);
+    });
   });
 
   describe('formatPhone', () => {
@@ -93,6 +111,14 @@ describe('Formatter Utils', () => {
 
     it('should return original if invalid', () => {
       expect(formatPhone('invalid')).toBe('invalid');
+      expect(formatPhone('')).toBe('');
+    });
+
+    it('should not mutate the input value', () => {
+      const phone = '+436641234567';
+      formatPhone(phone);
+
+      expect(phone).toBe('+436641234567');
     });
   });
 });
