@@ -1,6 +1,6 @@
-import { screen, fireEvent, waitFor } from '@testing-library/react';
-import { render } from '../../test-utils';
-import { ReactNode } from 'react';
+import type { ReactNode } from 'react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { renderHook, waitFor } from '@testing-library/react';
 import {
   useChefRecommendations,
   usePersonalizedChef,
@@ -8,7 +8,6 @@ import {
   useRateChef
 } from '../useChef';
 import { AuthProvider } from '../../contexts/AuthContext';
-import { ToastProvider } from '../../contexts/ToastContext';
 
 // Mock API
 jest.mock('../../utils/api');
@@ -16,9 +15,39 @@ import api from '../../utils/api';
 
 const mockApi = api as jest.Mocked<typeof api>;
 
+const createWrapper = (initialAuthState: {
+  user: { id: string; email: string } | null;
+  token: string | null;
+}) => {
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: {
+        retry: false,
+        gcTime: 0,
+      },
+      mutations: {
+        retry: false,
+      },
+    },
+  });
+
+  return ({ children }: { children: ReactNode }) => (
+    <QueryClientProvider client={queryClient}>
+      <AuthProvider initialAuthState={initialAuthState}>{children}</AuthProvider>
+    </QueryClientProvider>
+  );
+};
+
 describe('useChef', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockApi.get.mockReset();
+    mockApi.post.mockReset();
+    localStorage.clear();
+  });
+
+  afterEach(() => {
+    localStorage.clear();
   });
 
   describe('useChefRecommendations', () => {
@@ -65,8 +94,10 @@ describe('useChef', () => {
       mockApi.get.mockResolvedValueOnce({ data: mockRecommendations });
 
       const { result } = renderHook(() => useChefRecommendations(), {
-        wrapper: createWrapper({ user: { id: '1' }, token: 'token' }),
+        wrapper: createWrapper({ user: { id: '1', email: 'chef@example.com' }, token: 'token' }),
       });
+
+      expect(result.current.isLoading).toBe(true);
 
       await waitFor(() => {
         expect(result.current.isSuccess).toBe(true);
@@ -96,11 +127,12 @@ describe('useChef', () => {
         minRating: 4.5,
         availableTime: 'Lunch',
       };
+      const originalFilters = { ...filters };
 
       mockApi.get.mockResolvedValueOnce({ data: mockRecommendations });
 
       const { result } = renderHook(() => useChefRecommendations(filters), {
-        wrapper: createWrapper({ user: { id: '1' }, token: 'token' }),
+        wrapper: createWrapper({ user: { id: '1', email: 'chef@example.com' }, token: 'token' }),
       });
 
       await waitFor(() => {
@@ -108,6 +140,36 @@ describe('useChef', () => {
       });
 
       expect(mockApi.get).toHaveBeenCalledWith('/chefs/recommendations?specialty=Italian&maxHourlyRate=50&minRating=4.5&availableTime=Lunch');
+      expect(filters).toEqual(originalFilters);
+    });
+
+    it('should handle an empty recommendations response', async () => {
+      mockApi.get.mockResolvedValueOnce({ data: [] });
+
+      const { result } = renderHook(() => useChefRecommendations(), {
+        wrapper: createWrapper({ user: { id: '1', email: 'chef@example.com' }, token: 'token' }),
+      });
+
+      await waitFor(() => {
+        expect(result.current.isSuccess).toBe(true);
+      });
+
+      expect(result.current.data).toEqual([]);
+    });
+
+    it('should expose recommendation request errors', async () => {
+      const error = new Error('Recommendations unavailable');
+      mockApi.get.mockRejectedValueOnce(error);
+
+      const { result } = renderHook(() => useChefRecommendations(), {
+        wrapper: createWrapper({ user: { id: '1', email: 'chef@example.com' }, token: 'token' }),
+      });
+
+      await waitFor(() => {
+        expect(result.current.isError).toBe(true);
+      });
+
+      expect(result.current.error).toBe(error);
     });
   });
 
@@ -166,7 +228,7 @@ describe('useChef', () => {
       mockApi.get.mockResolvedValueOnce({ data: mockPersonalized });
 
       const { result } = renderHook(() => usePersonalizedChef(), {
-        wrapper: createWrapper({ user: { id: '1' }, token: 'token' }),
+        wrapper: createWrapper({ user: { id: '1', email: 'chef@example.com' }, token: 'token' }),
       });
 
       await waitFor(() => {
@@ -257,7 +319,7 @@ describe('useChef', () => {
       mockApi.get.mockResolvedValueOnce({ data: mockProfile });
 
       const { result } = renderHook(() => useChefProfile('chef-1'), {
-        wrapper: createWrapper({ user: { id: '1' }, token: 'token' }),
+        wrapper: createWrapper({ user: { id: '1', email: 'chef@example.com' }, token: 'token' }),
       });
 
       await waitFor(() => {
@@ -309,7 +371,7 @@ describe('useChef', () => {
       mockApi.post.mockResolvedValueOnce({ data: mockRating });
 
       const { result } = renderHook(() => useRateChef(), {
-        wrapper: createWrapper({ user: { id: '1' }, token: 'token' }),
+        wrapper: createWrapper({ user: { id: '1', email: 'chef@example.com' }, token: 'token' }),
       });
 
       result.current.mutate(ratingData);
@@ -331,7 +393,7 @@ describe('useChef', () => {
       });
 
       const { result } = renderHook(() => useRateChef(), {
-        wrapper: createWrapper({ user: { id: '1' }, token: 'token' }),
+        wrapper: createWrapper({ user: { id: '1', email: 'chef@example.com' }, token: 'token' }),
       });
 
       result.current.mutate({
