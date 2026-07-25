@@ -1,7 +1,5 @@
-import { screen, fireEvent, waitFor } from '@testing-library/react';
-import { render } from '../../test-utils';
+import { renderHook } from '@testing-library/react';
 import { 
-  useFormValidation, 
   validateEmail, 
   validatePassword, 
   validatePhone, 
