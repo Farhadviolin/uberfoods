@@ -1,12 +1,11 @@
-import { screen, fireEvent, waitFor } from '@testing-library/react';
+import { screen, fireEvent } from '@testing-library/react';
 import { render } from '../../test-utils';
 import { LanguageSwitcher } from '../LanguageSwitcher';
 import { I18nextProvider } from 'react-i18next';
-import i18n from 'i18next';
-import { initReactI18next } from 'react-i18next';
+import { createInstance } from 'i18next';
 
 // Mock i18n für Tests
-const mockI18n = i18n.createInstance();
+const mockI18n = createInstance();
 mockI18n.init({
   resources: {
     de: { 
@@ -86,7 +85,21 @@ describe('LanguageSwitcher', () => {
     const button = screen.getByRole('button');
     fireEvent.click(button);
 
-    expect(mockI18n.changeLanguage).toHaveBeenCalled();
+    expect(mockI18n.changeLanguage).toHaveBeenCalledWith('en');
+    expect(localStorage.getItem('i18nextLng')).toBe('en');
+  });
+
+  it('switches language with the keyboard', () => {
+    render(
+      <I18nextProvider i18n={mockI18n}>
+        <LanguageSwitcher />
+      </I18nextProvider>
+    );
+
+    fireEvent.keyDown(screen.getByRole('button'), { key: 'Enter' });
+
+    expect(mockI18n.changeLanguage).toHaveBeenCalledWith('en');
+    expect(localStorage.getItem('i18nextLng')).toBe('en');
   });
 
   it('has accessible aria-label', () => {
@@ -97,7 +110,11 @@ describe('LanguageSwitcher', () => {
     );
 
     const button = screen.getByRole('button');
-    expect(button).toHaveAttribute('aria-label');
+    expect(button).toHaveAttribute(
+      'aria-label',
+      'Sprache wechseln. Aktuelle Sprache: Deutsch'
+    );
+    expect(button).toHaveAttribute('title', 'Sprache wechseln (Deutsch)');
   });
 });
 
