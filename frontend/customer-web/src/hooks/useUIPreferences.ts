@@ -1,9 +1,10 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../utils/api';
 import { useAuth } from '../contexts/AuthContext';
+import { getEnvVar } from '../utils/env';
 
 // E2E Mode: Skip API calls and use only localStorage
-const isE2EMode = import.meta.env.VITE_E2E_DISABLE_UI_PREFS === 'true';
+const isE2EMode = getEnvVar('VITE_E2E_DISABLE_UI_PREFS') === 'true';
 
 export interface UIPreferences {
   sidebarCollapsed?: boolean;

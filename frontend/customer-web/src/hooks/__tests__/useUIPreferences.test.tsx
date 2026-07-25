@@ -1,20 +1,20 @@
-import React from 'react';
-import { screen, fireEvent, waitFor } from '@testing-library/react';
-import { render } from '../../test-utils';
+import { waitFor } from '@testing-library/react';
+import { renderHook } from '../../test-utils';
 import { useUIPreferences, useUpdateUIPreferences } from '../useUIPreferences';
-import { AuthProvider } from '../../contexts/AuthContext';
+
+jest.mock('../../utils/env', () => ({
+  getEnvVar: jest.fn(),
+}));
+const { getEnvVar: mockGetEnvVar } = jest.requireMock<typeof import('../../utils/env')>('../../utils/env');
 
 // Mock the API
 jest.mock('../../utils/api');
-const mockApi = require('../../utils/api');
-
-const createWrapper = ({ children }: { children: React.ReactNode }) => {
-  return children;
-};
+const mockApi = jest.requireMock<typeof import('../../utils/api')>('../../utils/api');
 
 describe('useUIPreferences', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockGetEnvVar.mockReturnValue(undefined);
   });
 
   it('fetches UI preferences when authenticated', async () => {
