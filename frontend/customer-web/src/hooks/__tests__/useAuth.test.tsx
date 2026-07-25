@@ -1,23 +1,26 @@
 import React from 'react';
-import { screen, fireEvent, waitFor } from '@testing-library/react';
-import { renderHook } from '../../test-utils';
-import { useAuth } from '../../contexts/AuthContext';
+import { act, renderHook, waitFor } from '@testing-library/react';
+import { AuthProvider, useAuth } from '../../contexts/AuthContext';
 import * as api from '../../utils/api';
 
 jest.mock('../../utils/api');
 
 describe('useAuth Hook', () => {
+  const wrapper = ({ children }: { children: React.ReactNode }) => (
+    <AuthProvider>{children}</AuthProvider>
+  );
+  const mockedApi = jest.mocked(api.default);
 
   beforeEach(() => {
     jest.clearAllMocks();
-    queryClient.clear();
     localStorage.clear();
-    sessionStorage.clear();
+    delete api.default.defaults.headers.common.Authorization;
   });
 
   it('initializes with unauthenticated state', () => {
-    const { result } = renderHook(() => useAuth());
+    const { result } = renderHook(() => useAuth(), { wrapper });
 
+    expect(result.current.loading).toBe(false);
     expect(result.current.isAuthenticated).toBe(false);
     expect(result.current.user).toBeNull();
   });
@@ -36,9 +39,9 @@ describe('useAuth Hook', () => {
       },
     };
 
-    (api.default.post as jest.Mock).mockResolvedValue(mockLoginResponse);
+    mockedApi.post.mockResolvedValue(mockLoginResponse);
 
-    const { result } = renderHook(() => useAuth());
+    const { result } = renderHook(() => useAuth(), { wrapper });
 
     await act(async () => {
       await result.current.login('test@example.com', 'password123');
@@ -51,11 +54,11 @@ describe('useAuth Hook', () => {
   });
 
   it('handles login failure', async () => {
-    (api.default.post as jest.Mock).mockRejectedValue(
+    mockedApi.post.mockRejectedValue(
       new Error('Invalid credentials')
     );
 
-    const { result } = renderHook(() => useAuth());
+    const { result } = renderHook(() => useAuth(), { wrapper });
 
     await expect(
       act(async () => {
@@ -77,9 +80,9 @@ describe('useAuth Hook', () => {
       },
     };
 
-    (api.default.post as jest.Mock).mockResolvedValue(mockLoginResponse);
+    mockedApi.post.mockResolvedValue(mockLoginResponse);
 
-    const { result } = renderHook(() => useAuth());
+    const { result } = renderHook(() => useAuth(), { wrapper });
 
     // Login first
     await act(async () => {
@@ -99,7 +102,7 @@ describe('useAuth Hook', () => {
     expect(result.current.user).toBeNull();
   });
 
-  it('persists auth state in sessionStorage', async () => {
+  it('persists the customer session in localStorage', async () => {
     const mockLoginResponse = {
       data: {
         accessToken: 'mock_access_token',
@@ -110,21 +113,21 @@ describe('useAuth Hook', () => {
       },
     };
 
-    (api.default.post as jest.Mock).mockResolvedValue(mockLoginResponse);
+    mockedApi.post.mockResolvedValue(mockLoginResponse);
 
-    const { result } = renderHook(() => useAuth());
+    const { result } = renderHook(() => useAuth(), { wrapper });
 
     await act(async () => {
       await result.current.login('test@example.com', 'password123');
     });
 
     await waitFor(() => {
-      const storedToken = sessionStorage.getItem('accessToken');
+      const storedToken = localStorage.getItem('customer_token');
       expect(storedToken).toBe('mock_access_token');
     });
   });
 
-  it('handles token refresh', async () => {
+  it('refreshes an authenticated customer session', async () => {
     const mockRefreshResponse = {
       data: {
         accessToken: 'new_access_token',
@@ -132,19 +135,36 @@ describe('useAuth Hook', () => {
       },
     };
 
-    sessionStorage.setItem('refreshToken', 'old_refresh_token');
-    (api.default.post as jest.Mock).mockResolvedValue(mockRefreshResponse);
+    localStorage.setItem('customer_refresh_token', 'old_refresh_token');
+    mockedApi.post.mockResolvedValue(mockRefreshResponse);
 
-    const { result } = renderHook(() => useAuth());
+    const { result } = renderHook(() => useAuth(), { wrapper });
 
     await act(async () => {
-      await result.current.refreshToken();
+      await result.current.refreshSession();
     });
 
     await waitFor(() => {
-      const storedToken = sessionStorage.getItem('accessToken');
+      const storedToken = localStorage.getItem('customer_token');
       expect(storedToken).toBe('new_access_token');
     });
+  });
+
+  it('clears the customer session when refresh fails', async () => {
+    localStorage.setItem('customer_token', 'old_access_token');
+    localStorage.setItem('customer_refresh_token', 'old_refresh_token');
+    localStorage.setItem('customer_user', JSON.stringify({ id: 'user_1', email: 'test@example.com' }));
+    mockedApi.post.mockRejectedValue(new Error('Invalid refresh token'));
+
+    const { result } = renderHook(() => useAuth(), { wrapper });
+
+    await expect(act(async () => {
+      await result.current.refreshSession();
+    })).rejects.toThrow('Invalid refresh token');
+
+    expect(result.current.isAuthenticated).toBe(false);
+    expect(localStorage.getItem('customer_token')).toBeNull();
+    expect(localStorage.getItem('customer_refresh_token')).toBeNull();
   });
 });
 

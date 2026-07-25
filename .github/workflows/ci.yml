@@ -202,6 +202,28 @@ jobs:
       working-directory: ./frontend/driver-app
       run: npm test -- --runInBand
 
+  customer-typecheck:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v5
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v5
+      with:
+        node-version: '24'
+        cache: 'npm'
+        cache-dependency-path: 'frontend/customer-web/package-lock.json'
+
+    - name: Install customer web dependencies
+      working-directory: ./frontend/customer-web
+      run: npm ci
+
+    - name: Run complete customer web typecheck
+      working-directory: ./frontend/customer-web
+      run: npm run type-check
+
   admin-jest:
     runs-on: ubuntu-latest
 
@@ -815,7 +837,7 @@ jobs:
   # Build and deploy checks
   build:
     runs-on: ubuntu-latest
-    needs: [dependency-audit, api-verification, driver-jest, admin-jest, ui-e2e-lifecycle, frontend-e2e]
+    needs: [dependency-audit, api-verification, driver-jest, customer-typecheck, admin-jest, ui-e2e-lifecycle, frontend-e2e]
 
     steps:
     - name: Checkout code

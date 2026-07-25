@@ -1,214 +1,140 @@
-import { screen, fireEvent, waitFor } from '@testing-library/react';
-import { render } from '../../test-utils';
-import { Cart } from '../Cart';
+import type { ReactNode } from 'react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { AuthProvider } from '../../contexts/AuthContext';
 import { CartProvider } from '../../contexts/CartContext';
+import { ToastProvider } from '../../contexts/ToastContext';
+import { Cart } from '../Cart';
+import api from '../../utils/api';
 
-// Mock the cart context
-jest.mock('../../contexts/CartContext', () => ({
-  CartProvider: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-  useCart: () => ({
-    items: [
-      {
-        id: '1',
-        dishId: 'dish1',
-        name: 'Test Dish',
-        price: 12.99,
-        quantity: 2,
-        customizations: [],
-      },
-    ],
-    total: 25.98,
-    addItem: jest.fn(),
-    removeItem: jest.fn(),
-    updateQuantity: jest.fn(),
-    clearCart: jest.fn(),
-  }),
-}));
+jest.mock('../../utils/api');
+jest.mock('../Payment', () => ({ Payment: () => null }));
 
-const createTest = () => new ({
-  defaultOptions: {
-    queries: { retry: false },
-    mutations: { retry: false },
-  },
-});
+const restaurant = { id: 'restaurant_1', name: 'Test Restaurant' };
+const cart = [{
+  dish: { id: 'dish_1', name: 'Test Dish', price: 12.99 },
+  quantity: 2,
+}];
 
-const renderWithProviders = (component: React.ReactElement) => {
-  return render(component);
+const wrapper = ({ children }: { children: ReactNode }) => {
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+  });
+
+  return (
+    <QueryClientProvider client={queryClient}>
+      <MemoryRouter>
+        <AuthProvider>
+          <ToastProvider>
+            <CartProvider>{children}</CartProvider>
+          </ToastProvider>
+        </AuthProvider>
+      </MemoryRouter>
+    </QueryClientProvider>
+  );
 };
 
 describe('Cart Component', () => {
-  it('renders empty cart message when no items', () => {
-    // Override the mock for empty cart
-    jest.doMock('../../contexts/CartContext', () => ({
-      CartProvider: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-      useCart: () => ({
-        items: [],
-        total: 0,
-        addItem: jest.fn(),
-        removeItem: jest.fn(),
-        updateQuantity: jest.fn(),
-        clearCart: jest.fn(),
-      }),
-    }));
+  const mockedApi = jest.mocked(api);
 
-    render(<Cart />);
-    expect(screen.getByText('Your cart is empty')).toBeInTheDocument();
+  beforeEach(() => {
+    jest.clearAllMocks();
+    localStorage.clear();
   });
 
-  it('renders cart items correctly', () => {
-    render(<Cart />);
+  it('renders an empty cart', () => {
+    render(<Cart cart={[]} restaurant={restaurant} />, { wrapper });
+
+    expect(screen.getByTestId('cart').querySelector('.cart-empty')).not.toBeNull();
+  });
+
+  it('renders cart items and calculates the subtotal', () => {
+    render(<Cart cart={cart} restaurant={restaurant} />, { wrapper });
 
     expect(screen.getByText('Test Dish')).toBeInTheDocument();
-    expect(screen.getByText('2')).toBeInTheDocument(); // Quantity
-    expect(screen.getByText('€12.99')).toBeInTheDocument(); // Unit price
-    expect(screen.getByText('€25.98')).toBeInTheDocument(); // Total
+    expect(screen.getByText('12.99 € × 2')).toBeInTheDocument();
+    expect(screen.getAllByText('25.98 €').length).toBeGreaterThan(0);
   });
 
-  it('displays cart total', () => {
-    render(<Cart />);
+  it('delegates valid quantity changes to the supplied cart owner', () => {
+    const updateQuantity = jest.fn();
+    render(<Cart cart={cart} restaurant={restaurant} updateQuantity={updateQuantity} />, { wrapper });
 
-    expect(screen.getByText('Total: €25.98')).toBeInTheDocument();
+    fireEvent.click(screen.getByLabelText('cart.increaseQuantity'));
+    fireEvent.click(screen.getByLabelText('cart.decreaseQuantity'));
+
+    expect(updateQuantity).toHaveBeenNthCalledWith(1, 'dish_1', 3);
+    expect(updateQuantity).toHaveBeenNthCalledWith(2, 'dish_1', 1);
   });
 
-  it('allows quantity updates', () => {
-    const mockUpdateQuantity = jest.fn();
-    jest.doMock('../../contexts/CartContext', () => ({
-      CartProvider: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-      useCart: () => ({
-        items: [
-          {
-            id: '1',
-            dishId: 'dish1',
-            name: 'Test Dish',
-            price: 12.99,
-            quantity: 2,
-            customizations: [],
-          },
-        ],
-        total: 25.98,
-        addItem: jest.fn(),
-        removeItem: jest.fn(),
-        updateQuantity: mockUpdateQuantity,
-        clearCart: jest.fn(),
-      }),
+  it('removes an item when its quantity is decreased to zero', () => {
+    const updateQuantity = jest.fn();
+    render(<Cart cart={[{ ...cart[0], quantity: 1 }]} restaurant={restaurant} updateQuantity={updateQuantity} />, { wrapper });
+
+    fireEvent.click(screen.getByLabelText('cart.decreaseQuantity'));
+
+    expect(updateQuantity).toHaveBeenCalledWith('dish_1', 0);
+  });
+
+  it('does not create an order for an unauthenticated checkout', async () => {
+    render(<Cart cart={cart} restaurant={restaurant} />, { wrapper });
+
+    fireEvent.submit(screen.getByTestId('checkout-button').closest('form')!);
+
+    await waitFor(() => {
+      expect(screen.getByText('cart.guestFieldsError')).toBeInTheDocument();
+    });
+    expect(mockedApi.post).not.toHaveBeenCalledWith('/orders/customer', expect.anything());
+  });
+
+  it('creates the canonical checkout payload for an authenticated customer', async () => {
+    localStorage.setItem('customer_token', 'access_token');
+    localStorage.setItem('customer_user', JSON.stringify({
+      id: 'customer_1',
+      email: 'customer@example.com',
+      address: 'Teststraße 1, Wien',
+      phone: '+431234567',
     }));
+    mockedApi.get.mockResolvedValue({
+      data: { sub: 'customer_1', email: 'customer@example.com' },
+    });
+    mockedApi.post.mockImplementation((url) => {
+      if (url === '/orders/customer') {
+        return new Promise(() => undefined);
+      }
+      return Promise.resolve({ data: {} });
+    });
 
-    render(<Cart />);
+    render(<Cart
+      cart={[{
+        ...cart[0],
+        modifications: { extras: ['cheese'] },
+        specialInstructions: 'No onions',
+      }]}
+      restaurant={restaurant}
+    />, { wrapper });
 
-    const increaseButton = screen.getByLabelText('Increase quantity');
-    fireEvent.click(increaseButton);
+    await waitFor(() => expect(mockedApi.get).toHaveBeenCalledWith('/auth/customer/me'));
+    fireEvent.click(screen.getByTestId('checkout-button'));
 
-    expect(mockUpdateQuantity).toHaveBeenCalledWith('1', 3);
-  });
-
-  it('allows item removal', () => {
-    const mockRemoveItem = jest.fn();
-    jest.doMock('../../contexts/CartContext', () => ({
-      CartProvider: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-      useCart: () => ({
-        items: [
-          {
-            id: '1',
-            dishId: 'dish1',
-            name: 'Test Dish',
-            price: 12.99,
-            quantity: 2,
-            customizations: [],
-          },
-        ],
-        total: 25.98,
-        addItem: jest.fn(),
-        removeItem: mockRemoveItem,
-        updateQuantity: jest.fn(),
-        clearCart: jest.fn(),
-      }),
-    }));
-
-    render(<Cart />);
-
-    const removeButton = screen.getByLabelText('Remove item');
-    fireEvent.click(removeButton);
-
-    expect(mockRemoveItem).toHaveBeenCalledWith('1');
-  });
-
-  it('shows checkout button', () => {
-    render(<Cart />);
-
-    expect(screen.getByText('Proceed to Checkout')).toBeInTheDocument();
-  });
-
-  it('handles minimum order amount', () => {
-    jest.doMock('../../contexts/CartContext', () => ({
-      CartProvider: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-      useCart: () => ({
-        items: [
-          {
-            id: '1',
-            dishId: 'dish1',
-            name: 'Cheap Dish',
-            price: 5.99,
-            quantity: 1,
-            customizations: [],
-          },
-        ],
-        total: 5.99,
-        addItem: jest.fn(),
-        removeItem: jest.fn(),
-        updateQuantity: jest.fn(),
-        clearCart: jest.fn(),
-      }),
-    }));
-
-    render(<Cart />);
-
-    expect(screen.getByText('Minimum order: €15.00')).toBeInTheDocument();
-    expect(screen.getByText('Add €9.01 more to proceed')).toBeInTheDocument();
-  });
-
-  it('displays delivery fee', () => {
-    render(<Cart />);
-
-    expect(screen.getByText('Delivery fee: €2.50')).toBeInTheDocument();
-  });
-
-  it('calculates final total with delivery fee', () => {
-    render(<Cart />);
-
-    expect(screen.getByText('Final total: €28.48')).toBeInTheDocument();
-  });
-
-  it('prevents checkout when below minimum order', () => {
-    jest.doMock('../../contexts/CartContext', () => ({
-      CartProvider: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-      useCart: () => ({
-        items: [
-          {
-            id: '1',
-            dishId: 'dish1',
-            name: 'Cheap Dish',
-            price: 5.99,
-            quantity: 1,
-            customizations: [],
-          },
-        ],
-        total: 5.99,
-        addItem: jest.fn(),
-        removeItem: jest.fn(),
-        updateQuantity: jest.fn(),
-        clearCart: jest.fn(),
-      }),
-    }));
-
-    render(<Cart />);
-
-    const checkoutButton = screen.getByText('Proceed to Checkout');
-    expect(checkoutButton).toBeDisabled();
+    await waitFor(() => {
+      expect(mockedApi.post).toHaveBeenCalledWith('/orders/customer', {
+        customerId: 'customer_1',
+        restaurantId: 'restaurant_1',
+        items: [{
+          dishId: 'dish_1',
+          quantity: 2,
+          modifications: { extras: ['cheese'] },
+          specialInstructions: 'No onions',
+        }],
+        address: 'Teststraße 1, Wien',
+        deliveryAddress: 'Teststraße 1, Wien',
+        phone: '+431234567',
+        notes: '',
+        promotionId: undefined,
+        deliveryFee: 0,
+      });
+    });
   });
 });
-
-
-
-
-
-

@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useMemo, type FormEvent } from 'react
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../contexts/AuthContext';
-import { useCart } from '../contexts/CartContext';
+import { type CartItem as ContextCartItem, useCart } from '../contexts/CartContext';
 import { useGeocodeAddress } from '../hooks/useGeocoding';
 import api from '../utils/api';
 import { Payment } from './Payment';
@@ -45,6 +45,17 @@ interface CartProps {
   onClearCart?: () => void;
 }
 
+function toCheckoutCartItem(item: ContextCartItem): CartItem {
+  return {
+    dish: {
+      id: item.dishId,
+      name: item.name,
+      price: item.price,
+    },
+    quantity: item.quantity,
+  };
+}
+
 export function Cart({ cart, restaurant, updateQuantity, onClearCart }: CartProps) {
   const { t } = useTranslation();
   const [loading, setLoading] = useState(false);
@@ -82,14 +93,7 @@ export function Cart({ cart, restaurant, updateQuantity, onClearCart }: CartProp
     };
   }, []);
 
-  const effectiveCart = cart ?? cartContext.items.map(item => ({
-    dish: {
-      id: item.dishId,
-      name: item.name,
-      price: item.price,
-    },
-    quantity: item.quantity,
-  }));
+  const effectiveCart: CartItem[] = cart ?? cartContext.items.map(toCheckoutCartItem);
   const effectiveRestaurant = restaurant ?? {
     id: cartContext.restaurantId || 'unknown',
     name: t('cart.title'),

@@ -11,8 +11,8 @@ import {
 interface User {
   id: string;
   email: string;
-  name: string;
-  phone: string;
+  name?: string;
+  phone?: string;
   address?: string;
 }
 
@@ -21,25 +21,61 @@ interface InitialAuthState {
   token: string | null;
 }
 
-function normalizeAuthPayload(payload: unknown) {
-  const data = (payload as { data?: unknown })?.data ?? payload ?? {};
-  const normalizedData = data as Record<string, unknown>;
-  const accessToken =
-    (normalizedData.access_token as string | undefined)
-    ?? (normalizedData.accessToken as string | undefined)
-    ?? (normalizedData.token as string | undefined)
-    ?? null;
-  const refreshToken =
-    (normalizedData.refresh_token as string | undefined)
-    ?? (normalizedData.refreshToken as string | undefined)
-    ?? null;
-  const user = (normalizedData.user as User | undefined) ?? {
-    id: normalizedData.id as string,
-    email: normalizedData.email as string,
-    name: normalizedData.name as string,
-    phone: normalizedData.phone as string,
-    address: normalizedData.address as string | undefined,
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function readNonEmptyString(value: unknown): string | undefined {
+  return typeof value === 'string' && value.trim().length > 0 ? value.trim() : undefined;
+}
+
+function readCustomerUser(value: unknown): User {
+  if (!isRecord(value)) {
+    throw new Error('Ungültige Auth-Antwort: Kundendaten fehlen.');
+  }
+
+  const id = readNonEmptyString(value.id) ?? readNonEmptyString(value.sub);
+  const email = readNonEmptyString(value.email);
+  if (!id || !email) {
+    throw new Error('Ungültige Auth-Antwort: Kunden-ID oder E-Mail fehlen.');
+  }
+
+  const name = readNonEmptyString(value.name);
+  const phone = readNonEmptyString(value.phone);
+  const address = normalizeStoredAddress(value.address);
+
+  return {
+    id,
+    email,
+    ...(name ? { name } : {}),
+    ...(phone ? { phone } : {}),
+    ...(address ? { address } : {}),
   };
+}
+
+function normalizeTokenPayload(data: Record<string, unknown>) {
+  return {
+    accessToken:
+      readNonEmptyString(data.access_token)
+      ?? readNonEmptyString(data.accessToken)
+      ?? readNonEmptyString(data.token)
+      ?? null,
+    refreshToken:
+      readNonEmptyString(data.refresh_token)
+      ?? readNonEmptyString(data.refreshToken)
+      ?? null,
+  };
+}
+
+function normalizeAuthPayload(payload: unknown) {
+  const response = isRecord(payload) ? payload : null;
+  const data = response && isRecord(response.data) ? response.data : response;
+  if (!data) {
+    throw new Error('Ungültige Auth-Antwort.');
+  }
+
+  const { accessToken, refreshToken } = normalizeTokenPayload(data);
+  const user = readCustomerUser(isRecord(data.user) ? data.user : data);
 
   return { accessToken, refreshToken, user };
 }
@@ -72,8 +108,9 @@ function persistCustomerProfileAddress(address: string | undefined) {
   }
 }
 
-function mergeCustomerUserForStorage(previousUser: unknown, nextUser: unknown) {
-  return mergeCustomerUserWithPreservedAddress(previousUser, nextUser);
+function mergeCustomerUserForStorage(previousUser: unknown, nextUser: unknown): User {
+  const mergedUser = mergeCustomerUserWithPreservedAddress(previousUser, nextUser);
+  return readCustomerUser(mergedUser);
 }
 
 interface AuthContextType {
@@ -81,6 +118,7 @@ interface AuthContextType {
   token: string | null;
   login: (email: string, password: string) => Promise<void>;
   register: (email: string, password: string, name: string, phone: string, address?: string) => Promise<void>;
+  refreshSession: () => Promise<void>;
   logout: () => void;
   updateUser: (updates: Partial<User>) => void;
   isAuthenticated: boolean;
@@ -96,6 +134,7 @@ export function AuthProvider({ children, initialAuthState }: { children: ReactNo
 
   function logout() {
     localStorage.removeItem('customer_token');
+    localStorage.removeItem('customer_refresh_token');
     localStorage.removeItem('customer_user');
     for (const key of CUSTOMER_PROFILE_ADDRESS_KEYS) {
       localStorage.removeItem(key);
@@ -107,12 +146,58 @@ export function AuthProvider({ children, initialAuthState }: { children: ReactNo
 
   function updateUser(updates: Partial<User>) {
     setUser((current) => {
-      const nextUser = mergeCustomerUserForStorage(current, updates) as User;
+      if (!current) {
+        return current;
+      }
+
+      const nextUser = mergeCustomerUserForStorage(current, updates);
       localStorage.setItem('customer_user', JSON.stringify(nextUser));
       persistCustomerProfileAddress(nextUser.address);
       return nextUser;
     });
   }
+
+  function persistRefreshToken(refreshToken: string | null) {
+    if (refreshToken) {
+      localStorage.setItem('customer_refresh_token', refreshToken);
+      return;
+    }
+
+    localStorage.removeItem('customer_refresh_token');
+  }
+
+  const refreshSession = async () => {
+    const refreshToken = localStorage.getItem('customer_refresh_token');
+    if (!refreshToken) {
+      logout();
+      throw new Error('Sitzung kann nicht aktualisiert werden.');
+    }
+
+    try {
+      const response = await api.post('/auth/refresh', { refresh_token: refreshToken });
+      const responseData = isRecord(response.data) && isRecord(response.data.data)
+        ? response.data.data
+        : response.data;
+      if (!isRecord(responseData)) {
+        throw new Error('Ungültige Refresh-Antwort.');
+      }
+
+      const tokens = normalizeTokenPayload(responseData);
+      if (!tokens.accessToken) {
+        throw new Error('Ungültige Refresh-Antwort: Access-Token fehlt.');
+      }
+
+      localStorage.setItem('customer_token', tokens.accessToken);
+      persistRefreshToken(tokens.refreshToken ?? refreshToken);
+      setToken(tokens.accessToken);
+      if (api?.defaults?.headers?.common) {
+        api.defaults.headers.common['Authorization'] = `Bearer ${tokens.accessToken}`;
+      }
+    } catch (error) {
+      logout();
+      throw error;
+    }
+  };
 
   useEffect(() => {
     if (initialAuthState) {
@@ -141,9 +226,9 @@ export function AuthProvider({ children, initialAuthState }: { children: ReactNo
             api.defaults.headers.common['Authorization'] = `Bearer ${storedToken}`;
           }
           const response = await api.get('/auth/customer/me');
-          const storedUserData = JSON.parse(storedUser) as Partial<User> | null;
+          const storedUserData = parseMaybeJson(storedUser);
           const normalized = normalizeAuthPayload(response.data);
-          const mergedUser = mergeCustomerUserForStorage(storedUserData, normalized.user) as User;
+          const mergedUser = mergeCustomerUserForStorage(storedUserData, normalized.user);
           
           // Token ist gültig - setze User und Token
           setToken(storedToken);
@@ -179,10 +264,14 @@ export function AuthProvider({ children, initialAuthState }: { children: ReactNo
         password,
       });
 
-      const { accessToken, user } = normalizeAuthPayload(response.data);
-      const mergedUser = mergeCustomerUserForStorage(localStorage.getItem('customer_user'), user) as User;
+      const { accessToken, refreshToken, user } = normalizeAuthPayload(response.data);
+      const mergedUser = mergeCustomerUserForStorage(localStorage.getItem('customer_user'), user);
+      if (!accessToken) {
+        throw new Error('Ungültige Auth-Antwort: Access-Token fehlt.');
+      }
       
-      localStorage.setItem('customer_token', accessToken ?? '');
+      localStorage.setItem('customer_token', accessToken);
+      persistRefreshToken(refreshToken);
       localStorage.setItem('customer_user', JSON.stringify(mergedUser));
       persistCustomerProfileAddress(mergedUser.address);
       
@@ -207,10 +296,14 @@ export function AuthProvider({ children, initialAuthState }: { children: ReactNo
         address,
       });
 
-      const { accessToken, user } = normalizeAuthPayload(response.data);
-      const mergedUser = mergeCustomerUserForStorage(localStorage.getItem('customer_user'), user) as User;
+      const { accessToken, refreshToken, user } = normalizeAuthPayload(response.data);
+      const mergedUser = mergeCustomerUserForStorage(localStorage.getItem('customer_user'), user);
+      if (!accessToken) {
+        throw new Error('Ungültige Auth-Antwort: Access-Token fehlt.');
+      }
       
-      localStorage.setItem('customer_token', accessToken ?? '');
+      localStorage.setItem('customer_token', accessToken);
+      persistRefreshToken(refreshToken);
       localStorage.setItem('customer_user', JSON.stringify(mergedUser));
       persistCustomerProfileAddress(mergedUser.address);
       
@@ -232,6 +325,7 @@ export function AuthProvider({ children, initialAuthState }: { children: ReactNo
         token,
         login,
         register,
+        refreshSession,
         logout,
         updateUser,
         isAuthenticated: !!token,
@@ -252,6 +346,7 @@ export function useAuth() {
       token: null,
       login: async () => {},
       register: async () => {},
+      refreshSession: async () => {},
       logout: () => {},
       updateUser: () => {},
       isAuthenticated: false,
