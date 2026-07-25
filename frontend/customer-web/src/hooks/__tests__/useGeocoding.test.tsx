@@ -1,5 +1,6 @@
-import { screen, fireEvent, waitFor } from '@testing-library/react';
-import { render } from '../../test-utils';
+import type { ReactNode } from 'react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { renderHook, waitFor } from '@testing-library/react';
 import { useGeocodeAddress, useReverseGeocode } from '../useGeocoding';
 import api from '../../utils/api';
 
@@ -8,16 +9,24 @@ const mockedApi = api as jest.Mocked<typeof api>;
 
 describe('useGeocoding', () => {
   let queryClient: QueryClient;
+  const wrapper = ({ children }: { children: ReactNode }) => (
+    <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+  );
 
   beforeEach(() => {
     queryClient = new QueryClient({
       defaultOptions: {
         queries: {
           retry: false,
+          gcTime: 0,
         },
       },
     });
-    jest.clearAllMocks();
+    mockedApi.post.mockReset();
+  });
+
+  afterEach(() => {
+    queryClient.clear();
   });
 
   describe('useGeocodeAddress', () => {
@@ -31,7 +40,7 @@ describe('useGeocoding', () => {
 
       mockedApi.post.mockResolvedValue(mockResponse);
 
-      const { result } = renderHook(() => useGeocodeAddress('Vienna'));
+      const { result } = renderHook(() => useGeocodeAddress('Vienna'), { wrapper });
 
       await waitFor(() => {
         expect(result.current.isSuccess).toBe(true);
@@ -41,7 +50,7 @@ describe('useGeocoding', () => {
     });
 
     it('does not fetch for empty address', () => {
-      const { result } = renderHook(() => useGeocodeAddress(''));
+      const { result } = renderHook(() => useGeocodeAddress(''), { wrapper });
 
       expect(result.current.isLoading).toBe(false);
       expect(mockedApi.post).not.toHaveBeenCalled();
@@ -50,7 +59,7 @@ describe('useGeocoding', () => {
     it('handles API errors gracefully', async () => {
       mockedApi.post.mockRejectedValue(new Error('API Error'));
 
-      const { result } = renderHook(() => useGeocodeAddress('Invalid Address'));
+      const { result } = renderHook(() => useGeocodeAddress('Invalid Address'), { wrapper });
 
       await waitFor(() => {
         // Der Hook gibt null zurück bei Fehlern, nicht isError
@@ -71,7 +80,10 @@ describe('useGeocoding', () => {
 
       mockedApi.post.mockResolvedValue(mockResponse);
 
-      const { result } = renderHook(() => useReverseGeocode({ lat: 48.2082, lng: 16.3738 }));
+      const { result } = renderHook(
+        () => useReverseGeocode({ lat: 48.2082, lng: 16.3738 }),
+        { wrapper }
+      );
 
       await waitFor(() => {
         expect(result.current.isSuccess).toBe(true);
@@ -81,7 +93,7 @@ describe('useGeocoding', () => {
     });
 
     it('does not fetch for invalid coordinates', () => {
-      const { result } = renderHook(() => useReverseGeocode(null));
+      const { result } = renderHook(() => useReverseGeocode(null), { wrapper });
 
       expect(result.current.isLoading).toBe(false);
       expect(mockedApi.post).not.toHaveBeenCalled();
