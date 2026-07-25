@@ -1,156 +1,155 @@
-import { screen, fireEvent, waitFor } from '@testing-library/react';
+import { screen, fireEvent } from '@testing-library/react';
 import { render } from '../../test-utils';
-import userEvent from '@testing-library/user-event';
 import { RestaurantList } from '../RestaurantList';
-import * as api from '../../utils/api';
+import { useRestaurants } from '../../hooks/useRestaurants';
 
-jest.mock('../../utils/api');
+jest.mock('react', () => {
+  const actualReact = jest.requireActual<typeof import('react')>('react');
+  return {
+    __esModule: true,
+    ...actualReact,
+    default: actualReact,
+  };
+});
+
+jest.mock('../../hooks/useRestaurants');
+
+const mockUseRestaurants = jest.mocked(useRestaurants);
+
+const restaurants = [
+  {
+    id: 'rest_1',
+    name: 'Pizza Paradise',
+    description: 'Best Italian Pizza in Town',
+    address: 'Hauptstrasse 1, Wien',
+    phone: '+431234567',
+    cuisines: ['Italian', 'Pizza'],
+    rating: 4.8,
+    deliveryFee: 3.5,
+    minOrderAmount: 15,
+    estimatedDeliveryTime: 30,
+    isOpen: true,
+  },
+  {
+    id: 'rest_2',
+    name: 'Burger King',
+    description: 'American Burgers',
+    address: 'Kärntner Strasse 10, Wien',
+    phone: '+439876543',
+    cuisines: ['American', 'Burger'],
+    rating: 4.2,
+    deliveryFee: 2,
+    minOrderAmount: 10,
+    estimatedDeliveryTime: 20,
+    isOpen: true,
+  },
+];
+
+const setRestaurantsState = (
+  data: typeof restaurants | undefined,
+  isLoading = false,
+  error: Error | null = null
+) => {
+  mockUseRestaurants.mockReturnValue({
+    data,
+    isLoading,
+    error,
+  } as ReturnType<typeof useRestaurants>);
+};
 
 describe('RestaurantList', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    window.history.replaceState(null, '', '/');
+    setRestaurantsState([]);
   });
 
   it('renders restaurant list title', () => {
     render(<RestaurantList />);
-    expect(screen.getByText(/Restaurants/i)).toBeInTheDocument();
+
+    expect(screen.getByRole('heading', { name: '0 Restaurants gefunden' })).toBeInTheDocument();
+    expect(screen.getByText('Keine Restaurants gefunden')).toBeInTheDocument();
   });
 
-  it('displays restaurants', async () => {
-    const mockRestaurants = [
-      {
-        id: 'rest_1',
-        name: 'Pizza Paradise',
-        description: 'Best Italian Pizza in Town',
-        address: 'Hauptstrasse 1, Wien',
-        rating: 4.8,
-        isActive: true,
-      },
-      {
-        id: 'rest_2',
-        name: 'Burger King',
-        description: 'American Burgers',
-        address: 'Kärntner Strasse 10, Wien',
-        rating: 4.2,
-        isActive: true,
-      },
-    ];
-
-    (api.default.get as jest.Mock).mockResolvedValue({
-      data: { data: mockRestaurants },
-    });
+  it('displays restaurants', () => {
+    setRestaurantsState(restaurants);
 
     render(<RestaurantList />);
 
-    await waitFor(() => {
-      expect(screen.getByText('Pizza Paradise')).toBeInTheDocument();
-      expect(screen.getByText('Burger King')).toBeInTheDocument();
-    });
+    expect(screen.getByText('Pizza Paradise')).toBeInTheDocument();
+    expect(screen.getByText('Burger King')).toBeInTheDocument();
+    expect(screen.getByText('4.8')).toBeInTheDocument();
+    expect(document.querySelector('.delivery-fee')).toHaveTextContent('3,50 € Lieferung');
   });
 
-  it('filters restaurants by cuisine', async () => {
-    const mockRestaurants = [
-      {
-        id: 'rest_1',
-        name: 'Pizza Paradise',
-        cuisines: ['Italian', 'Pizza'],
-        rating: 4.8,
-      },
-      {
-        id: 'rest_2',
-        name: 'Burger King',
-        cuisines: ['American', 'Burger'],
-        rating: 4.2,
-      },
-    ];
+  it('filters restaurants by cuisine', () => {
+    setRestaurantsState(restaurants);
 
-    (api.default.get as jest.Mock).mockResolvedValue({
-      data: { data: mockRestaurants },
-    });
+    render(<RestaurantList selectedCuisines={['Italian']} />);
 
-    render(<RestaurantList />);
-
-    await waitFor(() => {
-      expect(screen.getByText('Pizza Paradise')).toBeInTheDocument();
-    });
-
-    // Filter nach Italian Küche (wenn UI verfügbar)
-    const italianFilter = screen.queryByText('Italian');
-    if (italianFilter) {
-      userEvent.click(italianFilter);
-      await waitFor(() => {
-        expect(screen.getByText('Pizza Paradise')).toBeInTheDocument();
-        expect(screen.queryByText('Burger King')).not.toBeInTheDocument();
-      });
-    }
+    expect(screen.getByText('Pizza Paradise')).toBeInTheDocument();
+    expect(screen.queryByText('Burger King')).not.toBeInTheDocument();
   });
 
-  it('searches restaurants', async () => {
-    const mockRestaurants = [
-      {
-        id: 'rest_1',
-        name: 'Pizza Paradise',
-        description: 'Best Italian Pizza',
-        address: 'Hauptstrasse 1, Wien',
-      },
-    ];
+  it('searches restaurants', () => {
+    setRestaurantsState(restaurants);
 
-    (api.default.get as jest.Mock).mockResolvedValue({
-      data: { data: mockRestaurants },
-    });
+    render(<RestaurantList searchTerm="Pizza" />);
 
-    render(<RestaurantList />);
+    expect(screen.getByText('Pizza Paradise')).toBeInTheDocument();
+    expect(screen.queryByText('Burger King')).not.toBeInTheDocument();
+  });
 
-    await waitFor(() => {
-      expect(screen.getByText('Pizza Paradise')).toBeInTheDocument();
-    });
+  it('sorts restaurants by delivery fee', () => {
+    setRestaurantsState(restaurants);
 
-    // Search functionality testen (wenn Search Input verfügbar)
-    const searchInput = screen.queryByPlaceholderText(/Suche/i);
-    if (searchInput) {
-      userEvent.type(searchInput, 'Pizza');
-      await waitFor(() => {
-        expect(screen.getByText('Pizza Paradise')).toBeInTheDocument();
-      });
-    }
+    render(<RestaurantList sortBy="deliveryFee" />);
+
+    expect(screen.getAllByTestId('restaurant-name').map((element) => element.textContent)).toEqual([
+      'Burger King',
+      'Pizza Paradise',
+    ]);
   });
 
   it('handles loading state', () => {
+    setRestaurantsState(undefined, true);
+
     render(<RestaurantList />);
-    expect(screen.getByText(/Loading/i)).toBeInTheDocument();
+
+    expect(document.querySelectorAll('.skeleton')).toHaveLength(24);
+    expect(screen.queryByText('Keine Restaurants gefunden')).not.toBeInTheDocument();
   });
 
-  it('handles error state', async () => {
-    (api.default.get as jest.Mock).mockRejectedValue(
-      new Error('Network error')
-    );
+  it('handles error state', () => {
+    setRestaurantsState(undefined, false, new Error('Network error'));
 
     render(<RestaurantList />);
 
-    await waitFor(() => {
-      expect(screen.getByText(/Fehler/i)).toBeInTheDocument();
-    });
+    expect(screen.getByRole('heading', { name: 'Fehler beim Laden der Restaurants' })).toBeInTheDocument();
+    expect(screen.getByText('Network error')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Erneut versuchen' })).toBeInTheDocument();
   });
 
   it('navigates to restaurant menu', async () => {
-    const mockRestaurants = [
-      {
-        id: 'rest_1',
-        name: 'Pizza Paradise',
-        description: 'Best Italian Pizza',
-      },
-    ];
-
-    (api.default.get as jest.Mock).mockResolvedValue({
-      data: { data: mockRestaurants },
-    });
+    setRestaurantsState([restaurants[0]]);
 
     render(<RestaurantList />);
 
-    await waitFor(() => {
-      const restaurantLink = screen.getByText('Pizza Paradise');
-      expect(restaurantLink.closest('a')).toHaveAttribute('href', '/restaurant/rest_1');
-    });
+    fireEvent.click(screen.getByTestId('restaurant-card'));
+
+    expect(window.location.pathname).toBe('/restaurant/rest_1');
+  });
+
+  it('calls the supplied selection callback with the selected restaurant', () => {
+    const onRestaurantClick = jest.fn();
+    setRestaurantsState([restaurants[0]]);
+
+    render(<RestaurantList onRestaurantClick={onRestaurantClick} />);
+
+    fireEvent.click(screen.getByTestId('restaurant-card'));
+
+    expect(onRestaurantClick).toHaveBeenCalledTimes(1);
+    expect(onRestaurantClick).toHaveBeenCalledWith(restaurants[0]);
   });
 });
 
