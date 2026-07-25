@@ -1,7 +1,8 @@
 import { screen, fireEvent, waitFor } from '@testing-library/react';
-import { render } from '../../test-utils';
+import { render } from '../test-utils';
 import Chat from '../components/Chat';
 import React from 'react';
+import api from '../utils/api';
 
 // Mock useWebSocket
 jest.mock('../hooks/useWebSocket', () => ({
@@ -43,7 +44,6 @@ describe('Chat Component', () => {
   });
 
   it('renders chat interface correctly', async () => {
-    const api = require('../utils/api').default;
     api.get.mockResolvedValueOnce({ data: [] });
 
     render(<Chat orderId="test-order" />);
@@ -65,7 +65,6 @@ describe('Chat Component', () => {
       { id: '2', message: 'Hi there!', senderType: 'restaurant', senderId: 'rest-1', senderName: 'Restaurant', timestamp: new Date().toISOString() },
     ];
 
-    const api = require('../utils/api').default;
     api.get.mockResolvedValueOnce({ data: mockHistory });
 
     render(<Chat orderId="test-order" />);
