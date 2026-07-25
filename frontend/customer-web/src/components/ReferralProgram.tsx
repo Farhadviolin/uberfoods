@@ -10,6 +10,7 @@ import { Skeleton } from '../design-system/Skeleton';
 import { useToast } from '../contexts/ToastContext';
 import { Users, Gift, Copy, Check, Share2, TrendingUp } from 'lucide-react';
 import { AxiosErrorWithResponse } from '../types';
+import { formatCurrency as formatCurrencyValue } from '../utils/formatters';
 import './ReferralProgram.css';
 
 interface ReferralStats {
@@ -160,10 +161,7 @@ export function ReferralProgram() {
 
   const formatCurrency = (amount: number) => {
     const locale = i18n.language === 'de' ? 'de-DE' : 'en-US';
-    return new Intl.NumberFormat(locale, {
-      style: 'currency',
-      currency: 'EUR',
-    }).format(amount);
+    return formatCurrencyValue(amount, locale);
   };
 
   if (!user) {

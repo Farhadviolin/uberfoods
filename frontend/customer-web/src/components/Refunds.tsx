@@ -12,6 +12,10 @@ import { Skeleton } from '../design-system/Skeleton';
 import { EmptyState } from '../design-system/EmptyState';
 import { useToast } from '../contexts/ToastContext';
 import { ArrowLeft, DollarSign, Clock, CheckCircle, XCircle, AlertCircle, FileText } from 'lucide-react';
+import {
+  formatCurrency as formatCurrencyValue,
+  formatDate as formatDateValue,
+} from '../utils/formatters';
 import './Refunds.css';
 
 interface Refund {
@@ -97,23 +101,19 @@ export function Refunds() {
   };
 
   const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
     const locale = i18n.language === 'de' ? 'de-DE' : 'en-US';
-    return new Intl.DateTimeFormat(locale, {
+    return formatDateValue(dateString, locale, {
       year: 'numeric',
       month: 'short',
       day: 'numeric',
       hour: '2-digit',
       minute: '2-digit',
-    }).format(date);
+    });
   };
 
   const formatCurrency = (amount: number) => {
     const locale = i18n.language === 'de' ? 'de-DE' : 'en-US';
-    return new Intl.NumberFormat(locale, {
-      style: 'currency',
-      currency: 'EUR',
-    }).format(amount);
+    return formatCurrencyValue(amount, locale);
   };
 
   const getStatusIcon = (status: Refund['status']) => {

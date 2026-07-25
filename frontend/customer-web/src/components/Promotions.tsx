@@ -7,6 +7,7 @@ import { Badge } from '../design-system/Badge';
 import { Skeleton } from '../design-system/Skeleton';
 import { EmptyState } from '../design-system/EmptyState';
 import { Tag, Calendar, Percent, Gift } from 'lucide-react';
+import { formatDate as formatDateValue } from '../utils/formatters';
 import './Promotions.css';
 
 interface Promotion {
@@ -67,13 +68,12 @@ export function Promotions() {
   }, [user?.id, loadPromotions, loadMyPromotions]);
 
   const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
     const locale = i18n.language === 'de' ? 'de-DE' : 'en-US';
-    return new Intl.DateTimeFormat(locale, {
+    return formatDateValue(dateString, locale, {
       year: 'numeric',
       month: 'short',
       day: 'numeric',
-    }).format(date);
+    });
   };
 
   const formatDiscount = (promotion: Promotion) => {
