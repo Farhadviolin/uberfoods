@@ -1,5 +1,4 @@
-import { screen, fireEvent, waitFor } from '@testing-library/react';
-import { render } from '../../test-utils';
+import { act, renderHook } from '@testing-library/react';
 import { useDebouncedValue } from '../useDebouncedValue';
 
 describe('useDebouncedValue', () => {
@@ -8,6 +7,7 @@ describe('useDebouncedValue', () => {
   });
 
   afterEach(() => {
+    jest.clearAllTimers();
     jest.useRealTimers();
   });
 
