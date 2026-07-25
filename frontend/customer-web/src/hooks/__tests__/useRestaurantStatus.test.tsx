@@ -1,4 +1,5 @@
 import React from 'react';
+import { waitFor } from '@testing-library/react';
 import { renderHook } from '../../test-utils';
 import {
   useRestaurantStatus,
@@ -9,7 +10,7 @@ import {
 
 // Mock the API
 jest.mock('../../utils/api');
-const mockApi = require('../../utils/api').default || require('../../utils/api');
+const { default: mockApi } = jest.requireMock<typeof import('../../utils/api')>('../../utils/api');
 
 describe('useRestaurantStatus', () => {
   beforeEach(() => {
