@@ -1,14 +1,18 @@
+import { waitFor } from '@testing-library/react';
 import { renderHook } from '../../test-utils';
 import { useRestaurants } from '../useRestaurants';
 
 // Mock the API
 jest.mock('../../utils/api', () => ({
+  __esModule: true,
   default: {
     get: jest.fn(),
   },
+  api: {
+    get: jest.fn(),
+  },
 }));
-
-const mockApi = require('../../utils/api').default;
+const { api: mockApi } = jest.requireMock<typeof import('../../utils/api')>('../../utils/api');
 
 describe('useRestaurants Hook', () => {
   const mockRestaurants = [
@@ -47,15 +51,19 @@ describe('useRestaurants Hook', () => {
     expect(result.current).toBeDefined();
   });
 
-  it('should call API with correct URL', () => {
+  it('should call API with correct URL', async () => {
     renderHook(() => useRestaurants());
-    expect(mockApi.get).toHaveBeenCalledWith('/restaurants/public');
+    await waitFor(() => {
+      expect(mockApi.get).toHaveBeenCalledWith('/restaurants/public?sortBy=rating&sortOrder=desc');
+    });
   });
 
-  it('should call API with search parameters', () => {
+  it('should call API with search parameters', async () => {
     const options = { searchTerm: 'pizza' };
     renderHook(() => useRestaurants(options));
-    expect(mockApi.get).toHaveBeenCalledWith('/restaurants/public?search=pizza');
+    await waitFor(() => {
+      expect(mockApi.get).toHaveBeenCalledWith('/restaurants/public?search=pizza&sortBy=rating&sortOrder=desc');
+    });
   });
 });
 
