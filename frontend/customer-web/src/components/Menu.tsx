@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import api from '../utils/api';
@@ -46,6 +46,7 @@ export function Menu() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [restaurant, setRestaurant] = useState<Restaurant | null>(null);
+  const restaurantRef = useRef<Restaurant | null>(null);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -98,50 +99,14 @@ export function Menu() {
   const fetchRestaurant = useCallback(async (restaurantId: string) => {
     try {
       setLoading(true);
+      setError(null);
       console.log('Fetching restaurant data for:', restaurantId);
 
-      // E2E: Use static data instead of API call
-      const staticRestaurantData = {
-        id: restaurantId,
-        name: restaurantId === 'rest_001' ? 'Pizza Palace' :
-              restaurantId === 'rest_002' ? 'Burger Kingdom' :
-              'Sushi Express',
-        description: 'Delicious food from our restaurant',
-        address: '123 Main St, Berlin',
-        dishes: [
-          {
-            id: 'dish-pizza-margherita',
-            name: 'Pizza Margherita',
-            description: 'Klassische Pizza mit Tomaten, Mozzarella und Basilikum',
-            price: 8.50,
-            imageUrl: null,
-            category: 'Pizza',
-            isAvailable: true
-          },
-          {
-            id: 'dish-pizza-pepperoni',
-            name: 'Pizza Pepperoni',
-            description: 'Scharfe Salami, Käse und Tomatensauce',
-            price: 10.50,
-            imageUrl: null,
-            category: 'Pizza',
-            isAvailable: true
-          },
-          {
-            id: 'dish-pizza-hawaii',
-            name: 'Pizza Hawaii',
-            description: 'Schinken, Ananas und Käse',
-            price: 11.00,
-            imageUrl: null,
-            category: 'Pizza',
-            isAvailable: true
-          }
-        ]
-      };
-
-      setRestaurant(staticRestaurantData);
-      setError(null);
+      const response = await api.get<Restaurant>(`/restaurants/public/${restaurantId}`);
+      restaurantRef.current = response.data;
+      setRestaurant(response.data);
     } catch (err: unknown) {
+      restaurantRef.current = null;
       setError(extractErrorMessage(err));
       setRestaurant(null);
     } finally {
@@ -150,6 +115,8 @@ export function Menu() {
   }, []);
 
   useEffect(() => {
+    const intentTimeouts: ReturnType<typeof setTimeout>[] = [];
+
     console.log('Menu useEffect triggered, id:', id);
     if (id) {
       console.log('Calling fetchRestaurant with id:', id);
@@ -174,9 +141,10 @@ export function Menu() {
       try {
         const intent = JSON.parse(voiceIntent);
         if (Date.now() - intent.timestamp < 10000) {
-          setTimeout(() => {
-            if (restaurant) {
-              const dish = restaurant.dishes?.find(d => d.id === intent.dishId);
+          intentTimeouts.push(setTimeout(() => {
+            const currentRestaurant = restaurantRef.current;
+            if (currentRestaurant) {
+              const dish = currentRestaurant.dishes?.find(d => d.id === intent.dishId);
               if (dish) {
                 for (let i = 0; i < (intent.quantity || 1); i++) {
                   addToCart(dish);
@@ -184,7 +152,7 @@ export function Menu() {
               }
             }
             localStorage.removeItem('voice_order_intent');
-          }, 1000);
+          }, 1000));
         } else {
           localStorage.removeItem('voice_order_intent');
         }
@@ -197,9 +165,10 @@ export function Menu() {
       try {
         const intent = JSON.parse(quickOrderIntent);
         if (Date.now() - intent.timestamp < 10000) {
-          setTimeout(() => {
-            if (restaurant) {
-              const dish = restaurant.dishes?.find(d => d.id === intent.dishId);
+          intentTimeouts.push(setTimeout(() => {
+            const currentRestaurant = restaurantRef.current;
+            if (currentRestaurant) {
+              const dish = currentRestaurant.dishes?.find(d => d.id === intent.dishId);
               if (dish) {
                 for (let i = 0; i < (intent.quantity || 1); i++) {
                   addToCart(dish);
@@ -207,7 +176,7 @@ export function Menu() {
               }
             }
             localStorage.removeItem('quick_order_intent');
-          }, 1000);
+          }, 1000));
         } else {
           localStorage.removeItem('quick_order_intent');
         }
@@ -220,10 +189,11 @@ export function Menu() {
       try {
         const intent = JSON.parse(reorderIntent);
         if (Date.now() - intent.timestamp < 10000) {
-          setTimeout(() => {
-            if (restaurant && intent.items) {
+          intentTimeouts.push(setTimeout(() => {
+            const currentRestaurant = restaurantRef.current;
+            if (currentRestaurant && intent.items) {
               intent.items.forEach((item: { dishId: string; quantity?: number }) => {
-                const dish = restaurant.dishes?.find(d => d.id === item.dishId);
+                const dish = currentRestaurant.dishes?.find(d => d.id === item.dishId);
                 if (dish) {
                   for (let i = 0; i < (item.quantity || 1); i++) {
                     addToCart(dish);
@@ -232,7 +202,7 @@ export function Menu() {
               });
             }
             localStorage.removeItem('reorder_intent');
-          }, 1000);
+          }, 1000));
         } else {
           localStorage.removeItem('reorder_intent');
         }
@@ -240,7 +210,10 @@ export function Menu() {
         localStorage.removeItem('reorder_intent');
       }
     }
-  }, [id, restaurant, addToCart, fetchRestaurant]);
+    return () => {
+      intentTimeouts.forEach(clearTimeout);
+    };
+  }, [id, addToCart, fetchRestaurant]);
 
   useEffect(() => {
     // Speichere Warenkorb in localStorage
@@ -278,6 +251,17 @@ export function Menu() {
     );
   }
 
+  if (error) {
+    return (
+      <div>
+        <button className="fb-back-button" onClick={() => navigate('/')}>
+          {t('menu.backToRestaurants')}
+        </button>
+        <div className="error">{error}</div>
+      </div>
+    );
+  }
+
   if (!restaurant) {
     return (
       <div>
@@ -289,13 +273,13 @@ export function Menu() {
     );
   }
 
-  const availableDishes = restaurant.dishes?.filter(d => d.isAvailable) || [];
-  const categories = [...new Set(availableDishes.map(d => d.category).filter(Boolean))];
+  const menuDishes = restaurant.dishes || [];
+  const categories = [...new Set(menuDishes.map(d => d.category).filter(Boolean))];
 
   console.log('Menu component data:', {
     restaurantLoaded: !!restaurant,
     dishCount: restaurant?.dishes?.length || 0,
-    availableDishesCount: availableDishes.length,
+    availableDishesCount: menuDishes.filter(d => d.isAvailable).length,
     categories,
     activeTab,
     error
@@ -349,7 +333,7 @@ export function Menu() {
                 <div key={category} className="category-section">
                   <h3>{category}</h3>
                   <div className="dishes">
-                    {availableDishes
+                    {menuDishes
                       .filter(d => d.category === category)
                       .map(dish => (
                         <div key={dish.id} className="dish-card" data-testid="dish-card">
@@ -390,7 +374,7 @@ export function Menu() {
               // Fallback: render all dishes without categories for E2E testing
               <div className="category-section">
                 <div className="dishes">
-                  {availableDishes.map(dish => (
+                  {menuDishes.map(dish => (
                     <div key={dish.id} className="dish-card" data-testid="dish-card">
                       <img
                         src={getImageUrl(dish.imageUrl) || getDishPlaceholder()}
@@ -426,7 +410,7 @@ export function Menu() {
               </div>
             )}
 
-          {availableDishes.length === 0 && (
+          {menuDishes.length === 0 && (
             <div className="empty-state">
               <div style={{ fontSize: '48px', marginBottom: '16px' }}>🍽️</div>
               <p>{t('menu.noDishesAvailable')}</p>
