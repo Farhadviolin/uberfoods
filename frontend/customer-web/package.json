@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
+    "postinstall": "node ../../scripts/patch-brace-expansion-cjs.cjs",
     "dev": "vite",
     "dev:e2e": "vite --mode e2e --host 127.0.0.1 --port 3102 --strictPort",
     "build": "vite build",
@@ -76,6 +77,7 @@
     "zustand": "^5.0.8"
   },
   "overrides": {
+    "brace-expansion": "5.0.8",
     "glob": "^10.3.12",
     "uuid": "^11.1.1"
   },
