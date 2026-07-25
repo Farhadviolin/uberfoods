@@ -1,5 +1,4 @@
-import { screen, fireEvent, waitFor } from '@testing-library/react';
-import { render } from '../../test-utils';
+import { act, fireEvent, renderHook } from '@testing-library/react';
 import { useKeyboardShortcuts } from '../useKeyboardShortcuts';
 
 describe('useKeyboardShortcuts', () => {
