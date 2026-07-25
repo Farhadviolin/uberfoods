@@ -1,8 +1,9 @@
-import React, { ReactElement } from 'react';
+import type { ReactElement, ReactNode } from 'react';
 import { render, renderHook, RenderOptions } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { BrowserRouter } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
+import { CartProvider } from './contexts/CartContext';
 import { FavoritesProvider } from './contexts/FavoritesContext';
 import { ToastProvider } from './contexts/ToastContext';
 import { ThemeProvider } from './design-system/ThemeProvider';
@@ -22,7 +23,7 @@ const createTestQueryClient = () =>
   });
 
 // Test wrapper with all providers
-const TestWrapper = ({ children }: { children: React.ReactNode }) => (
+const TestWrapper = ({ children }: { children: ReactNode }) => (
   <QueryClientProvider client={createTestQueryClient()}>
     <BrowserRouter>
       <ThemeProvider>
@@ -39,18 +40,11 @@ const TestWrapper = ({ children }: { children: React.ReactNode }) => (
 );
 
 // Test wrapper with cart provider
-const TestWrapperWithCart = ({ children }: { children: React.ReactNode }) => {
-  const CartProvider = React.lazy(() => import('./contexts/CartContext').then(module => ({ default: module.CartProvider })));
-  return (
-    <TestWrapper>
-      <React.Suspense fallback={<div>Loading...</div>}>
-        <CartProvider>
-          {children}
-        </CartProvider>
-      </React.Suspense>
-    </TestWrapper>
-  );
-};
+const TestWrapperWithCart = ({ children }: { children: ReactNode }) => (
+  <TestWrapper>
+    <CartProvider>{children}</CartProvider>
+  </TestWrapper>
+);
 
 // Custom render function that includes all providers
 const customRender = (
