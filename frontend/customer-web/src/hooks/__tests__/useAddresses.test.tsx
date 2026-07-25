@@ -1,199 +1,318 @@
-import { renderHook } from '../../test-utils';
+import type { ReactNode } from 'react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { renderHook, waitFor } from '@testing-library/react';
+import { AuthProvider } from '../../contexts/AuthContext';
 import {
   useAddresses,
   useCreateAddress,
-  useUpdateAddress,
   useDeleteAddress,
-  useSetDefaultAddress
+  useSetDefaultAddress,
+  useUpdateAddress,
+  type Address,
 } from '../useAddresses';
 
-// Mock API
 jest.mock('../../utils/api');
 import api from '../../utils/api';
 
-const mockApi = api as jest.Mocked<typeof api>;
+const mockApi = jest.mocked(api);
+const authenticatedState = {
+  user: { id: 'customer-1', email: 'customer@example.com', name: 'Test Customer' },
+  token: 'customer-token',
+};
+
+function createHarness(
+  initialAuthState: {
+    user: { id: string; email: string; name?: string } | null;
+    token: string | null;
+  } = { user: null, token: null },
+) {
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: { retry: false, gcTime: 0 },
+      mutations: { retry: false },
+    },
+  });
+
+  function Wrapper({ children }: { children: ReactNode }) {
+    return (
+      <QueryClientProvider client={queryClient}>
+        <AuthProvider initialAuthState={initialAuthState}>{children}</AuthProvider>
+      </QueryClientProvider>
+    );
+  }
+
+  return { queryClient, wrapper: Wrapper };
+}
+
+const homeAddress: Address = {
+  id: 'address-1',
+  label: 'Home',
+  street: 'Main Street 123',
+  city: 'Vienna',
+  postalCode: '1010',
+  country: 'Austria',
+  notes: 'Ring the bell',
+  isDefault: true,
+};
+
+const workAddress: Address = {
+  id: 'address-2',
+  label: 'Work',
+  street: 'Business Street 456',
+  city: 'Vienna',
+  postalCode: '1020',
+  country: 'Austria',
+  isDefault: false,
+};
 
 describe('useAddresses', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockApi.get.mockReset();
+    mockApi.post.mockReset();
+    mockApi.put.mockReset();
+    mockApi.delete.mockReset();
+    mockApi.patch.mockReset();
+    localStorage.clear();
+  });
+
+  afterEach(() => {
+    localStorage.clear();
   });
 
   describe('useAddresses', () => {
-    it('should fetch addresses successfully', async () => {
-      const mockAddresses = [
-        {
-          id: '1',
-          type: 'home',
-          street: 'Main Street 123',
-          city: 'Vienna',
-          zipCode: '1010',
-          country: 'Austria',
-          isDefault: true,
-          createdAt: '2024-01-01T00:00:00Z',
-        },
-        {
-          id: '2',
-          type: 'work',
-          street: 'Business Street 456',
-          city: 'Vienna',
-          zipCode: '1020',
-          country: 'Austria',
-          isDefault: false,
-          createdAt: '2024-01-02T00:00:00Z',
-        },
-      ];
+    it('fetches typed customer addresses with the addresses query key', async () => {
+      const addresses: Address[] = [homeAddress, workAddress];
+      const originalAddresses = addresses.map((address) => ({ ...address }));
+      mockApi.get.mockResolvedValueOnce({ data: addresses });
+      const { queryClient, wrapper } = createHarness(authenticatedState);
+      const { result } = renderHook(() => useAddresses(), { wrapper });
 
-      mockApi.get.mockResolvedValueOnce({ data: mockAddresses });
+      expect(result.current.isLoading).toBe(true);
+      await waitFor(() => expect(result.current.isSuccess).toBe(true));
 
-      const { result } = renderHook(() => useAddresses(), {
-        wrapper: createWrapper({ user: { id: '1' }, token: 'token' }),
-      });
-
-      await waitFor(() => {
-        expect(result.current.isSuccess).toBe(true);
-      });
-
+      expect(mockApi.get).toHaveBeenCalledTimes(1);
       expect(mockApi.get).toHaveBeenCalledWith('/customers/me/addresses');
-      expect(result.current.data).toEqual(mockAddresses);
+      expect(result.current.data).toEqual(addresses);
+      expect(queryClient.getQueryData(['addresses'])).toEqual(addresses);
+      expect(addresses).toEqual(originalAddresses);
     });
 
-    it('should handle address fetch errors', async () => {
-      mockApi.get.mockRejectedValueOnce(new Error('Address fetch failed'));
+    it('preserves an empty address list', async () => {
+      mockApi.get.mockResolvedValueOnce({ data: [] });
+      const { wrapper } = createHarness(authenticatedState);
+      const { result } = renderHook(() => useAddresses(), { wrapper });
 
-      const { result } = renderHook(() => useAddresses(), {
-        wrapper: createWrapper({ user: { id: '1' }, token: 'token' }),
-      });
+      await waitFor(() => expect(result.current.isSuccess).toBe(true));
 
-      await waitFor(() => {
-        expect(result.current.isError).toBe(true);
-      });
+      expect(result.current.data).toEqual([]);
+    });
+
+    it.each([401, 403])('converts HTTP %s to an empty address list', async (status) => {
+      mockApi.get.mockRejectedValueOnce({ response: { status } });
+      const { wrapper } = createHarness(authenticatedState);
+      const { result } = renderHook(() => useAddresses(), { wrapper });
+
+      await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+      expect(result.current.data).toEqual([]);
+      expect(mockApi.get).toHaveBeenCalledTimes(1);
+    });
+
+    it.each([404, 500])('exposes an unhandled HTTP %s query error', async (status) => {
+      const error = { response: { status } };
+      mockApi.get.mockRejectedValueOnce(error);
+      const { wrapper } = createHarness(authenticatedState);
+      const { result } = renderHook(() => useAddresses(), { wrapper });
+
+      await waitFor(() => expect(result.current.isError).toBe(true));
+
+      expect(result.current.error).toBe(error);
+      expect(mockApi.get).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not request addresses without production customer authentication', () => {
+      const previousNodeEnv = process.env.NODE_ENV;
+      process.env.NODE_ENV = 'production';
+      const { wrapper } = createHarness();
+      const { result, unmount } = renderHook(() => useAddresses(), { wrapper });
+
+      expect(result.current.fetchStatus).toBe('idle');
+      expect(result.current.isLoading).toBe(false);
+      expect(result.current.data).toBeUndefined();
+      expect(mockApi.get).not.toHaveBeenCalled();
+
+      unmount();
+      process.env.NODE_ENV = previousNodeEnv;
     });
   });
 
   describe('useCreateAddress', () => {
-    it('should create address successfully', async () => {
-      const mockAddress = {
-        id: '3',
-        type: 'home',
+    it('creates an address without mutating input and invalidates addresses', async () => {
+      const createData: Omit<Address, 'id' | 'isDefault'> = {
+        label: 'Parents',
         street: 'New Street 789',
         city: 'Vienna',
-        zipCode: '1030',
+        postalCode: '1030',
         country: 'Austria',
+        notes: 'Back entrance',
+      };
+      const originalInput = { ...createData };
+      const createdAddress: Address = {
+        ...createData,
+        id: 'address-3',
         isDefault: false,
-        createdAt: '2024-01-03T00:00:00Z',
       };
-
-      const createData = {
-        type: 'home',
-        street: 'New Street 789',
-        city: 'Vienna',
-        zipCode: '1030',
-        country: 'Austria',
-      };
-
-      mockApi.post.mockResolvedValueOnce({ data: mockAddress });
-
-      const { result } = renderHook(() => useCreateAddress(), {
-        wrapper: createWrapper({ user: { id: '1' }, token: 'token' }),
-      });
+      mockApi.post.mockResolvedValueOnce({ data: createdAddress });
+      const { queryClient, wrapper } = createHarness(authenticatedState);
+      const invalidate = jest.spyOn(queryClient, 'invalidateQueries');
+      const { result } = renderHook(() => useCreateAddress(), { wrapper });
 
       result.current.mutate(createData);
-
-      await waitFor(() => {
-        expect(result.current.isSuccess).toBe(true);
-      });
+      await waitFor(() => expect(result.current.isSuccess).toBe(true));
 
       expect(mockApi.post).toHaveBeenCalledWith('/customers/me/addresses', createData);
-      expect(result.current.data).toEqual(mockAddress);
+      expect(result.current.data).toEqual(createdAddress);
+      expect(createData).toEqual(originalInput);
+      expect(invalidate).toHaveBeenCalledWith({ queryKey: ['addresses'] });
+    });
+
+    it('exposes creation errors without invalidating addresses', async () => {
+      const error = new Error('Address creation failed');
+      mockApi.post.mockRejectedValueOnce(error);
+      const { queryClient, wrapper } = createHarness(authenticatedState);
+      const invalidate = jest.spyOn(queryClient, 'invalidateQueries');
+      const { result } = renderHook(() => useCreateAddress(), { wrapper });
+
+      result.current.mutate({
+        label: 'Home',
+        street: 'Main Street 123',
+        city: 'Vienna',
+        postalCode: '1010',
+        country: 'Austria',
+      });
+      await waitFor(() => expect(result.current.isError).toBe(true));
+
+      expect(result.current.error).toBe(error);
+      expect(invalidate).not.toHaveBeenCalled();
     });
   });
 
   describe('useUpdateAddress', () => {
-    it('should update address successfully', async () => {
-      const mockAddress = {
-        id: '1',
-        type: 'home',
+    it('updates an address using the real consumer shape and invalidates addresses', async () => {
+      const updateInput = {
+        id: 'address-1',
+        label: 'Home',
         street: 'Updated Street 123',
         city: 'Vienna',
-        zipCode: '1010',
+        postalCode: '1010',
         country: 'Austria',
+        notes: 'Second floor',
         isDefault: true,
-        createdAt: '2024-01-01T00:00:00Z',
       };
+      const originalInput = { ...updateInput };
+      const updatedAddress: Address = { ...updateInput };
+      mockApi.put.mockResolvedValueOnce({ data: updatedAddress });
+      const { queryClient, wrapper } = createHarness(authenticatedState);
+      const invalidate = jest.spyOn(queryClient, 'invalidateQueries');
+      const { result } = renderHook(() => useUpdateAddress(), { wrapper });
 
-      const updateData = {
+      result.current.mutate(updateInput);
+      await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+      expect(mockApi.put).toHaveBeenCalledWith('/customers/me/addresses/address-1', {
+        label: 'Home',
         street: 'Updated Street 123',
-      };
-
-      mockApi.put.mockResolvedValueOnce({ data: mockAddress });
-
-      const { result } = renderHook(() => useUpdateAddress(), {
-        wrapper: createWrapper({ user: { id: '1' }, token: 'token' }),
+        city: 'Vienna',
+        postalCode: '1010',
+        country: 'Austria',
+        notes: 'Second floor',
+        isDefault: true,
       });
+      expect(result.current.data).toEqual(updatedAddress);
+      expect(updateInput).toEqual(originalInput);
+      expect(invalidate).toHaveBeenCalledWith({ queryKey: ['addresses'] });
+    });
 
-      result.current.mutate({ addressId: '1', updates: updateData });
+    it('exposes update errors without invalidating addresses', async () => {
+      const error = new Error('Address update failed');
+      mockApi.put.mockRejectedValueOnce(error);
+      const { queryClient, wrapper } = createHarness(authenticatedState);
+      const invalidate = jest.spyOn(queryClient, 'invalidateQueries');
+      const { result } = renderHook(() => useUpdateAddress(), { wrapper });
 
-      await waitFor(() => {
-        expect(result.current.isSuccess).toBe(true);
+      result.current.mutate({
+        id: 'address-1',
+        updates: { street: 'Updated Street 123' },
       });
+      await waitFor(() => expect(result.current.isError).toBe(true));
 
-      expect(mockApi.put).toHaveBeenCalledWith('/customers/me/addresses/1', updateData);
-      expect(result.current.data).toEqual(mockAddress);
+      expect(result.current.error).toBe(error);
+      expect(invalidate).not.toHaveBeenCalled();
     });
   });
 
   describe('useDeleteAddress', () => {
-    it('should delete address successfully', async () => {
-      mockApi.delete.mockResolvedValueOnce();
+    it('deletes an address and invalidates addresses', async () => {
+      const response = { success: true };
+      mockApi.delete.mockResolvedValueOnce({ data: response });
+      const { queryClient, wrapper } = createHarness(authenticatedState);
+      const invalidate = jest.spyOn(queryClient, 'invalidateQueries');
+      const { result } = renderHook(() => useDeleteAddress(), { wrapper });
 
-      const { result } = renderHook(() => useDeleteAddress(), {
-        wrapper: createWrapper({ user: { id: '1' }, token: 'token' }),
-      });
+      result.current.mutate('address-1');
+      await waitFor(() => expect(result.current.isSuccess).toBe(true));
 
-      result.current.mutate('1');
+      expect(mockApi.delete).toHaveBeenCalledWith('/customers/me/addresses/address-1');
+      expect(result.current.data).toEqual(response);
+      expect(invalidate).toHaveBeenCalledWith({ queryKey: ['addresses'] });
+    });
 
-      await waitFor(() => {
-        expect(result.current.isSuccess).toBe(true);
-      });
+    it('exposes deletion errors without invalidating addresses', async () => {
+      const error = { response: { status: 404 } };
+      mockApi.delete.mockRejectedValueOnce(error);
+      const { queryClient, wrapper } = createHarness(authenticatedState);
+      const invalidate = jest.spyOn(queryClient, 'invalidateQueries');
+      const { result } = renderHook(() => useDeleteAddress(), { wrapper });
 
-      expect(mockApi.delete).toHaveBeenCalledWith('/customers/me/addresses/1');
+      result.current.mutate('missing-address');
+      await waitFor(() => expect(result.current.isError).toBe(true));
+
+      expect(result.current.error).toBe(error);
+      expect(invalidate).not.toHaveBeenCalled();
     });
   });
 
   describe('useSetDefaultAddress', () => {
-    it('should set default address successfully', async () => {
-      const mockAddress = {
-        id: '1',
-        type: 'home',
-        street: 'Main Street 123',
-        city: 'Vienna',
-        zipCode: '1010',
-        country: 'Austria',
-        isDefault: true,
-        createdAt: '2024-01-01T00:00:00Z',
-      };
+    it('sets the default address and invalidates addresses', async () => {
+      mockApi.patch.mockResolvedValueOnce({ data: homeAddress });
+      const { queryClient, wrapper } = createHarness(authenticatedState);
+      const invalidate = jest.spyOn(queryClient, 'invalidateQueries');
+      const { result } = renderHook(() => useSetDefaultAddress(), { wrapper });
 
-      mockApi.patch.mockResolvedValueOnce({ data: mockAddress });
+      result.current.mutate('address-1');
+      await waitFor(() => expect(result.current.isSuccess).toBe(true));
 
-      const { result } = renderHook(() => useSetDefaultAddress(), {
-        wrapper: createWrapper({ user: { id: '1' }, token: 'token' }),
-      });
+      expect(mockApi.patch).toHaveBeenCalledWith(
+        '/customers/me/addresses/address-1/default',
+      );
+      expect(result.current.data).toEqual(homeAddress);
+      expect(result.current.data?.isDefault).toBe(true);
+      expect(invalidate).toHaveBeenCalledWith({ queryKey: ['addresses'] });
+    });
 
-      result.current.mutate('1');
+    it('exposes set-default errors without invalidating addresses', async () => {
+      const error = { response: { status: 403 } };
+      mockApi.patch.mockRejectedValueOnce(error);
+      const { queryClient, wrapper } = createHarness(authenticatedState);
+      const invalidate = jest.spyOn(queryClient, 'invalidateQueries');
+      const { result } = renderHook(() => useSetDefaultAddress(), { wrapper });
 
-      await waitFor(() => {
-        expect(result.current.isSuccess).toBe(true);
-      });
+      result.current.mutate('address-2');
+      await waitFor(() => expect(result.current.isError).toBe(true));
 
-      expect(mockApi.patch).toHaveBeenCalledWith('/customers/me/addresses/1/default');
-      expect(result.current.data).toEqual(mockAddress);
+      expect(result.current.error).toBe(error);
+      expect(invalidate).not.toHaveBeenCalled();
     });
   });
 });
-
-
-
-
-
-
-
