@@ -1,14 +1,16 @@
 import React from 'react';
+import { waitFor } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { renderHook } from '../../test-utils';
 import { useFavoritesQuery, useToggleFavorite } from '../useFavoritesQuery';
 
 // Mock the API
 jest.mock('../../utils/api');
-const mockApi = require('../../utils/api');
+const mockApi = jest.requireMock<typeof import('../../utils/api')>('../../utils/api');
 
 // Mock error reporting
 jest.mock('../../utils/errorReporting');
-const mockLogWarning = require('../../utils/errorReporting').logWarning;
+const { logWarning: mockLogWarning } = jest.requireMock<typeof import('../../utils/errorReporting')>('../../utils/errorReporting');
 
 // Mock localStorage
 const mockLocalStorage = {
@@ -164,23 +166,20 @@ describe('useToggleFavorite', () => {
   it('invalidates favorites query on success', async () => {
     mockApi.post.mockResolvedValueOnce({ data: { success: true } });
 
-    const queryClient = new QueryClient();
+    const queryClient = new QueryClient({
+      defaultOptions: { mutations: { retry: false } },
+    });
     const invalidateQueriesSpy = jest.spyOn(queryClient, 'invalidateQueries');
+    const wrapper = ({ children }: { children: React.ReactNode }) => (
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    );
+    const { result } = renderHook(() => useToggleFavorite(), { wrapper });
 
-    const TestComponent = () => {
-      const toggleFavorite = useToggleFavorite();
-      React.useEffect(() => {
-        if (toggleFavorite.isSuccess) {
-          // Check if invalidateQueries was called
-        }
-      }, [toggleFavorite.isSuccess]);
-      return null;
-    };
+    result.current.mutate('restaurant-123');
 
-    renderHook(() => TestComponent());
-
-    // Note: In a real test, we'd check the invalidateQueries call
-    // This is simplified for the mock setup
+    await waitFor(() => {
+      expect(invalidateQueriesSpy).toHaveBeenCalledWith({ queryKey: ['favorites'] });
+    });
   });
 });
 
