@@ -1,44 +1,26 @@
-import React from 'react';
-import { screen, fireEvent, waitFor } from '@testing-library/react';
-import { render } from '../../test-utils';
+import { act, renderHook } from '@testing-library/react';
 import { useOfflineMode } from '../useOfflineMode';
 
-// Mock navigator.onLine
-const mockNavigator = {
-  onLine: true,
+const originalOnLineDescriptor = Object.getOwnPropertyDescriptor(window.navigator, 'onLine');
+const setNavigatorOnline = (onLine: boolean) => {
+  Object.defineProperty(window.navigator, 'onLine', {
+    configurable: true,
+    value: onLine,
+  });
 };
-Object.defineProperty(window.navigator, 'onLine', {
-  writable: true,
-  value: true,
-});
-
-// Mock online/offline events
-let onlineCallback: (() => void) | null = null;
-let offlineCallback: (() => void) | null = null;
-
-const mockAddEventListener = jest.fn((event: string, callback: () => void) => {
-  if (event === 'online') onlineCallback = callback;
-  if (event === 'offline') offlineCallback = callback;
-});
-
-const mockRemoveEventListener = jest.fn();
-
-Object.defineProperty(window, 'addEventListener', {
-  writable: true,
-  value: mockAddEventListener,
-});
-
-Object.defineProperty(window, 'removeEventListener', {
-  writable: true,
-  value: mockRemoveEventListener,
-});
 
 describe('useOfflineMode', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
-    onlineCallback = null;
-    offlineCallback = null;
-    mockNavigator.onLine = true;
+    setNavigatorOnline(true);
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+    if (originalOnLineDescriptor) {
+      Object.defineProperty(window.navigator, 'onLine', originalOnLineDescriptor);
+    } else {
+      delete (window.navigator as unknown as { onLine?: boolean }).onLine;
+    }
   });
 
   it('starts online by default', () => {
@@ -48,11 +30,20 @@ describe('useOfflineMode', () => {
     expect(result.current.isOffline).toBe(false);
   });
 
+  it('starts offline when the browser is offline', () => {
+    setNavigatorOnline(false);
+
+    const { result } = renderHook(() => useOfflineMode());
+
+    expect(result.current.isOnline).toBe(false);
+    expect(result.current.isOffline).toBe(true);
+  });
+
   it('detects going offline', () => {
     const { result } = renderHook(() => useOfflineMode());
 
     act(() => {
-      if (offlineCallback) offlineCallback();
+      window.dispatchEvent(new Event('offline'));
     });
 
     expect(result.current.isOnline).toBe(false);
@@ -64,13 +55,13 @@ describe('useOfflineMode', () => {
 
     // Go offline first
     act(() => {
-      if (offlineCallback) offlineCallback();
+      window.dispatchEvent(new Event('offline'));
     });
     expect(result.current.isOffline).toBe(true);
 
     // Come back online
     act(() => {
-      if (onlineCallback) onlineCallback();
+      window.dispatchEvent(new Event('online'));
     });
     expect(result.current.isOnline).toBe(true);
     expect(result.current.isOffline).toBe(false);
@@ -83,12 +74,27 @@ describe('useOfflineMode', () => {
   });
 
   it('cleans up event listeners on unmount', () => {
-    const { unmount } = renderHook(() => useOfflineMode());
+    const addEventListenerSpy = jest.spyOn(window, 'addEventListener');
+    const removeEventListenerSpy = jest.spyOn(window, 'removeEventListener');
+    const { result, rerender, unmount } = renderHook(() => useOfflineMode());
+    const onlineHandler = addEventListenerSpy.mock.calls.find(([event]) => event === 'online')?.[1];
+    const offlineHandler = addEventListenerSpy.mock.calls.find(([event]) => event === 'offline')?.[1];
+
+    rerender();
+
+    expect(
+      addEventListenerSpy.mock.calls.filter(([event]) => event === 'online' || event === 'offline')
+    ).toHaveLength(2);
 
     unmount();
 
-    expect(mockRemoveEventListener).toHaveBeenCalledWith('online', expect.any(Function));
-    expect(mockRemoveEventListener).toHaveBeenCalledWith('offline', expect.any(Function));
+    expect(removeEventListenerSpy).toHaveBeenCalledWith('online', onlineHandler);
+    expect(removeEventListenerSpy).toHaveBeenCalledWith('offline', offlineHandler);
+
+    act(() => {
+      window.dispatchEvent(new Event('offline'));
+    });
+    expect(result.current.isOnline).toBe(true);
   });
 });
 
