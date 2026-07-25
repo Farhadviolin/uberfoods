@@ -109,13 +109,29 @@ export function sanitizeEmail(email: string): string {
   if (!email || typeof email !== 'string') {
     return '';
   }
-  // Einfache E-Mail-Validierung
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  if (!emailRegex.test(email)) {
+
+  const parts = email.split('@');
+  if (parts.length !== 2) {
     return '';
   }
-  // Entferne gefährliche Zeichen
-  return email.replace(/[<>"']/g, '');
+
+  const [localPart, domain] = parts;
+  const domainLabels = domain.split('.');
+  const hasValidLocalPart =
+    /^[^\s@<>"']+$/.test(localPart) &&
+    !localPart.startsWith('.') &&
+    !localPart.endsWith('.') &&
+    !localPart.includes('..');
+  const hasValidDomain =
+    domainLabels.length >= 2 &&
+    domainLabels.every((label) =>
+      label.length > 0 &&
+      !label.startsWith('-') &&
+      !label.endsWith('-') &&
+      /^[\p{L}\p{N}-]+$/u.test(label)
+    );
+
+  return hasValidLocalPart && hasValidDomain ? email : '';
 }
 
 /**
