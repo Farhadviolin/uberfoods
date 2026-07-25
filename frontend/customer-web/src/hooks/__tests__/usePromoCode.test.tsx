@@ -1,10 +1,11 @@
 import React from 'react';
+import { waitFor } from '@testing-library/react';
 import { renderHook } from '../../test-utils';
 import { useValidatePromoCode } from '../usePromoCode';
 
 // Mock the API
 jest.mock('../../utils/api');
-const mockApi = require('../../utils/api');
+const mockApi = jest.requireMock<typeof import('../../utils/api')>('../../utils/api');
 
 describe('useValidatePromoCode', () => {
   beforeEach(() => {
