@@ -1,157 +1,395 @@
-import { screen, fireEvent, waitFor } from '@testing-library/react';
-import { render } from '../../test-utils';
-import { useOrders } from '../useOrders';
-import * as api from '../../utils/api';
+import type { ReactNode } from 'react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { renderHook, waitFor } from '@testing-library/react';
+import {
+  useCancelOrder,
+  useCreateOrder,
+  useOrder,
+  useOrders,
+  useReorder,
+  type Order,
+} from '../useOrders';
+import { AuthProvider } from '../../contexts/AuthContext';
+import type { CreateOrderData } from '../../types';
+import api from '../../utils/api';
 
 jest.mock('../../utils/api');
+
+const mockApi = jest.mocked(api);
+
+const authenticatedState = {
+  user: { id: 'customer-1', email: 'customer@example.com' },
+  token: 'customer-token',
+};
+
+const createWrapper = (
+  initialAuthState: {
+    user: { id: string; email: string } | null;
+    token: string | null;
+  },
+  exposeQueryClient?: (queryClient: QueryClient) => void
+) => {
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: {
+        retry: false,
+        gcTime: 0,
+      },
+      mutations: {
+        retry: false,
+      },
+    },
+  });
+  exposeQueryClient?.(queryClient);
+
+  return ({ children }: { children: ReactNode }) => (
+    <QueryClientProvider client={queryClient}>
+      <AuthProvider initialAuthState={initialAuthState}>{children}</AuthProvider>
+    </QueryClientProvider>
+  );
+};
+
+const createOrder = (overrides: Partial<Order> = {}): Order => ({
+  id: 'order-1',
+  status: 'DELIVERED',
+  totalAmount: 25.5,
+  createdAt: '2024-01-03T10:00:00Z',
+  restaurant: {
+    id: 'restaurant-1',
+    name: 'Pizza Paradise',
+  },
+  ...overrides,
+});
 
 describe('useOrders Hook (Customer)', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    queryClient.clear();
+    mockApi.get.mockReset();
+    mockApi.post.mockReset();
+    localStorage.clear();
   });
 
-  it('fetches customer orders', async () => {
-    const mockOrders = [
-      {
-        id: 'order_1',
-        status: 'DELIVERED',
-        totalAmount: 25.50,
-        restaurant: { name: 'Pizza Paradise' },
-        createdAt: new Date().toISOString(),
-      },
-      {
-        id: 'order_2',
+  afterEach(() => {
+    localStorage.clear();
+  });
+
+  describe('useOrders', () => {
+    it('fetches customer orders', async () => {
+      const mockOrders: Order[] = [
+        createOrder(),
+        createOrder({
+          id: 'order-2',
+          status: 'IN_TRANSIT',
+          totalAmount: 30,
+          restaurant: {
+            id: 'restaurant-2',
+            name: 'Burger House',
+          },
+        }),
+      ];
+      const originalOrders = JSON.parse(JSON.stringify(mockOrders)) as Order[];
+      let queryClient: QueryClient | undefined;
+      const wrapper = createWrapper(authenticatedState, (client) => {
+        queryClient = client;
+      });
+      mockApi.get.mockResolvedValueOnce({ data: { data: mockOrders } });
+
+      const { result } = renderHook(() => useOrders(), { wrapper });
+
+      expect(result.current.isLoading).toBe(true);
+
+      await waitFor(() => {
+        expect(result.current.isSuccess).toBe(true);
+      });
+
+      expect(mockApi.get).toHaveBeenCalledWith('/orders/my');
+      expect(result.current.data).toEqual(mockOrders);
+      expect(result.current.data?.[0].restaurant.name).toBe('Pizza Paradise');
+      expect(mockOrders).toEqual(originalOrders);
+      expect(queryClient?.getQueryState(['orders'])).toBeDefined();
+    });
+
+    it('supports a direct array response', async () => {
+      const mockOrders: Order[] = [createOrder()];
+      mockApi.get.mockResolvedValueOnce({ data: mockOrders });
+
+      const { result } = renderHook(() => useOrders(), {
+        wrapper: createWrapper(authenticatedState),
+      });
+
+      await waitFor(() => {
+        expect(result.current.isSuccess).toBe(true);
+      });
+
+      expect(result.current.data).toEqual(mockOrders);
+    });
+
+    it('returns an empty order list', async () => {
+      mockApi.get.mockResolvedValueOnce({ data: { data: [] } });
+
+      const { result } = renderHook(() => useOrders(), {
+        wrapper: createWrapper(authenticatedState),
+      });
+
+      await waitFor(() => {
+        expect(result.current.isSuccess).toBe(true);
+      });
+
+      expect(result.current.data).toEqual([]);
+    });
+
+    it('remains idle without customer authentication', () => {
+      const { result } = renderHook(() => useOrders(), {
+        wrapper: createWrapper({ user: null, token: null }),
+      });
+
+      expect(result.current.fetchStatus).toBe('idle');
+      expect(result.current.isLoading).toBe(false);
+      expect(result.current.data).toBeUndefined();
+      expect(mockApi.get).not.toHaveBeenCalled();
+    });
+
+    it.each([401, 403])('returns an empty list for a %i response', async (status) => {
+      mockApi.get.mockRejectedValueOnce({ response: { status } });
+
+      const { result } = renderHook(() => useOrders(), {
+        wrapper: createWrapper(authenticatedState),
+      });
+
+      await waitFor(() => {
+        expect(result.current.isSuccess).toBe(true);
+      });
+
+      expect(result.current.data).toEqual([]);
+    });
+
+    it('exposes non-authentication API errors', async () => {
+      const error = new Error('Failed to fetch orders');
+      mockApi.get.mockRejectedValueOnce(error);
+
+      const { result } = renderHook(() => useOrders(), {
+        wrapper: createWrapper(authenticatedState),
+      });
+
+      await waitFor(() => {
+        expect(result.current.isError).toBe(true);
+      });
+
+      expect(result.current.error).toBe(error);
+    });
+  });
+
+  describe('useOrder', () => {
+    it('fetches a single customer order', async () => {
+      const mockOrder = createOrder({
+        id: 'order-123',
         status: 'IN_TRANSIT',
-        totalAmount: 30.00,
-        restaurant: { name: 'Burger King' },
-        createdAt: new Date().toISOString(),
-      },
-    ];
+      });
+      let queryClient: QueryClient | undefined;
+      const wrapper = createWrapper(authenticatedState, (client) => {
+        queryClient = client;
+      });
+      mockApi.get.mockResolvedValueOnce({ data: mockOrder });
 
-    (api.default.get as jest.Mock).mockResolvedValue({
-      data: { data: mockOrders },
+      const { result } = renderHook(() => useOrder('order-123'), { wrapper });
+
+      await waitFor(() => {
+        expect(result.current.isSuccess).toBe(true);
+      });
+
+      expect(mockApi.get).toHaveBeenCalledWith('/orders/order-123');
+      expect(result.current.data).toEqual(mockOrder);
+      expect(queryClient?.getQueryState(['order', 'order-123'])).toBeDefined();
     });
 
-    const { result } = renderHook(() => useOrders());
+    it('does not request an order without an id', async () => {
+      const { result } = renderHook(() => useOrder(''), {
+        wrapper: createWrapper(authenticatedState),
+      });
 
-    await waitFor(() => {
-      expect(result.current.isSuccess).toBe(true);
+      await waitFor(() => {
+        expect(result.current.isSuccess).toBe(true);
+      });
+
+      expect(result.current.data).toBeNull();
+      expect(mockApi.get).not.toHaveBeenCalled();
     });
 
-    expect(result.current.data).toHaveLength(2);
-    expect(result.current.data?.[0].restaurant.name).toBe('Pizza Paradise');
+    it.each([401, 403])('returns null for a %i response', async (status) => {
+      mockApi.get.mockRejectedValueOnce({ response: { status } });
+
+      const { result } = renderHook(() => useOrder('order-123'), {
+        wrapper: createWrapper(authenticatedState),
+      });
+
+      await waitFor(() => {
+        expect(result.current.isSuccess).toBe(true);
+      });
+
+      expect(result.current.data).toBeNull();
+    });
   });
 
-  it('filters orders by status', async () => {
-    const mockOrders = [
-      { id: 'order_1', status: 'DELIVERED', totalAmount: 25.50 },
-    ];
+  describe('useCreateOrder', () => {
+    it('creates an order and invalidates the customer order list', async () => {
+      const createData: CreateOrderData = {
+        restaurantId: 'restaurant-1',
+        items: [{ dishId: 'dish-1', quantity: 2 }],
+        addressId: 'address-1',
+        notes: 'Leave at the door',
+        paymentMethod: 'card',
+      };
+      const originalCreateData = JSON.parse(JSON.stringify(createData)) as CreateOrderData;
+      const createdOrder = createOrder({ status: 'PENDING' });
+      let queryClient: QueryClient | undefined;
+      const wrapper = createWrapper(authenticatedState, (client) => {
+        queryClient = client;
+      });
+      mockApi.post.mockResolvedValueOnce({ data: createdOrder });
 
-    (api.default.get as jest.Mock).mockResolvedValue({
-      data: { data: mockOrders },
+      const { result } = renderHook(() => useCreateOrder(), { wrapper });
+      const invalidateQueries = jest.spyOn(queryClient!, 'invalidateQueries');
+
+      result.current.mutate(createData);
+
+      await waitFor(() => {
+        expect(result.current.isSuccess).toBe(true);
+      });
+
+      expect(mockApi.post).toHaveBeenCalledWith('/orders', createData);
+      expect(result.current.data).toEqual(createdOrder);
+      expect(createData).toEqual(originalCreateData);
+      expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ['orders'] });
     });
 
-    const { result } = renderHook(() => useOrders({ status: 'DELIVERED' }));
+    it('exposes creation errors without invalidating cache', async () => {
+      const error = new Error('Order creation failed');
+      let queryClient: QueryClient | undefined;
+      const wrapper = createWrapper(authenticatedState, (client) => {
+        queryClient = client;
+      });
+      mockApi.post.mockRejectedValueOnce(error);
 
-    await waitFor(() => {
-      expect(result.current.isSuccess).toBe(true);
+      const { result } = renderHook(() => useCreateOrder(), { wrapper });
+      const invalidateQueries = jest.spyOn(queryClient!, 'invalidateQueries');
+
+      result.current.mutate({
+        restaurantId: 'restaurant-1',
+        items: [{ dishId: 'dish-1', quantity: 1 }],
+      });
+
+      await waitFor(() => {
+        expect(result.current.isError).toBe(true);
+      });
+
+      expect(result.current.error).toBe(error);
+      expect(invalidateQueries).not.toHaveBeenCalled();
     });
-
-    expect(api.default.get).toHaveBeenCalledWith(
-      expect.stringContaining('/orders'),
-      expect.objectContaining({
-        params: expect.objectContaining({ status: 'DELIVERED' }),
-      })
-    );
   });
 
-  it('handles pagination', async () => {
-    const mockOrders = [
-      { id: 'order_1', totalAmount: 25.50 },
-    ];
+  describe('useCancelOrder', () => {
+    it('cancels an order and invalidates list and detail caches', async () => {
+      const cancelData = {
+        orderId: 'order-123',
+        reason: 'Ordered by mistake',
+        refundRequested: true,
+      };
+      const originalCancelData = { ...cancelData };
+      const response = { success: true };
+      let queryClient: QueryClient | undefined;
+      const wrapper = createWrapper(authenticatedState, (client) => {
+        queryClient = client;
+      });
+      mockApi.post.mockResolvedValueOnce({ data: response });
 
-    (api.default.get as jest.Mock).mockResolvedValue({
-      data: {
-        data: mockOrders,
-        pagination: {
-          page: 2,
-          limit: 10,
-          total: 25,
-          totalPages: 3,
-        },
-      },
+      const { result } = renderHook(() => useCancelOrder(), { wrapper });
+      const invalidateQueries = jest.spyOn(queryClient!, 'invalidateQueries');
+
+      result.current.mutate(cancelData);
+
+      await waitFor(() => {
+        expect(result.current.isSuccess).toBe(true);
+      });
+
+      expect(mockApi.post).toHaveBeenCalledWith('/orders/order-123/cancel', {
+        reason: 'Ordered by mistake',
+        refundRequested: true,
+      });
+      expect(result.current.data).toEqual(response);
+      expect(cancelData).toEqual(originalCancelData);
+      expect(invalidateQueries).toHaveBeenNthCalledWith(1, { queryKey: ['orders'] });
+      expect(invalidateQueries).toHaveBeenNthCalledWith(2, {
+        queryKey: ['order', 'order-123'],
+      });
     });
 
-    const { result } = renderHook(() => useOrders({ page: 2, limit: 10 }));
+    it('exposes cancellation errors without invalidating cache', async () => {
+      const error = new Error('Order cancellation failed');
+      let queryClient: QueryClient | undefined;
+      const wrapper = createWrapper(authenticatedState, (client) => {
+        queryClient = client;
+      });
+      mockApi.post.mockRejectedValueOnce(error);
 
-    await waitFor(() => {
-      expect(result.current.isSuccess).toBe(true);
+      const { result } = renderHook(() => useCancelOrder(), { wrapper });
+      const invalidateQueries = jest.spyOn(queryClient!, 'invalidateQueries');
+
+      result.current.mutate({
+        orderId: 'order-123',
+        reason: 'Ordered by mistake',
+      });
+
+      await waitFor(() => {
+        expect(result.current.isError).toBe(true);
+      });
+
+      expect(result.current.error).toBe(error);
+      expect(invalidateQueries).not.toHaveBeenCalled();
     });
-
-    expect(result.current.pagination?.page).toBe(2);
-    expect(result.current.pagination?.totalPages).toBe(3);
   });
 
-  it('tracks single order', async () => {
-    const mockOrder = {
-      id: 'order_123',
-      status: 'IN_TRANSIT',
-      driver: {
-        name: 'Max Driver',
-        location: { lat: 48.2082, lng: 16.3738 },
-      },
-      estimatedArrival: new Date().toISOString(),
-    };
+  describe('useReorder', () => {
+    it('reorders an order and invalidates the customer order list', async () => {
+      const reorderedOrder = createOrder({ id: 'order-456', status: 'PENDING' });
+      let queryClient: QueryClient | undefined;
+      const wrapper = createWrapper(authenticatedState, (client) => {
+        queryClient = client;
+      });
+      mockApi.post.mockResolvedValueOnce({ data: reorderedOrder });
 
-    (api.default.get as jest.Mock).mockResolvedValue({
-      data: mockOrder,
+      const { result } = renderHook(() => useReorder(), { wrapper });
+      const invalidateQueries = jest.spyOn(queryClient!, 'invalidateQueries');
+
+      result.current.mutate('order-123');
+
+      await waitFor(() => {
+        expect(result.current.isSuccess).toBe(true);
+      });
+
+      expect(mockApi.post).toHaveBeenCalledWith('/orders/order-123/reorder');
+      expect(result.current.data).toEqual(reorderedOrder);
+      expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ['orders'] });
     });
 
-    const { result } = renderHook(() => useOrders({ orderId: 'order_123' }));
+    it('exposes reorder errors without invalidating cache', async () => {
+      const error = new Error('Reorder failed');
+      let queryClient: QueryClient | undefined;
+      const wrapper = createWrapper(authenticatedState, (client) => {
+        queryClient = client;
+      });
+      mockApi.post.mockRejectedValueOnce(error);
 
-    await waitFor(() => {
-      expect(result.current.trackingData).toBeDefined();
+      const { result } = renderHook(() => useReorder(), { wrapper });
+      const invalidateQueries = jest.spyOn(queryClient!, 'invalidateQueries');
+
+      result.current.mutate('order-123');
+
+      await waitFor(() => {
+        expect(result.current.isError).toBe(true);
+      });
+
+      expect(result.current.error).toBe(error);
+      expect(invalidateQueries).not.toHaveBeenCalled();
     });
-
-    expect(result.current.trackingData?.driver.name).toBe('Max Driver');
-  });
-
-  it('cancels order', async () => {
-    (api.default.patch as jest.Mock).mockResolvedValue({
-      data: { success: true },
-    });
-
-    const { result } = renderHook(() => useOrders());
-
-    await act(async () => {
-      await result.current.cancelOrder('order_123');
-    });
-
-    expect(api.default.patch).toHaveBeenCalledWith(
-      expect.stringContaining('/orders/order_123'),
-      expect.objectContaining({ status: 'CANCELLED' })
-    );
-  });
-
-  it('handles error state', async () => {
-    (api.default.get as jest.Mock).mockRejectedValue(
-      new Error('Failed to fetch orders')
-    );
-
-    const { result } = renderHook(() => useOrders());
-
-    await waitFor(() => {
-      expect(result.current.isError).toBe(true);
-    });
-
-    expect(result.current.error).toBeDefined();
   });
 });
-
-
-
-
-
-
-
