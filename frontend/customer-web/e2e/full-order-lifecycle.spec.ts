@@ -734,8 +734,22 @@ async function fetchDriverOrderSnapshot(driverPage: Page, orderId: string) {
 
   return driverPage.evaluate(async (resolvedOrderId) => {
     try {
+      const tokenKeys = [
+        'driver_token',
+        'access_token',
+        'auth_token',
+        'uberfoods_auth_token',
+      ];
+      const token = [window.localStorage, window.sessionStorage]
+        .flatMap((storage) => tokenKeys.map((key) => storage.getItem(key)))
+        .find(Boolean);
       const response = await fetch(`/api/orders/${resolvedOrderId}`, {
         credentials: 'include',
+        headers: token
+          ? {
+            Authorization: `Bearer ${token}`,
+          }
+          : undefined,
       });
       const payload = await response.json().catch(() => null);
       const status = typeof payload?.status === 'string' ? payload.status : null;
@@ -1198,7 +1212,7 @@ async function resolveVisibleDriverTargetOrderCard(
   await driverPage.waitForLoadState('domcontentloaded').catch(() => undefined);
   await driverPage.waitForLoadState('networkidle').catch(() => undefined);
 
-  const reopened = await Promise.race([
+  let reopened = await Promise.race([
     inspectTargetCardDom().then((result) => result).catch(() => ({
       targetCardVisible: false,
       orderCardCount: 0,
@@ -1224,6 +1238,21 @@ async function resolveVisibleDriverTargetOrderCard(
       hasActiveOrdersZero: false,
     }), 2000)),
   ]);
+
+  for (
+    let attempt = 1;
+    attempt <= 5 && !reopened.targetCardVisible;
+    attempt += 1
+  ) {
+    await driverPage.waitForTimeout(1000);
+    for (const target of openOrdersTargets) {
+      if (await target.isVisible().catch(() => false)) {
+        await target.click({ timeout: 1500 }).catch(() => null);
+        break;
+      }
+    }
+    reopened = await inspectTargetCardDom();
+  }
 
   console.log('ℹ️ lifecycle: resolved visible driver target order card', {
     orderId,
@@ -1551,8 +1580,8 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
   let driverPickupVisibleCardState: Awaited<ReturnType<typeof resolveVisibleDriverTargetOrderCard>> | null = null;
   let driverPickupVisiblePickupButton: Locator | null = null;
   let driverPickupVisiblePickupButtonSeen = false;
-  let driverPickupClickedDuringVisibleStep = false;
-  let driverPickupVisibleClickDiagnostics: {
+  const driverPickupClickedDuringVisibleStep = false;
+  const driverPickupVisibleClickDiagnostics: {
     orderId: string;
     currentUrl: string;
     clickedFromVisibleStep: boolean;
@@ -1703,9 +1732,56 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
     const driverPage = await driverContext.newPage();
     const adminPage = await adminContext.newPage();
     let expectedAssignedDriverId = driverUser.id;
+    let authenticatedRestaurant: { id: string; name: string } | null = null;
 
     try {
       await installCustomerStorageDiagnostics(customerPage);
+
+      authenticatedRestaurant = await withStepTimeout(
+        'resolve authenticated restaurant ownership',
+        async () => {
+          await restaurantPage.goto(testUrls.restaurant);
+          await TestHelpers.waitForStablePage(restaurantPage);
+
+          const ownRestaurantResponse = await restaurantPage.evaluate(async () => {
+            const accessToken = window.localStorage.getItem('restaurant_token');
+            if (!accessToken) {
+              return { ok: false, status: 0, payload: null };
+            }
+
+            const response = await window.fetch('/api/restaurants/me', {
+              headers: {
+                Authorization: `Bearer ${accessToken}`,
+              },
+            });
+            const payload = await response.json().catch(() => null);
+            return {
+              ok: response.ok,
+              status: response.status,
+              payload,
+            };
+          });
+
+          expect(
+            ownRestaurantResponse.ok,
+            `Authenticated restaurant lookup failed with ${ownRestaurantResponse.status}`,
+          ).toBeTruthy();
+
+          const responsePayload = ownRestaurantResponse.payload as {
+            id?: string;
+            name?: string;
+            data?: { id?: string; name?: string };
+          } | null;
+          const ownRestaurant = responsePayload?.data ?? responsePayload;
+          expect(ownRestaurant?.id).toBeTruthy();
+          expect(ownRestaurant?.name).toBeTruthy();
+
+          return {
+            id: ownRestaurant!.id!,
+            name: ownRestaurant!.name!,
+          };
+        },
+      );
 
       // ============================================
       // PHASE 1: CUSTOMER CREATES ORDER
@@ -1737,11 +1813,15 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
       });
 
       await withStepTimeout('phase1 restaurant selection', async () => {
-        const restaurantCard = customerPage.locator('[data-testid="restaurant-card"], .restaurant-card').first();
+        const restaurantCard = customerPage
+          .locator('[data-testid="restaurant-card"], .restaurant-card')
+          .filter({ hasText: authenticatedRestaurant!.name })
+          .first();
         await expect(restaurantCard).toBeVisible();
         console.log('✅ lifecycle: phase1 restaurant card visible');
         await restaurantCard.click();
         await customerPage.waitForURL(/\/restaurant\/[^/]+$/);
+        expect(new URL(customerPage.url()).pathname).toBe(`/restaurant/${authenticatedRestaurant!.id}`);
         await expect(customerPage.locator('[data-testid="menu-content"]')).toBeVisible();
         console.log('✅ lifecycle: phase1 restaurant selected');
         console.log('✅ lifecycle: phase1 menu content visible');
@@ -3975,6 +4055,8 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
             || createdOrder.data?.restaurantId
             || createdOrder.data?.restaurant?.id
             || orderRestaurantId;
+          expect(createdOrder.status ?? createdOrder.data?.status).toBe('PENDING');
+          expect(orderRestaurantId).toBe(authenticatedRestaurant!.id);
           if (!orderId) {
             throw new Error('Order creation response did not include an id');
           }
@@ -4288,35 +4370,7 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
       await restaurantPage.goto(testUrls.restaurant);
       await TestHelpers.waitForStablePage(restaurantPage);
 
-      if (orderRestaurantId) {
-        await restaurantPage.evaluate((targetRestaurantId) => {
-          const currentRestaurantId = localStorage.getItem('restaurant_id');
-          if (currentRestaurantId !== targetRestaurantId) {
-            localStorage.setItem('restaurant_id', targetRestaurantId);
-          }
-
-          const rawUser = localStorage.getItem('restaurant_user');
-          if (rawUser) {
-            try {
-              const parsedUser = JSON.parse(rawUser);
-              if (parsedUser && typeof parsedUser === 'object') {
-                const nextUser = {
-                  ...parsedUser,
-                  restaurantId: targetRestaurantId,
-                };
-                localStorage.setItem('restaurant_user', JSON.stringify(nextUser));
-              }
-            } catch {
-              // Keep the existing auth payload if it cannot be parsed.
-            }
-          }
-
-          localStorage.setItem(`restaurant_onboarding_done_${targetRestaurantId}`, 'true');
-        }, orderRestaurantId);
-        await restaurantPage.reload({ waitUntil: 'domcontentloaded' });
-        await restaurantPage.waitForLoadState('networkidle').catch(() => null);
-        await TestHelpers.waitForStablePage(restaurantPage);
-      }
+      expect(orderRestaurantId).toBe(authenticatedRestaurant.id);
 
       const collectRestaurantAuthSnapshot = async () => restaurantPage.evaluate(() => {
         const rawUser = localStorage.getItem('restaurant_user');
@@ -4580,7 +4634,7 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
         restaurantApiResponses: restaurantApiResponseStatuses,
       });
 
-      let resolvedOrderCard = await withStepTimeout('phase2 restaurant order visible', async () => {
+      const resolvedOrderCard = await withStepTimeout('phase2 restaurant order visible', async () => {
         let card = await findVisibleRestaurantOrder();
         if (!card) {
           for (let attempt = 1; attempt <= 2 && !card; attempt += 1) {
@@ -4615,56 +4669,50 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
         return card;
       });
 
-      await withStepTimeout('phase2 restaurant ready button click', async () => {
-        const readyBtn = resolvedOrderCard
-          .locator('button[data-testid="restaurant-order-ready-button"]')
-          .or(resolvedOrderCard.locator(selectors.readyForPickupBtn))
-          .first();
-        if (!await readyBtn.isVisible().catch(() => false)) {
-          const fallbackReadyBtn = resolvedOrderCard.getByRole('button', { name: /ready|pickup|bereit|abholbereit|vorbereiten|accept|annehmen/i }).first();
-          if (await fallbackReadyBtn.isVisible().catch(() => false) && await fallbackReadyBtn.isEnabled().catch(() => false)) {
-            await fallbackReadyBtn.click();
-            return;
-          }
+      await withStepTimeout('phase2 restaurant status transitions', async () => {
+        await resolvedOrderCard.click();
+        const orderDetails = restaurantPage.locator('.modal-content').first();
+        await expect(orderDetails).toBeVisible();
+        const statusSelect = orderDetails.locator('select').first();
+        await expect(statusSelect).toBeVisible();
 
-          const diagnostics = await collectRestaurantOrderLookupDiagnostics();
-          console.log('restaurantReadyButtonMissing', diagnostics);
-          throw new Error(`Restaurant ready button not visible: ${JSON.stringify(diagnostics)}`);
+        for (const nextStatus of ['CONFIRMED', 'PREPARING', 'READY_FOR_PICKUP'] as const) {
+          const statusPatch = restaurantPage.waitForResponse(
+            (response) => {
+              if (
+                response.request().method() !== 'PATCH'
+                || !new URL(response.url()).pathname.endsWith(`/api/orders/${orderId}/status`)
+              ) {
+                return false;
+              }
+
+              try {
+                return response.request().postDataJSON()?.status === nextStatus;
+              } catch {
+                return false;
+              }
+            },
+            { timeout: 15000 },
+          );
+          await statusSelect.selectOption(nextStatus);
+          const statusPatchResponse = await statusPatch;
+          const statusPatchBody = await statusPatchResponse.json().catch(() => null) as {
+            status?: string;
+            data?: { status?: string };
+          } | null;
+
+          expect(
+            statusPatchResponse.ok(),
+            `Restaurant ${nextStatus} PATCH failed with ${statusPatchResponse.status()}`,
+          ).toBeTruthy();
+          expect(statusPatchBody?.data?.status ?? statusPatchBody?.status).toBe(nextStatus);
+          const currentOrderCard = restaurantPage
+            .getByTestId(`restaurant-order-card-${orderId}`)
+            .or(restaurantPage.locator(`[data-order-id="${orderId}"]`))
+            .first();
+          await expect(currentOrderCard).toHaveAttribute('data-status', nextStatus);
+          await expect(statusSelect).toHaveValue(nextStatus);
         }
-
-        await expect(readyBtn).toBeEnabled();
-        const readyPatch = restaurantPage.waitForResponse(
-          (response) =>
-            response.request().method() === 'PATCH'
-            && new URL(response.url()).pathname.endsWith(`/api/orders/${orderId}/status`),
-          { timeout: 15000 },
-        );
-        await readyBtn.click();
-        const readyPatchResponse = await readyPatch;
-        if (!readyPatchResponse.ok()) {
-          const readyPatchStatus = readyPatchResponse.status();
-          const readyPatchUrl = readyPatchResponse.url();
-          const readyPatchRequest = readyPatchResponse.request();
-          const readyPatchMethod = readyPatchRequest.method();
-          const readyPatchPostData = readyPatchRequest.postData();
-
-          let readyPatchBody = '';
-          try {
-            readyPatchBody = await readyPatchResponse.text();
-          } catch (error) {
-            readyPatchBody = `failed to read response body: ${String(error)}`;
-          }
-
-          console.log('❌ lifecycle: restaurant ready PATCH failed', {
-            status: readyPatchStatus,
-            url: readyPatchUrl,
-            method: readyPatchMethod,
-            postData: readyPatchPostData,
-            body: readyPatchBody,
-            orderId,
-          });
-        }
-        expect(readyPatchResponse.ok()).toBeTruthy();
       });
 
       await withStepTimeout('phase2 restaurant status visible', async () => {
@@ -4723,7 +4771,6 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
       const availableOrder = driverPage
         .getByTestId(`driver-order-card-${orderId}`)
         .or(driverPage.locator(`[data-order-id="${orderId}"]`))
-        .or(driverPage.locator(selectors.orderCard))
         .first();
       await expect(availableOrder).toBeVisible({ timeout: 15000 });
 
@@ -4755,6 +4802,11 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
         acceptResponse.ok(),
         `Driver accept response failed: ${acceptResponse.status()} ${acceptResponse.url()} ${await acceptResponse.text().catch(() => '')}`,
       ).toBeTruthy();
+      const acceptedOrder = await acceptResponse.json().catch(() => null) as {
+        status?: string;
+        data?: { status?: string };
+      } | null;
+      expect(acceptedOrder?.data?.status ?? acceptedOrder?.status).toBe('ACCEPTED');
 
       // Re-resolve the card because accepting can move it between order lists.
       const acceptedOrderCard = driverPage
@@ -4764,7 +4816,7 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
       await expect(acceptedOrderCard).toBeVisible({ timeout: 15000 });
       await expect(acceptedOrderCard).toHaveAttribute(
         'data-status',
-        /CONFIRMED|ACCEPTED|ASSIGNED|IN_TRANSIT/i,
+        'ACCEPTED',
         { timeout: 10000 },
       );
       let driverPickupCompleted = false;
@@ -5000,6 +5052,7 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
         let fallbackResponseBody: string | null = null;
         let retryPickupAttempted = false;
         let retryPickupButtonText: string | null = null;
+        let pickupFallbackResult: Awaited<ReturnType<typeof tryPickupApiFallbackForVisibleAcceptedOrder>> | null = null;
         console.log('ℹ️ lifecycle: phase3 driver page state before pickup click', {
           orderId,
           isClosed: driverPage.isClosed(),
@@ -5534,7 +5587,7 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
           visibleInteractiveElements: driverPickupVisibleCardState.visibleLinkTexts,
           source: 'phase3 driver pickup button visible',
         } : undefined;
-        const pickupFallbackResult = await tryPickupApiFallbackForVisibleAcceptedOrder({
+        pickupFallbackResult = await tryPickupApiFallbackForVisibleAcceptedOrder({
           driverPage,
           orderId,
           stage: 'phase3 driver pickup click before recovery',
@@ -5816,6 +5869,23 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
               bodySnippet: (pickupResponseBody || '').slice(0, 500) || null,
             });
           }
+
+          let pickupResponseStatus: string | null = null;
+          try {
+            const parsedPickupResponse = pickupResponseBody ? JSON.parse(pickupResponseBody) : null;
+            pickupResponseStatus = parsedPickupResponse?.data?.status ?? parsedPickupResponse?.status ?? null;
+          } catch {
+            pickupResponseStatus = null;
+          }
+          expect(pickupResponseStatus).toBe('PICKED_UP');
+          latestApiStatus = pickupResponseStatus;
+          driverPickupCompleted = true;
+          console.log('✅ lifecycle: driver pickup response confirmed exact status', {
+            orderId,
+            status: pickupResponseStatus,
+            responseStatus: pickupResponse.status(),
+          });
+          return;
         }
 
         const pickupStatusTextAfter = await readLocatorTextWithin(pickupStatusLocator, 1000);
@@ -5823,7 +5893,7 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
           || /PICKED_UP|IN_TRANSIT|OUT_FOR_DELIVERY|ON_THE_WAY|abgeholt|unterwegs|in delivery|delivered/i.test(pickupStatusTextAfter);
         pickupConfirmedBySignal = Boolean(pickupResponse) || hasPickupUiSuccess;
         latestApiStatusBeforePickupClick = latestApiStatus || pickupSnapshot?.status || null;
-        if (pickupFallbackResult.latestApiStatusAfterFallback) {
+        if (pickupFallbackResult?.latestApiStatusAfterFallback) {
           latestApiStatusAfterFallback = pickupFallbackResult.latestApiStatusAfterFallback;
         }
         pageTextPreview = driverPickupVisibleCardState?.bodyTextPreview || '';
@@ -5961,7 +6031,7 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
 
         let pickupRequestObserved = false;
         let pickupResponseStatus: number | null = null;
-        let confirmedPickupSnapshot = await waitForConfirmedDriverPickupStatus(
+        const confirmedPickupSnapshot = await waitForConfirmedDriverPickupStatus(
           driverPage,
           orderId,
           'phase3 driver pickup click',
@@ -6592,86 +6662,58 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
         adminShellVisible,
       });
 
-      // Navigate to orders management
-      const adminBaseUrl =
-        testUrls.admin ||
-        process.env.ADMIN_URL ||
-        process.env.VITE_ADMIN_URL ||
-        'http://127.0.0.1:3002';
-
-      console.log('➡️ lifecycle: phase4 opening admin root and orders sidebar', {
-        adminBaseUrl,
-        orderId,
-      });
-
-      await adminPage.goto(adminBaseUrl, { waitUntil: 'domcontentloaded', timeout: 15_000 });
-      await TestHelpers.waitForStablePage(adminPage);
-      const ordersNav = adminPage.getByTestId('sidebar-link-orders');
-      const visibleOrdersNavCount = await ordersNav.count().catch(() => 0);
-      if (visibleOrdersNavCount > 0 && await ordersNav.first().isVisible().catch(() => false)) {
-        await ordersNav.first().click();
-        await TestHelpers.waitForStablePage(adminPage);
-      } else {
-        const fallbackOrdersLink = adminPage.getByRole('link', { name: /Bestellungen|Orders/i })
-          .or(adminPage.getByRole('button', { name: /Bestellungen|Orders/i }))
-          .first();
-        if (await fallbackOrdersLink.isVisible().catch(() => false)) {
-          await fallbackOrdersLink.click({ timeout: 15_000 });
-          await TestHelpers.waitForStablePage(adminPage);
-        }
-      }
-
-      const adminOrdersTable = adminPage.locator(selectors.adminOrdersTable);
-      try {
-        await expect(adminOrdersTable).toBeVisible({ timeout: 15_000 });
-      } catch (error) {
-        const adminShellVisible = await adminPage
-          .locator('[data-testid="admin-shell"], nav, main')
-          .first()
-          .isVisible()
-          .catch(() => false);
-        const visibleNavTexts = await adminPage.locator('nav, [data-testid="sidebar"], [data-testid="admin-shell"], button, a')
-          .evaluateAll((nodes) => nodes
-            .map((node) => (node.textContent || '').trim().replace(/\s+/g, ' '))
-            .filter(Boolean)
-            .slice(0, 30))
-          .catch(() => []);
-        const visibleTableLikeElements = await adminPage.locator('table, [role="table"], [data-testid*="table"], .table, .orders-table, .datatable')
-          .evaluateAll((nodes) => nodes
-            .map((node) => (node.textContent || '').trim().replace(/\s+/g, ' '))
-            .filter(Boolean)
-            .slice(0, 20))
-          .catch(() => []);
-        const pageTextSnippet = (await adminPage.locator('body').innerText().catch(() => '')).slice(0, 1000);
-        throw new Error(`Admin orders table not visible after sidebar navigation: ${JSON.stringify({
-          currentUrl: adminPage.url(),
-          adminShellVisible,
-          visibleNavTexts,
-          visibleTableLikeElements,
-          orderId,
-          pageTextSnippet,
-          cause: error instanceof Error ? error.message : String(error),
-        })}`);
-      }
-      console.log('✅ lifecycle: phase4 admin orders table visible', {
-        currentUrl: adminPage.url(),
-        orderId,
-      });
-
-      // Find the completed order
-      const adminOrderRow = adminPage.locator(selectors.adminOrderRow).filter({ hasText: orderId || testOrder.id });
-      await expect(adminOrderRow).toBeVisible();
-
-      // Verify final status and driver assignment
+      const storedCustomerUser = await readJsonFromLocalStorageSafely<{ id?: string }>(
+        customerPage,
+        'customer_user',
+      );
       const storedDriverUser = await readJsonFromLocalStorageSafely<{ id?: string }>(
         driverPage,
         'driver_user',
       );
+      expect(storedCustomerUser?.id).toBeTruthy();
       expectedAssignedDriverId = storedDriverUser?.id || driverUser.id;
-      await expect(adminOrderRow.locator('[data-testid="status"]')).toContainText('DELIVERED');
-      await expect(adminOrderRow.locator('[data-testid="driver-id"], [data-testid="assigned-driver"]')).toContainText(expectedAssignedDriverId);
 
-      console.log(`✅ Admin verified order ${orderId}: DELIVERED with driver ${expectedAssignedDriverId}`);
+      const adminOrderLookup = await adminPage.evaluate(async (targetOrderId) => {
+        const token =
+          window.sessionStorage.getItem('uberfoods_auth_token') ||
+          window.sessionStorage.getItem('access_token') ||
+          window.sessionStorage.getItem('auth_token');
+        if (!token) {
+          return { ok: false, status: 0, order: null };
+        }
+
+        const response = await window.fetch('/api/admin/orders?limit=50', {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+        const payload = await response.json().catch(() => null);
+        const data = payload?.data ?? payload;
+        const orders = data?.orders ?? data?.data?.orders ?? [];
+        const order = Array.isArray(orders)
+          ? (orders.find((candidate: { id?: string }) => candidate.id === targetOrderId) ?? null)
+          : null;
+
+        return {
+          ok: response.ok,
+          status: response.status,
+          order,
+        };
+      }, orderId);
+
+      expect(
+        adminOrderLookup.ok,
+        `Admin order lookup failed with ${adminOrderLookup.status}`
+      ).toBeTruthy();
+      expect(adminOrderLookup.order).not.toBeNull();
+      expect(adminOrderLookup.order?.status).toBe('DELIVERED');
+      expect(adminOrderLookup.order?.customerId).toBe(storedCustomerUser!.id);
+      expect(adminOrderLookup.order?.restaurantId).toBe(authenticatedRestaurant.id);
+      expect(adminOrderLookup.order?.driverId).toBe(expectedAssignedDriverId);
+
+      console.log(
+        `✅ Admin verified order ${orderId}: DELIVERED with driver ${expectedAssignedDriverId}`
+      );
 
       // ============================================
       // FINAL VERIFICATION: CROSS-APP CONSISTENCY
@@ -6831,39 +6873,62 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
         };
 
         const activateOrdersView = async () => {
+          const activeOrdersSidebarItem = restaurantPage
+            .locator('button.sidebar-item.active')
+            .filter({ hasText: /bestellungen|orders/i })
+            .first();
           const navTargets = [
+            restaurantPage
+              .locator('button.sidebar-item')
+              .filter({ hasText: /bestellungen|orders/i })
+              .first(),
             restaurantPage.getByTestId('sidebar-link-orders').first(),
             restaurantPage.getByTestId('nav-orders').first(),
             restaurantPage.getByTestId('orders-link').first(),
             restaurantPage.getByRole('button', { name: /bestellungen|orders/i }).first(),
             restaurantPage.getByRole('link', { name: /bestellungen|orders/i }).first(),
             restaurantPage.locator('a[href*="/orders"]').first(),
+            restaurantPage.getByText(/^(bestellungen|orders)$/i).first(),
           ];
 
           for (const target of navTargets) {
             try {
               if (await target.isVisible().catch(() => false)) {
                 await target.click({ timeout: 1500 });
-                return true;
+                await activeOrdersSidebarItem
+                  .waitFor({ state: 'visible', timeout: 3000 })
+                  .catch(() => undefined);
+                if (await activeOrdersSidebarItem.isVisible().catch(() => false)) {
+                  return true;
+                }
               }
             } catch {
               // try next candidate
             }
           }
 
-          if (!restaurantPage.url().includes('/orders')) {
-            await restaurantPage.goto(`${testUrls.restaurant}/orders`, {
-              waitUntil: 'domcontentloaded',
-              timeout: 10000,
-            }).catch(() => null);
+          const ordersSidebarItem = restaurantPage
+            .locator('button.sidebar-item')
+            .filter({ hasText: /bestellungen|orders/i })
+            .first();
+          if (await ordersSidebarItem.isVisible().catch(() => false)) {
+            await ordersSidebarItem.evaluate((button) => {
+              (button as HTMLButtonElement).click();
+            }).catch(() => undefined);
+            await activeOrdersSidebarItem
+              .waitFor({ state: 'visible', timeout: 3000 })
+              .catch(() => undefined);
           }
 
-          return restaurantPage.url().includes('/orders');
+          return activeOrdersSidebarItem.isVisible().catch(() => false);
         };
 
         let restaurantOrdersViewActivated = false;
         const restaurantOrdersNavAttempted = await activateOrdersView();
         await restaurantPage.waitForLoadState('domcontentloaded', { timeout: 5000 }).catch(() => undefined);
+        if (restaurantOrdersNavAttempted) {
+          await restaurantPage.waitForTimeout(1500);
+        }
 
         const signalSnapshot = await Promise.race([
           orderSignals(),
@@ -6874,10 +6939,14 @@ test.describe('Full Order Lifecycle UI-E2E', () => {
           }), 2000)),
         ]);
         restaurantOrdersViewActivated = Boolean(
-          signalSnapshot.selectorCounts.orderCards > 0
-          || signalSnapshot.selectorCounts.orderLinks > 0
-          || signalSnapshot.rowTexts.some((text) => text.includes(orderId) || text.includes(shortOrderId))
-          || /bestellungen|orders/i.test(signalSnapshot.bodyText),
+          restaurantOrdersNavAttempted
+          && (
+            signalSnapshot.selectorCounts.orderCards > 0
+            || signalSnapshot.selectorCounts.orderLinks > 0
+            || signalSnapshot.rowTexts.some((text) => text.includes(orderId) || text.includes(shortOrderId))
+            || signalSnapshot.bodyText.includes(orderId)
+            || signalSnapshot.bodyText.includes(shortOrderId)
+          ),
         );
 
         if (!restaurantOrdersViewActivated) {
