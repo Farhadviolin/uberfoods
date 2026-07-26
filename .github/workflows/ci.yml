@@ -113,11 +113,39 @@ jobs:
       working-directory: ./backend
       run: npm run typecheck
 
+    - name: Verify fresh database and seed idempotency
+      working-directory: ./backend
+      run: npm run verify:fresh-db-seed-idempotency
+      env:
+        DATABASE_URL: postgresql://postgres:postgres123@localhost:5434/uberfoods
+        SEED_IDEMPOTENCY_ALLOW_TEMP_DATABASES: true
+        SEED_CUSTOMER_PASSWORD: customer123
+        SEED_RESTAURANT_PASSWORD: restaurant123
+        SEED_DRIVER_PASSWORD: driver123
+
     - name: Run database migrations
       working-directory: ./backend
       run: npx prisma migrate deploy --schema=./prisma/schema.prisma
       env:
         DATABASE_URL: postgresql://postgres:postgres123@localhost:5434/uberfoods
+
+    - name: Seed CI database
+      working-directory: ./backend
+      run: npm run prisma:seed
+      env:
+        DATABASE_URL: postgresql://postgres:postgres123@localhost:5434/uberfoods
+        SEED_CUSTOMER_PASSWORD: customer123
+        SEED_RESTAURANT_PASSWORD: restaurant123
+        SEED_DRIVER_PASSWORD: driver123
+
+    - name: Repeat CI database seed
+      working-directory: ./backend
+      run: npm run prisma:seed
+      env:
+        DATABASE_URL: postgresql://postgres:postgres123@localhost:5434/uberfoods
+        SEED_CUSTOMER_PASSWORD: customer123
+        SEED_RESTAURANT_PASSWORD: restaurant123
+        SEED_DRIVER_PASSWORD: driver123
 
     - name: Create test driver
       working-directory: ./backend

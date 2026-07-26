@@ -48,6 +48,7 @@
     "prisma:generate:abs": "prisma generate --schema=\"$PWD/prisma/schema.prisma\"",
     "prisma:deploy:abs": "prisma migrate deploy --schema=\"$PWD/prisma/schema.prisma\"",
     "prisma:seed": "ts-node prisma/seed.ts",
+    "verify:fresh-db-seed-idempotency": "ts-node scripts/verify-fresh-db-seed-idempotency.ts",
     "prisma:seed-admin": "ts-node prisma/seed-admin.ts",
     "prisma:seed-rbac": "node prisma/seed-rbac.js",
     "prisma:seed-tier-configs": "ts-node prisma/seed-tier-configs.ts",
