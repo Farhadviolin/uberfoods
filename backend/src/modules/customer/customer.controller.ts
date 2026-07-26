@@ -149,7 +149,11 @@ export class CustomerController {
     @Query("userId") userIdQuery?: string,
     @Headers("x-user-id") userIdHeader?: string,
   ) {
-    const customerId = this.getCurrentCustomerId(req, userIdQuery, userIdHeader);
+    const customerId = this.getCurrentCustomerId(
+      req,
+      userIdQuery,
+      userIdHeader,
+    );
     return this.prisma.customerFavorite.findMany({
       where: { customerId },
       include: {
@@ -177,7 +181,11 @@ export class CustomerController {
     @Query("userId") userIdQuery?: string,
     @Headers("x-user-id") userIdHeader?: string,
   ) {
-    const customerId = this.getCurrentCustomerId(req, userIdQuery, userIdHeader);
+    const customerId = this.getCurrentCustomerId(
+      req,
+      userIdQuery,
+      userIdHeader,
+    );
     if (!body.restaurantId) {
       throw new BadRequestException("restaurantId is required");
     }
@@ -206,7 +214,11 @@ export class CustomerController {
     @Query("userId") userIdQuery?: string,
     @Headers("x-user-id") userIdHeader?: string,
   ) {
-    const customerId = this.getCurrentCustomerId(req, userIdQuery, userIdHeader);
+    const customerId = this.getCurrentCustomerId(
+      req,
+      userIdQuery,
+      userIdHeader,
+    );
     await this.prisma.customerFavorite.deleteMany({
       where: { customerId, restaurantId },
     });

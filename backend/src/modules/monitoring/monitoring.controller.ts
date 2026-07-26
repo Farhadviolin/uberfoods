@@ -1,5 +1,10 @@
 import { Body, Controller, Get, Post, UseGuards } from "@nestjs/common";
-import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiResponse,
+  ApiTags,
+} from "@nestjs/swagger";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { MonitoringService } from "./monitoring.service";
 
@@ -53,7 +58,9 @@ export class MonitoringController {
   @ApiBearerAuth()
   @ApiOperation({ summary: "Create alert" })
   @ApiResponse({ status: 201, description: "Alert created" })
-  createAlert(@Body() body: { type?: string; severity?: string; message?: string }) {
+  createAlert(
+    @Body() body: { type?: string; severity?: string; message?: string },
+  ) {
     return this.monitoringService.createAlert();
   }
 }

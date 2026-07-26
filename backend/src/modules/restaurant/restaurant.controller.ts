@@ -252,11 +252,17 @@ export class RestaurantController {
         select: { isAvailable: true, isActive: true },
       }),
     ]);
-    const completedOrders = orders.filter((order) => order.status === "DELIVERED");
+    const completedOrders = orders.filter(
+      (order) => order.status === "DELIVERED",
+    );
     const activeOrders = orders.filter((order) =>
-      ["PENDING", "CONFIRMED", "PREPARING", "READY", "OUT_FOR_DELIVERY"].includes(
-        order.status,
-      ),
+      [
+        "PENDING",
+        "CONFIRMED",
+        "PREPARING",
+        "READY",
+        "OUT_FOR_DELIVERY",
+      ].includes(order.status),
     );
     const totalRevenue = completedOrders.reduce(
       (sum, order) => sum + order.totalAmount,
@@ -269,11 +275,14 @@ export class RestaurantController {
       averageOrderValue:
         completedOrders.length > 0 ? totalRevenue / completedOrders.length : 0,
       totalDishes: dishes.length,
-      activeDishes: dishes.filter((dish) => dish.isAvailable && dish.isActive).length,
+      activeDishes: dishes.filter((dish) => dish.isAvailable && dish.isActive)
+        .length,
       completedOrders: completedOrders.length,
       activeOrders: activeOrders.length,
       completionRate:
-        orders.length > 0 ? Math.round((completedOrders.length / orders.length) * 100) : 0,
+        orders.length > 0
+          ? Math.round((completedOrders.length / orders.length) * 100)
+          : 0,
     };
   }
 
@@ -288,7 +297,12 @@ export class RestaurantController {
       query.period || "week",
     );
     return analytics.ordersByStatus
-      ? [{ date: new Date().toISOString().slice(0, 10), revenue: analytics.totalRevenue }]
+      ? [
+          {
+            date: new Date().toISOString().slice(0, 10),
+            revenue: analytics.totalRevenue,
+          },
+        ]
       : [];
   }
 

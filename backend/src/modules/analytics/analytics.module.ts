@@ -7,7 +7,12 @@ import { AnalyticsController } from "./analytics.controller";
 import { AnalyticsService } from "./analytics.service";
 
 @Module({
-  imports: [DatabaseModule, forwardRef(() => AdminModule), DriverModule, RbacModule],
+  imports: [
+    DatabaseModule,
+    forwardRef(() => AdminModule),
+    DriverModule,
+    RbacModule,
+  ],
   controllers: [AnalyticsController],
   providers: [AnalyticsService],
 })

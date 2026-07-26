@@ -2383,8 +2383,8 @@ export class AdminController {
   async getRevenueStatistics(@Query("period") period = "7d") {
     try {
       const days = period === "30d" ? 30 : period === "90d" ? 90 : 7;
-      const totalRevenue = (await this.adminService.getDashboardStats())
-        .totalRevenue ?? 0;
+      const totalRevenue =
+        (await this.adminService.getDashboardStats()).totalRevenue ?? 0;
       const averageDailyRevenue = days > 0 ? totalRevenue / days : 0;
 
       return Array.from({ length: days }, (_, index) => {

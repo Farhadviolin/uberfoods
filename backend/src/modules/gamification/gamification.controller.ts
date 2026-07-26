@@ -1,5 +1,10 @@
 import { Controller, Get, Query, UseGuards } from "@nestjs/common";
-import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiResponse,
+  ApiTags,
+} from "@nestjs/swagger";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { GetUser } from "../auth/decorators/get-user.decorator";
 import { GamificationService } from "./gamification.service";
@@ -33,6 +38,9 @@ export class GamificationController {
     @Query("limit") limit = "10",
   ) {
     const parsedLimit = Number.parseInt(limit, 10);
-    return this.gamificationService.getLeaderboard(type, Number.isNaN(parsedLimit) ? 10 : parsedLimit);
+    return this.gamificationService.getLeaderboard(
+      type,
+      Number.isNaN(parsedLimit) ? 10 : parsedLimit,
+    );
   }
 }

@@ -50,7 +50,9 @@ export class GamificationService {
 
   async getLeaderboard(type = "level", limit = 10) {
     const orderBy =
-      type === "points" ? { points: "desc" as const } : { level: "desc" as const };
+      type === "points"
+        ? { points: "desc" as const }
+        : { level: "desc" as const };
 
     return this.prisma.gamificationStats.findMany({
       orderBy,

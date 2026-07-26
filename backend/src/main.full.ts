@@ -75,9 +75,7 @@ function validateEnv() {
 }
 
 async function bootstrap() {
-  console.log(
-    `[BOOT] Full stack starting, NODE_ENV="${process.env.NODE_ENV}"`,
-  );
+  console.log(`[BOOT] Full stack starting, NODE_ENV="${process.env.NODE_ENV}"`);
   validateEnv();
 
   const sentryDsn = process.env.SENTRY_DSN;

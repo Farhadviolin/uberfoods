@@ -46,11 +46,19 @@ export class WebSocketGateway
     return { success: false };
   }
 
-  async broadcastToRoom(room: string, event: string, payload: unknown): Promise<void> {
+  async broadcastToRoom(
+    room: string,
+    event: string,
+    payload: unknown,
+  ): Promise<void> {
     this.server?.to(room).emit(event, payload);
   }
 
-  async sendToUser(userId: string, event: string, payload: unknown): Promise<void> {
+  async sendToUser(
+    userId: string,
+    event: string,
+    payload: unknown,
+  ): Promise<void> {
     this.server?.to(userId).emit(event, payload);
   }
 }

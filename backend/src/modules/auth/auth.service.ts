@@ -354,7 +354,9 @@ export class AuthService {
     includeRefreshToken: boolean = false,
   ): Promise<LoginResult> {
     const userType =
-      typeof user.userType === "string" ? user.userType.toLowerCase() : undefined;
+      typeof user.userType === "string"
+        ? user.userType.toLowerCase()
+        : undefined;
     const role = user.role || userType || "customer";
     const payload = {
       email: user.email,

@@ -614,7 +614,10 @@ export class RestaurantController {
             Object.assign(result, flatten(item, `${prefix}${key}[${index}].`));
           });
         } else if (typeof obj[key] === "object" && obj[key] !== null) {
-          Object.assign(result, flatten(obj[key] as CSVData, `${prefix}${key}.`));
+          Object.assign(
+            result,
+            flatten(obj[key] as CSVData, `${prefix}${key}.`),
+          );
         } else {
           result[`${prefix}${key}`] = obj[key];
         }

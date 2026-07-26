@@ -44,11 +44,17 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     const roleUpper = role?.toUpperCase();
 
     // ADMIN: immer DB-Validierung, kein Dev-Fallback
-    if (typeUpper === "ADMIN" || roleUpper === "ADMIN" || roleUpper === "SUPER_ADMIN") {
+    if (
+      typeUpper === "ADMIN" ||
+      roleUpper === "ADMIN" ||
+      roleUpper === "SUPER_ADMIN"
+    ) {
       if (!userId) {
         throw new UnauthorizedException("Invalid admin token (missing sub)");
       }
-      const admin = await this.prisma.admin.findUnique({ where: { id: userId } });
+      const admin = await this.prisma.admin.findUnique({
+        where: { id: userId },
+      });
       if (!admin) {
         throw new UnauthorizedException("Admin not found");
       }
