@@ -26,7 +26,7 @@ services:
     rootDir: backend
     region: frankfurt
     plan: starter
-    branch: master
+    branch: codex/local-release-check
     autoDeployTrigger: checksPass
     healthCheckPath: /api/health
     buildCommand: npm ci && npm run build
@@ -109,7 +109,7 @@ services:
     name: uberfoods-customer-web-staging
     runtime: static
     rootDir: frontend/customer-web
-    branch: master
+    branch: codex/local-release-check
     autoDeployTrigger: checksPass
     buildCommand: npm ci && npm run build
     staticPublishPath: ./dist
@@ -147,7 +147,7 @@ services:
     name: uberfoods-admin-panel-staging
     runtime: static
     rootDir: frontend/admin-panel
-    branch: master
+    branch: codex/local-release-check
     autoDeployTrigger: checksPass
     buildCommand: npm ci && npm run build
     staticPublishPath: ./dist
@@ -173,7 +173,7 @@ services:
     name: uberfoods-restaurant-web-staging
     runtime: static
     rootDir: frontend/restaurant-web
-    branch: master
+    branch: codex/local-release-check
     autoDeployTrigger: checksPass
     buildCommand: npm ci && npm run build
     staticPublishPath: ./dist
@@ -193,7 +193,7 @@ services:
     name: uberfoods-driver-app-staging
     runtime: static
     rootDir: frontend/driver-app
-    branch: master
+    branch: codex/local-release-check
     autoDeployTrigger: checksPass
     buildCommand: npm ci && npm run build
     staticPublishPath: ./dist
