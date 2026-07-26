@@ -7,6 +7,7 @@ import { PrismaService } from "../../prisma/prisma.service";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { RolesGuard } from "../auth/guards/roles.guard";
 import { DriverEndpointsController } from "./driver-endpoints.controller";
+import { OrderService } from "./order.service";
 
 describe("DriverEndpointsController security", () => {
   const orderFindMany = jest.fn();
@@ -19,12 +20,16 @@ describe("DriverEndpointsController security", () => {
       update: orderUpdate,
     },
   } as unknown as PrismaService;
+  const orderService = {
+    acceptByDriver: jest.fn(),
+    updateStatusForActor: jest.fn(),
+  } as unknown as OrderService;
 
   let controller: DriverEndpointsController;
 
   beforeEach(() => {
     jest.clearAllMocks();
-    controller = new DriverEndpointsController(prisma);
+    controller = new DriverEndpointsController(prisma, orderService);
   });
 
   it("requires JWT authentication and the DRIVER role for every endpoint", () => {
@@ -118,6 +123,7 @@ describe("DriverEndpointsController security", () => {
 
     expect(orderFindUnique).not.toHaveBeenCalled();
     expect(orderUpdate).not.toHaveBeenCalled();
+    expect(orderService.acceptByDriver).not.toHaveBeenCalled();
   });
 
   it("rejects updating an order through another driver's alias", async () => {
@@ -126,12 +132,13 @@ describe("DriverEndpointsController security", () => {
         "driver-authenticated",
         "driver-other",
         "order-1",
-        { status: "PICKED_UP" },
+        { status: "PICKED_UP" as const },
       ),
     ).rejects.toBeInstanceOf(ForbiddenException);
 
     expect(orderFindUnique).not.toHaveBeenCalled();
     expect(orderUpdate).not.toHaveBeenCalled();
+    expect(orderService.updateStatusForActor).not.toHaveBeenCalled();
   });
 
   it("allows the authenticated driver to use an alias", async () => {

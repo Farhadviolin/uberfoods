@@ -233,7 +233,6 @@ if (-not $accessToken) {
 $driverId = $login.Json.data.user.id
 Write-Host "✅ Driver Login: $($login.Status)" -ForegroundColor Green
 Write-Host "   Driver ID: $driverId" -ForegroundColor White
-Write-Host "   Token: $($accessToken.Substring(0, 30))..." -ForegroundColor White
 
 # Test 1b: Customer login for creating the driver test order
 Write-Host "`n1b. Testing Customer Login..." -ForegroundColor Yellow
@@ -277,20 +276,19 @@ if ([string]::IsNullOrWhiteSpace($customerId)) {
 }
 Write-Host "✅ Customer Login: $($customerLogin.Status)" -ForegroundColor Green
 
-Write-Host "`n1c2. Testing Admin Login..." -ForegroundColor Yellow
-$adminEmail = if ($env:ADMIN_TEST_EMAIL) { $env:ADMIN_TEST_EMAIL } else { "ci-admin@example.test" }
-$adminPassword = if ($env:ADMIN_TEST_PASSWORD) { $env:ADMIN_TEST_PASSWORD } else { "ci-admin-password-placeholder" }
-$adminLogin = Invoke-CurlJson -Method "POST" -Url "$baseUrl/api/auth/login" -Body @{
-    email = $adminEmail
-    password = $adminPassword
-    userType = "admin"
+Write-Host "`n1c2. Testing Restaurant Login..." -ForegroundColor Yellow
+$restaurantEmail = if ($env:RESTAURANT_TEST_EMAIL) { $env:RESTAURANT_TEST_EMAIL } else { "ci-restaurant@example.test" }
+$restaurantPassword = if ($env:RESTAURANT_TEST_PASSWORD) { $env:RESTAURANT_TEST_PASSWORD } else { "ci-restaurant-password-placeholder" }
+$restaurantLogin = Invoke-CurlJson -Method "POST" -Url "$baseUrl/api/auth/restaurant/login" -Body @{
+    email = $restaurantEmail
+    password = $restaurantPassword
 }
-$adminToken = Get-AccessTokenFromResponse -ResponseJson $adminLogin.Json
-if ($adminLogin.Status -notin @(200, 201) -or -not $adminToken) {
-    Write-Host "❌ Admin Login Failed: status=$($adminLogin.Status), emailConfigured=$([bool]$adminEmail), response=$($adminLogin.Body)" -ForegroundColor Red
+$restaurantToken = Get-AccessTokenFromResponse -ResponseJson $restaurantLogin.Json
+if ($restaurantLogin.Status -notin @(200, 201) -or -not $restaurantToken) {
+    Write-Host "❌ Restaurant Login Failed: status=$($restaurantLogin.Status), emailConfigured=$([bool]$restaurantEmail), response=$($restaurantLogin.Body)" -ForegroundColor Red
     exit 1
 }
-Write-Host "✅ Admin Login: $($adminLogin.Status)" -ForegroundColor Green
+Write-Host "✅ Restaurant Login: $($restaurantLogin.Status)" -ForegroundColor Green
 
 Write-Host "`n1c. Loading Restaurant + Dish..." -ForegroundColor Yellow
 $restaurants = Invoke-CurlJson -Method "GET" -Url "$baseUrl/api/restaurants/public"
@@ -373,19 +371,21 @@ if (-not $testOrderId) {
 $testOrderId = [string]$testOrderId
 Write-Host "✅ Test Order Created: $($order.Status) - ID: $testOrderId" -ForegroundColor Green
 
-# Set order to READY_FOR_PICKUP
-Write-Host "   Setting order to READY_FOR_PICKUP..." -ForegroundColor Cyan
+# Advance order to READY_FOR_PICKUP
+Write-Host "   Advancing order to READY_FOR_PICKUP..." -ForegroundColor Cyan
 if (-not $testOrderId -or [string]::IsNullOrWhiteSpace($testOrderId)) {
     throw "Cannot update test order status because testOrderId is empty"
 }
-$ready = Invoke-CurlJson -Method "PATCH" -Url "$baseUrl/api/orders/$testOrderId/status" -Headers @{
-    Authorization = "Bearer $adminToken"
-} -Body @{
-    status = "READY_FOR_PICKUP"
-}
-if ($ready.Status -ne 200) {
-    Write-Host "❌ Order Status Update Failed: $($ready.Status) $($ready.Body)" -ForegroundColor Red
-    exit 1
+foreach ($restaurantStatus in @("CONFIRMED", "PREPARING", "READY_FOR_PICKUP")) {
+    $ready = Invoke-CurlJson -Method "PATCH" -Url "$baseUrl/api/orders/$testOrderId/status" -Headers @{
+        Authorization = "Bearer $restaurantToken"
+    } -Body @{
+        status = $restaurantStatus
+    }
+    if ($ready.Status -ne 200) {
+        Write-Host "❌ Order Status Update Failed: $($ready.Status) $($ready.Body)" -ForegroundColor Red
+        exit 1
+    }
 }
 Write-Host "✅ Order Ready: $($ready.Status) - Status: $($ready.Json.data.status)" -ForegroundColor Green
 

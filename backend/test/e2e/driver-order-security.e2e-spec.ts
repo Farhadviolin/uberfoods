@@ -228,13 +228,13 @@ describe("UF-AUDIT-006 driver order security over HTTP", () => {
     await request(app.getHttpServer())
       .post(`/api/drivers/orders/${seed.orderB.id}/accept`)
       .set("Authorization", bearer(driverAToken))
-      .expect(400);
+      .expect(409);
 
     await request(app.getHttpServer())
       .put(`/api/drivers/orders/${seed.orderB.id}/status`)
       .set("Authorization", bearer(driverAToken))
       .send({ status: "PICKED_UP" })
-      .expect(400);
+      .expect(403);
 
     await expectOrderState(seed.orderB.id, seed.driverB.id, "ACCEPTED");
   });
@@ -411,17 +411,26 @@ describe("UF-AUDIT-006 driver order security over HTTP", () => {
     const customerIds = customers.map((customer) => customer.id);
     const restaurantIds = restaurants.map((restaurant) => restaurant.id);
     const driverIds = drivers.map((driver) => driver.id);
-
-    await prisma.orderItem.deleteMany({
+    const orders = await prisma.order.findMany({
       where: {
-        order: {
-          OR: [
-            { customerId: { in: customerIds } },
-            { restaurantId: { in: restaurantIds } },
-            { driverId: { in: driverIds } },
-          ],
-        },
+        OR: [
+          { customerId: { in: customerIds } },
+          { restaurantId: { in: restaurantIds } },
+          { driverId: { in: driverIds } },
+        ],
       },
+      select: { id: true },
+    });
+    const orderIds = orders.map((order) => order.id);
+
+    await prisma.assignmentLog.deleteMany({
+      where: { orderId: { in: orderIds } },
+    });
+    await prisma.auditLedger.deleteMany({
+      where: { entityType: "order", entityId: { in: orderIds } },
+    });
+    await prisma.orderItem.deleteMany({
+      where: { orderId: { in: orderIds } },
     });
     await prisma.order.deleteMany({
       where: {

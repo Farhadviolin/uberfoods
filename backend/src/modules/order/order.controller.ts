@@ -11,6 +11,7 @@ import {
   HttpStatus,
   Logger,
   Request,
+  ForbiddenException,
 } from "@nestjs/common";
 import {
   ApiTags,
@@ -25,7 +26,9 @@ import { WebhookService, WebhookConfig } from "./webhook.service";
 import { PaymentService } from "../payment/payment.service";
 import { RegisterWebhookDto } from "./dto/register-webhook.dto";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
+import { RolesGuard } from "../auth/guards/roles.guard";
 import { GetUser } from "../auth/decorators/get-user.decorator";
+import { Roles } from "../../common/decorators/roles.decorator";
 import { CurrentCustomerId } from "../../common/decorators/current-user.decorator";
 import { BadRequestException } from "@nestjs/common";
 import { CreateOrderDto } from "./dto/create-order.dto";
@@ -39,6 +42,13 @@ import {
   KeysetPaginationDto,
   KeysetPaginationResult,
 } from "./dto/keyset-pagination.dto";
+import { OrderOwnershipGuard } from "./order-ownership.guard";
+import {
+  getOrderActorId,
+  getOrderActorRole,
+  OrderActor,
+  scopeOrderFilters,
+} from "./order-authorization.policy";
 
 interface AdvancedStatsQuery {
   startDate?: string;
@@ -123,7 +133,7 @@ interface PayPalOrder {
 
 @ApiTags("Orders")
 @ApiBearerAuth()
-@UseGuards(RateLimitGuard)
+@UseGuards(RateLimitGuard, JwtAuthGuard, RolesGuard, OrderOwnershipGuard)
 @Controller("orders")
 export class OrderController {
   private readonly logger = new Logger(OrderController.name);
@@ -275,12 +285,13 @@ export class OrderController {
       // Legacy offset-based pagination (deprecated)
       page?: string;
     },
+    @GetUser() actor: OrderActor,
   ) {
+    const scopedQuery = scopeOrderFilters(actor, {
+      ...query,
+      status: normalizeStatusFilter(query.status ?? query["status[]"]),
+    });
     try {
-      const normalizedQuery = {
-        ...query,
-        status: normalizeStatusFilter(query.status ?? query["status[]"]),
-      };
       // Check if using new cursor-based pagination
       if (query.cursor !== undefined || query.direction !== undefined) {
         // Use new keyset pagination
@@ -291,10 +302,10 @@ export class OrderController {
         };
 
         const filters = {
-          restaurantId: query.restaurantId,
-          customerId: query.customerId,
-          driverId: query.driverId,
-          status: normalizedQuery.status,
+          restaurantId: scopedQuery.restaurantId as string | undefined,
+          customerId: scopedQuery.customerId as string | undefined,
+          driverId: scopedQuery.driverId as string | undefined,
+          status: scopedQuery.status as string | undefined,
         };
 
         const result = await this.orderService.findAllWithCursor(
@@ -315,7 +326,7 @@ export class OrderController {
         };
 
         const result = await this.orderService.findAll(
-          normalizedQuery,
+          scopedQuery,
           paginationOptions,
         );
         return result;
@@ -349,22 +360,22 @@ export class OrderController {
 
   @Get("my")
   @UseGuards(JwtAuthGuard)
-  async getCurrentCustomerOrders(@Request() req: AuthenticatedRequest) {
-    const customerId = req.user?.id || req.user?.sub;
-    if (!customerId) {
-      throw new BadRequestException("Customer ID not found");
-    }
+  @Roles("CUSTOMER")
+  async getCurrentCustomerOrders(@GetUser() actor: OrderActor) {
+    const customerId = getOrderActorId(actor);
     return this.orderService.findAll({ customerId });
   }
 
   @Get("customer/my-orders")
   @UseGuards(JwtAuthGuard)
+  @Roles("CUSTOMER")
   async getMyOrders(@CurrentCustomerId() customerId: string) {
     return this.orderService.findAll({ customerId });
   }
 
   @Get("customer/:id")
   @UseGuards(JwtAuthGuard)
+  @Roles("CUSTOMER")
   async getCustomerOrder(
     @Param("id") id: string,
     @CurrentCustomerId() customerId: string,
@@ -378,66 +389,97 @@ export class OrderController {
   }
 
   @Get("driver/:driverId")
-  async getDriverOrders(@Param("driverId") driverId: string) {
+  @Roles("DRIVER", "SUPER_ADMIN")
+  async getDriverOrders(
+    @Param("driverId") driverId: string,
+    @GetUser() actor: OrderActor,
+  ) {
+    this.assertPathIdentity(actor, driverId, "DRIVER");
     return this.orderService.findAll({ driverId });
   }
 
   @Get("restaurant/:restaurantId/pending")
-  async getPendingOrders(@Param("restaurantId") restaurantId: string) {
+  @Roles("RESTAURANT", "SUPER_ADMIN")
+  async getPendingOrders(
+    @Param("restaurantId") restaurantId: string,
+    @GetUser() actor: OrderActor,
+  ) {
+    this.assertPathIdentity(actor, restaurantId, "RESTAURANT");
     return this.orderService.findAll({ restaurantId, status: "PENDING" });
   }
 
   @Get("restaurant/:restaurantId/preparing")
-  async getPreparingOrders(@Param("restaurantId") restaurantId: string) {
+  @Roles("RESTAURANT", "SUPER_ADMIN")
+  async getPreparingOrders(
+    @Param("restaurantId") restaurantId: string,
+    @GetUser() actor: OrderActor,
+  ) {
+    this.assertPathIdentity(actor, restaurantId, "RESTAURANT");
     return this.orderService.findAll({ restaurantId, status: "PREPARING" });
   }
 
   @Get("restaurant/:restaurantId/ready")
-  async getReadyOrders(@Param("restaurantId") restaurantId: string) {
+  @Roles("RESTAURANT", "SUPER_ADMIN")
+  async getReadyOrders(
+    @Param("restaurantId") restaurantId: string,
+    @GetUser() actor: OrderActor,
+  ) {
+    this.assertPathIdentity(actor, restaurantId, "RESTAURANT");
     return this.orderService.findAll({ restaurantId, status: "READY" });
   }
 
   @Get("restaurant/:restaurantId/delivered")
-  async getDeliveredOrders(@Param("restaurantId") restaurantId: string) {
+  @Roles("RESTAURANT", "SUPER_ADMIN")
+  async getDeliveredOrders(
+    @Param("restaurantId") restaurantId: string,
+    @GetUser() actor: OrderActor,
+  ) {
+    this.assertPathIdentity(actor, restaurantId, "RESTAURANT");
     return this.orderService.findAll({ restaurantId, status: "DELIVERED" });
   }
 
   @Get(":id")
-  async findOne(@Param("id") id: string) {
+  async findOne(@Param("id") id: string, @GetUser() _actor?: OrderActor) {
     return this.orderService.findOne(id);
   }
 
   @Post()
   @Throttle({ default: { limit: 20, ttl: 60000 } }) // 20 requests per minute for order creation (prevent spam)
   @UseGuards(JwtAuthGuard)
-  async createOrder(@Body() data: CreateOrderDto, @Request() req: any) {
-    // For customer orders, extract customerId from JWT if not provided
-    if (!data.customerId && req.user?.id && req.user?.userType === "customer") {
-      data.customerId = req.user.id;
-    }
+  @Roles("CUSTOMER")
+  async createOrder(
+    @Body() data: CreateOrderDto,
+    @GetUser() actor: OrderActor,
+  ) {
+    data.customerId = getOrderActorId(actor);
     return this.orderService.create(data);
   }
 
   @Post("customer")
   @Throttle({ default: { limit: 20, ttl: 60000 } }) // 20 requests per minute for order creation (prevent spam)
   @UseGuards(JwtAuthGuard)
-  async create(@Body() data: CreateOrderDto) {
+  @Roles("CUSTOMER")
+  async create(@Body() data: CreateOrderDto, @GetUser() actor: OrderActor) {
+    data.customerId = getOrderActorId(actor);
     return this.orderService.create(data);
   }
 
   @Post(":id/accept")
   @Throttle({ default: { limit: 30, ttl: 60000 } }) // 30 requests per minute for order acceptance
   @UseGuards(JwtAuthGuard)
-  async accept(@Param("id") id: string, @Body() body: AcceptOrderDto) {
-    // Support both formats: driverId (from driver app) or userId/userType (from other apps)
-    const userId = body.driverId || body.userId || "";
-    const userType = body.userType || (body.driverId ? "DRIVER" : "");
-    return this.orderService.accept(id, userId, userType);
+  @Roles("DRIVER")
+  async accept(
+    @Param("id") id: string,
+    @Body() _body: AcceptOrderDto,
+    @GetUser() actor: OrderActor,
+  ) {
+    return this.orderService.acceptByDriver(id, actor);
   }
 
   @Post(":id/reject")
   @Throttle({ default: { limit: 30, ttl: 60000 } }) // 30 requests per minute for order rejection
   @UseGuards(JwtAuthGuard)
+  @Roles("DRIVER")
   async reject(
     @Param("id") id: string,
     @Body() body: { reason?: string; driverId?: string },
@@ -448,13 +490,15 @@ export class OrderController {
   @Post(":id/cancel")
   @Throttle({ default: { limit: 10, ttl: 60000 } }) // 10 requests per minute for order cancellation (prevent abuse)
   @UseGuards(JwtAuthGuard)
+  @Roles("CUSTOMER")
   async cancel(@Param("id") id: string, @Body() body: CancelOrderDto) {
-    return this.orderService.cancel(id, body.reason, body.cancelledBy);
+    return this.orderService.cancel(id, body.reason, "CUSTOMER");
   }
 
   @Post(":id/cancel-restaurant")
   @Throttle({ default: { limit: 10, ttl: 60000 } }) // 10 requests per minute
   @UseGuards(JwtAuthGuard)
+  @Roles("RESTAURANT")
   async cancelRestaurant(
     @Param("id") id: string,
     @Body() body: { reason?: string },
@@ -465,21 +509,43 @@ export class OrderController {
   @Patch(":id/status")
   @Throttle({ default: { limit: 30, ttl: 60000 } }) // 30 requests per minute for status updates
   @UseGuards(JwtAuthGuard)
+  @Roles("RESTAURANT", "DRIVER")
   async updateStatus(
     @Param("id") id: string,
     @Body() body: UpdateOrderStatusDto,
+    @GetUser() actor: OrderActor,
   ) {
-    return this.orderService.updateStatus(id, body.status, body.metadata);
+    return this.orderService.updateStatusForActor(
+      id,
+      body.status,
+      actor,
+      body.metadata,
+    );
   }
 
   @Patch(":id/assign")
   @Throttle({ default: { limit: 20, ttl: 60000 } }) // 20 requests per minute for driver assignments
   @UseGuards(JwtAuthGuard)
+  @Roles("SUPER_ADMIN")
   async assignDriver(
     @Param("id") id: string,
     @Body() body: { driverId: string },
   ) {
     return this.orderService.assignDriver(id, body.driverId);
+  }
+
+  private assertPathIdentity(
+    actor: OrderActor,
+    pathId: string,
+    expectedRole: "DRIVER" | "RESTAURANT",
+  ): void {
+    const role = getOrderActorRole(actor);
+    if (role === "SUPER_ADMIN") {
+      return;
+    }
+    if (role !== expectedRole || getOrderActorId(actor) !== pathId) {
+      throw new ForbiddenException("Resource ownership mismatch");
+    }
   }
 
   @Patch(":id/priority")
@@ -542,6 +608,7 @@ export class OrderController {
   @Post("bulk-status")
   @Throttle({ default: { limit: 5, ttl: 60000 } }) // 5 requests per minute for bulk operations (very restrictive)
   @UseGuards(JwtAuthGuard)
+  @Roles("SUPER_ADMIN")
   async bulkStatusUpdate(
     @Body() body: { orders: Array<{ id: string; status: string }> },
   ) {

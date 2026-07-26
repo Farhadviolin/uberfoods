@@ -6,7 +6,6 @@ import {
   Body,
   Param,
   UseGuards,
-  BadRequestException,
   ForbiddenException,
   Logger,
 } from "@nestjs/common";
@@ -16,6 +15,8 @@ import { RolesGuard } from "../auth/guards/roles.guard";
 import { GetUser } from "../auth/decorators/get-user.decorator";
 import { Roles } from "../../common/decorators/roles.decorator";
 import { PrismaService } from "../../prisma/prisma.service";
+import { OrderService } from "./order.service";
+import { UpdateOrderStatusDto } from "./dto/update-order-status.dto";
 
 @ApiTags("Driver")
 @Controller("drivers")
@@ -24,7 +25,10 @@ import { PrismaService } from "../../prisma/prisma.service";
 export class DriverEndpointsController {
   private readonly logger = new Logger(DriverEndpointsController.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly orderService: OrderService,
+  ) {}
 
   @Get("orders/available")
   @ApiOperation({ summary: "Get available orders for driver" })
@@ -159,17 +163,10 @@ export class DriverEndpointsController {
 
   private async acceptOrderImpl(driverId: string, orderId: string) {
     try {
-      const order = await this.prisma.order.findUnique({
-        where: { id: orderId },
+      return await this.orderService.acceptByDriver(orderId, {
+        id: driverId,
+        role: "DRIVER",
       });
-      if (!order || order.driverId) {
-        throw new BadRequestException("Order not available");
-      }
-      const updated = await this.prisma.order.update({
-        where: { id: orderId },
-        data: { driverId, status: "ACCEPTED" },
-      });
-      return updated;
     } catch (error) {
       this.logger.error(`Failed to accept order: ${(error as Error).message}`);
       throw error;
@@ -183,7 +180,7 @@ export class DriverEndpointsController {
   async updateOrderStatus(
     @GetUser("id") driverId: string,
     @Param("orderId") orderId: string,
-    @Body() body: { status: string },
+    @Body() body: UpdateOrderStatusDto,
   ) {
     return this.updateOrderStatusImpl(driverId, orderId, body.status);
   }
@@ -199,7 +196,7 @@ export class DriverEndpointsController {
     @GetUser("id") authenticatedDriverId: string,
     @Param("driverId") pathDriverId: string,
     @Param("orderId") orderId: string,
-    @Body() body: { status: string },
+    @Body() body: UpdateOrderStatusDto,
   ) {
     this.assertDriverIdentity(authenticatedDriverId, pathDriverId);
     return this.updateOrderStatusImpl(
@@ -226,17 +223,10 @@ export class DriverEndpointsController {
     status: string,
   ) {
     try {
-      const order = await this.prisma.order.findUnique({
-        where: { id: orderId },
+      return await this.orderService.updateStatusForActor(orderId, status, {
+        id: driverId,
+        role: "DRIVER",
       });
-      if (!order || order.driverId !== driverId) {
-        throw new BadRequestException("Order not assigned to driver");
-      }
-      const updated = await this.prisma.order.update({
-        where: { id: orderId },
-        data: { status },
-      });
-      return updated;
     } catch (error) {
       this.logger.error(
         `Failed to update order status: ${(error as Error).message}`,

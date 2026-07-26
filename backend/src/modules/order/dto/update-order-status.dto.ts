@@ -15,7 +15,9 @@ export class UpdateOrderStatusDto {
     "PREPARING",
     "READY",
     "READY_FOR_PICKUP",
+    "ACCEPTED",
     "PICKED_UP",
+    "IN_TRANSIT",
     "DELIVERING",
     "DELIVERED",
     "CANCELLED",
@@ -26,7 +28,9 @@ export class UpdateOrderStatusDto {
     | "PREPARING"
     | "READY"
     | "READY_FOR_PICKUP"
+    | "ACCEPTED"
     | "PICKED_UP"
+    | "IN_TRANSIT"
     | "DELIVERING"
     | "DELIVERED"
     | "CANCELLED";

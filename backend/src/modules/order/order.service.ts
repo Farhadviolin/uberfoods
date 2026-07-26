@@ -2,10 +2,13 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  ConflictException,
+  ForbiddenException,
   Logger,
   Inject,
   forwardRef,
 } from "@nestjs/common";
+import { createHash, randomUUID } from "crypto";
 import { ModuleRef } from "@nestjs/core";
 import { MetadataUtil } from "../../common/utils/metadata.util";
 import { normalizePrismaJson } from "../../common/utils/prisma-json.util";
@@ -22,6 +25,12 @@ import {
   KeysetPaginationDto,
   KeysetPaginationResult,
 } from "./dto/keyset-pagination.dto";
+import {
+  assertCanTransitionOrder,
+  getOrderActorId,
+  getOrderActorRole,
+  OrderActor,
+} from "./order-authorization.policy";
 
 interface OrderWithRelations {
   id: string;
@@ -72,15 +81,15 @@ function normalizeStatusWhere(status?: string) {
   return statuses.length === 1 ? statuses[0] : { in: statuses };
 }
 
-function applyAssignedDriverId<T extends { driverId?: string | null; assignmentLogs?: Array<{ driverId: string; createdAt: Date }> }>(
-  order: T,
-) {
+function applyAssignedDriverId<
+  T extends {
+    driverId?: string | null;
+    assignmentLogs?: Array<{ driverId: string; createdAt: Date }>;
+  },
+>(order: T) {
   return {
     ...order,
-    driverId:
-      order.driverId ||
-      order.assignmentLogs?.[0]?.driverId ||
-      null,
+    driverId: order.driverId || order.assignmentLogs?.[0]?.driverId || null,
   };
 }
 
@@ -627,7 +636,9 @@ export class OrderService {
       }
 
       const result: KeysetPaginationResult<OrderWithRelations> = {
-        data: data.map((order) => applyAssignedDriverId(order)) as unknown as OrderWithRelations[],
+        data: data.map((order) =>
+          applyAssignedDriverId(order),
+        ) as unknown as OrderWithRelations[],
         nextCursor,
         hasMore,
       };
@@ -863,6 +874,63 @@ export class OrderService {
     return updatedOrder;
   }
 
+  async updateStatusForActor(
+    id: string,
+    status: string,
+    actor: OrderActor,
+    metadata?: Record<string, unknown>,
+  ) {
+    const order = await this.findOne(id);
+    assertCanTransitionOrder(actor, order, status);
+
+    const actorId = getOrderActorId(actor);
+    const actorRole = getOrderActorRole(actor);
+    const deliveredAt = status === "DELIVERED" ? new Date() : undefined;
+
+    const updatedOrder = await this.prisma.$transaction(async (tx) => {
+      const result = await tx.order.updateMany({
+        where: {
+          id,
+          status: order.status,
+          ...(actorRole === "RESTAURANT"
+            ? { restaurantId: actorId }
+            : { driverId: actorId }),
+        },
+        data: {
+          status,
+          deliveredAt,
+          version: { increment: 1 },
+        },
+      });
+
+      if (result.count !== 1) {
+        throw new ConflictException(
+          "Order changed before the status transition could be applied",
+        );
+      }
+
+      const updated = await tx.order.findUniqueOrThrow({ where: { id } });
+      await this.appendOrderAuditEntry(tx, {
+        actorId,
+        action: "order.status_changed",
+        orderId: id,
+        payload: {
+          metadata: metadata ?? {},
+          previousStatus: order.status,
+          status,
+        },
+      });
+      return updated;
+    });
+
+    this.invalidateOrderCaches(id);
+    await this.triggerOrderWebhooks(
+      `status.${status.toLowerCase()}`,
+      updatedOrder,
+    );
+    return updatedOrder;
+  }
+
   async assignDriver(id: string, driverId: string) {
     const order = await this.findOne(id);
     // Status-Prüfung für Tests lockern: nur DELIVERED/CANCELLED blockieren
@@ -893,34 +961,134 @@ export class OrderService {
     return updatedOrder;
   }
 
-  async accept(id: string, userId: string, userType: string) {
-    const order = await this.findOne(id);
-
-    let updatedOrder;
-    if (userType === "DRIVER") {
-      if (order.driverId && order.driverId !== userId) {
-        throw new BadRequestException(
-          "Order already assigned to another driver",
-        );
-      }
-      updatedOrder = await this.prisma.order.update({
-        where: { id },
-        data: { driverId: userId, status: "ACCEPTED" },
-      });
-    } else if (userType === "RESTAURANT") {
-      updatedOrder = await this.prisma.order.update({
-        where: { id },
-        data: { status: "CONFIRMED" },
-      });
-    } else {
-      throw new BadRequestException("Invalid user type for order acceptance");
+  async acceptByDriver(id: string, actor: OrderActor) {
+    const role = getOrderActorRole(actor);
+    if (role !== "DRIVER") {
+      throw new ForbiddenException("Only drivers can accept orders");
     }
+    const driverId = getOrderActorId(actor);
 
-    // Invalidate order-related caches
+    const updatedOrder = await this.prisma.$transaction(async (tx) => {
+      const result = await tx.order.updateMany({
+        where: {
+          id,
+          status: "READY_FOR_PICKUP",
+          driverId: null,
+        },
+        data: {
+          driverId,
+          status: "ACCEPTED",
+          version: { increment: 1 },
+        },
+      });
+
+      if (result.count !== 1) {
+        const existingOrder = await tx.order.findUnique({
+          where: { id },
+          select: { id: true },
+        });
+        if (!existingOrder) {
+          throw new NotFoundException(`Order with ID ${id} not found`);
+        }
+        throw new ConflictException("Order is not available for acceptance");
+      }
+
+      await tx.assignmentLog.create({
+        data: {
+          orderId: id,
+          driverId,
+          algorithm: "driver-claim",
+          score: 1,
+          estimatedDeliveryTime: 0,
+          estimatedDistance: 0,
+          confidence: 1,
+          reasoning: ["Authenticated driver claimed available order"],
+          success: true,
+        },
+      });
+      await this.appendOrderAuditEntry(tx, {
+        actorId: driverId,
+        action: "order.driver_claimed",
+        orderId: id,
+        payload: {
+          driverId,
+          previousStatus: "READY_FOR_PICKUP",
+          status: "ACCEPTED",
+        },
+      });
+
+      return tx.order.findUniqueOrThrow({ where: { id } });
+    });
+
+    this.invalidateOrderCaches(id);
+    await this.triggerOrderWebhooks("driver.assigned", updatedOrder);
+    return updatedOrder;
+  }
+
+  private invalidateOrderCaches(id: string): void {
     this.cacheService.delete(`order_findOne_${id}`);
     this.cacheService.deletePattern("order_findAll.*");
+  }
 
-    return updatedOrder;
+  private async appendOrderAuditEntry(
+    tx: Prisma.TransactionClient,
+    entry: {
+      actorId: string;
+      action: string;
+      orderId: string;
+      payload: Record<string, unknown>;
+    },
+  ): Promise<void> {
+    const createdAt = new Date();
+    const previous = await tx.auditLedger.findFirst({
+      orderBy: { createdAt: "desc" },
+      select: { hash: true },
+    });
+    const prevHash = previous?.hash || "genesis";
+    const payload = this.sortAuditPayload(entry.payload);
+    const metadata = {
+      actorType: "user",
+      actorId: entry.actorId,
+      action: entry.action,
+      entityType: "order",
+      entityId: entry.orderId,
+      timestamp: createdAt.toISOString(),
+    };
+    const hash = createHash("sha256")
+      .update(JSON.stringify({ prevHash, payload, metadata }))
+      .digest("hex");
+
+    await tx.auditLedger.create({
+      data: {
+        id: `audit_${randomUUID()}`,
+        createdAt,
+        actorType: "user",
+        actorId: entry.actorId,
+        action: entry.action,
+        entityType: "order",
+        entityId: entry.orderId,
+        payload: payload as Prisma.InputJsonValue,
+        prevHash,
+        hash,
+      },
+    });
+  }
+
+  private sortAuditPayload(value: unknown): unknown {
+    if (Array.isArray(value)) {
+      return value.map((item) => this.sortAuditPayload(item));
+    }
+    if (!value || typeof value !== "object") {
+      return value;
+    }
+    return Object.keys(value as Record<string, unknown>)
+      .sort()
+      .reduce<Record<string, unknown>>((result, key) => {
+        result[key] = this.sortAuditPayload(
+          (value as Record<string, unknown>)[key],
+        );
+        return result;
+      }, {});
   }
 
   async reject(id: string, reason: string) {

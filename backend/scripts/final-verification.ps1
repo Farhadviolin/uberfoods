@@ -320,23 +320,21 @@ if (-not $accessToken) {
     exit 1
 }
 Write-Host "✅ Driver Login: $($login.Status)" -ForegroundColor Green
-Write-Host "   Access Token: $($accessToken.Substring(0, 50))..." -ForegroundColor White
 
-# Test 2a: Admin Login for order status updates
-Write-Host "`n2a. Testing Admin Login..." -ForegroundColor Yellow
-$adminEmail = if ($env:ADMIN_TEST_EMAIL) { $env:ADMIN_TEST_EMAIL } else { "ci-admin@example.test" }
-$adminPassword = if ($env:ADMIN_TEST_PASSWORD) { $env:ADMIN_TEST_PASSWORD } else { "ci-admin-password-placeholder" }
-$adminLogin = Invoke-CurlJson -Method "POST" -Url "$baseUrl/api/auth/login" -Body @{
-    email = $adminEmail
-    password = $adminPassword
-    userType = "admin"
+# Test 2a: Restaurant Login for order status updates
+Write-Host "`n2a. Testing Restaurant Login..." -ForegroundColor Yellow
+$restaurantEmail = if ($env:RESTAURANT_TEST_EMAIL) { $env:RESTAURANT_TEST_EMAIL } else { "ci-restaurant@example.test" }
+$restaurantPassword = if ($env:RESTAURANT_TEST_PASSWORD) { $env:RESTAURANT_TEST_PASSWORD } else { "ci-restaurant-password-placeholder" }
+$restaurantLogin = Invoke-CurlJson -Method "POST" -Url "$baseUrl/api/auth/restaurant/login" -Body @{
+    email = $restaurantEmail
+    password = $restaurantPassword
 }
-$adminToken = Get-AccessTokenFromResponse -ResponseJson $adminLogin.Json
-if ($adminLogin.Status -notin @(200, 201) -or -not $adminToken) {
-    Write-Host "❌ Admin Login Failed: status=$($adminLogin.Status), emailConfigured=$([bool]$adminEmail), response=$($adminLogin.Body)" -ForegroundColor Red
+$restaurantToken = Get-AccessTokenFromResponse -ResponseJson $restaurantLogin.Json
+if ($restaurantLogin.Status -notin @(200, 201) -or -not $restaurantToken) {
+    Write-Host "❌ Restaurant Login Failed: status=$($restaurantLogin.Status), emailConfigured=$([bool]$restaurantEmail), response=$($restaurantLogin.Body)" -ForegroundColor Red
     exit 1
 }
-Write-Host "✅ Admin Login: $($adminLogin.Status)" -ForegroundColor Green
+Write-Host "✅ Restaurant Login: $($restaurantLogin.Status)" -ForegroundColor Green
 
 # Test 2b: Customer Login for order creation
 Write-Host "`n2b. Testing Customer Login..." -ForegroundColor Yellow
@@ -464,26 +462,28 @@ if (-not $orderId) {
 $orderId = [string]$orderId
 Write-Host "✅ Order Created: $($order.Status) - ID: $orderId" -ForegroundColor Green
 
-# Step 2: Restaurant sets order to READY_FOR_PICKUP (200)
-Write-Host "   Step 2: Restaurant sets READY_FOR_PICKUP..." -ForegroundColor Cyan
+# Step 2: Restaurant advances the order to READY_FOR_PICKUP (200)
+Write-Host "   Step 2: Restaurant advances to READY_FOR_PICKUP..." -ForegroundColor Cyan
 if (-not $orderId -or [string]::IsNullOrWhiteSpace($orderId)) {
     throw "Cannot update order status because orderId is empty"
 }
-$ready = Invoke-CurlJson -Method "PATCH" -Url "$baseUrl/api/orders/$orderId/status" -Headers @{
-    Authorization = "Bearer $adminToken"
-} -Body @{
-    status = "READY_FOR_PICKUP"
-}
-$readyStatus = Get-OrderStatusFromResponse -ResponseJson $ready.Json
-if ($ready.Status -ne 200 -or $readyStatus -ne "READY_FOR_PICKUP") {
-    Write-Host "Restaurant Status Update response did not match expected status." -ForegroundColor Red
-    if ($ready.Json) {
-        Write-Host "Status response top-level keys: $($ready.Json.PSObject.Properties.Name -join ', ')" -ForegroundColor White
-        if ($ready.Json.data) {
-            Write-Host "Status response data keys: $($ready.Json.data.PSObject.Properties.Name -join ', ')" -ForegroundColor White
-        }
+foreach ($restaurantStatus in @("CONFIRMED", "PREPARING", "READY_FOR_PICKUP")) {
+    $ready = Invoke-CurlJson -Method "PATCH" -Url "$baseUrl/api/orders/$orderId/status" -Headers @{
+        Authorization = "Bearer $restaurantToken"
+    } -Body @{
+        status = $restaurantStatus
     }
-    throw "Restaurant Status Update Failed: $($ready.Status)"
+    $readyStatus = Get-OrderStatusFromResponse -ResponseJson $ready.Json
+    if ($ready.Status -ne 200 -or $readyStatus -ne $restaurantStatus) {
+        Write-Host "Restaurant Status Update response did not match expected status." -ForegroundColor Red
+        if ($ready.Json) {
+            Write-Host "Status response top-level keys: $($ready.Json.PSObject.Properties.Name -join ', ')" -ForegroundColor White
+            if ($ready.Json.data) {
+                Write-Host "Status response data keys: $($ready.Json.data.PSObject.Properties.Name -join ', ')" -ForegroundColor White
+            }
+        }
+        throw "Restaurant Status Update Failed: $($ready.Status)"
+    }
 }
 Write-Host "✅ Order Status Updated: $($ready.Status) - Status: $readyStatus" -ForegroundColor Green
 
@@ -498,57 +498,59 @@ if ($accept.Status -notin @(200, 201)) {
 }
 Write-Host "✅ Order Accepted: $($accept.Status) - Status: $($accept.Json.data.status), Driver: $($accept.Json.data.driverId)" -ForegroundColor Green
 
-# Step 4: Driver marks order as DELIVERED (200)
-Write-Host "   Step 4: Driver marks DELIVERED..." -ForegroundColor Cyan
-$deliver = Invoke-CurlJson -Method "PUT" -Url "$baseUrl/api/drivers/orders/$orderId/status" -Headers @{
-    Authorization = "Bearer $accessToken"
-} -Body @{
-    status = "DELIVERED"
-}
-$deliveredStatus = Get-OrderStatusFromResponse -ResponseJson $deliver.Json
-if ($deliver.Status -ne 200 -or $deliveredStatus -ne "DELIVERED") {
-    Write-Host "Delivery Status Update response did not match expected status." -ForegroundColor Yellow
-    if ($deliver.Json) {
-        Write-Host "Delivery response top-level keys: $($deliver.Json.PSObject.Properties.Name -join ', ')" -ForegroundColor Yellow
-        if ($deliver.Json.data) {
-            Write-Host "Delivery response data keys: $($deliver.Json.data.PSObject.Properties.Name -join ', ')" -ForegroundColor Yellow
-        }
+# Step 4: Driver advances the order to DELIVERED (200)
+Write-Host "   Step 4: Driver advances to DELIVERED..." -ForegroundColor Cyan
+foreach ($driverStatus in @("PICKED_UP", "DELIVERED")) {
+    $deliver = Invoke-CurlJson -Method "PUT" -Url "$baseUrl/api/drivers/orders/$orderId/status" -Headers @{
+        Authorization = "Bearer $accessToken"
+    } -Body @{
+        status = $driverStatus
     }
-    Write-Host "❌ Delivery Status Update Failed: $($deliver.Status) $($deliver.Body)" -ForegroundColor Red
-    exit 1
+    $deliveredStatus = Get-OrderStatusFromResponse -ResponseJson $deliver.Json
+    if ($deliver.Status -ne 200 -or $deliveredStatus -ne $driverStatus) {
+        Write-Host "Delivery Status Update response did not match expected status." -ForegroundColor Yellow
+        if ($deliver.Json) {
+            Write-Host "Delivery response top-level keys: $($deliver.Json.PSObject.Properties.Name -join ', ')" -ForegroundColor Yellow
+            if ($deliver.Json.data) {
+                Write-Host "Delivery response data keys: $($deliver.Json.data.PSObject.Properties.Name -join ', ')" -ForegroundColor Yellow
+            }
+        }
+        Write-Host "❌ Delivery Status Update Failed: $($deliver.Status) $($deliver.Body)" -ForegroundColor Red
+        exit 1
+    }
 }
 Write-Host "✅ Order Delivered: $($deliver.Status) - Status: $deliveredStatus" -ForegroundColor Green
 
-# Step 5: Admin verifies final order status (200)
-Write-Host "   Step 5: Admin verifies final status..." -ForegroundColor Cyan
-$admin = Invoke-CurlJson -Method "GET" -Url "$baseUrl/api/orders/$orderId" -Headers @{
-    Authorization = "Bearer $adminToken"
+# Step 5: Owning customer verifies final order status (200)
+Write-Host "   Step 5: Customer verifies final status..." -ForegroundColor Cyan
+$verifiedOrder = Invoke-CurlJson -Method "GET" -Url "$baseUrl/api/orders/$orderId" -Headers @{
+    Authorization = "Bearer $customerToken"
 }
-$adminStatus = Get-OrderStatusFromResponse -ResponseJson $admin.Json
-$adminOrderId = Get-OrderIdFromResponse -ResponseJson $admin.Json
-$adminDriverId = Get-DriverIdFromResponse -ResponseJson $admin.Json
-if ($admin.Status -ne 200 -or $adminStatus -ne "DELIVERED") {
-    Write-Host "Admin verification response did not match expected delivered status." -ForegroundColor Yellow
-    if ($admin.Json) {
-        Write-Host "Admin response top-level keys: $($admin.Json.PSObject.Properties.Name -join ', ')" -ForegroundColor Yellow
-        if ($admin.Json.data) {
-            Write-Host "Admin response data keys: $($admin.Json.data.PSObject.Properties.Name -join ', ')" -ForegroundColor Yellow
+$verifiedStatus = Get-OrderStatusFromResponse -ResponseJson $verifiedOrder.Json
+$verifiedOrderId = Get-OrderIdFromResponse -ResponseJson $verifiedOrder.Json
+$verifiedDriverId = Get-DriverIdFromResponse -ResponseJson $verifiedOrder.Json
+if ($verifiedOrder.Status -ne 200 -or $verifiedStatus -ne "DELIVERED") {
+    Write-Host "Customer verification response did not match expected delivered status." -ForegroundColor Yellow
+    if ($verifiedOrder.Json) {
+        Write-Host "Verification response top-level keys: $($verifiedOrder.Json.PSObject.Properties.Name -join ', ')" -ForegroundColor Yellow
+        if ($verifiedOrder.Json.data) {
+            Write-Host "Verification response data keys: $($verifiedOrder.Json.data.PSObject.Properties.Name -join ', ')" -ForegroundColor Yellow
         }
-        if ($admin.Json.order) {
-            Write-Host "Admin response order keys: $($admin.Json.order.PSObject.Properties.Name -join ', ')" -ForegroundColor Yellow
+        if ($verifiedOrder.Json.order) {
+            Write-Host "Verification response order keys: $($verifiedOrder.Json.order.PSObject.Properties.Name -join ', ')" -ForegroundColor Yellow
         }
     }
-    throw "Admin Verification Failed: $($admin.Status)"
+    throw "Customer Verification Failed: $($verifiedOrder.Status)"
 }
-if ($adminOrderId -and ([string]$adminOrderId) -ne ([string]$orderId)) {
-    throw "Admin Verification Failed: returned orderId does not match created orderId"
+if ($verifiedOrderId -and ([string]$verifiedOrderId) -ne ([string]$orderId)) {
+    throw "Customer Verification Failed: returned orderId does not match created orderId"
 }
-if (-not $adminDriverId) {
-    Write-Host "Admin verification warning: driverId was not present in the response, but order status is DELIVERED." -ForegroundColor Yellow
+if (-not $verifiedDriverId) {
+    Write-Host "Customer verification warning: driverId was not present in the response, but order status is DELIVERED." -ForegroundColor Yellow
 } else {
-    Write-Host "Admin verification driverId detected: $adminDriverId" -ForegroundColor Green
+    Write-Host "Customer verification driverId detected: $verifiedDriverId" -ForegroundColor Green
 }
-Write-Host "✅ Admin Verification: $($admin.Status) - Status: $adminStatus, Driver: $adminDriverId" -ForegroundColor Green
+Write-Host "✅ Customer Verification: $($verifiedOrder.Status) - Status: $verifiedStatus, Driver: $verifiedDriverId" -ForegroundColor Green
 
 # Test 5: System Status Summary
 Write-Host "`n5. System Health Summary..." -ForegroundColor Yellow
@@ -559,4 +561,4 @@ Write-Host "  ✅ Health Check (/api/health)" -ForegroundColor Green
 Write-Host "  ✅ Driver Login (JWT token)" -ForegroundColor Green
 Write-Host "  ✅ RBAC Authentication (401→200)" -ForegroundColor Green
 Write-Host "  ✅ E2E Order Lifecycle (201→200→200→200→200)" -ForegroundColor Green
-Write-Host "  ✅ Admin Verification (DELIVERED + driverId)" -ForegroundColor Green
+Write-Host "  ✅ Customer Ownership Verification (DELIVERED + driverId)" -ForegroundColor Green
