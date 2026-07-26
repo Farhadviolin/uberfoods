@@ -902,8 +902,18 @@ jobs:
         npm ci
         npm run build
 
+    - name: Install restaurant-web dependencies
+      working-directory: ./frontend/restaurant-web
+      run: npm ci
+
+    - name: Run complete restaurant-web typecheck
+      working-directory: ./frontend/restaurant-web
+      run: npm run typecheck
+
+    - name: Run complete restaurant-web Jest suite
+      working-directory: ./frontend/restaurant-web
+      run: npm test -- --runInBand
+
     - name: Build restaurant web
       working-directory: ./frontend/restaurant-web
-      run: |
-        npm ci
-        npm run build
+      run: npm run build

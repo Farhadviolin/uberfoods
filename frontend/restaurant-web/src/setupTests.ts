@@ -1,7 +1,13 @@
 import "@testing-library/jest-dom";
 
+jest.mock("./config", () =>
+  jest.requireActual<typeof import("./test/runtimeConfig")>(
+    "./test/runtimeConfig",
+  ),
+);
+
 // jsdom globals setup for testing
-Object.defineProperty(window, 'TransformStream', {
+Object.defineProperty(window, "TransformStream", {
   writable: true,
   value: class TransformStream {
     constructor() {
@@ -10,19 +16,19 @@ Object.defineProperty(window, 'TransformStream', {
   },
 });
 
-Object.defineProperty(window, 'crypto', {
+Object.defineProperty(window, "crypto", {
   value: {
-    randomUUID: () => '00000000-0000-0000-0000-000000000000',
+    randomUUID: () => "00000000-0000-0000-0000-000000000000",
     getRandomValues: (arr: Uint8Array) => arr.fill(0),
   },
 });
 
-Object.defineProperty(window, 'fetch', {
+Object.defineProperty(window, "fetch", {
   writable: true,
   value: jest.fn(),
 });
 
-Object.defineProperty(window, 'Request', {
+Object.defineProperty(window, "Request", {
   writable: true,
   value: class Request {
     constructor(url: string, options?: any) {
@@ -31,7 +37,7 @@ Object.defineProperty(window, 'Request', {
   },
 });
 
-Object.defineProperty(window, 'Response', {
+Object.defineProperty(window, "Response", {
   writable: true,
   value: class Response {
     constructor(body?: any, options?: any) {

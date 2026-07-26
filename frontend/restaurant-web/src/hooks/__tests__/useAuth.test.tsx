@@ -5,6 +5,7 @@ import { randomUUID } from "crypto";
 import { useAuth, useLogin, useLogout, useRefreshToken } from "../useAuth";
 import { AuthProvider } from "../../contexts/AuthContext";
 import { ToastProvider } from "../../contexts/ToastContext";
+import { config } from "../../config";
 
 // Mock API
 jest.mock("../../utils/api");
@@ -37,6 +38,16 @@ describe("useAuth", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     localStorage.clear();
+  });
+
+  it("uses deterministic config when optional Vite overrides are absent", () => {
+    expect(config).toEqual({
+      apiUrl: "http://localhost:3000",
+      wsUrl: "http://localhost:3000",
+      appName: "UberFoods Restaurant",
+      isDevelopment: true,
+      isProduction: false,
+    });
   });
 
   describe("useAuth", () => {

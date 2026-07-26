@@ -29,16 +29,8 @@ export function KitchenDisplay() {
 
   // Retry-Logik für Status-Updates
   const retryUpdateStatus = useRetry(
-    async ({
-      id,
-      status,
-      version,
-    }: {
-      id: string;
-      status: string;
-      version?: number;
-    }) => {
-      return await updateStatus.mutateAsync({ id, status, version });
+    async ({ id, status }: { id: string; status: string }) => {
+      return await updateStatus.mutateAsync({ id, status });
     },
     { maxRetries: 3, retryDelay: 1000, exponentialBackoff: true },
   );
@@ -125,14 +117,9 @@ export function KitchenDisplay() {
 
   const handleStatusChange = async (orderId: string, newStatus: string) => {
     try {
-      // Hole aktuelle Order-Version für Optimistic Locking
-      const currentOrder = orders.find((o) => o.id === orderId);
-      const version = currentOrder?.version;
-
       await retryUpdateStatus.execute({
         id: orderId,
         status: newStatus,
-        version,
       });
       showToast(`Status geändert`, "success");
     } catch (error: unknown) {

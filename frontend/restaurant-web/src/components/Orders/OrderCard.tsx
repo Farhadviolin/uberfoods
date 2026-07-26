@@ -48,13 +48,13 @@ export function OrderCard({ order }: OrderCardProps) {
       await updateStatus.mutateAsync({
         orderId: order.id,
         status: newStatus,
-        version: order.version,
       });
       showToast(
         `Status auf ${formatOrderStatus(newStatus)} geändert`,
         "success",
       );
     } catch (error: unknown) {
+      setVisibleStatus(order.status);
       try {
         localStorage.setItem(storageKey, order.status);
       } catch {
@@ -218,7 +218,7 @@ export function OrderCard({ order }: OrderCardProps) {
                     fontSize: "var(--fb-font-size-sm)",
                     padding: "6px 12px",
                   }}
-                  >
+                >
                   Bereit
                 </button>
               )}
@@ -266,7 +266,7 @@ export function OrderCard({ order }: OrderCardProps) {
                     fontSize: "var(--fb-font-size-sm)",
                     padding: "6px 12px",
                   }}
-                  >
+                >
                   Fertig
                 </button>
               )}
