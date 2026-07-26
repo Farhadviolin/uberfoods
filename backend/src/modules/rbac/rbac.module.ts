@@ -1,8 +1,9 @@
 import { Module } from "@nestjs/common";
+import { DatabaseModule } from "../../common/database/database.module";
 import { RbacService } from "./rbac.service";
 
 @Module({
-  imports: [],
+  imports: [DatabaseModule],
   controllers: [],
   providers: [RbacService],
   exports: [RbacService],

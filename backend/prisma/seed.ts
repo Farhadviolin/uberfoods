@@ -2,6 +2,11 @@ import { PrismaClient } from '@prisma/client';
 import { seedTierConfigs } from './seed-tier-configs';
 import * as bcrypt from 'bcrypt';
 
+// eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/no-var-requires -- Keep the shared seed directly executable as CommonJS.
+const { seedRBAC } = require('./seed-rbac.js') as {
+  seedRBAC: (client: PrismaClient) => Promise<void>;
+};
+
 const databaseUrl = process.env.DATABASE_URL;
 if (!databaseUrl) {
   throw new Error('DATABASE_URL environment variable is not set!');
@@ -283,7 +288,7 @@ async function main() {
   // Erstelle Admin-Benutzer für E2E Tests
   const adminPassword = 'admin123';
   const hashedAdminPassword = await bcrypt.hash(adminPassword, 10);
-  const admin = await prisma.admin.upsert({
+  await prisma.admin.upsert({
     where: { email: 'admin@uberfoods.com' },
     update: {},
     create: {
@@ -295,6 +300,8 @@ async function main() {
   });
 
   console.log('✅ Admin user created for E2E tests');
+
+  await seedRBAC(prisma);
 
   // Seed Tier Configs
   await seedTierConfigs();

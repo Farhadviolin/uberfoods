@@ -1,27 +1,7 @@
 // Lade .env Datei
 require('dotenv').config({ path: require('path').join(__dirname, '..', '.env') });
 
-const { PrismaClient } = require('@prisma/client');
-const { Pool } = require('pg');
-const { PrismaPg } = require('@prisma/adapter-pg');
-
-// Erstelle Prisma Client mit Adapter (wie in PrismaService)
-const databaseUrl = process.env.DATABASE_URL;
-
-if (!databaseUrl) {
-  console.error('❌ DATABASE_URL environment variable is not set!');
-  process.exit(1);
-}
-
-const pool = new Pool({ connectionString: databaseUrl });
-const adapter = new PrismaPg(pool);
-
-const prisma = new PrismaClient({
-  adapter,
-  log: ['error', 'warn'],
-});
-
-async function seedRBAC() {
+async function seedRBAC(prisma) {
   console.log('🌱 Seeding RBAC data...');
 
   // Create default permissions
@@ -199,25 +179,17 @@ async function seedRBAC() {
 
   let createdCount = 0;
   for (const perm of permissions) {
-    try {
-      await prisma.permission.upsert({
-        where: {
-          resource_action: {
-            resource: perm.resource,
-            action: perm.action,
-          },
+    await prisma.permission.upsert({
+      where: {
+        resource_action: {
+          resource: perm.resource,
+          action: perm.action,
         },
-        update: {},
-        create: perm,
-      });
-      createdCount++;
-    } catch (error) {
-      if (error.code === 'P2002' || error.message?.includes('Unique constraint')) {
-        // Permission already exists, skip
-        continue;
-      }
-      console.warn(`⚠️  Failed to create permission ${perm.resource}:${perm.action}:`, error.message);
-    }
+      },
+      update: { description: perm.description },
+      create: perm,
+    });
+    createdCount++;
   }
 
   console.log(`✅ Created/Updated ${createdCount} permissions`);
@@ -300,51 +272,51 @@ async function seedRBAC() {
   ];
 
   for (const role of roles) {
-    try {
-      // Check if role exists
-      const existingRole = await prisma.role.findUnique({
-        where: { name: role.name },
-      });
-
-      if (existingRole) {
-        // Update existing role
-        await prisma.role.update({
-          where: { name: role.name },
-          data: {
-            description: role.description,
-            permissions: role.permissions,
-          },
-        });
-        console.log(`✅ Updated role: ${role.name}`);
-      } else {
-        // Create new role
-        await prisma.role.create({
-          data: {
-            name: role.name,
-            description: role.description,
-            permissions: role.permissions,
-          },
-        });
-        console.log(`✅ Created role: ${role.name}`);
-      }
-    } catch (error) {
-      console.error(`❌ Failed to create/update role ${role.name}:`, error.message);
-      console.error('Error details:', error);
-    }
+    await prisma.role.upsert({
+      where: { name: role.name },
+      update: {
+        description: role.description,
+        permissions: role.permissions,
+      },
+      create: role,
+    });
+    console.log(`✅ Created/Updated role: ${role.name}`);
   }
 
   console.log('✅ RBAC seeding completed!');
 }
 
-seedRBAC()
-  .catch((e) => {
+async function runStandaloneSeed() {
+  const { PrismaClient } = require('@prisma/client');
+  const { Pool } = require('pg');
+  const { PrismaPg } = require('@prisma/adapter-pg');
+  const databaseUrl = process.env.DATABASE_URL;
+
+  if (!databaseUrl) {
+    throw new Error('DATABASE_URL environment variable is not set!');
+  }
+
+  const pool = new Pool({ connectionString: databaseUrl });
+  const adapter = new PrismaPg(pool);
+  const prisma = new PrismaClient({
+    adapter,
+    log: ['error', 'warn'],
+  });
+
+  try {
+    await seedRBAC(prisma);
+  } finally {
+    await prisma.$disconnect();
+    await pool.end();
+  }
+}
+
+module.exports = { seedRBAC, runStandaloneSeed };
+
+if (require.main === module) {
+  runStandaloneSeed().catch((e) => {
     console.error('❌ Error seeding RBAC:', e);
     process.exit(1);
-  })
-  .finally(async () => {
-    await prisma.$disconnect();
-    if (pool) {
-      await pool.end();
-    }
   });
+}
 

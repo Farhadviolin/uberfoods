@@ -15,12 +15,13 @@ describe("P0 order authorization and atomic driver claim over HTTP", () => {
   let prisma: PrismaService;
   let seed: Awaited<ReturnType<typeof seedData>>;
   let customerAToken: string;
-  let customerBToken: string;
   let restaurantAToken: string;
   let restaurantBToken: string;
   let driverAToken: string;
   let driverBToken: string;
   let adminToken: string;
+  let moderatorToken: string;
+  let supportToken: string;
   let superAdminToken: string;
 
   beforeAll(async () => {
@@ -63,12 +64,14 @@ describe("P0 order authorization and atomic driver claim over HTTP", () => {
 
     [
       customerAToken,
-      customerBToken,
+      ,
       restaurantAToken,
       restaurantBToken,
       driverAToken,
       driverBToken,
       adminToken,
+      moderatorToken,
+      supportToken,
     ] = await Promise.all([
       login("/api/auth/customer/login", seed.customerA.email),
       login("/api/auth/customer/login", seed.customerB.email),
@@ -77,6 +80,8 @@ describe("P0 order authorization and atomic driver claim over HTTP", () => {
       login("/api/auth/driver/login", seed.driverA.email),
       login("/api/auth/driver/login", seed.driverB.email),
       login("/api/auth/login", seed.admin.email, { userType: "admin" }),
+      login("/api/auth/login", seed.moderator.email, { userType: "admin" }),
+      login("/api/auth/login", seed.support.email, { userType: "admin" }),
     ]);
 
     superAdminToken = app.get(JwtService).sign({
@@ -156,6 +161,82 @@ describe("P0 order authorization and atomic driver claim over HTTP", () => {
       .get(`/api/orders/${seed.customerOwn.id}`)
       .set("Authorization", bearer(superAdminToken))
       .expect(200);
+  });
+
+  it("uses persisted RBAC permissions only on the administrative order route", async () => {
+    const adminOrders = await request(app.getHttpServer())
+      .get("/api/admin/orders?limit=50")
+      .set("Authorization", bearer(adminToken))
+      .expect(200);
+    expect(extractAdminOrderIds(adminOrders.body)).toContain(
+      seed.customerOwn.id,
+    );
+
+    await request(app.getHttpServer())
+      .get("/api/orders?limit=50")
+      .set("Authorization", bearer(adminToken))
+      .expect(403);
+
+    await request(app.getHttpServer())
+      .get("/api/admin/orders?limit=50")
+      .set("Authorization", bearer(moderatorToken))
+      .expect(200);
+    await request(app.getHttpServer())
+      .get("/api/admin/orders?limit=50")
+      .set("Authorization", bearer(supportToken))
+      .expect(200);
+  });
+
+  it("keeps actor order lists scoped and rejects non-admin actors on the admin route", async () => {
+    const customerOrders = await request(app.getHttpServer())
+      .get("/api/orders?limit=100")
+      .set("Authorization", bearer(customerAToken))
+      .expect(200);
+    expect(extractActorOrderIds(customerOrders.body)).toContain(
+      seed.customerOwn.id,
+    );
+    expect(extractActorOrderIds(customerOrders.body)).not.toContain(
+      seed.customerForeign.id,
+    );
+
+    const restaurantOrders = await request(app.getHttpServer())
+      .get("/api/orders?limit=100")
+      .set("Authorization", bearer(restaurantAToken))
+      .expect(200);
+    expect(extractActorOrderIds(restaurantOrders.body)).toContain(
+      seed.restaurantFlow.id,
+    );
+    expect(extractActorOrderIds(restaurantOrders.body)).not.toContain(
+      seed.customerForeign.id,
+    );
+
+    const driverOrders = await request(app.getHttpServer())
+      .get("/api/orders?limit=100")
+      .set("Authorization", bearer(driverAToken))
+      .expect(200);
+    expect(extractActorOrderIds(driverOrders.body)).toContain(
+      seed.driverFlow.id,
+    );
+    expect(extractActorOrderIds(driverOrders.body)).not.toContain(
+      seed.driverForeign.id,
+    );
+
+    for (const token of [customerAToken, restaurantAToken, driverAToken]) {
+      await request(app.getHttpServer())
+        .get("/api/admin/orders?limit=50")
+        .set("Authorization", bearer(token))
+        .set("x-user-role", "ADMIN")
+        .send({ role: "ADMIN" })
+        .expect(403);
+    }
+
+    await request(app.getHttpServer())
+      .get("/api/admin/orders?limit=50")
+      .expect(401);
+    await request(app.getHttpServer())
+      .get("/api/admin/orders?limit=50")
+      .set("Authorization", "Bearer invalid-token")
+      .expect(401);
   });
 
   it("rejects every customer attempt to use the general status route", async () => {
@@ -465,13 +546,29 @@ describe("P0 order authorization and atomic driver claim over HTTP", () => {
           },
         }),
       ]);
-    const [admin, superAdmin] = await Promise.all([
+    const [admin, moderator, support, superAdmin] = await Promise.all([
       prisma.admin.create({
         data: {
           email: `${prefix}-admin-${suffix}@example.test`,
           password: passwordHash,
           name: "P0 Admin",
           role: AdminRole.ADMIN,
+        },
+      }),
+      prisma.admin.create({
+        data: {
+          email: `${prefix}-moderator-${suffix}@example.test`,
+          password: passwordHash,
+          name: "P0 Moderator",
+          role: AdminRole.MODERATOR,
+        },
+      }),
+      prisma.admin.create({
+        data: {
+          email: `${prefix}-support-${suffix}@example.test`,
+          password: passwordHash,
+          name: "P0 Support",
+          role: AdminRole.SUPPORT,
         },
       }),
       prisma.admin.create({
@@ -565,6 +662,8 @@ describe("P0 order authorization and atomic driver claim over HTTP", () => {
       driverA,
       driverB,
       admin,
+      moderator,
+      support,
       superAdmin,
       customerOwn,
       customerForeign,
@@ -668,4 +767,24 @@ function bearer(token: string): string {
 
 function unwrap(body: any): any {
   return body?.data ?? body;
+}
+
+function extractAdminOrderIds(body: any): string[] {
+  const payload = unwrap(body);
+  const orders = payload?.orders ?? payload?.data?.orders ?? [];
+  return Array.isArray(orders)
+    ? orders.map((order: { id?: string }) => order.id).filter(Boolean)
+    : [];
+}
+
+function extractActorOrderIds(body: any): string[] {
+  const payload = unwrap(body);
+  const orders = Array.isArray(payload)
+    ? payload
+    : Array.isArray(payload?.data)
+      ? payload.data
+      : [];
+  return orders
+    .map((order: { id?: string }) => order.id)
+    .filter((id: string | undefined): id is string => Boolean(id));
 }
