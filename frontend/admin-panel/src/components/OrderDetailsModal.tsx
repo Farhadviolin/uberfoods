@@ -8,22 +8,22 @@ interface Order {
   id: string;
   status: string;
   totalAmount: number;
-  address: string;
-  phone: string;
-  notes: string;
+  address?: string | null;
+  phone?: string | null;
+  notes?: string | null;
   createdAt: string;
   customer: {
     id: string;
-    name: string;
-    email: string;
-  };
+    name?: string | null;
+    email?: string | null;
+  } | null;
   restaurant: {
     id: string;
-    name: string;
-  };
+    name?: string | null;
+  } | null;
   driver: {
     id: string;
-    name: string;
+    name?: string | null;
   } | null;
   items: Array<{
     dish: {
@@ -38,6 +38,10 @@ interface Order {
 
 function getOrderItems(order: Order) {
   return Array.isArray(order.items) ? order.items : [];
+}
+
+function getAvailableText(value?: string | null) {
+  return value?.trim() || 'Nicht verfügbar';
 }
 
 interface OrderDetailsModalProps {
@@ -118,32 +122,32 @@ function OrderDetailsModalInner({
           <div className="info-grid">
             <div className="info-item">
               <strong>Name:</strong>
-              <span>{order.customer.name}</span>
+              <span>{getAvailableText(order.customer?.name)}</span>
             </div>
             <div className="info-item">
               <strong>E-Mail:</strong>
-              <span>{order.customer.email}</span>
+              <span>{getAvailableText(order.customer?.email)}</span>
             </div>
             <div className="info-item">
               <strong>Telefon:</strong>
-              <span>{order.phone}</span>
+              <span>{getAvailableText(order.phone)}</span>
             </div>
             <div className="info-item">
               <strong>Adresse:</strong>
-              <span>{order.address}</span>
+              <span>{getAvailableText(order.address)}</span>
             </div>
           </div>
         </div>
 
         <div className="order-details-section">
           <h3>Restaurant</h3>
-          <p>{order.restaurant.name}</p>
+          <p>{getAvailableText(order.restaurant?.name)}</p>
         </div>
 
         {order.driver && (
           <div className="order-details-section">
             <h3>Fahrer</h3>
-            <p>{order.driver.name}</p>
+            <p>{getAvailableText(order.driver.name)}</p>
           </div>
         )}
 

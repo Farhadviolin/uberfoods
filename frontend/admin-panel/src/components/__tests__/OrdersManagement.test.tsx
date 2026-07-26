@@ -17,6 +17,12 @@ const mockOrders = [
     restaurant: { id: 'r2', name: 'Burger Joint' }, driver: { id: 'd1', name: 'Driver One' },
     items: [],
   },
+  {
+    id: 'order-3', status: 'PENDING', totalAmount: 12, address: '', phone: '',
+    createdAt: '2026-07-23T10:00:00Z', customer: { id: 'c3' },
+    restaurant: { id: 'r3' }, driver: { id: 'd2' },
+    items: [],
+  },
 ];
 
 jest.mock('../../hooks/useOrders', () => ({
@@ -70,5 +76,17 @@ describe('OrdersManagement', () => {
     render(<OrdersManagement />);
     expect(screen.getByText('Live')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Export/ })).toBeEnabled();
+  });
+
+  it('opens incomplete order details without inventing missing customer or assignment data', () => {
+    render(<OrdersManagement />);
+
+    fireEvent.click(screen.getByRole('heading', { name: 'Bestellung #order-3' }));
+
+    expect(screen.getAllByRole('heading', { name: 'Bestellung #order-3' })).toHaveLength(2);
+    expect(screen.getAllByText('Nicht verfügbar').length).toBeGreaterThanOrEqual(5);
+    expect(screen.getByText('Unknown customer')).toBeInTheDocument();
+    expect(screen.getByText('Unassigned')).toBeInTheDocument();
+    expect(screen.getByText('Order ID: order-3')).toBeInTheDocument();
   });
 });

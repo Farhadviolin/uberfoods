@@ -11,11 +11,22 @@ interface DriverExportProps {
   onClose: () => void;
 }
 
+type ExportFormat = 'csv' | 'excel' | 'pdf';
+type ExportType = 'basic' | 'detailed' | 'full';
+
+function isExportFormat(value: string): value is ExportFormat {
+  return value === 'csv' || value === 'excel' || value === 'pdf';
+}
+
+function isExportType(value: string): value is ExportType {
+  return value === 'basic' || value === 'detailed' || value === 'full';
+}
+
 export function DriverExport({ driverIds, onClose }: DriverExportProps) {
   const { showToast } = useToast();
   const { hasPermission } = usePermissions();
-  const [exportFormat, setExportFormat] = useState<'csv' | 'excel' | 'pdf'>('csv');
-  const [exportType, setExportType] = useState<'basic' | 'detailed' | 'full'>('basic');
+  const [exportFormat, setExportFormat] = useState<ExportFormat>('csv');
+  const [exportType, setExportType] = useState<ExportType>('basic');
   const [includeData, setIncludeData] = useState({
     profile: true,
     earnings: true,
@@ -56,7 +67,8 @@ export function DriverExport({ driverIds, onClose }: DriverExportProps) {
       if (!(response.data instanceof Blob)) {
         throw new Error('Ungültige Datei-Antwort');
       }
-      const contentType = response.headers?.['content-type'] || '';
+      const contentTypeHeader = response.headers?.['content-type'];
+      const contentType = typeof contentTypeHeader === 'string' ? contentTypeHeader : '';
       const allowedTypes = [
         'application/pdf',
         'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
@@ -71,9 +83,7 @@ export function DriverExport({ driverIds, onClose }: DriverExportProps) {
       if (!/^blob:/i.test(blobUrl)) {
         throw new Error('Unsichere Blob-URL erzeugt');
       }
-      // Validate exportFormat to prevent injection
-      const safeFormat = ['pdf', 'excel', 'csv'].includes(exportFormat) ? exportFormat : 'csv';
-      const extension = safeFormat === 'pdf' ? 'pdf' : safeFormat === 'excel' ? 'xlsx' : 'csv';
+      const extension = exportFormat === 'pdf' ? 'pdf' : exportFormat === 'excel' ? 'xlsx' : 'csv';
       const link = document.createElement('a');
       link.href = blobUrl;
       // Create safe filename with only alphanumeric characters and date
@@ -122,7 +132,14 @@ export function DriverExport({ driverIds, onClose }: DriverExportProps) {
       <div className="export-options">
         <div className="option-group">
           <label>Format:</label>
-          <select value={exportFormat} onChange={(e) => setExportFormat(e.target.value as any)}>
+          <select
+            value={exportFormat}
+            onChange={(e) => {
+              if (isExportFormat(e.target.value)) {
+                setExportFormat(e.target.value);
+              }
+            }}
+          >
             <option value="csv">CSV</option>
             <option value="excel">Excel (XLSX)</option>
             <option value="pdf">PDF</option>
@@ -131,7 +148,14 @@ export function DriverExport({ driverIds, onClose }: DriverExportProps) {
 
         <div className="option-group">
           <label>Typ:</label>
-          <select value={exportType} onChange={(e) => setExportType(e.target.value as any)}>
+          <select
+            value={exportType}
+            onChange={(e) => {
+              if (isExportType(e.target.value)) {
+                setExportType(e.target.value);
+              }
+            }}
+          >
             <option value="basic">Basis</option>
             <option value="detailed">Detailliert</option>
             <option value="full">Vollständig</option>
