@@ -31,6 +31,35 @@ interface ChurnPreventionAction {
   cost: number; // Geschätzte Kosten in €
 }
 
+interface DriverCommissionTransaction {
+  driverCommission: number;
+  createdAt: Date;
+}
+
+export function calculateEarningsVolatility(
+  transactions: readonly DriverCommissionTransaction[],
+): number {
+  if (transactions.length === 0) {
+    return 0;
+  }
+
+  const dailyEarnings: Record<string, number> = {};
+  for (const transaction of transactions) {
+    const day = transaction.createdAt.toISOString().split("T")[0];
+    dailyEarnings[day] =
+      (dailyEarnings[day] || 0) + transaction.driverCommission;
+  }
+
+  const earnings = Object.values(dailyEarnings);
+  const mean =
+    earnings.reduce((sum, value) => sum + value, 0) / earnings.length;
+  const variance =
+    earnings.reduce((sum, value) => sum + Math.pow(value - mean, 2), 0) /
+    earnings.length;
+
+  return Math.sqrt(variance);
+}
+
 @Injectable()
 export class ChurnPredictionService {
   private readonly logger = new Logger(ChurnPredictionService.name);
@@ -491,28 +520,10 @@ export class ChurnPredictionService {
         driverId,
         createdAt: { gte: thirtyDaysAgo },
       },
-      select: { commissionAmount: true, createdAt: true },
+      select: { driverCommission: true, createdAt: true },
     });
 
-    if (transactions.length === 0) {
-      return { volatility: 0 };
-    }
-
-    // Berechne Standardabweichung der täglichen Einnahmen
-    const dailyEarnings = transactions.reduce((acc, transaction) => {
-      const day = transaction.createdAt.toISOString().split("T")[0];
-      acc[day] = (acc[day] || 0) + transaction.commissionAmount;
-      return acc;
-    }, {});
-
-    const earnings = Object.values(dailyEarnings) as number[];
-    const mean = earnings.reduce((sum, val) => sum + val, 0) / earnings.length;
-    const variance =
-      earnings.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) /
-      earnings.length;
-    const volatility = Math.sqrt(variance);
-
-    return { volatility };
+    return { volatility: calculateEarningsVolatility(transactions) };
   }
 
   private async getSupportTickets(driverId: string) {

@@ -1,5 +1,35 @@
 import { Injectable, Logger } from "@nestjs/common";
+import { Prisma, SubscriptionTier } from "@prisma/client";
 import { PrismaService } from "../../prisma/prisma.service";
+
+interface SubscriptionTierReference {
+  tier: SubscriptionTier;
+}
+
+interface SubscriptionTierPrice {
+  tier: SubscriptionTier;
+  price: number;
+}
+
+export function calculateSubscriptionRevenue(
+  subscriptions: readonly SubscriptionTierReference[],
+  tierPrices: readonly SubscriptionTierPrice[],
+): number {
+  const priceByTier = new Map(
+    tierPrices.map((tierConfig) => [tierConfig.tier, tierConfig.price]),
+  );
+
+  return subscriptions.reduce((total, subscription) => {
+    const price = priceByTier.get(subscription.tier);
+    if (price === undefined) {
+      throw new Error(
+        `Missing subscription tier price for ${subscription.tier}`,
+      );
+    }
+
+    return total + price;
+  }, 0);
+}
 
 interface CohortAnalysis {
   cohortId: string; // z.B. "2024-W01" oder "2024-01"
@@ -346,12 +376,9 @@ export class AdvancedAnalyticsService {
     const [revenueData, orderData, earningsData, upgradeData] =
       await Promise.all([
         // Revenue von Subscriptions
-        this.prisma.driverSubscription.aggregate({
-          where: {
-            driverId: { in: driverIds },
-            currentPeriodStart: { gte: acquisitionDate, lte: sixMonthsLater },
-          },
-          _sum: { price: true },
+        this.getSubscriptionRevenue({
+          driverId: { in: driverIds },
+          currentPeriodStart: { gte: acquisitionDate, lte: sixMonthsLater },
         }),
 
         // Order-Daten
@@ -370,7 +397,7 @@ export class AdvancedAnalyticsService {
             driverId: { in: driverIds },
             createdAt: { gte: acquisitionDate, lte: sixMonthsLater },
           },
-          _sum: { commissionAmount: true },
+          _sum: { driverCommission: true },
         }),
 
         // Upgrade-Daten
@@ -383,9 +410,9 @@ export class AdvancedAnalyticsService {
         }),
       ]);
 
-    const totalRevenue = revenueData._sum.price || 0;
+    const totalRevenue = revenueData;
     const totalOrders = orderData._count;
-    const totalEarnings = earningsData._sum.commissionAmount || 0;
+    const totalEarnings = earningsData._sum.driverCommission || 0;
 
     return {
       totalRevenue,
@@ -450,15 +477,10 @@ export class AdvancedAnalyticsService {
     const sixMonthsLater = new Date(acquisitionDate);
     sixMonthsLater.setMonth(sixMonthsLater.getMonth() + 6);
 
-    const historicalRevenue = await this.prisma.driverSubscription.aggregate({
-      where: {
-        driverId: { in: driverIds },
-        currentPeriodStart: { gte: acquisitionDate, lte: sixMonthsLater },
-      },
-      _sum: { price: true },
+    const historicalLTV = await this.getSubscriptionRevenue({
+      driverId: { in: driverIds },
+      currentPeriodStart: { gte: acquisitionDate, lte: sixMonthsLater },
     });
-
-    const historicalLTV = historicalRevenue._sum.price || 0;
 
     // Vereinfachte Vorhersage (würde ML-Modell verwenden)
     const predictedLTV = historicalLTV * 1.5; // 50% mehr für zukünftige Monate
@@ -570,29 +592,41 @@ export class AdvancedAnalyticsService {
     const sixMonthsAgo = new Date(Date.now() - 6 * 30 * 24 * 60 * 60 * 1000);
 
     const [subscriptionRevenue, commissionEarnings] = await Promise.all([
-      this.prisma.driverSubscription.aggregate({
-        where: {
-          driverId,
-          currentPeriodStart: { gte: sixMonthsAgo },
-        },
-        _sum: { price: true },
+      this.getSubscriptionRevenue({
+        driverId,
+        currentPeriodStart: { gte: sixMonthsAgo },
       }),
       this.prisma.commissionTransaction.aggregate({
         where: {
           driverId,
           createdAt: { gte: sixMonthsAgo },
         },
-        _sum: { commissionAmount: true },
+        _sum: { driverCommission: true },
       }),
     ]);
 
     return {
-      subscriptionRevenue: subscriptionRevenue._sum.price || 0,
-      commissionEarnings: commissionEarnings._sum.commissionAmount || 0,
+      subscriptionRevenue,
+      commissionEarnings: commissionEarnings._sum.driverCommission || 0,
       totalValue:
-        (subscriptionRevenue._sum.price || 0) +
-        (commissionEarnings._sum.commissionAmount || 0),
+        subscriptionRevenue + (commissionEarnings._sum.driverCommission || 0),
     };
+  }
+
+  private async getSubscriptionRevenue(
+    where: Prisma.DriverSubscriptionWhereInput,
+  ): Promise<number> {
+    const [subscriptions, tierPrices] = await Promise.all([
+      this.prisma.driverSubscription.findMany({
+        where,
+        select: { tier: true },
+      }),
+      this.prisma.subscriptionTierConfig.findMany({
+        select: { tier: true, price: true },
+      }),
+    ]);
+
+    return calculateSubscriptionRevenue(subscriptions, tierPrices);
   }
 
   private async getSubscriptionData(driverId: string): Promise<any> {

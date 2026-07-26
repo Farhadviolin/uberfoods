@@ -1,4 +1,5 @@
 import { Injectable, Logger } from "@nestjs/common";
+import type { Prisma } from "@prisma/client";
 import { PrismaService } from "../../prisma/prisma.service";
 import { ChurnPredictionService } from "./churn-prediction.service";
 import { IntelligentTierService } from "./intelligent-tier.service";
@@ -72,6 +73,19 @@ interface AutomationResult {
     confidence: number;
     expectedImpact: number;
     actualImpact?: number;
+  };
+}
+
+export function createAutomationRecommendation(
+  ruleId: string,
+  actionsExecuted: number,
+  timestamp: Date,
+): Prisma.InputJsonObject {
+  return {
+    type: "automation_rule",
+    ruleId,
+    actionsExecuted,
+    timestamp: timestamp.toISOString(),
   };
 }
 
@@ -850,12 +864,7 @@ export class IntelligentLifecycleService {
         costSavings: 0,
         roi: 0,
         recommendations: [
-          {
-            type: "automation_rule",
-            ruleId,
-            actionsExecuted: actions.length,
-            timestamp: new Date(),
-          },
+          createAutomationRecommendation(ruleId, actions.length, new Date()),
         ],
       },
     });

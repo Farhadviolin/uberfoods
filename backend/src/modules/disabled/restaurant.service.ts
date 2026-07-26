@@ -25,7 +25,7 @@ interface OperatingHours {
   };
 }
 
-interface DeliveryZone {
+export interface DeliveryZone {
   id?: string;
   name: string;
   coordinates: Array<{ lat: number; lng: number }>;

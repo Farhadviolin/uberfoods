@@ -1,4 +1,5 @@
 import { Injectable, Logger } from "@nestjs/common";
+import type { Prisma } from "@prisma/client";
 import { PrismaService } from "../../prisma/prisma.service";
 import { SubscriptionEmailService } from "./subscription-email.service";
 import { ChurnPredictionService } from "./churn-prediction.service";
@@ -97,6 +98,47 @@ interface CampaignResult {
   clickedAt?: Date;
   convertedAt?: Date;
   goalAchieved: boolean;
+}
+
+interface BehavioralEmailTemplateValues {
+  driverName: string;
+  currentTier: string;
+  recommendedTier: string;
+  expectedEarningsIncrease: number;
+  averageRating: string;
+  onTimeRate: string;
+  churnRisk: number;
+  daysLeft: string;
+}
+
+export function createBehavioralEmailReplacements(
+  values: BehavioralEmailTemplateValues,
+): Record<string, string> {
+  return {
+    "{{driverName}}": values.driverName,
+    "{{currentTier}}": values.currentTier,
+    "{{recommendedTier}}": values.recommendedTier,
+    "{{earningsIncrease}}": Math.round(
+      values.expectedEarningsIncrease,
+    ).toString(),
+    "{{avgRating}}": values.averageRating,
+    "{{onTimeRate}}": values.onTimeRate,
+    "{{churnRisk}}": Math.round(values.churnRisk * 100).toString(),
+    "{{daysLeft}}": values.daysLeft,
+  };
+}
+
+export function createCampaignRecommendation(
+  campaignId: string,
+  status: string,
+  sentAt: Date,
+): Prisma.InputJsonObject {
+  return {
+    type: "email_campaign",
+    campaignId,
+    status,
+    sentAt: sentAt.toISOString(),
+  };
 }
 
 @Injectable()
@@ -520,18 +562,16 @@ export class BehavioralEmailService {
     let personalizedContent = JSON.parse(JSON.stringify(content));
 
     // Ersetze Platzhalter
-    const replacements = {
-      "{{driverName}}": driver.name?.split(" ")[0] || "Fahrer",
-      "{{currentTier}}": profile.subscriptionTier,
-      "{{recommendedTier}}": tierRecommendation.recommendedTier,
-      "{{earningsIncrease}}": Math.round(
-        tierRecommendation.expectedEarningsIncrease,
-      ),
-      "{{avgRating}}": "4.8", // Würde aus Performance kommen
-      "{{onTimeRate}}": "95", // Würde aus Performance kommen
-      "{{churnRisk}}": Math.round(profile.churnRisk * 100),
-      "{{daysLeft}}": "3", // Für Trial-Ending
-    };
+    const replacements = createBehavioralEmailReplacements({
+      driverName: driver.name?.split(" ")[0] || "Fahrer",
+      currentTier: profile.subscriptionTier,
+      recommendedTier: tierRecommendation.recommendedTier,
+      expectedEarningsIncrease: tierRecommendation.expectedEarningsIncrease,
+      averageRating: "4.8", // Würde aus Performance kommen
+      onTimeRate: "95", // Würde aus Performance kommen
+      churnRisk: profile.churnRisk,
+      daysLeft: "3", // Für Trial-Ending
+    });
 
     // Rekursiv durch Object ersetzen
     personalizedContent = this.replacePlaceholders(
@@ -608,12 +648,7 @@ export class BehavioralEmailService {
         costSavings: 0,
         roi: 0,
         recommendations: [
-          {
-            type: "email_campaign",
-            campaignId,
-            status,
-            sentAt: new Date(),
-          },
+          createCampaignRecommendation(campaignId, status, new Date()),
         ],
       },
     });

@@ -105,6 +105,14 @@ jobs:
       working-directory: ./backend
       run: npx prisma generate --schema=./prisma/schema.prisma
 
+    - name: Run complete backend lint
+      working-directory: ./backend
+      run: npm run lint:check
+
+    - name: Run complete backend typecheck
+      working-directory: ./backend
+      run: npm run typecheck
+
     - name: Run database migrations
       working-directory: ./backend
       run: npx prisma migrate deploy --schema=./prisma/schema.prisma
