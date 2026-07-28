@@ -8,7 +8,9 @@ services:
     volumes:
       - postgres-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U uberfoods -d uberfoods"]
+      # The maintenance database exists throughout initdb. The verifier checks
+      # the application database and schema explicitly after this bootstrap gate.
+      test: ["CMD-SHELL", "pg_isready -U uberfoods -d postgres"]
       interval: 5s
       timeout: 5s
       retries: 24
@@ -77,7 +79,13 @@ services:
     ports:
       - "127.0.0.1:${PROD_SIM_BACKEND_PORT:?set by verifier}:3000"
     healthcheck:
-      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/api/health', r => process.exit(r.statusCode === 200 ? 0 : 1))"]
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "require('http').get('http://localhost:3000/api/health', r => process.exit(r.statusCode === 200 ? 0 : 1))",
+        ]
       interval: 5s
       timeout: 5s
       retries: 24
@@ -102,7 +110,13 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.frontend
-      args: { APP_NAME: admin-panel, VITE_API_BASE_URL: /api, VITE_API_URL: /api, VITE_WS_URL: /socket.io }
+      args:
+        {
+          APP_NAME: admin-panel,
+          VITE_API_BASE_URL: /api,
+          VITE_API_URL: /api,
+          VITE_WS_URL: /socket.io,
+        }
     ports: ["127.0.0.1:${PROD_SIM_ADMIN_PORT:?set by verifier}:80"]
 
   restaurant-web:
@@ -110,7 +124,13 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.frontend
-      args: { APP_NAME: restaurant-web, VITE_API_BASE_URL: /api, VITE_API_URL: /api, VITE_WS_URL: /socket.io }
+      args:
+        {
+          APP_NAME: restaurant-web,
+          VITE_API_BASE_URL: /api,
+          VITE_API_URL: /api,
+          VITE_WS_URL: /socket.io,
+        }
     ports: ["127.0.0.1:${PROD_SIM_RESTAURANT_PORT:?set by verifier}:80"]
 
   driver-web:
@@ -118,7 +138,13 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.frontend
-      args: { APP_NAME: driver-app, VITE_API_BASE_URL: /api, VITE_API_URL: /api, VITE_WS_URL: /socket.io }
+      args:
+        {
+          APP_NAME: driver-app,
+          VITE_API_BASE_URL: /api,
+          VITE_API_URL: /api,
+          VITE_WS_URL: /socket.io,
+        }
     ports: ["127.0.0.1:${PROD_SIM_DRIVER_PORT:?set by verifier}:80"]
 
 volumes:

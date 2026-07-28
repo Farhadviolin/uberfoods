@@ -205,7 +205,10 @@ function run(
   const output = `${result.stdout ?? ""}${result.stderr ?? ""}`;
   if (evidence) {
     const artifactFile = `commands/${String(evidenceStep).replace(/[^a-z0-9_-]/gi, "_")}-${Date.now()}.log`;
-    evidence.write(artifactFile, sanitize(output));
+    evidence.write(
+      artifactFile,
+      output ? sanitize(output) : "[command completed without output]\n",
+    );
     evidence.events({
       phase: evidencePhase,
       step: evidenceStep,
@@ -268,18 +271,92 @@ function postgresIdentity(environment) {
   );
   if (!mount?.Name) fail("PostgreSQL named data volume is missing");
   const volume = inspectJson("volume", mount.Name);
+  const volumeIdentity = sha256({
+    name: mount.Name,
+    createdAt: volume.CreatedAt,
+    driver: volume.Driver,
+    mountpoint: volume.Mountpoint,
+    labels: volume.Labels,
+  });
   return {
     containerId,
     containerName: String(container.Name ?? "").replace(/^\//, ""),
     healthy: container.State?.Health?.Status === "healthy",
+    startedAt: container.State?.StartedAt,
+    finishedAt: container.State?.FinishedAt,
     volumeName: mount.Name,
     volumeCreatedAt: volume.CreatedAt,
+    volumeIdentity,
+  };
+}
+
+function namespaceResourceSnapshot() {
+  const filters = [`label=com.docker.compose.project=${project}`];
+  const list = (type, extraArgs = []) =>
+    run(
+      "docker",
+      [
+        type,
+        "ls",
+        "--quiet",
+        ...filters.flatMap((filter) => ["--filter", filter]),
+        ...extraArgs,
+      ],
+      { quiet: true },
+    )
+      .output.split(/\r?\n/)
+      .filter(Boolean);
+  return {
+    containers: run(
+      "docker",
+      [
+        "ps",
+        "-a",
+        "--quiet",
+        "--filter",
+        `label=com.docker.compose.project=${project}`,
+      ],
+      { quiet: true },
+    )
+      .output.split(/\r?\n/)
+      .filter(Boolean),
+    networks: list("network"),
+    volumes: list("volume"),
+    namedPostgresVolumes: run(
+      "docker",
+      [
+        "volume",
+        "ls",
+        "--quiet",
+        "--filter",
+        `name=^${project}_postgres-data$`,
+      ],
+      { quiet: true },
+    )
+      .output.split(/\r?\n/)
+      .filter((name) => name === `${project}_postgres-data`),
   };
 }
 
 function auditLogs(logs, context, label) {
   const result = auditRuntimeLogs(logs, context);
   if (result.unexpected.length) {
+    evidence.summary.runtimeLogAudit = {
+      result: "FAIL",
+      classifiedExpectedShutdownDiagnostics:
+        result.classifiedExpectedShutdownDiagnostics,
+      classifiedBootstrapShutdownDiagnostics:
+        result.classifiedBootstrapShutdownDiagnostics,
+      classifiedRecreateShutdownDiagnostics:
+        result.classifiedRecreateShutdownDiagnostics,
+      unexplainedFatalDiagnostics: result.unexplainedFatalDiagnostics,
+      lifecycleState: result.lifecycleState,
+    };
+    evidence.summary.classifiedExpectedShutdownDiagnostics =
+      result.classifiedExpectedShutdownDiagnostics;
+    evidence.summary.unexplainedFatalDiagnostics =
+      result.unexplainedFatalDiagnostics;
+    evidence.write("runtime-log-audit.json", evidence.summary.runtimeLogAudit);
     fail(
       `${label} found unexplained fatal diagnostics: ${sanitize(result.unexpected.slice(0, 3).join(" | "))}`,
     );
@@ -605,6 +682,12 @@ function databaseSnapshot(orderId) {
     { quiet: true, input: `${orderSnapshotSql};\n` },
   );
   return parseOrderSnapshot(result.output, validatedOrderId);
+}
+
+function structuredOrderSnapshot(snapshot) {
+  const [orderId, status, customerId, restaurantId, driverId] =
+    String(snapshot).split("|");
+  return { orderId, status, customerId, restaurantId, driverId };
 }
 
 async function assertPsqlStdinIntegration() {
@@ -1057,7 +1140,35 @@ async function main() {
     setEvidencePhase("build", "no-cache-images");
     compose(["build", "--no-cache"], { env: environment });
     setEvidencePhase("database", "fresh-database");
+    const expectedInitialVolumeName = `${project}_postgres-data`;
+    const namespaceBeforeBootstrap = namespaceResourceSnapshot();
+    if (
+      namespaceBeforeBootstrap.containers.length ||
+      namespaceBeforeBootstrap.networks.length ||
+      namespaceBeforeBootstrap.volumes.length ||
+      namespaceBeforeBootstrap.namedPostgresVolumes.length
+    ) {
+      fail("isolated namespace was not empty before Fresh DB bootstrap");
+    }
+    evidence.write("fresh-namespace-before-bootstrap.json", {
+      result: "PASS",
+      namespace: project,
+      ...namespaceBeforeBootstrap,
+    });
+    const freshDatabaseStartedAt = new Date();
     compose(["up", "-d", "--wait", "postgres", "redis"], { env: environment });
+    const bootstrapWindowEnd = new Date();
+    const initialPostgres = postgresIdentity(environment);
+    postgresVolumeName = initialPostgres.volumeName;
+    if (initialPostgres.volumeName !== expectedInitialVolumeName)
+      fail("Fresh DB bootstrap used an unexpected PostgreSQL volume");
+    let applicationDatabaseReachable = false;
+    let migrationsApplied = false;
+    let schemaReachable = false;
+    let databaseOperationVerified = false;
+    let seedSucceeded = false;
+    let seedIdempotent = false;
+    let backendReady = false;
     const freshTables = compose(
       [
         "exec",
@@ -1073,6 +1184,8 @@ async function main() {
       ],
       { env: environment, quiet: true },
     ).output.trim();
+    applicationDatabaseReachable = true;
+    databaseOperationVerified = true;
     if (freshTables !== "0")
       fail(
         `fresh production database unexpectedly has ${freshTables} public tables`,
@@ -1091,8 +1204,12 @@ async function main() {
       ],
       { env: environment },
     );
+    migrationsApplied = true;
+    schemaReachable = true;
     compose(["run", "--rm", "seed"], { env: environment });
+    seedSucceeded = true;
     compose(["run", "--rm", "seed"], { env: environment });
+    seedIdempotent = true;
     compose(
       ["run", "--rm", "tooling", "node", "scripts/create-test-restaurant.js"],
       { env: environment },
@@ -1165,6 +1282,7 @@ async function main() {
         unwrap(health.json)?.status === "ready"
       );
     });
+    backendReady = true;
     for (const pathPart of [
       "/api/health/live",
       "/api/health/ready",
@@ -1241,9 +1359,11 @@ async function main() {
     }
     const lifecycleOrderId = requireOrderId(orderIdMatch[1]);
     const beforeRestart = databaseSnapshot(lifecycleOrderId);
+    const beforeRestartStructured = structuredOrderSnapshot(beforeRestart);
     const persistenceBefore = {
       orderId: lifecycleOrderId,
       snapshot: beforeRestart,
+      ownership: beforeRestartStructured,
       sha256: sha256({ orderId: lifecycleOrderId, snapshot: beforeRestart }),
     };
     evidence.write("persistence-before.json", persistenceBefore);
@@ -1316,29 +1436,144 @@ async function main() {
     if (databaseSnapshot(lifecycleOrderId) !== beforeRestart)
       fail("order state changed during application recreation");
 
-    const preRecreateLogs = compose(["logs", "--no-color", "--timestamps"], {
-      env: environment,
-      quiet: true,
-    }).output;
+    const bootstrapPostgresLogs = run(
+      "docker",
+      ["logs", "--timestamps", initialPostgres.containerId],
+      { quiet: true },
+    ).output;
+    const preRecreateLogs = compose(
+      [
+        "logs",
+        "--no-color",
+        "--timestamps",
+        "redis",
+        "backend",
+        "customer-web",
+        "admin-panel",
+        "restaurant-web",
+        "driver-web",
+      ],
+      {
+        env: environment,
+        quiet: true,
+      },
+    ).output;
     for (const value of secretValues)
-      if (preRecreateLogs.includes(value))
+      if (
+        preRecreateLogs.includes(value) ||
+        bootstrapPostgresLogs.includes(value)
+      )
         fail("simulation logs contain a generated secret");
+    const bootstrapContext = {
+      phase: "fresh-database-initdb",
+      bootstrapWindowStart: freshDatabaseStartedAt,
+      bootstrapWindowEnd,
+      initialContainerId: initialPostgres.containerId,
+      sourceContainerId: initialPostgres.containerId,
+      isolatedNamespace: project,
+      freshNamespaceVerified: true,
+      initialVolumeName: initialPostgres.volumeName,
+      expectedInitialVolumeName,
+      initialVolumeIdentity: initialPostgres.volumeIdentity,
+      initialVolumeCreatedAt: initialPostgres.volumeCreatedAt,
+      applicationDatabaseReachable,
+      migrationsApplied,
+      schemaReachable,
+      databaseOperationVerified,
+      seedSucceeded,
+      seedIdempotent,
+      postgresHealthy: initialPostgres.healthy,
+      backendReady,
+      recreateRequestedAt: undefined,
+    };
+    evidence.summary.postgresBootstrap = {
+      result: "NOT_PROVEN",
+      initialPostgresContainerId: initialPostgres.containerId,
+      sourcePostgresContainerId: initialPostgres.containerId,
+      namespace: project,
+      freshNamespaceVerified: true,
+      bootstrapWindowStart: freshDatabaseStartedAt.toISOString(),
+      bootstrapWindowEnd: bootstrapWindowEnd.toISOString(),
+      initialVolumeName: initialPostgres.volumeName,
+      initialVolumeIdentity: initialPostgres.volumeIdentity,
+      initialVolumeCreatedAt: initialPostgres.volumeCreatedAt,
+      postconditions: {
+        postgresHealthy: initialPostgres.healthy,
+        applicationDatabaseReachable,
+        migrationsApplied,
+        schemaReachable,
+        databaseOperationVerified,
+        seedSucceeded,
+        seedIdempotent,
+        backendReady,
+      },
+      classifiedBootstrapShutdownDiagnostics: [],
+    };
+    evidence.write(
+      "postgres-bootstrap.json",
+      evidence.summary.postgresBootstrap,
+    );
+    const bootstrapAudit = auditLogs(
+      bootstrapPostgresLogs,
+      bootstrapContext,
+      "phase 1 PostgreSQL initdb bootstrap log audit",
+    );
+    evidence.summary.postgresBootstrap = {
+      ...evidence.summary.postgresBootstrap,
+      result: "PASS",
+      classifiedBootstrapShutdownDiagnostics:
+        bootstrapAudit.classifiedBootstrapShutdownDiagnostics,
+    };
+    evidence.summary.classifiedBootstrapShutdownDiagnostics =
+      bootstrapAudit.classifiedBootstrapShutdownDiagnostics;
+    evidence.write(
+      "postgres-bootstrap.json",
+      evidence.summary.postgresBootstrap,
+    );
     auditLogs(
       preRecreateLogs,
       { phase: "normal-operation" },
-      "phase 1 log audit",
+      "phase 1 non-PostgreSQL runtime log audit",
     );
 
     const oldPostgres = postgresIdentity(environment);
+    if (oldPostgres.containerId !== initialPostgres.containerId)
+      fail("initial PostgreSQL container changed before controlled recreate");
     if (!oldPostgres.healthy)
       fail("PostgreSQL was not healthy before controlled recreate");
     postgresVolumeName = oldPostgres.volumeName;
-    const recreateStartedAt = new Date();
-    compose(["stop", "postgres"], { env: environment });
-    const oldContainerStoppedAt = new Date();
+    setEvidencePhase("postgres-recreate", "controlled-stop");
+    const recreateRequestedAt = new Date();
+    const controlledStopResult = compose(["stop", "postgres"], {
+      env: environment,
+    });
+    const stoppedPostgresContainer = inspectJson(
+      "container",
+      oldPostgres.containerId,
+    );
+    const oldPostgresContainerEndedAt = new Date(
+      stoppedPostgresContainer.State?.FinishedAt,
+    );
+    if (Number.isNaN(oldPostgresContainerEndedAt.getTime()))
+      fail("old PostgreSQL container end timestamp is missing");
+    const controlledStop = {
+      eventType: "controlled-postgres-stop",
+      namespace: project,
+      targetContainerId: oldPostgres.containerId,
+      startedAt: recreateRequestedAt.toISOString(),
+      endedAt: oldPostgresContainerEndedAt.toISOString(),
+      exitCode: controlledStopResult.status,
+      operation: "docker compose stop postgres",
+    };
     const shutdownLogs = run(
       "docker",
-      ["logs", "--timestamps", oldPostgres.containerId],
+      [
+        "logs",
+        "--timestamps",
+        "--since",
+        recreateRequestedAt.toISOString(),
+        oldPostgres.containerId,
+      ],
       { quiet: true },
     ).output;
     compose(["rm", "-f", "postgres"], { env: environment });
@@ -1370,6 +1605,22 @@ async function main() {
     );
     const recoveredAt = new Date();
     const newPostgres = postgresIdentity(environment);
+    const newPostgresContainerStartedAt = new Date(newPostgres.startedAt);
+    if (Number.isNaN(newPostgresContainerStartedAt.getTime()))
+      fail("new PostgreSQL container start timestamp is missing");
+    compose(
+      [
+        "run",
+        "--rm",
+        "migration",
+        "npx",
+        "prisma",
+        "migrate",
+        "status",
+        "--schema=./prisma/schema.prisma",
+      ],
+      { env: environment },
+    );
 
     compose(["restart", "backend"], { env: environment });
     await waitFor(
@@ -1394,15 +1645,35 @@ async function main() {
       "/restaurants",
     );
     const afterPostgresRecreate = databaseSnapshot(lifecycleOrderId);
+    const afterPostgresRecreateStructured = structuredOrderSnapshot(
+      afterPostgresRecreate,
+    );
     const persistenceVerified = afterPostgresRecreate === beforeRestart;
+    const ownershipVerified =
+      beforeRestartStructured.orderId ===
+        afterPostgresRecreateStructured.orderId &&
+      beforeRestartStructured.status ===
+        afterPostgresRecreateStructured.status &&
+      beforeRestartStructured.customerId ===
+        afterPostgresRecreateStructured.customerId &&
+      beforeRestartStructured.restaurantId ===
+        afterPostgresRecreateStructured.restaurantId &&
+      beforeRestartStructured.driverId ===
+        afterPostgresRecreateStructured.driverId;
+    const postgresRecovered =
+      newPostgres.healthy &&
+      afterPostgresRecreateStructured.status === "DELIVERED";
+    const backendRecovered = true;
     const persistenceAfter = {
       orderId: lifecycleOrderId,
       snapshot: afterPostgresRecreate,
+      ownership: afterPostgresRecreateStructured,
       sha256: sha256({
         orderId: lifecycleOrderId,
         snapshot: afterPostgresRecreate,
       }),
       result: persistenceVerified ? "PASS" : "FAIL",
+      ownershipResult: ownershipVerified ? "PASS" : "FAIL",
     };
     evidence.write("persistence-after.json", persistenceAfter);
     evidence.summary.persistenceComparison = {
@@ -1411,6 +1682,8 @@ async function main() {
     };
     if (!persistenceVerified)
       fail("order state changed during PostgreSQL container recreation");
+    if (!ownershipVerified)
+      fail("order ownership changed during PostgreSQL container recreation");
 
     assertPostgresRecreateEvidence({
       oldContainerId: oldPostgres.containerId,
@@ -1419,12 +1692,20 @@ async function main() {
       newVolumeName: newPostgres.volumeName,
       oldVolumeCreatedAt: oldPostgres.volumeCreatedAt,
       newVolumeCreatedAt: newPostgres.volumeCreatedAt,
-      postgresHealthy: newPostgres.healthy,
+      postgresVolumeIdentityBefore: oldPostgres.volumeIdentity,
+      postgresVolumeIdentityAfter: newPostgres.volumeIdentity,
+      recreateRequestedAt,
+      oldPostgresContainerEndedAt,
+      newPostgresContainerStartedAt,
+      postgresRecovered,
+      backendRecovered,
       persistenceVerified,
+      ownershipVerified,
       seedRanAfterRecreate: false,
     });
     const backendRecoveryAt = new Date();
     evidence.summary.postgresRecreate = {
+      result: "PASS",
       composeProject: project,
       service: "postgres",
       oldContainerName: oldPostgres.containerName,
@@ -1435,30 +1716,46 @@ async function main() {
       volumeBefore: oldPostgres.volumeName,
       volumeAfter: newPostgres.volumeName,
       volumeIdentical: oldPostgres.volumeName === newPostgres.volumeName,
+      postgresVolumeIdentityBefore: oldPostgres.volumeIdentity,
+      postgresVolumeIdentityAfter: newPostgres.volumeIdentity,
       postgresHealthyBefore: oldPostgres.healthy,
       postgresHealthyAfter: newPostgres.healthy,
-      backendReadyAfter: true,
-      stopStartedAt: recreateStartedAt.toISOString(),
-      oldContainerStoppedAt: oldContainerStoppedAt.toISOString(),
+      postgresRecovered,
+      backendRecovered,
+      persistenceVerified,
+      ownershipVerified,
+      backendReadyAfter: backendRecovered,
+      controlledStop,
+      recreateRequestedAt: recreateRequestedAt.toISOString(),
+      shutdownWindowStart: recreateRequestedAt.toISOString(),
+      shutdownWindowEnd: oldPostgresContainerEndedAt.toISOString(),
+      oldPostgresContainerEndedAt: oldPostgresContainerEndedAt.toISOString(),
+      newPostgresContainerStartedAt:
+        newPostgresContainerStartedAt.toISOString(),
       postgresRecoveredAt: recoveredAt.toISOString(),
+      backendRecoveredAt: backendRecoveryAt.toISOString(),
+      classifiedRecreateShutdownDiagnostics: [],
     };
-    evidence.write("postgres-recreate.json", evidence.summary.postgresRecreate);
     const lifecycleAudit = auditLogs(
       shutdownLogs,
       {
         phase: "postgres-recreate",
-        postgresService: "postgres-1",
-        recreateStartedAt,
-        recoveredAt,
-        containerRecreated: oldPostgres.containerId !== newPostgres.containerId,
-        postgresHealthy: newPostgres.healthy,
+        recreateRequestedAt,
+        shutdownWindowStart: recreateRequestedAt,
+        shutdownWindowEnd: oldPostgresContainerEndedAt,
+        oldPostgresContainerEndedAt,
+        newPostgresContainerStartedAt,
+        postgresVolumeIdentityBefore: oldPostgres.volumeIdentity,
+        postgresVolumeIdentityAfter: newPostgres.volumeIdentity,
+        postgresRecovered,
+        backendRecovered,
         persistenceVerified,
+        ownershipVerified,
         oldContainerId: oldPostgres.containerId,
         newContainerId: newPostgres.containerId,
         sourceContainerId: oldPostgres.containerId,
-        oldContainerStopStartedAt: recreateStartedAt,
-        oldContainerStoppedAt,
-        backendRecoveryAt,
+        isolatedNamespace: project,
+        controlledStop,
       },
       "phase 2 PostgreSQL lifecycle log audit",
     );
@@ -1476,8 +1773,53 @@ async function main() {
     );
     evidence.summary.runtimeLogAudit = {
       result: "PASS",
+      bootstrapExpectedShutdowns: bootstrapAudit.expectedShutdowns,
       lifecycleExpectedShutdowns: lifecycleAudit.expectedShutdowns,
+      classifiedExpectedShutdownDiagnostics: [
+        ...bootstrapAudit.classifiedExpectedShutdownDiagnostics,
+        ...lifecycleAudit.classifiedExpectedShutdownDiagnostics,
+      ],
+      classifiedBootstrapShutdownDiagnostics:
+        bootstrapAudit.classifiedBootstrapShutdownDiagnostics,
+      classifiedRecreateShutdownDiagnostics:
+        lifecycleAudit.classifiedRecreateShutdownDiagnostics,
+      unexplainedFatalDiagnostics: lifecycleAudit.unexplainedFatalDiagnostics,
+      lifecycleState: lifecycleAudit.lifecycleState,
     };
+    evidence.summary.postgresRecreate.classifiedRecreateShutdownDiagnostics =
+      lifecycleAudit.classifiedRecreateShutdownDiagnostics;
+    evidence.summary.postgresRecreate.lifecycleState =
+      lifecycleAudit.lifecycleState;
+    Object.assign(evidence.summary, {
+      oldPostgresContainerId: oldPostgres.containerId,
+      newPostgresContainerId: newPostgres.containerId,
+      sourcePostgresContainerId: oldPostgres.containerId,
+      oldPostgresContainerEndedAt: oldPostgresContainerEndedAt.toISOString(),
+      recreateRequestedAt: recreateRequestedAt.toISOString(),
+      newPostgresContainerStartedAt:
+        newPostgresContainerStartedAt.toISOString(),
+      shutdownWindowStart: recreateRequestedAt.toISOString(),
+      shutdownWindowEnd: oldPostgresContainerEndedAt.toISOString(),
+      postgresVolumeIdentityBefore: oldPostgres.volumeIdentity,
+      postgresVolumeIdentityAfter: newPostgres.volumeIdentity,
+      postgresRecovered,
+      backendRecovered,
+      persistenceVerified,
+      ownershipVerified,
+      classifiedExpectedShutdownDiagnostics:
+        evidence.summary.runtimeLogAudit.classifiedExpectedShutdownDiagnostics,
+      classifiedBootstrapShutdownDiagnostics:
+        bootstrapAudit.classifiedBootstrapShutdownDiagnostics,
+      classifiedRecreateShutdownDiagnostics:
+        lifecycleAudit.classifiedRecreateShutdownDiagnostics,
+      unexplainedFatalDiagnostics: lifecycleAudit.unexplainedFatalDiagnostics,
+      lifecycleState: lifecycleAudit.lifecycleState,
+      secretScan: {
+        result: "PASS",
+        checkedRuntimeSecretValues: secretValues.size,
+      },
+    });
+    evidence.write("postgres-recreate.json", evidence.summary.postgresRecreate);
     evidence.write("runtime-log-audit.json", evidence.summary.runtimeLogAudit);
     console.log(
       `PostgreSQL recreate evidence: old-container=${oldPostgres.containerName}/${oldPostgres.containerId}; new-container=${newPostgres.containerName}/${newPostgres.containerId}; volume=${postgresVolumeName}; expected-shutdown-diagnostics=${lifecycleAudit.expectedShutdowns}`,
