@@ -467,7 +467,14 @@ export class RestaurantController {
   @Post(":id/delivery-fee")
   async calculateDeliveryFee(
     @Param("id") id: string,
-    @Body() body: { lat: number; lng: number; orderAmount: number },
+    @Body()
+    body: {
+      lat?: number;
+      lng?: number;
+      orderAmount?: number;
+      subtotal?: number;
+      customerLocation?: { lat: number; lng: number };
+    },
   ) {
     return this.restaurantService.calculateDeliveryFee(id, body);
   }

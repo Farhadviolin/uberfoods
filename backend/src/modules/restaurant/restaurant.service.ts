@@ -654,7 +654,9 @@ export class RestaurantService {
 
   async getDeliveryZones(id: string) {
     const restaurant = await this.findOne(id);
-    return restaurant.deliveryZones;
+    return Array.isArray(restaurant.deliveryZones)
+      ? restaurant.deliveryZones
+      : [];
   }
 
   async getActiveDeliveryZones(id: string) {
@@ -707,22 +709,30 @@ export class RestaurantService {
 
   async calculateDeliveryFee(
     id: string,
-    data: { lat: number; lng: number; orderAmount: number },
+    data: {
+      lat?: number;
+      lng?: number;
+      orderAmount?: number;
+      subtotal?: number;
+      customerLocation?: { lat: number; lng: number };
+    },
   ) {
     const restaurant = await this.findOne(id);
     const fee = restaurant.deliveryFee || 2.5;
+    const orderAmount = data.orderAmount ?? data.subtotal ?? 0;
 
     // Check free delivery threshold
     if (
       restaurant.freeDeliveryThreshold &&
-      data.orderAmount >= restaurant.freeDeliveryThreshold
+      orderAmount >= restaurant.freeDeliveryThreshold
     ) {
-      return { fee: 0, isFree: true };
+      return { deliveryFee: 0, fee: 0, isFree: true };
     }
 
     // Distance-based calculation (simplified)
     // In production, use actual distance calculation
     return {
+      deliveryFee: fee,
       fee,
       isFree: false,
       breakdown: {

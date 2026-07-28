@@ -2,7 +2,11 @@ import { Test, TestingModule } from "@nestjs/testing";
 import { INestApplication, ValidationPipe } from "@nestjs/common";
 import * as request from "supertest";
 import { AppModuleE2E } from "../../src/app.module.e2e";
-import { getTestEmail, getTestPassword, getTestToken } from "../utils/test-credentials";
+import {
+  getTestEmail,
+  getTestPassword,
+  getTestToken,
+} from "../utils/test-credentials";
 
 /**
  * Frontend-Backend Integration Tests
@@ -15,7 +19,44 @@ describe("Frontend-Backend Integration (e2e)", () => {
   let customerToken: string;
   let adminToken: string;
   let restaurantToken: string;
+  let restaurantId: string;
   let driverToken: string;
+
+  async function ensureCustomerAuth() {
+    if (customerToken) return;
+    const response = await request(app.getHttpServer())
+      .post("/api/auth/customer/login")
+      .send({
+        email: getTestEmail("CUSTOMER_LOGIN"),
+        password: getTestPassword("CUSTOMER_LOGIN"),
+      })
+      .expect((res) => expect([200, 201]).toContain(res.status));
+    customerToken =
+      response.body?.data?.access_token ?? response.body?.access_token;
+    expect(customerToken).toBeDefined();
+  }
+
+  async function ensureRestaurantAuth() {
+    if (restaurantToken && restaurantId) return;
+    const response = await request(app.getHttpServer())
+      .post("/api/auth/restaurant/login")
+      .send({
+        email: getTestEmail("RESTAURANT_LOGIN"),
+        password: getTestPassword("RESTAURANT_LOGIN"),
+      })
+      .expect((res) => expect([200, 201]).toContain(res.status));
+    restaurantToken =
+      response.body?.data?.access_token ?? response.body?.access_token;
+    expect(restaurantToken).toBeDefined();
+
+    const restaurantResponse = await request(app.getHttpServer())
+      .get("/api/restaurants/me")
+      .set("Authorization", `Bearer ${restaurantToken}`)
+      .expect(200);
+    restaurantId =
+      restaurantResponse.body?.data?.id ?? restaurantResponse.body?.id;
+    expect(restaurantId).toBeDefined();
+  }
 
   beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
@@ -41,6 +82,8 @@ describe("Frontend-Backend Integration (e2e)", () => {
   });
 
   describe("Customer-Web Integration", () => {
+    beforeAll(ensureCustomerAuth);
+
     describe("Authentication", () => {
       it("POST /api/auth/customer/login - Customer Web Login", async () => {
         const response = await request(app.getHttpServer())
@@ -50,7 +93,7 @@ describe("Frontend-Backend Integration (e2e)", () => {
             password: getTestPassword("CUSTOMER_LOGIN"),
           });
 
-        if (response.status === 200) {
+        if ([200, 201].includes(response.status)) {
           expect(response.body).toHaveProperty("access_token");
           customerToken = response.body.access_token;
         }
@@ -68,7 +111,8 @@ describe("Frontend-Backend Integration (e2e)", () => {
           });
 
         if (response.status === 201 || response.status === 200) {
-          const token = response.body?.data?.access_token ?? response.body?.access_token;
+          const token =
+            response.body?.data?.access_token ?? response.body?.access_token;
           expect(token).toBeDefined();
         }
       });
@@ -121,7 +165,7 @@ describe("Frontend-Backend Integration (e2e)", () => {
 
     describe("Social Features", () => {
       it("GET /api/social/feed - Social Feed", async () => {
-        if (!customerToken) return;
+        expect(customerToken).toBeDefined();
 
         return request(app.getHttpServer())
           .get("/api/social/feed")
@@ -132,24 +176,63 @@ describe("Frontend-Backend Integration (e2e)", () => {
           });
       });
 
-      it.skip("GET /api/social/live-orders - Live Orders (route not implemented)", () => {
+      it("GET /api/social/live-orders - Live Orders", () => {
+        expect(customerToken).toBeDefined();
         return request(app.getHttpServer())
           .get("/api/social/live-orders?limit=20")
+          .set("Authorization", `Bearer ${customerToken}`)
           .expect(200)
           .expect((res) => {
-            const items = res.body?.data ?? res.body;
-            expect(Array.isArray(items)).toBe(true);
+            expect(Array.isArray(res.body)).toBe(true);
+            for (const item of res.body) {
+              expect(item).toEqual({
+                id: expect.stringMatching(/^[a-f0-9]{20}$/),
+                restaurant: expect.any(String),
+                dish: expect.any(String),
+                userName: "Anonymous",
+                timestamp: expect.any(String),
+              });
+              expect(item).not.toHaveProperty("customerId");
+              expect(item).not.toHaveProperty("driverId");
+              expect(item).not.toHaveProperty("address");
+              expect(item).not.toHaveProperty("customerLocation");
+              expect(item).not.toHaveProperty("paymentStatus");
+              expect(item).not.toHaveProperty("transactionId");
+            }
           });
       });
 
-      it.skip("GET /api/social/trending - Trending (route not implemented)", () => {
+      it("GET /api/social/trending - Trending", () => {
+        expect(customerToken).toBeDefined();
         return request(app.getHttpServer())
           .get("/api/social/trending?limit=10")
+          .set("Authorization", `Bearer ${customerToken}`)
           .expect(200)
           .expect((res) => {
-            const items = res.body?.data ?? res.body;
-            expect(Array.isArray(items)).toBe(true);
+            expect(Array.isArray(res.body)).toBe(true);
+            for (const item of res.body) {
+              expect(item).toEqual({
+                id: expect.stringMatching(/^[a-f0-9]{20}$/),
+                dish: expect.any(String),
+                restaurantName: expect.any(String),
+                count: expect.any(Number),
+                trend: expect.stringMatching(/^(up|stable)$/),
+              });
+              expect(item).not.toHaveProperty("customerId");
+              expect(item).not.toHaveProperty("orderId");
+              expect(item).not.toHaveProperty("payment");
+            }
           });
+      });
+
+      it("rejects unauthenticated and invalid social discovery requests", async () => {
+        await request(app.getHttpServer())
+          .get("/api/social/live-orders")
+          .expect(401);
+        await request(app.getHttpServer())
+          .get("/api/social/trending?limit=0")
+          .set("Authorization", `Bearer ${customerToken}`)
+          .expect(400);
       });
     });
 
@@ -185,7 +268,8 @@ describe("Frontend-Backend Integration (e2e)", () => {
           .get("/api/restaurants/public")
           .expect(200);
 
-        const restItems = restaurantResponse.body?.data ?? restaurantResponse.body;
+        const restItems =
+          restaurantResponse.body?.data ?? restaurantResponse.body;
         if (restItems?.length > 0) {
           return request(app.getHttpServer())
             .post("/api/group-orders")
@@ -205,7 +289,7 @@ describe("Frontend-Backend Integration (e2e)", () => {
 
     describe("Predictive Features", () => {
       it("GET /api/analytics/delivery-patterns - Delivery Patterns", async () => {
-        if (!customerToken) return;
+        expect(customerToken).toBeDefined();
 
         return request(app.getHttpServer())
           .get("/api/analytics/delivery-patterns")
@@ -218,13 +302,14 @@ describe("Frontend-Backend Integration (e2e)", () => {
       });
 
       it("POST /api/analytics/predict-delivery - Predict Delivery", async () => {
-        if (!customerToken) return;
+        expect(customerToken).toBeDefined();
 
         const restaurantResponse = await request(app.getHttpServer())
           .get("/api/restaurants/public")
           .expect(200);
 
-        const restItems = restaurantResponse.body?.data ?? restaurantResponse.body;
+        const restItems =
+          restaurantResponse.body?.data ?? restaurantResponse.body;
         if (restItems?.length > 0) {
           return request(app.getHttpServer())
             .post("/api/analytics/predict-delivery")
@@ -242,7 +327,7 @@ describe("Frontend-Backend Integration (e2e)", () => {
       });
 
       it("GET /api/analytics/predictions - Predictive Ordering", async () => {
-        if (!customerToken) return;
+        expect(customerToken).toBeDefined();
 
         return request(app.getHttpServer())
           .get("/api/analytics/predictions")
@@ -276,7 +361,8 @@ describe("Frontend-Backend Integration (e2e)", () => {
           .get("/api/restaurants/public")
           .expect(200);
 
-        const restaurants = restaurantResponse.body?.data ?? restaurantResponse.body;
+        const restaurants =
+          restaurantResponse.body?.data ?? restaurantResponse.body;
         if (restaurants?.length > 0) {
           const dishesResponse = await request(app.getHttpServer())
             .get(`/api/dishes/restaurant/${restaurants[0].id}`)
@@ -301,6 +387,8 @@ describe("Frontend-Backend Integration (e2e)", () => {
   });
 
   describe("Restaurant-Web Integration", () => {
+    beforeAll(ensureRestaurantAuth);
+
     describe("Authentication", () => {
       it("POST /api/auth/restaurant/login - Restaurant Login", async () => {
         const response = await request(app.getHttpServer())
@@ -310,7 +398,7 @@ describe("Frontend-Backend Integration (e2e)", () => {
             password: getTestPassword("RESTAURANT_LOGIN"),
           });
 
-        if (response.status === 200) {
+        if ([200, 201].includes(response.status)) {
           expect(response.body).toHaveProperty("access_token");
           restaurantToken = response.body.access_token;
         }
@@ -325,7 +413,8 @@ describe("Frontend-Backend Integration (e2e)", () => {
           .get("/api/restaurants/public")
           .expect(200);
 
-        const restaurants = restaurantResponse.body?.data ?? restaurantResponse.body;
+        const restaurants =
+          restaurantResponse.body?.data ?? restaurantResponse.body;
         if (restaurants?.length > 0) {
           return request(app.getHttpServer())
             .get(`/api/restaurants/${restaurants[0].id}`)
@@ -341,7 +430,8 @@ describe("Frontend-Backend Integration (e2e)", () => {
           .get("/api/restaurants/public")
           .expect(200);
 
-        const restItems = restaurantResponse.body?.data ?? restaurantResponse.body;
+        const restItems =
+          restaurantResponse.body?.data ?? restaurantResponse.body;
         if (restItems?.length > 0) {
           return request(app.getHttpServer())
             .get(`/api/restaurants/${restItems[0].id}/status`)
@@ -357,36 +447,25 @@ describe("Frontend-Backend Integration (e2e)", () => {
           .get("/api/restaurants/public")
           .expect(200);
 
-        const restItems = restaurantResponse.body?.data ?? restaurantResponse.body;
+        const restItems =
+          restaurantResponse.body?.data ?? restaurantResponse.body;
         if (restItems?.length > 0) {
           return request(app.getHttpServer())
-            .get(
-              `/api/restaurants/${restItems[0].id}/operating-hours`,
-            )
+            .get(`/api/restaurants/${restItems[0].id}/operating-hours`)
             .set("Authorization", `Bearer ${restaurantToken}`)
             .expect(200);
         }
       });
 
       it("GET /api/restaurants/:id/delivery-zones - Get Delivery Zones", async () => {
-        if (!restaurantToken) return;
-
-        const restaurantResponse = await request(app.getHttpServer())
-          .get("/api/restaurants/public")
-          .expect(200);
-
-        const restItems = restaurantResponse.body?.data ?? restaurantResponse.body;
-        if (restItems?.length > 0) {
-          return request(app.getHttpServer())
-            .get(
-              `/api/restaurants/${restItems[0].id}/delivery-zones`,
-            )
-            .set("Authorization", `Bearer ${restaurantToken}`)
-            .expect(200)
-            .expect((res) => {
-              expect(Array.isArray(res.body)).toBe(true);
-            });
-        }
+        expect(restaurantToken).toBeDefined();
+        return request(app.getHttpServer())
+          .get(`/api/restaurants/${restaurantId}/delivery-zones`)
+          .set("Authorization", `Bearer ${restaurantToken}`)
+          .expect(200)
+          .expect((res) => {
+            expect(Array.isArray(res.body)).toBe(true);
+          });
       });
 
       it("GET /api/restaurants/:id/capacity - Get Capacity", async () => {
@@ -396,7 +475,8 @@ describe("Frontend-Backend Integration (e2e)", () => {
           .get("/api/restaurants/public")
           .expect(200);
 
-        const restItems = restaurantResponse.body?.data ?? restaurantResponse.body;
+        const restItems =
+          restaurantResponse.body?.data ?? restaurantResponse.body;
         if (restItems?.length > 0) {
           return request(app.getHttpServer())
             .get(`/api/restaurants/${restItems[0].id}/capacity`)
@@ -414,7 +494,8 @@ describe("Frontend-Backend Integration (e2e)", () => {
           .get("/api/restaurants/public")
           .expect(200);
 
-        const restItems = restaurantResponse.body?.data ?? restaurantResponse.body;
+        const restItems =
+          restaurantResponse.body?.data ?? restaurantResponse.body;
         if (restItems?.length > 0) {
           return request(app.getHttpServer())
             .get(`/api/dishes/restaurant/${restItems[0].id}`)
@@ -429,66 +510,35 @@ describe("Frontend-Backend Integration (e2e)", () => {
 
     describe("Inventory", () => {
       it("GET /api/inventory/restaurant/:id/overview - Get Inventory Overview", async () => {
-        if (!restaurantToken) return;
-
-        const restaurantResponse = await request(app.getHttpServer())
-          .get("/api/restaurants/public")
-          .expect(200);
-
-        const restItems = restaurantResponse.body?.data ?? restaurantResponse.body;
-        if (restItems?.length > 0) {
-          return request(app.getHttpServer())
-            .get(
-              `/api/inventory/restaurant/${restItems[0].id}/overview`,
-            )
-            .set("Authorization", `Bearer ${restaurantToken}`)
-            .expect(200)
-            .expect((res) => {
-              expect(res.body).toHaveProperty("totalValue");
-            });
-        }
+        return request(app.getHttpServer())
+          .get(`/api/inventory/restaurant/${restaurantId}/overview`)
+          .set("Authorization", `Bearer ${restaurantToken}`)
+          .expect(200)
+          .expect((res) => {
+            expect(res.body).toHaveProperty("totalValue");
+          });
       });
 
       it("GET /api/inventory/restaurant/:id/stock - Get Stock Items", async () => {
-        if (!restaurantToken) return;
-
-        const restaurantResponse = await request(app.getHttpServer())
-          .get("/api/restaurants/public")
-          .expect(200);
-
-        const restItems = restaurantResponse.body?.data ?? restaurantResponse.body;
-        if (restItems?.length > 0) {
-          return request(app.getHttpServer())
-            .get(
-              `/api/inventory/restaurant/${restItems[0].id}/stock`,
-            )
-            .set("Authorization", `Bearer ${restaurantToken}`)
-            .expect(200)
-            .expect((res) => {
-              expect(Array.isArray(res.body)).toBe(true);
-            });
-        }
+        return request(app.getHttpServer())
+          .get(`/api/inventory/restaurant/${restaurantId}/stock`)
+          .set("Authorization", `Bearer ${restaurantToken}`)
+          .expect(200)
+          .expect((res) => {
+            expect(Array.isArray(res.body)).toBe(true);
+          });
       });
     });
 
     describe("Order Management", () => {
-      it("GET /api/orders?restaurantId= - Get Restaurant Orders", async () => {
-        if (!restaurantToken) return;
-
-        const restaurantResponse = await request(app.getHttpServer())
-          .get("/api/restaurants/public")
-          .expect(200);
-
-        const restItems = restaurantResponse.body?.data ?? restaurantResponse.body;
-        if (restItems?.length > 0) {
-          return request(app.getHttpServer())
-            .get(`/api/orders?restaurantId=${restItems[0].id}`)
-            .set("Authorization", `Bearer ${restaurantToken}`)
-            .expect(200)
-            .expect((res) => {
-              expect(Array.isArray(res.body)).toBe(true);
-            });
-        }
+      it("GET /api/restaurants/:id/orders - Get Restaurant Orders", async () => {
+        return request(app.getHttpServer())
+          .get(`/api/restaurants/${restaurantId}/orders`)
+          .set("Authorization", `Bearer ${restaurantToken}`)
+          .expect(200)
+          .expect((res) => {
+            expect(Array.isArray(res.body)).toBe(true);
+          });
       });
 
       it("GET /api/orders/:id/timeline - Get Order Timeline", async () => {
@@ -523,16 +573,15 @@ describe("Frontend-Backend Integration (e2e)", () => {
           .get("/api/restaurants/public")
           .expect(200);
 
-        const restItems = restaurantResponse.body?.data ?? restaurantResponse.body;
+        const restItems =
+          restaurantResponse.body?.data ?? restaurantResponse.body;
         if (restItems?.length > 0) {
           return request(app.getHttpServer())
-            .get(
-              `/api/restaurants/${restItems[0].id}/analytics?period=30d`,
-            )
+            .get(`/api/restaurants/${restItems[0].id}/analytics?period=30d`)
             .set("Authorization", `Bearer ${restaurantToken}`)
             .expect(200)
             .expect((res) => {
-              expect(res.body).toHaveProperty("revenue");
+              expect(res.body).toHaveProperty("totalRevenue");
             });
         }
       });
@@ -544,12 +593,11 @@ describe("Frontend-Backend Integration (e2e)", () => {
           .get("/api/restaurants/public")
           .expect(200);
 
-        const restItems = restaurantResponse.body?.data ?? restaurantResponse.body;
+        const restItems =
+          restaurantResponse.body?.data ?? restaurantResponse.body;
         if (restItems?.length > 0) {
           return request(app.getHttpServer())
-            .get(
-              `/api/restaurants/${restItems[0].id}/performance?period=30d`,
-            )
+            .get(`/api/restaurants/${restItems[0].id}/performance?period=30d`)
             .set("Authorization", `Bearer ${restaurantToken}`)
             .expect(200);
         }
@@ -634,12 +682,58 @@ describe("Frontend-Backend Integration (e2e)", () => {
     });
 
     describe("Subscription", () => {
-      it.skip("GET /api/drivers/subscription/tiers - Get Subscription Tiers (route not implemented)", () => {
+      beforeAll(async () => {
+        if (driverToken) return;
+        const response = await request(app.getHttpServer())
+          .post("/api/auth/driver/login")
+          .send({
+            email: getTestEmail("DRIVER_LOGIN"),
+            password: getTestPassword("DRIVER_LOGIN"),
+          });
+        driverToken =
+          response.body?.data?.access_token ?? response.body?.access_token;
+      });
+
+      it("GET /api/drivers/subscription/tiers - Get Subscription Tiers", () => {
+        expect(driverToken).toBeDefined();
+        return request(app.getHttpServer())
+          .get("/api/drivers/subscription/tiers")
+          .set("Authorization", `Bearer ${driverToken}`)
+          .expect(200)
+          .expect((res) => {
+            expect(Object.keys(res.body)).toEqual(["tiers"]);
+            expect(Array.isArray(res.body.tiers)).toBe(true);
+            for (const tier of res.body.tiers) {
+              expect(tier).toEqual({
+                tier: expect.stringMatching(
+                  /^(BASIC|PRO|FULLTIME|ENTERPRISE)$/,
+                ),
+                name: expect.any(String),
+                price: expect.any(Number),
+                displayCommission: expect.any(String),
+                features: expect.any(Array),
+                isPopular: expect.any(Boolean),
+                isActive: true,
+              });
+              expect(tier).not.toHaveProperty("id");
+              expect(tier).not.toHaveProperty("stripePriceId");
+              expect(tier).not.toHaveProperty("createdAt");
+              expect(tier).not.toHaveProperty("updatedAt");
+            }
+          });
+      });
+
+      it("allows public subscription tier discovery without exposing internals", () => {
         return request(app.getHttpServer())
           .get("/api/drivers/subscription/tiers")
           .expect(200)
           .expect((res) => {
-            expect(Array.isArray(res.body)).toBe(true);
+            expect(Array.isArray(res.body.tiers)).toBe(true);
+            for (const tier of res.body.tiers) {
+              expect(tier).not.toHaveProperty("stripePriceId");
+              expect(tier).not.toHaveProperty("createdAt");
+              expect(tier).not.toHaveProperty("updatedAt");
+            }
           });
       });
     });

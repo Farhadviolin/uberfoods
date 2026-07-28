@@ -4,6 +4,7 @@ import { AdminModule } from "../admin/admin.module";
 import { DriverModule } from "../driver/driver.module";
 import { RbacModule } from "../rbac/rbac.module";
 import { AnalyticsController } from "./analytics.controller";
+import { AnalyticsPublicController } from "./analytics-public.controller";
 import { AnalyticsService } from "./analytics.service";
 
 @Module({
@@ -13,7 +14,7 @@ import { AnalyticsService } from "./analytics.service";
     DriverModule,
     RbacModule,
   ],
-  controllers: [AnalyticsController],
+  controllers: [AnalyticsController, AnalyticsPublicController],
   providers: [AnalyticsService],
 })
 export class AnalyticsModule {}

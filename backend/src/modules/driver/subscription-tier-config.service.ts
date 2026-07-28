@@ -1,6 +1,7 @@
 import { Injectable, Logger, NotFoundException } from "@nestjs/common";
 import { PrismaService } from "../../prisma/prisma.service";
 import { SubscriptionTier } from "@prisma/client";
+import { PublicSubscriptionTierDto } from "./dto/public-subscription-tier.dto";
 
 interface TierConfigUpdateData {
   name?: string;
@@ -128,6 +129,52 @@ export class SubscriptionTierConfigService {
       this.logger.warn("Verwende Fallback-Daten");
       return this.fallbackTierConfigs;
     }
+  }
+
+  async getActivePublicTierConfigs(): Promise<PublicSubscriptionTierDto[]> {
+    const configs = await this.prisma.subscriptionTierConfig.findMany({
+      where: { isActive: true },
+      select: {
+        tier: true,
+        name: true,
+        price: true,
+        displayCommission: true,
+        features: true,
+        isPopular: true,
+        isActive: true,
+      },
+      orderBy: [{ price: "asc" }, { tier: "asc" }],
+    });
+
+    const activeConfigs =
+      configs.length > 0
+        ? configs
+        : this.fallbackTierConfigs
+            .filter((config) => config.isActive)
+            .map(
+              ({
+                tier,
+                name,
+                price,
+                displayCommission,
+                features,
+                isPopular,
+                isActive,
+              }) => ({
+                tier,
+                name,
+                price,
+                displayCommission,
+                features,
+                isPopular,
+                isActive,
+              }),
+            );
+
+    return activeConfigs.sort(
+      (left, right) =>
+        left.price - right.price || left.tier.localeCompare(right.tier),
+    );
   }
 
   async updateTierConfig(tierName: string, updates: TierConfigUpdateData) {

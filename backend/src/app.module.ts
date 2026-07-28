@@ -11,6 +11,7 @@ import { AdminModule } from "./modules/admin/admin.module";
 import { RestaurantModule } from "./modules/restaurant/restaurant.module";
 import { SocialMediaModule } from "./modules/social-media/social-media.module";
 import { AnalyticsModule } from "./modules/analytics/analytics.module";
+import { InventoryModule } from "./modules/inventory/inventory.module";
 import { AutomationModule } from "./modules/automation/automation.module";
 import { ReportingModule } from "./modules/reporting/reporting.module";
 
@@ -49,6 +50,7 @@ import { AuditLedgerService } from "./common/audit/audit-ledger.service";
     RestaurantModule,
     SocialMediaModule,
     AnalyticsModule,
+    InventoryModule,
     AutomationModule,
     ReportingModule,
 

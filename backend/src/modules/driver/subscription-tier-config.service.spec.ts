@@ -1,9 +1,9 @@
-import { Test, TestingModule } from '@nestjs/testing';
-import { SubscriptionTierConfigService } from './subscription-tier-config.service';
-import { PrismaService } from '../../prisma/prisma.service';
-import { NotFoundException } from '@nestjs/common';
+import { Test, TestingModule } from "@nestjs/testing";
+import { SubscriptionTierConfigService } from "./subscription-tier-config.service";
+import { PrismaService } from "../../prisma/prisma.service";
+import { NotFoundException } from "@nestjs/common";
 
-describe('SubscriptionTierConfigService', () => {
+describe("SubscriptionTierConfigService", () => {
   let service: SubscriptionTierConfigService;
   let prisma: PrismaService;
 
@@ -27,7 +27,9 @@ describe('SubscriptionTierConfigService', () => {
       ],
     }).compile();
 
-    service = module.get<SubscriptionTierConfigService>(SubscriptionTierConfigService);
+    service = module.get<SubscriptionTierConfigService>(
+      SubscriptionTierConfigService,
+    );
     prisma = module.get<PrismaService>(PrismaService);
   });
 
@@ -35,66 +37,120 @@ describe('SubscriptionTierConfigService', () => {
     jest.clearAllMocks();
   });
 
-  describe('getAllTierConfigs', () => {
-    it('should return all tier configs', async () => {
+  describe("getAllTierConfigs", () => {
+    it("should return all tier configs", async () => {
       const mockConfigs = [
-        { id: '1', tier: 'BASIC', price: 9.99 },
-        { id: '2', tier: 'PRO', price: 19.99 },
+        { id: "1", tier: "BASIC", price: 9.99 },
+        { id: "2", tier: "PRO", price: 19.99 },
       ];
 
-      mockPrismaService.subscriptionTierConfig.findMany.mockResolvedValue(mockConfigs);
+      mockPrismaService.subscriptionTierConfig.findMany.mockResolvedValue(
+        mockConfigs,
+      );
 
       const result = await service.getAllTierConfigs();
 
       expect(result).toEqual(mockConfigs);
-      expect(mockPrismaService.subscriptionTierConfig.findMany).toHaveBeenCalledWith({
-        orderBy: { price: 'asc' },
+      expect(
+        mockPrismaService.subscriptionTierConfig.findMany,
+      ).toHaveBeenCalledWith({
+        orderBy: { price: "asc" },
       });
     });
   });
 
-  describe('getTierConfig', () => {
-    it('should return tier config by name', async () => {
-      const tierName = 'PRO';
-      const mockConfig = { id: '1', tier: 'PRO', price: 19.99 };
+  describe("getActivePublicTierConfigs", () => {
+    it("selects only public fields and returns deterministic active tiers", async () => {
+      const mockConfigs = [
+        {
+          tier: "BASIC",
+          name: "Basic",
+          price: 29,
+          displayCommission: "25%",
+          features: ["Standard Support"],
+          isPopular: false,
+          isActive: true,
+        },
+      ];
+      mockPrismaService.subscriptionTierConfig.findMany.mockResolvedValue(
+        mockConfigs,
+      );
 
-      mockPrismaService.subscriptionTierConfig.findFirst.mockResolvedValue(mockConfig);
+      await expect(service.getActivePublicTierConfigs()).resolves.toEqual(
+        mockConfigs,
+      );
+      expect(
+        mockPrismaService.subscriptionTierConfig.findMany,
+      ).toHaveBeenCalledWith({
+        where: { isActive: true },
+        select: {
+          tier: true,
+          name: true,
+          price: true,
+          displayCommission: true,
+          features: true,
+          isPopular: true,
+          isActive: true,
+        },
+        orderBy: [{ price: "asc" }, { tier: "asc" }],
+      });
+    });
+  });
+
+  describe("getTierConfig", () => {
+    it("should return tier config by name", async () => {
+      const tierName = "PRO";
+      const mockConfig = { id: "1", tier: "PRO", price: 19.99 };
+
+      mockPrismaService.subscriptionTierConfig.findFirst.mockResolvedValue(
+        mockConfig,
+      );
 
       const result = await service.getTierConfig(tierName);
 
       expect(result).toEqual(mockConfig);
     });
 
-    it('should throw NotFoundException if tier not found', async () => {
-      mockPrismaService.subscriptionTierConfig.findFirst.mockResolvedValue(null);
+    it("should throw NotFoundException if tier not found", async () => {
+      mockPrismaService.subscriptionTierConfig.findFirst.mockResolvedValue(
+        null,
+      );
 
-      await expect(service.getTierConfig('INVALID')).rejects.toThrow(NotFoundException);
+      await expect(service.getTierConfig("INVALID")).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 
-  describe('createTierConfig', () => {
-    it('should create new tier config', async () => {
-      const tierData = { tier: 'PREMIUM', name: 'Premium Plan', price: 29.99 };
-      const mockConfig = { id: '1', ...tierData };
+  describe("createTierConfig", () => {
+    it("should create new tier config", async () => {
+      const tierData = { tier: "PREMIUM", name: "Premium Plan", price: 29.99 };
+      const mockConfig = { id: "1", ...tierData };
 
-      mockPrismaService.subscriptionTierConfig.create.mockResolvedValue(mockConfig);
+      mockPrismaService.subscriptionTierConfig.create.mockResolvedValue(
+        mockConfig,
+      );
 
       const result = await service.createTierConfig(tierData as any);
 
       expect(result).toEqual(mockConfig);
-      expect(mockPrismaService.subscriptionTierConfig.create).toHaveBeenCalledWith({
+      expect(
+        mockPrismaService.subscriptionTierConfig.create,
+      ).toHaveBeenCalledWith({
         data: tierData,
       });
     });
   });
 
-  describe('updateTierConfig', () => {
-    it('should update tier config', async () => {
-      const tierName = 'PRO';
+  describe("updateTierConfig", () => {
+    it("should update tier config", async () => {
+      const tierName = "PRO";
       const updates = { price: 24.99 };
-      const mockConfig = { id: '1', tier: 'PRO', price: 19.99 };
+      const mockConfig = { id: "1", tier: "PRO", price: 19.99 };
 
-      mockPrismaService.subscriptionTierConfig.findFirst.mockResolvedValue(mockConfig);
+      mockPrismaService.subscriptionTierConfig.findFirst.mockResolvedValue(
+        mockConfig,
+      );
       mockPrismaService.subscriptionTierConfig.update.mockResolvedValue({
         ...mockConfig,
         ...updates,
@@ -103,14 +159,19 @@ describe('SubscriptionTierConfigService', () => {
       const result = await service.updateTierConfig(tierName, updates);
 
       expect(result.price).toBe(24.99);
-      expect(mockPrismaService.subscriptionTierConfig.update).toHaveBeenCalled();
+      expect(
+        mockPrismaService.subscriptionTierConfig.update,
+      ).toHaveBeenCalled();
     });
 
-    it('should throw NotFoundException if tier not found', async () => {
-      mockPrismaService.subscriptionTierConfig.findFirst.mockResolvedValue(null);
+    it("should throw NotFoundException if tier not found", async () => {
+      mockPrismaService.subscriptionTierConfig.findFirst.mockResolvedValue(
+        null,
+      );
 
-      await expect(service.updateTierConfig('INVALID', { price: 10 })).rejects.toThrow(NotFoundException);
+      await expect(
+        service.updateTierConfig("INVALID", { price: 10 }),
+      ).rejects.toThrow(NotFoundException);
     });
   });
 });
-

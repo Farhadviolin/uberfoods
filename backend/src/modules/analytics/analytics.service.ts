@@ -1041,4 +1041,135 @@ export class AnalyticsService {
     }
     return Number((((current - previous) / previous) * 100).toFixed(2));
   }
+
+  async getDeliveryPatterns() {
+    const restaurants = await this.prisma.restaurant.findMany({
+      where: { isActive: true },
+      select: {
+        id: true,
+        name: true,
+        estimatedDeliveryTime: true,
+        orders: {
+          where: { status: "DELIVERED" },
+          take: 100,
+          orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+          select: {
+            createdAt: true,
+            deliveredAt: true,
+            estimatedDeliveryTime: true,
+          },
+        },
+      },
+      take: 50,
+      orderBy: [{ name: "asc" }, { id: "asc" }],
+    });
+
+    return restaurants.map((restaurant) => {
+      const completed = restaurant.orders.filter((order) => order.deliveredAt);
+      const averageActualTime =
+        completed.length === 0
+          ? restaurant.estimatedDeliveryTime || 30
+          : completed.reduce(
+              (sum, order) =>
+                sum +
+                (order.deliveredAt!.getTime() - order.createdAt.getTime()) /
+                  60000,
+              0,
+            ) / completed.length;
+      const averageEstimatedTime =
+        restaurant.orders.length === 0
+          ? restaurant.estimatedDeliveryTime || 30
+          : restaurant.orders.reduce(
+              (sum, order) => sum + (order.estimatedDeliveryTime || 30),
+              0,
+            ) / restaurant.orders.length;
+
+      return {
+        restaurantId: restaurant.id,
+        restaurantName: restaurant.name,
+        totalOrders: restaurant.orders.length,
+        averageEstimatedTime: Number(averageEstimatedTime.toFixed(1)),
+        averageActualTime: Number(averageActualTime.toFixed(1)),
+        accuracy:
+          completed.length === 0
+            ? 0
+            : Number(
+                Math.max(
+                  0,
+                  1 -
+                    Math.abs(averageActualTime - averageEstimatedTime) /
+                      Math.max(averageEstimatedTime, 1),
+                ).toFixed(2),
+              ),
+        reliability: completed.length >= 5 ? "high" : "developing",
+      };
+    });
+  }
+
+  async predictDelivery(data: {
+    restaurantId: string;
+    customerLat: number;
+    customerLng: number;
+    preferredDeliveryTime?: string;
+  }) {
+    const restaurant = await this.prisma.restaurant.findUniqueOrThrow({
+      where: { id: data.restaurantId },
+      select: {
+        id: true,
+        name: true,
+        estimatedDeliveryTime: true,
+        _count: {
+          select: {
+            orders: {
+              where: {
+                status: { in: ["PENDING", "CONFIRMED", "PREPARING", "READY"] },
+              },
+            },
+          },
+        },
+      },
+    });
+    const baseTime = restaurant.estimatedDeliveryTime || 30;
+    const loadMinutes = Math.min(restaurant._count.orders * 3, 30);
+
+    return {
+      estimatedDeliveryTime: baseTime + loadMinutes,
+      confidence: restaurant._count.orders > 0 ? 0.75 : 0.6,
+      factors: {
+        restaurant: restaurant.name,
+        currentLoad: restaurant._count.orders,
+        distance: 0,
+        weather: "unknown",
+        timeOfDay: new Date().toISOString().slice(11, 16),
+        dayOfWeek: new Date().toISOString().slice(0, 10),
+      },
+    };
+  }
+
+  async getPredictions() {
+    const dishes = await this.prisma.dish.findMany({
+      where: { isAvailable: true, restaurant: { isActive: true } },
+      select: {
+        id: true,
+        name: true,
+        restaurant: { select: { name: true } },
+      },
+      take: 20,
+      orderBy: [
+        { restaurant: { name: "asc" } },
+        { name: "asc" },
+        { id: "asc" },
+      ],
+    });
+
+    return dishes.map((dish) => ({
+      id: dish.id,
+      type: "pattern-based",
+      title: dish.name,
+      description: `Popular choice from ${dish.restaurant.name}`,
+      restaurant: dish.restaurant.name,
+      dish: dish.name,
+      confidence: 0.5,
+    }));
+  }
 }

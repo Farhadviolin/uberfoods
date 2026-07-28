@@ -11,10 +11,11 @@ import { SubscriptionFinancialService } from "./subscription-financial.service";
 import { SubscriptionAuditService } from "./subscription-audit.service";
 import { SubscriptionDriverInsightsService } from "./subscription-driver-insights.service";
 import { SubscriptionTierConfigService } from "./subscription-tier-config.service";
+import { DriverSubscriptionTiersController } from "./driver-subscription-tiers.controller";
 
 @Module({
   imports: [DatabaseModule],
-  controllers: [], // Temporarily disabled due to TypeScript errors
+  controllers: [DriverSubscriptionTiersController],
   providers: [
     DriverService,
     SubscriptionService,

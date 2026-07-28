@@ -24,6 +24,7 @@ import { MonitoringModule } from "./modules/monitoring/monitoring.module";
 import { SecurityModule } from "./modules/security/security.module";
 import { SearchModule } from "./modules/search/search.module";
 import { AnalyticsModule } from "./modules/analytics/analytics.module";
+import { InventoryModule } from "./modules/inventory/inventory.module";
 import { AutomationModule } from "./modules/automation/automation.module";
 import { ReportingModule } from "./modules/reporting/reporting.module";
 import { SocialMediaModule } from "./modules/social-media/social-media.module";
@@ -78,6 +79,7 @@ import { FinancialSyncModule } from "./modules/financial-sync/financial-sync.mod
     SecurityModule,
     SearchModule,
     AnalyticsModule,
+    InventoryModule,
     AutomationModule,
     ReportingModule,
     SocialMediaModule,

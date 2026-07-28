@@ -1,4 +1,12 @@
-import { Controller, Get, Param, Post, UseGuards } from "@nestjs/common";
+import {
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  Param,
+  Post,
+  UseGuards,
+} from "@nestjs/common";
 import {
   ApiBearerAuth,
   ApiOperation,
@@ -23,11 +31,20 @@ export class AnalyticsPublicController {
   }
 
   @Post("predict-delivery")
+  @HttpCode(200)
   @ApiBearerAuth()
   @ApiOperation({ summary: "Predict delivery time" })
   @ApiResponse({ status: 200, description: "Prediction retrieved" })
-  predictDelivery() {
-    return this.analyticsService.predictDelivery();
+  predictDelivery(
+    @Body()
+    body: {
+      restaurantId: string;
+      customerLat: number;
+      customerLng: number;
+      preferredDeliveryTime?: string;
+    },
+  ) {
+    return this.analyticsService.predictDelivery(body);
   }
 
   @Get("predictions")
@@ -43,6 +60,6 @@ export class AnalyticsPublicController {
   @ApiOperation({ summary: "Expense analytics" })
   @ApiResponse({ status: 200, description: "Expenses retrieved" })
   getExpenseAnalytics(@Param("period") period: string) {
-    return this.analyticsService.getExpenseAnalytics(period);
+    return this.analyticsService.getRevenueAnalytics(period);
   }
 }
