@@ -4,8 +4,6 @@ import {
   BadRequestException,
   ConflictException,
   Logger,
-  Optional,
-  Inject,
 } from "@nestjs/common";
 import { JwtService } from "@nestjs/jwt";
 import { PrismaService } from "../../prisma/prisma.service";
@@ -44,6 +42,12 @@ interface VehicleInfo {
   [key: string]: unknown;
 }
 
+interface RefreshTokenPayload {
+  sub: string;
+  userType: "admin" | "restaurant" | "driver" | "customer";
+  type: "refresh";
+}
+
 @Injectable()
 export class AuthService {
   private readonly logger = new Logger(AuthService.name);
@@ -52,9 +56,7 @@ export class AuthService {
     private prisma: PrismaService,
     private jwtService: JwtService,
     private mfaService: MfaService,
-    @Optional()
-    @Inject(DriverAuditService)
-    private driverAuditService?: DriverAuditService,
+    private driverAuditService: DriverAuditService,
   ) {}
 
   /**
@@ -276,7 +278,7 @@ export class AuthService {
       await this.logSuccessfulLogin(user.id, userType);
 
       // Audit Driver login
-      if (userType === "driver" && this.driverAuditService) {
+      if (userType === "driver") {
         await this.driverAuditService.log({
           driverId: user.id,
           action: "LOGIN",
@@ -751,49 +753,64 @@ export class AuthService {
 
   // Session Management
   async refreshToken(refreshToken: string, sessionId?: string) {
+    let payload: RefreshTokenPayload;
+
     try {
-      // Verify refresh token
-      const payload = this.jwtService.verify(refreshToken, {
+      payload = this.jwtService.verify<RefreshTokenPayload>(refreshToken, {
         secret: this.getRefreshTokenSecret(),
       });
-
-      // Validate session if provided
-      if (sessionId) {
-        const session = await this.prisma.session.findUnique({
-          where: { id: sessionId },
-        });
-
-        if (!session || session.expiresAt < new Date()) {
-          throw new UnauthorizedException("Invalid session");
-        }
-      }
-
-      // Generate new tokens
-      const user = await this.getUserById(payload.sub, payload.userType);
-      const newPayload = {
-        email: user.email,
-        sub: user.id,
-        role: payload.userType,
-        userType: payload.userType,
-      };
-
-      const tokens = {
-        access_token: this.jwtService.sign(newPayload),
-        refresh_token: refreshToken, // Keep same refresh token
-      };
-
-      if (payload.userType === "driver") {
-        await this.driverAuditService.log({
-          driverId: payload.sub,
-          action: "LOGIN",
-          metadata: { refresh: true, sessionId },
-        });
-      }
-
-      return tokens;
     } catch (error) {
+      if (this.isJwtVerificationError(error)) {
+        throw new UnauthorizedException("Invalid refresh token");
+      }
+      throw error;
+    }
+
+    if (!this.isRefreshTokenPayload(payload)) {
       throw new UnauthorizedException("Invalid refresh token");
     }
+
+    if (sessionId) {
+      const session = await this.prisma.session.findUnique({
+        where: { id: sessionId },
+      });
+
+      if (
+        !session ||
+        session.expiresAt < new Date() ||
+        session.userId !== payload.sub ||
+        session.userType !== payload.userType
+      ) {
+        throw new UnauthorizedException("Invalid session");
+      }
+    }
+
+    const user = await this.getUserById(payload.sub, payload.userType);
+    if (!user || user.isActive === false) {
+      throw new UnauthorizedException("Invalid refresh token");
+    }
+
+    const newPayload = {
+      email: user.email,
+      sub: user.id,
+      role: payload.userType,
+      userType: payload.userType,
+    };
+
+    const tokens = {
+      access_token: this.jwtService.sign(newPayload),
+      refresh_token: refreshToken,
+    };
+
+    if (payload.userType === "driver") {
+      await this.driverAuditService.log({
+        driverId: payload.sub,
+        action: "LOGIN",
+        metadata: { refresh: true, sessionId },
+      });
+    }
+
+    return tokens;
   }
 
   async logout(sessionId: string) {
@@ -921,6 +938,33 @@ export class AuthService {
     }
 
     return jwtSecret;
+  }
+
+  private isJwtVerificationError(error: unknown): boolean {
+    return (
+      error instanceof Error &&
+      ["JsonWebTokenError", "TokenExpiredError", "NotBeforeError"].includes(
+        error.name,
+      )
+    );
+  }
+
+  private isRefreshTokenPayload(
+    payload: unknown,
+  ): payload is RefreshTokenPayload {
+    if (!payload || typeof payload !== "object") {
+      return false;
+    }
+
+    const candidate = payload as Partial<RefreshTokenPayload>;
+    return (
+      typeof candidate.sub === "string" &&
+      candidate.sub.length > 0 &&
+      candidate.type === "refresh" &&
+      ["admin", "restaurant", "driver", "customer"].includes(
+        candidate.userType as string,
+      )
+    );
   }
 
   private async getUserById(id: string, userType: string) {

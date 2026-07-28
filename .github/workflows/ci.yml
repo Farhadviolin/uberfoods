@@ -59,6 +59,7 @@ jobs:
       CUSTOMER_TEST_PASSWORD: ci-customer-password-placeholder
       DRIVER_TEST_EMAIL: ci-driver@example.test
       DRIVER_TEST_PASSWORD: ci-driver-password-placeholder
+      TEST_DRIVER_PASSWORD: ci-driver-password-placeholder
       RESTAURANT_TEST_EMAIL: ci-restaurant@example.test
       RESTAURANT_TEST_PASSWORD: ci-restaurant-password-placeholder
     services:
@@ -122,6 +123,7 @@ jobs:
         SEED_CUSTOMER_PASSWORD: customer123
         SEED_RESTAURANT_PASSWORD: restaurant123
         SEED_DRIVER_PASSWORD: driver123
+        TEST_DRIVER_PASSWORD: e2e-driver-password-placeholder
 
     - name: Run database migrations
       working-directory: ./backend
@@ -901,9 +903,25 @@ jobs:
         retention-days: 30
 
   # Build and deploy checks
+  production-simulation:
+    name: Verify local production simulation
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v5
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v5
+      with:
+        node-version: '24'
+
+    - name: Verify local production simulation
+      run: npm run verify:production-simulation
+
   build:
     runs-on: ubuntu-latest
-    needs: [dependency-audit, api-verification, driver-jest, customer-typecheck, customer-quality, admin-jest, ui-e2e-lifecycle, frontend-e2e]
+    needs: [dependency-audit, api-verification, driver-jest, customer-typecheck, customer-quality, admin-jest, ui-e2e-lifecycle, frontend-e2e, production-simulation]
 
     steps:
     - name: Checkout code

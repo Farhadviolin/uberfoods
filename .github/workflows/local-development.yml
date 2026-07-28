@@ -17,6 +17,8 @@ jobs:
   api-verification:
     if: inputs.test_type == 'all' || inputs.test_type == 'api-only'
     runs-on: ubuntu-latest
+    env:
+      TEST_DRIVER_PASSWORD: local-development-driver-password-placeholder
 
     services:
       postgres:

@@ -8,6 +8,7 @@ import { AuthController } from "./auth.controller";
 import { SocialAuthService } from "./social-auth.service";
 import { MfaService } from "./mfa.service";
 import { DatabaseModule } from "../../common/database/database.module";
+import { DriverAuditService } from "../../common/services/driver-audit.service";
 import { RbacModule } from "../rbac/rbac.module";
 
 @Module({
@@ -33,7 +34,13 @@ import { RbacModule } from "../rbac/rbac.module";
       inject: [ConfigService],
     }),
   ],
-  providers: [AuthService, JwtStrategy, SocialAuthService, MfaService],
+  providers: [
+    AuthService,
+    JwtStrategy,
+    SocialAuthService,
+    MfaService,
+    DriverAuditService,
+  ],
   controllers: [AuthController],
   exports: [AuthService, JwtStrategy, SocialAuthService, MfaService, JwtModule],
 })

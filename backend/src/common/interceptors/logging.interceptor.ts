@@ -71,19 +71,20 @@ export class LoggingInterceptor implements NestInterceptor {
     if (!body) return body;
 
     const sanitized = { ...body };
-
-    // Entferne sensible Daten
-    if (sanitized.password) {
-      sanitized.password = "***";
-    }
-    if (sanitized.currentPassword) {
-      sanitized.currentPassword = "***";
-    }
-    if (sanitized.newPassword) {
-      sanitized.newPassword = "***";
-    }
-    if (sanitized.token) {
-      sanitized.token = "***";
+    const sensitiveFields = [
+      "password",
+      "currentPassword",
+      "newPassword",
+      "token",
+      "access_token",
+      "accessToken",
+      "refresh_token",
+      "refreshToken",
+    ];
+    for (const field of sensitiveFields) {
+      if (field in sanitized) {
+        sanitized[field] = "***";
+      }
     }
 
     return sanitized;

@@ -10,6 +10,8 @@ on:
 jobs:
   api-verification:
     runs-on: ubuntu-latest
+    env:
+      TEST_DRIVER_PASSWORD: ci-driver-password-placeholder
 
     services:
       postgres:

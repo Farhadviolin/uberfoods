@@ -1,5 +1,5 @@
 .git
-.gitignore
+.github
 **/node_modules
 **/dist
 **/build
@@ -9,7 +9,9 @@
 **/.env
 **/.env.*
 !**/.env.example
-*.log
-*.zip
+**/*.log
+backend/uploads
+backend/logs
+mobile
 tmp
-**/tmp
+artifacts

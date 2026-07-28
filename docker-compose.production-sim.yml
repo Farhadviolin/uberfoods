@@ -1,0 +1,125 @@
+services:
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: uberfoods
+      POSTGRES_PASSWORD: ${PROD_SIM_POSTGRES_PASSWORD:?set by verifier}
+      POSTGRES_DB: uberfoods
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U uberfoods -d uberfoods"]
+      interval: 5s
+      timeout: 5s
+      retries: 24
+
+  redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 24
+
+  migration:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+      target: migration
+    environment: &backend-env
+      NODE_ENV: production
+      DATABASE_URL: postgresql://uberfoods:${PROD_SIM_POSTGRES_PASSWORD:?set by verifier}@postgres:5432/uberfoods
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: ${PROD_SIM_JWT_SECRET:?set by verifier}
+      JWT_REFRESH_SECRET: ${PROD_SIM_JWT_REFRESH_SECRET:?set by verifier}
+      ALLOWED_ORIGINS: ${PROD_SIM_ALLOWED_ORIGINS:?set by verifier}
+      STRIPE_SECRET_KEY: test_stripe_key_not_for_network
+      STRIPE_WEBHOOK_SECRET: test_stripe_webhook_not_for_network
+      STRIPE_PRICE_BASIC: price_basic_test
+      STRIPE_PRICE_PRO: price_pro_test
+      STRIPE_PRICE_FULLTIME: price_fulltime_test
+      STRIPE_PRICE_ENTERPRISE: price_enterprise_test
+      PAYPAL_CLIENT_ID: test_paypal_client_not_for_network
+      PAYPAL_CLIENT_SECRET: test_paypal_secret_not_for_network
+      PAYPAL_WEBHOOK_ID: test_paypal_webhook_not_for_network
+      TEST_DRIVER_PASSWORD: ${PROD_SIM_DRIVER_PASSWORD:?set by verifier}
+      SEED_CUSTOMER_PASSWORD: ${PROD_SIM_SEED_CUSTOMER_PASSWORD:?set by verifier}
+      SEED_RESTAURANT_PASSWORD: ${PROD_SIM_SEED_RESTAURANT_PASSWORD:?set by verifier}
+      SEED_DRIVER_PASSWORD: ${PROD_SIM_SEED_DRIVER_PASSWORD:?set by verifier}
+      RESTAURANT_TEST_EMAIL: ci-restaurant@example.test
+      RESTAURANT_TEST_PASSWORD: ${PROD_SIM_RESTAURANT_PASSWORD:?set by verifier}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: ["npm", "run", "prisma:migrate:deploy"]
+
+  seed:
+    extends:
+      service: migration
+    command: ["npm", "run", "prisma:seed"]
+
+  tooling:
+    extends:
+      service: migration
+    command: ["node", "-e", "process.exit(0)"]
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+      target: production
+    environment: *backend-env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:${PROD_SIM_BACKEND_PORT:?set by verifier}:3000"
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/api/health', r => process.exit(r.statusCode === 200 ? 0 : 1))"]
+      interval: 5s
+      timeout: 5s
+      retries: 24
+
+  customer-web: &frontend
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+      args:
+        APP_NAME: customer-web
+        VITE_API_BASE_URL: /api
+        VITE_API_URL: /api
+        VITE_WS_URL: /socket.io
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:${PROD_SIM_CUSTOMER_PORT:?set by verifier}:80"
+
+  admin-panel:
+    <<: *frontend
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+      args: { APP_NAME: admin-panel, VITE_API_BASE_URL: /api, VITE_API_URL: /api, VITE_WS_URL: /socket.io }
+    ports: ["127.0.0.1:${PROD_SIM_ADMIN_PORT:?set by verifier}:80"]
+
+  restaurant-web:
+    <<: *frontend
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+      args: { APP_NAME: restaurant-web, VITE_API_BASE_URL: /api, VITE_API_URL: /api, VITE_WS_URL: /socket.io }
+    ports: ["127.0.0.1:${PROD_SIM_RESTAURANT_PORT:?set by verifier}:80"]
+
+  driver-web:
+    <<: *frontend
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+      args: { APP_NAME: driver-app, VITE_API_BASE_URL: /api, VITE_API_URL: /api, VITE_WS_URL: /socket.io }
+    ports: ["127.0.0.1:${PROD_SIM_DRIVER_PORT:?set by verifier}:80"]
+
+volumes:
+  postgres-data:

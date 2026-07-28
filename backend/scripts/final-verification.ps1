@@ -1,10 +1,56 @@
 # Final Verification Script for UberFoods Backend
 # Tests overall system health and driver functionality
 
+[CmdletBinding()]
+param(
+  [string] $BaseUrl = "http://localhost:3000",
+  [switch] $CredentialContractSelfTest
+)
+
 $ErrorActionPreference = "Stop"
 $ProgressPreference = "SilentlyContinue"
 [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new()
 $OutputEncoding = [System.Text.UTF8Encoding]::new()
+
+function Get-RequiredCredential {
+  param(
+    [Parameter(Mandatory = $true)][string] $Name,
+    [AllowNull()][string] $Value
+  )
+
+  if ([string]::IsNullOrWhiteSpace($Value)) {
+    throw "$Name environment variable is required and must not be empty"
+  }
+
+  return $Value
+}
+
+if ($CredentialContractSelfTest) {
+  foreach ($name in @("TEST_DRIVER_PASSWORD", "RESTAURANT_TEST_PASSWORD")) {
+    foreach ($invalidValue in @($null, "", " `t ")) {
+      try {
+        Get-RequiredCredential -Name $name -Value $invalidValue | Out-Null
+        throw "Expected empty credential to be rejected"
+      } catch {
+        if ($_.Exception.Message -notmatch $name) { throw }
+      }
+    }
+  }
+
+  $specialCharacterPassword = 'contract-$pecial-"-\\-value'
+  foreach ($name in @("TEST_DRIVER_PASSWORD", "RESTAURANT_TEST_PASSWORD")) {
+    $serialized = @{ password = (Get-RequiredCredential -Name $name -Value $specialCharacterPassword) } | ConvertTo-Json -Depth 20 -Compress
+    if (((($serialized | ConvertFrom-Json).password) -cne $specialCharacterPassword)) {
+      throw "$name JSON contract did not preserve special characters"
+    }
+  }
+
+  Write-Host "Credential contract self-test passed: driver and restaurant missing, empty, whitespace, and special-character cases" -ForegroundColor Green
+  exit 0
+}
+
+$driverPassword = Get-RequiredCredential -Name "TEST_DRIVER_PASSWORD" -Value $env:TEST_DRIVER_PASSWORD
+$restaurantPassword = Get-RequiredCredential -Name "RESTAURANT_TEST_PASSWORD" -Value $env:RESTAURANT_TEST_PASSWORD
 
 function Invoke-CurlJson {
   param(
@@ -85,6 +131,19 @@ function Get-AccessTokenFromResponse {
     return $ResponseJson.token
   }
 
+  return $null
+}
+
+function Get-RefreshTokenFromResponse {
+  param(
+    [Parameter(Mandatory = $true)]
+    $ResponseJson
+  )
+
+  if ($null -eq $ResponseJson) { return $null }
+  if ($ResponseJson.data -and $ResponseJson.data.refresh_token) { return $ResponseJson.data.refresh_token }
+  if ($ResponseJson.refresh_token) { return $ResponseJson.refresh_token }
+  if ($ResponseJson.refreshToken) { return $ResponseJson.refreshToken }
   return $null
 }
 
@@ -287,7 +346,7 @@ function Wait-ForBackend {
 }
 
 Write-Host "🚀 Starting Final Verification..." -ForegroundColor Green
-$baseUrl = "http://localhost:3000"
+$baseUrl = $BaseUrl.TrimEnd('/')
 
 # Wait for backend to be ready
 if (-not (Wait-ForBackend -MaxWaitSeconds 60)) {
@@ -306,25 +365,51 @@ Write-Host "✅ Health Check: $($health.Status) - Status: $($health.Json.status)
 
 # Test 2: Driver Login (should return 200 + access_token)
 Write-Host "`n2. Testing Driver Login..." -ForegroundColor Yellow
+$wrongLogin = Invoke-CurlJson -Method "POST" -Url "$baseUrl/api/auth/driver/login" -Body @{
+    email = "testdriver@example.com"
+    password = "${driverPassword}-invalid"
+}
+if ($wrongLogin.Status -ne 401) {
+    Write-Host "❌ Driver Login with wrong password expected 401, got $($wrongLogin.Status)" -ForegroundColor Red
+    exit 1
+}
 $login = Invoke-CurlJson -Method "POST" -Url "$baseUrl/api/auth/driver/login" -Body @{
     email = "testdriver@example.com"
-    password = "password123"
+    password = $driverPassword
 }
 if ($login.Status -notin @(200, 201)) {
     Write-Host "❌ Driver Login Failed: $($login.Status) $($login.Body)" -ForegroundColor Red
     exit 1
 }
 $accessToken = Get-AccessTokenFromResponse -ResponseJson $login.Json
-if (-not $accessToken) {
-    Write-Host "❌ Driver login failed - no access token in response" -ForegroundColor Red
+$refreshToken = Get-RefreshTokenFromResponse -ResponseJson $login.Json
+if (-not $accessToken -or -not $refreshToken) {
+    Write-Host "❌ Driver login failed - expected access and refresh tokens" -ForegroundColor Red
     exit 1
 }
 Write-Host "✅ Driver Login: $($login.Status)" -ForegroundColor Green
 
+$refresh = Invoke-CurlJson -Method "POST" -Url "$baseUrl/api/auth/refresh" -Body @{
+    refresh_token = $refreshToken
+}
+$refreshedAccessToken = Get-AccessTokenFromResponse -ResponseJson $refresh.Json
+if ($refresh.Status -notin @(200, 201) -or -not $refreshedAccessToken) {
+    Write-Host "❌ Refresh token flow failed: status=$($refresh.Status)" -ForegroundColor Red
+    exit 1
+}
+Write-Host "✅ Refresh Token Flow: $($refresh.Status)" -ForegroundColor Green
+
 # Test 2a: Restaurant Login for order status updates
 Write-Host "`n2a. Testing Restaurant Login..." -ForegroundColor Yellow
 $restaurantEmail = if ($env:RESTAURANT_TEST_EMAIL) { $env:RESTAURANT_TEST_EMAIL } else { "ci-restaurant@example.test" }
-$restaurantPassword = if ($env:RESTAURANT_TEST_PASSWORD) { $env:RESTAURANT_TEST_PASSWORD } else { "ci-restaurant-password-placeholder" }
+$wrongRestaurantLogin = Invoke-CurlJson -Method "POST" -Url "$baseUrl/api/auth/restaurant/login" -Body @{
+    email = $restaurantEmail
+    password = "${restaurantPassword}-invalid"
+}
+if ($wrongRestaurantLogin.Status -ne 401) {
+    Write-Host "❌ Restaurant Login with wrong password expected 401, got $($wrongRestaurantLogin.Status)" -ForegroundColor Red
+    exit 1
+}
 $restaurantLogin = Invoke-CurlJson -Method "POST" -Url "$baseUrl/api/auth/restaurant/login" -Body @{
     email = $restaurantEmail
     password = $restaurantPassword
@@ -551,6 +636,7 @@ if (-not $verifiedDriverId) {
     Write-Host "Customer verification driverId detected: $verifiedDriverId" -ForegroundColor Green
 }
 Write-Host "✅ Customer Verification: $($verifiedOrder.Status) - Status: $verifiedStatus, Driver: $verifiedDriverId" -ForegroundColor Green
+Write-Host "PRODUCTION_SIM_ORDER_ID=$orderId"
 
 # Test 5: System Status Summary
 Write-Host "`n5. System Health Summary..." -ForegroundColor Yellow

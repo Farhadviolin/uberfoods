@@ -6,6 +6,12 @@ $ProgressPreference = "SilentlyContinue"
 [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new()
 $OutputEncoding = [System.Text.UTF8Encoding]::new()
 
+if ([string]::IsNullOrWhiteSpace($env:TEST_DRIVER_PASSWORD)) {
+  throw "TEST_DRIVER_PASSWORD environment variable is required and must not be empty"
+}
+
+$driverPassword = $env:TEST_DRIVER_PASSWORD
+
 function Invoke-CurlJson {
   param(
     [Parameter(Mandatory)] [string] $Method,
@@ -219,8 +225,10 @@ if (-not (Wait-ForBackend -MaxWaitSeconds 60)) {
 
 # Test 1: Driver Login
 Write-Host "`n1. Testing Driver Login..." -ForegroundColor Yellow
-$loginJson = '{"email":"testdriver@example.com","password":"password123"}'
-$login = Invoke-CurlJson -Method "POST" -Url "$baseUrl/api/auth/driver/login" -Body $loginJson
+$login = Invoke-CurlJson -Method "POST" -Url "$baseUrl/api/auth/driver/login" -Body @{
+    email = "testdriver@example.com"
+    password = $driverPassword
+}
 if ($login.Status -notin @(200, 201)) {
     Write-Host "❌ Driver Login Failed: $($login.Status) $($login.Body)" -ForegroundColor Red
     exit 1

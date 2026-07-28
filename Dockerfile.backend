@@ -1,57 +1,41 @@
-# Multi-stage build for optimized production image
-
-# Stage 1: Dependencies
+# Production image.  Keep the repository layout while installing packages: the
+# package post-install hook deliberately resolves ../scripts from backend/.
 FROM node:20-bullseye-slim AS dependencies
-WORKDIR /app
-COPY backend/package*.json ./
-RUN npm ci --only=production
-
-# Stage 2: Build
-FROM node:20-bullseye-slim AS builder
-WORKDIR /app
-COPY backend/package*.json ./
+WORKDIR /workspace
+COPY scripts/patch-brace-expansion-cjs.cjs scripts/patch-brace-expansion-cjs.cjs
+COPY backend/package*.json backend/
+WORKDIR /workspace/backend
 RUN npm ci
-COPY backend/ ./
-RUN npx prisma generate
+
+FROM dependencies AS builder
+COPY backend ./
 RUN npm run build
 
-# Stage 3: Production
+# This target is intentionally only used by the isolated simulation for the
+# explicit migration, seed, and fixture commands.  It is never an app runtime.
+FROM builder AS migration
+WORKDIR /workspace/backend
+
+FROM builder AS production-dependencies
+RUN npm prune --omit=dev
+
 FROM node:20-bullseye-slim AS production
 WORKDIR /app
-
-# Install dumb-init for proper signal handling
 RUN apt-get update \
   && apt-get install -y --no-install-recommends dumb-init \
-  && rm -rf /var/lib/apt/lists/*
-
-# Create non-root user
-RUN groupadd -g 1001 nodejs \
+  && rm -rf /var/lib/apt/lists/* \
+  && groupadd -g 1001 nodejs \
   && useradd -u 1001 -g nodejs -m nodejs
-
-# Copy dependencies
-COPY --from=dependencies --chown=nodejs:nodejs /app/node_modules ./node_modules
-# Copy generated Prisma client artifacts from the build stage
-COPY --from=builder --chown=nodejs:nodejs /app/node_modules/.prisma ./node_modules/.prisma
-
-# Copy built application
-COPY --from=builder --chown=nodejs:nodejs /app/dist ./dist
-COPY --from=builder --chown=nodejs:nodejs /app/prisma ./prisma
-COPY --from=builder --chown=nodejs:nodejs /app/package*.json ./
-
-# Create runtime directories used by logger, uploads and health-related services
-RUN mkdir -p logs uploads/restaurants uploads/dishes uploads/reviews && \
-    chown -R nodejs:nodejs logs uploads
-
-# Switch to non-root user
+COPY --from=production-dependencies --chown=nodejs:nodejs /workspace/backend/node_modules ./node_modules
+COPY --from=builder --chown=nodejs:nodejs /workspace/backend/node_modules/.prisma ./node_modules/.prisma
+COPY --from=builder --chown=nodejs:nodejs /workspace/backend/dist ./dist
+COPY --from=builder --chown=nodejs:nodejs /workspace/backend/prisma ./prisma
+COPY --from=builder --chown=nodejs:nodejs /workspace/backend/package*.json ./
+RUN mkdir -p logs uploads/restaurants uploads/dishes uploads/reviews \
+  && chown -R nodejs:nodejs logs uploads
 USER nodejs
-
-# Expose port
 EXPOSE 3000
-
-# Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
   CMD node -e "require('http').get('http://localhost:3000/api/health', (r) => process.exit(r.statusCode === 200 ? 0 : 1))"
-
-# Start application with dumb-init
 ENTRYPOINT ["dumb-init", "--"]
 CMD ["node", "dist/main.prod.js"]

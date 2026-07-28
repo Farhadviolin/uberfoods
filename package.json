@@ -18,6 +18,7 @@
     "dev:admin": "npm --prefix frontend/admin-panel run dev:fixed",
     "verify:local": "powershell -NoLogo -NoProfile -ExecutionPolicy Bypass -File scripts/verify-local.ps1",
     "verify:local:no-docker": "powershell -NoLogo -NoProfile -ExecutionPolicy Bypass -File scripts/verify-local-no-docker.ps1",
+    "verify:production-simulation": "node scripts/verify-production-simulation.mjs",
     "prisma:generate": "npm --prefix backend run prisma:generate",
     "prisma:migrate:dev": "npm --prefix backend run prisma:migrate:dev",
     "prisma:migrate:deploy": "npm --prefix backend run prisma:migrate:deploy",
