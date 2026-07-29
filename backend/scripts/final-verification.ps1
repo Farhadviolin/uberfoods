@@ -385,6 +385,7 @@ function Get-OrderCollection {
   if ($ResponseJson.data -and $ResponseJson.data.orders) { return @($ResponseJson.data.orders) }
   if ($ResponseJson.orders) { return @($ResponseJson.orders) }
   if ($ResponseJson -is [array]) { return @($ResponseJson) }
+  if (Get-OrderIdFromResponse -ResponseJson $ResponseJson) { return @($ResponseJson) }
   return @()
 }
 

@@ -16,6 +16,10 @@ const verifier = readFileSync(
   path.join(repoRoot, "scripts/verify-production-simulation.mjs"),
   "utf8",
 );
+const finalVerification = readFileSync(
+  path.join(repoRoot, "backend/scripts/final-verification.ps1"),
+  "utf8",
+);
 const apiVerificationWorkflows = [
   ".github/workflows/ci.yml",
   ".github/workflows/api-verification.yml",
@@ -84,4 +88,11 @@ test("every API verification workflow provisions the second production-simulatio
       `${relativePath} must provision Driver B before final verification runs`,
     );
   }
+});
+
+test("final verification preserves a single available order enumerated by PowerShell", () => {
+  assert.match(
+    finalVerification,
+    /if \(Get-OrderIdFromResponse -ResponseJson \$ResponseJson\) \{ return @\(\$ResponseJson\) \}/,
+  );
 });
