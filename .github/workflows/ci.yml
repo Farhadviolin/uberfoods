@@ -114,6 +114,10 @@ jobs:
       working-directory: ./backend
       run: npm run typecheck
 
+    - name: Run complete backend Jest suite
+      working-directory: ./backend
+      run: npm run test:backend
+
     - name: Verify fresh database and seed idempotency
       working-directory: ./backend
       run: npm run verify:fresh-db-seed-idempotency

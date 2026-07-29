@@ -7,6 +7,7 @@ import { DatabaseModule } from "./common/database/database.module";
 
 // Feature Modules - Core E2E modules (Auth, Admin)
 import { AuthModule } from "./modules/auth/auth.module";
+import { DriverModule } from "./modules/driver/driver.module";
 import { AdminModule } from "./modules/admin/admin.module";
 import { RestaurantModule } from "./modules/restaurant/restaurant.module";
 import { SocialMediaModule } from "./modules/social-media/social-media.module";
@@ -46,6 +47,7 @@ import { AuditLedgerService } from "./common/audit/audit-ledger.service";
 
     // Essential Feature Modules - Core E2E modules
     AuthModule,
+    DriverModule,
     AdminModule,
     RestaurantModule,
     SocialMediaModule,
