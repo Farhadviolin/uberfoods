@@ -52,6 +52,7 @@ function passingFinalState(overrides = {}) {
       classifiedExpectedShutdownDiagnostics: [],
       unexplainedFatalDiagnostics: [],
     },
+    driverRuntimeLifecycle: { result: "PASS" },
     postgresBootstrap: {
       result: "PASS",
       classifiedBootstrapShutdownDiagnostics: [],
@@ -329,12 +330,29 @@ test("primary or cleanup failure still produces one valid nonzero summary", () =
     assert.equal(summary.primaryResult, "PASS");
     assert.equal(summary.cleanupResult, "FAIL");
     assert.equal(summary.runtimeLogAudit.result, "NOT_PROVEN");
+    assert.equal(summary.driverRuntimeLifecycle.result, "NOT_PROVEN");
     assert.equal(summary.postgresBootstrap.result, "NOT_PROVEN");
     assert.equal(summary.initialPostgresContainerId, null);
     assert.deepEqual(summary.classifiedBootstrapShutdownDiagnostics, []);
     assert.deepEqual(summary.classifiedRecreateShutdownDiagnostics, []);
     assert.deepEqual(summary.classifiedExpectedShutdownDiagnostics, []);
     assert.deepEqual(summary.unexplainedFatalDiagnostics, []);
+  }));
+
+test("driver runtime lifecycle is mandatory for a successful final summary", () =>
+  withEvidence((root, evidence) => {
+    const state = passingFinalState();
+    delete state.driverRuntimeLifecycle;
+    const result = finalizeSimulationEvidence({
+      evidence,
+      repoRoot: root,
+      phase: "final",
+      step: "summary",
+    });
+    const summary = JSON.parse(readFileSync(result.result.summaryPath, "utf8"));
+    assert.equal(result.exitCode, 1);
+    assert.equal(summary.result, "FAIL");
+    assert.equal(summary.driverRuntimeLifecycle.result, "NOT_PROVEN");
   }));
 
 test("final summary preserves structured PostgreSQL lifecycle evidence", () =>

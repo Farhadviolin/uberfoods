@@ -128,6 +128,7 @@ export function assertEvidenceSummaryContract(summary) {
   }
   assertArray(summary.artifactFiles, "$.artifactFiles");
   assertObject(summary.runtimeLogAudit, "$.runtimeLogAudit");
+  assertObject(summary.driverRuntimeLifecycle, "$.driverRuntimeLifecycle");
   assertObject(summary.postgresBootstrap, "$.postgresBootstrap");
   assertObject(summary.postgresRecreate, "$.postgresRecreate");
   assertObject(summary.secretScan, "$.secretScan");
@@ -141,6 +142,7 @@ export function assertEvidenceSummaryContract(summary) {
   }
   for (const [object, field] of [
     [summary.runtimeLogAudit, "$.runtimeLogAudit"],
+    [summary.driverRuntimeLifecycle, "$.driverRuntimeLifecycle"],
     [summary.postgresBootstrap, "$.postgresBootstrap"],
     [summary.postgresRecreate, "$.postgresRecreate"],
     [summary.secretScan, "$.secretScan"],
@@ -381,7 +383,13 @@ export function finalizeSimulationEvidence({
   runtimeLogAuditStatus,
   stderr = console.error,
 }) {
-  const exitCode = primaryFailure || cleanupFailure ? 1 : 0;
+  const driverRuntimeLifecycle = evidence.summary.driverRuntimeLifecycle ?? {
+    result: "NOT_PROVEN",
+  };
+  const exitCode =
+    primaryFailure || cleanupFailure || driverRuntimeLifecycle.result !== "PASS"
+      ? 1
+      : 0;
   const finalState = {
     exitCode,
     result: exitCode === 0 ? "PASS" : "FAIL",
@@ -396,6 +404,7 @@ export function finalizeSimulationEvidence({
       classifiedExpectedShutdownDiagnostics: [],
       unexplainedFatalDiagnostics: [],
     },
+    driverRuntimeLifecycle,
     persistenceComparison: evidence.summary.persistenceComparison ?? {
       result: "NOT_PROVEN",
     },

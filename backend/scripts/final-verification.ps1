@@ -26,7 +26,7 @@ function Get-RequiredCredential {
 }
 
 if ($CredentialContractSelfTest) {
-  foreach ($name in @("TEST_DRIVER_PASSWORD", "RESTAURANT_TEST_PASSWORD")) {
+  foreach ($name in @("TEST_DRIVER_PASSWORD", "PROD_SIM_DRIVER_B_PASSWORD", "RESTAURANT_TEST_PASSWORD")) {
     foreach ($invalidValue in @($null, "", " `t ")) {
       try {
         Get-RequiredCredential -Name $name -Value $invalidValue | Out-Null
@@ -38,7 +38,7 @@ if ($CredentialContractSelfTest) {
   }
 
   $specialCharacterPassword = 'contract-$pecial-"-\\-value'
-  foreach ($name in @("TEST_DRIVER_PASSWORD", "RESTAURANT_TEST_PASSWORD")) {
+  foreach ($name in @("TEST_DRIVER_PASSWORD", "PROD_SIM_DRIVER_B_PASSWORD", "RESTAURANT_TEST_PASSWORD")) {
     $serialized = @{ password = (Get-RequiredCredential -Name $name -Value $specialCharacterPassword) } | ConvertTo-Json -Depth 20 -Compress
     if (((($serialized | ConvertFrom-Json).password) -cne $specialCharacterPassword)) {
       throw "$name JSON contract did not preserve special characters"
@@ -50,6 +50,7 @@ if ($CredentialContractSelfTest) {
 }
 
 $driverPassword = Get-RequiredCredential -Name "TEST_DRIVER_PASSWORD" -Value $env:TEST_DRIVER_PASSWORD
+$driverBPassword = Get-RequiredCredential -Name "PROD_SIM_DRIVER_B_PASSWORD" -Value $env:PROD_SIM_DRIVER_B_PASSWORD
 $restaurantPassword = Get-RequiredCredential -Name "RESTAURANT_TEST_PASSWORD" -Value $env:RESTAURANT_TEST_PASSWORD
 
 function Invoke-CurlJson {
@@ -369,6 +370,57 @@ $wrongLogin = Invoke-CurlJson -Method "POST" -Url "$baseUrl/api/auth/driver/logi
     email = "testdriver@example.com"
     password = "${driverPassword}-invalid"
 }
+
+function Get-JwtSubject {
+  param([Parameter(Mandatory = $true)][string] $Token)
+  $payload = $Token.Split('.')[1].Replace('-', '+').Replace('_', '/')
+  while (($payload.Length % 4) -ne 0) { $payload += '=' }
+  return [string](([Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($payload)) | ConvertFrom-Json).sub)
+}
+
+function Get-OrderCollection {
+  param($ResponseJson)
+  if ($null -eq $ResponseJson) { return @() }
+  if ($ResponseJson.data -is [array]) { return @($ResponseJson.data) }
+  if ($ResponseJson.data -and $ResponseJson.data.orders) { return @($ResponseJson.data.orders) }
+  if ($ResponseJson.orders) { return @($ResponseJson.orders) }
+  if ($ResponseJson -is [array]) { return @($ResponseJson) }
+  return @()
+}
+
+function Find-Order {
+  param($ResponseJson, [string]$ExpectedOrderId)
+  return @(Get-OrderCollection -ResponseJson $ResponseJson | Where-Object {
+    ([string](Get-OrderIdFromResponse -ResponseJson $_)) -eq $ExpectedOrderId
+  })[0]
+}
+
+function Assert-NoProtectedOrderLeak {
+  param([Parameter(Mandatory = $true)]$Response)
+  $payload = $Response.Json
+  if ($payload -and ($payload.data -or $payload.order -or $payload.customer -or $payload.restaurant)) {
+    throw "Forbidden response leaked protected order, customer, or restaurant data"
+  }
+}
+
+function Assert-DriverAOrderUnchanged {
+  param(
+    [Parameter(Mandatory = $true)][string]$ExpectedOrderId,
+    [Parameter(Mandatory = $true)][string]$ExpectedDriverId,
+    [Parameter(Mandatory = $true)][string]$ExpectedStatus,
+    [Parameter(Mandatory = $true)][string]$Token,
+    [Parameter(Mandatory = $true)][string]$Label
+  )
+  $active = Invoke-CurlJson -Method "GET" -Url "$baseUrl/api/drivers/orders/active" -Headers @{
+      Authorization = "Bearer $Token"
+  }
+  $activeOrder = Find-Order $active.Json $ExpectedOrderId
+  if ($active.Status -ne 200 -or -not $activeOrder -or
+      (Get-OrderStatusFromResponse $activeOrder) -ne $ExpectedStatus -or
+      ([string](Get-DriverIdFromResponse $activeOrder)) -ne $ExpectedDriverId) {
+      throw "$Label changed Driver A order state or ownership"
+  }
+}
 if ($wrongLogin.Status -ne 401) {
     Write-Host "❌ Driver Login with wrong password expected 401, got $($wrongLogin.Status)" -ForegroundColor Red
     exit 1
@@ -388,6 +440,20 @@ if (-not $accessToken -or -not $refreshToken) {
     exit 1
 }
 Write-Host "✅ Driver Login: $($login.Status)" -ForegroundColor Green
+$driverAId = Get-JwtSubject -Token $accessToken
+
+$driverBLogin = Invoke-CurlJson -Method "POST" -Url "$baseUrl/api/auth/driver/login" -Body @{
+    email = "production-sim-driver-b@example.test"
+    password = $driverBPassword
+}
+$driverBToken = Get-AccessTokenFromResponse -ResponseJson $driverBLogin.Json
+if ($driverBLogin.Status -notin @(200, 201) -or -not $driverBToken) {
+    throw "Driver B login failed: status=$($driverBLogin.Status)"
+}
+$driverBId = Get-JwtSubject -Token $driverBToken
+if (-not $driverAId -or -not $driverBId -or $driverAId -eq $driverBId) {
+    throw "Driver runtime verification requires two distinct authenticated drivers"
+}
 
 $refresh = Invoke-CurlJson -Method "POST" -Url "$baseUrl/api/auth/refresh" -Body @{
     refresh_token = $refreshToken
@@ -572,16 +638,84 @@ foreach ($restaurantStatus in @("CONFIRMED", "PREPARING", "READY_FOR_PICKUP")) {
 }
 Write-Host "✅ Order Status Updated: $($ready.Status) - Status: $readyStatus" -ForegroundColor Green
 
-# Step 3: Driver accepts order (200/201)
+# Step 3: Driver discovery, RBAC, acceptance and isolation
 Write-Host "   Step 3: Driver accepts order..." -ForegroundColor Cyan
+$availableNoAuth = Invoke-CurlJson -Method "GET" -Url "$baseUrl/api/drivers/orders/available"
+if ($availableNoAuth.Status -ne 401) { throw "Available orders without authentication expected 401, got $($availableNoAuth.Status)" }
+$availableWrongRole = Invoke-CurlJson -Method "GET" -Url "$baseUrl/api/drivers/orders/available" -Headers @{
+    Authorization = "Bearer $customerToken"
+}
+if ($availableWrongRole.Status -ne 403) { throw "Available orders with customer role expected 403, got $($availableWrongRole.Status)" }
+$availableBefore = Invoke-CurlJson -Method "GET" -Url "$baseUrl/api/drivers/orders/available" -Headers @{
+    Authorization = "Bearer $accessToken"
+}
+$availableOrder = Find-Order -ResponseJson $availableBefore.Json -ExpectedOrderId $orderId
+if ($availableBefore.Status -ne 200 -or -not $availableOrder) { throw "READY_FOR_PICKUP order was not visible to Driver A" }
+if ((Get-OrderStatusFromResponse $availableOrder) -ne "READY_FOR_PICKUP") { throw "Available order had an unexpected status" }
+$availableRestaurantId = [string]$(if ($availableOrder.restaurantId) { $availableOrder.restaurantId } elseif ($availableOrder.restaurant.id) { $availableOrder.restaurant.id })
+$availableCustomerId = [string]$(if ($availableOrder.customerId) { $availableOrder.customerId } elseif ($availableOrder.customer.id) { $availableOrder.customer.id })
+if ($availableRestaurantId -ne $restaurantId -or $availableCustomerId -ne $customerId) {
+    throw "Available order did not correlate to the expected restaurant and customer"
+}
+$activeBefore = Invoke-CurlJson -Method "GET" -Url "$baseUrl/api/drivers/orders/active" -Headers @{
+    Authorization = "Bearer $accessToken"
+}
+if ($activeBefore.Status -ne 200 -or (Find-Order $activeBefore.Json $orderId)) { throw "Unaccepted order unexpectedly appeared in Driver A active orders" }
+
 $accept = Invoke-CurlJson -Method "POST" -Url "$baseUrl/api/drivers/orders/$orderId/accept" -Headers @{
     Authorization = "Bearer $accessToken"
 }
-if ($accept.Status -notin @(200, 201)) {
+if ($accept.Status -ne 201 -or (Get-OrderStatusFromResponse $accept.Json) -ne "ACCEPTED" -or
+    ([string](Get-DriverIdFromResponse $accept.Json)) -ne $driverAId -or
+    ([string](Get-OrderIdFromResponse $accept.Json)) -ne $orderId) {
     Write-Host "❌ Order Acceptance Failed: $($accept.Status) $($accept.Body)" -ForegroundColor Red
     exit 1
 }
 Write-Host "✅ Order Accepted: $($accept.Status) - Status: $($accept.Json.data.status), Driver: $($accept.Json.data.driverId)" -ForegroundColor Green
+
+$availableAfter = Invoke-CurlJson -Method "GET" -Url "$baseUrl/api/drivers/orders/available" -Headers @{
+    Authorization = "Bearer $accessToken"
+}
+if ($availableAfter.Status -ne 200 -or (Find-Order $availableAfter.Json $orderId)) { throw "Accepted order remained available" }
+$activeAfter = Invoke-CurlJson -Method "GET" -Url "$baseUrl/api/drivers/orders/active" -Headers @{
+    Authorization = "Bearer $accessToken"
+}
+$activeOrder = Find-Order $activeAfter.Json $orderId
+if ($activeAfter.Status -ne 200 -or -not $activeOrder -or (Get-OrderStatusFromResponse $activeOrder) -ne "ACCEPTED" -or
+    ([string](Get-DriverIdFromResponse $activeOrder)) -ne $driverAId) { throw "Driver A active-order ownership was not established" }
+
+$crossRead = Invoke-CurlJson -Method "GET" -Url "$baseUrl/api/drivers/$driverAId/orders/active" -Headers @{
+    Authorization = "Bearer $driverBToken"
+}
+if ($crossRead.Status -ne 403) { throw "Cross-driver alias read expected 403, got $($crossRead.Status)" }
+Assert-NoProtectedOrderLeak -Response $crossRead
+Assert-DriverAOrderUnchanged -ExpectedOrderId $orderId -ExpectedDriverId $driverAId -ExpectedStatus "ACCEPTED" -Token $accessToken -Label "Cross-driver alias read"
+$crossAccept = Invoke-CurlJson -Method "POST" -Url "$baseUrl/api/drivers/orders/$orderId/accept" -Headers @{
+    Authorization = "Bearer $driverBToken"
+}
+if ($crossAccept.Status -ne 409) { throw "Cross-driver accept expected 409, got $($crossAccept.Status)" }
+Assert-NoProtectedOrderLeak -Response $crossAccept
+Assert-DriverAOrderUnchanged -ExpectedOrderId $orderId -ExpectedDriverId $driverAId -ExpectedStatus "ACCEPTED" -Token $accessToken -Label "Cross-driver accept"
+$crossStatus = Invoke-CurlJson -Method "PUT" -Url "$baseUrl/api/drivers/orders/$orderId/status" -Headers @{
+    Authorization = "Bearer $driverBToken"
+} -Body @{ status = "PICKED_UP" }
+if ($crossStatus.Status -ne 403) { throw "Cross-driver status update expected 403, got $($crossStatus.Status)" }
+Assert-NoProtectedOrderLeak -Response $crossStatus
+Assert-DriverAOrderUnchanged -ExpectedOrderId $orderId -ExpectedDriverId $driverAId -ExpectedStatus "ACCEPTED" -Token $accessToken -Label "Cross-driver status update"
+
+$illegalTransition = Invoke-CurlJson -Method "PUT" -Url "$baseUrl/api/drivers/orders/$orderId/status" -Headers @{
+    Authorization = "Bearer $accessToken"
+} -Body @{ status = "DELIVERED" }
+if ($illegalTransition.Status -ne 409) { throw "Illegal ACCEPTED to DELIVERED transition expected 409, got $($illegalTransition.Status)" }
+$unchangedActive = Invoke-CurlJson -Method "GET" -Url "$baseUrl/api/drivers/orders/active" -Headers @{
+    Authorization = "Bearer $accessToken"
+}
+$unchangedOrder = Find-Order $unchangedActive.Json $orderId
+if ($unchangedActive.Status -ne 200 -or -not $unchangedOrder -or
+    (Get-OrderStatusFromResponse $unchangedOrder) -ne "ACCEPTED" -or
+    ([string](Get-DriverIdFromResponse $unchangedOrder)) -ne $driverAId) {
+    throw "Rejected cross-driver or illegal mutation changed order state or ownership"
+}
 
 # Step 4: Driver advances the order to DELIVERED (200)
 Write-Host "   Step 4: Driver advances to DELIVERED..." -ForegroundColor Cyan
@@ -637,6 +771,27 @@ if (-not $verifiedDriverId) {
 }
 Write-Host "✅ Customer Verification: $($verifiedOrder.Status) - Status: $verifiedStatus, Driver: $verifiedDriverId" -ForegroundColor Green
 Write-Host "PRODUCTION_SIM_ORDER_ID=$orderId"
+$driverRuntimeEvidence = [ordered]@{
+    result = "PASS"
+    orderId = $orderId
+    driverAId = $driverAId
+    driverBId = $driverBId
+    noAuthAvailableStatus = $availableNoAuth.Status
+    wrongRoleAvailableStatus = $availableWrongRole.Status
+    availableStatus = $availableBefore.Status
+    activeStatus = $activeAfter.Status
+    acceptStatus = $accept.Status
+    crossReadStatus = $crossRead.Status
+    crossAcceptStatus = $crossAccept.Status
+    crossStatusUpdateStatus = $crossStatus.Status
+    illegalTransitionStatus = $illegalTransition.Status
+    lifecycle = @("READY_FOR_PICKUP", "ACCEPTED", "PICKED_UP", "DELIVERED")
+    finalStatus = $verifiedStatus
+    finalDriverId = [string]$verifiedDriverId
+}
+$driverRuntimeJson = $driverRuntimeEvidence | ConvertTo-Json -Depth 20 -Compress
+$driverRuntimeEncoded = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($driverRuntimeJson)).TrimEnd('=').Replace('+', '-').Replace('/', '_')
+Write-Host "PRODUCTION_SIM_DRIVER_RUNTIME_EVIDENCE=$driverRuntimeEncoded"
 
 # Test 5: System Status Summary
 Write-Host "`n5. System Health Summary..." -ForegroundColor Yellow

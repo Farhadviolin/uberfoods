@@ -42,3 +42,18 @@ test("command evidence is non-empty and failed log audits preserve unexplained d
     /evidence\.summary\.unexplainedFatalDiagnostics\s*=\s*result\.unexplainedFatalDiagnostics/,
   );
 });
+
+test("production simulation provisions and proves two-driver runtime isolation", () => {
+  assert.match(
+    compose,
+    /PROD_SIM_DRIVER_B_PASSWORD: \$\{PROD_SIM_DRIVER_B_PASSWORD:\?set by verifier\}/,
+  );
+  assert.match(verifier, /create-production-sim-driver-b\.js/);
+  assert.match(verifier, /parseDriverRuntimeEvidence/);
+  assert.match(verifier, /crossReadStatus: 403/);
+  assert.match(verifier, /crossAcceptStatus: 409/);
+  assert.match(verifier, /crossStatusUpdateStatus: 403/);
+  assert.match(verifier, /illegalTransitionStatus: 409/);
+  assert.match(verifier, /verifyDriverPersistenceHttp/);
+  assert.match(verifier, /backend container recreation was not proven/);
+});

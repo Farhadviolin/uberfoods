@@ -968,7 +968,111 @@ async function verifyAuthSecretContract(
     driverId,
     environment,
   );
-  return refreshToken;
+  return { accessToken, refreshToken, driverId };
+}
+
+async function loginDriver(backendBase, email, password, label) {
+  const login = await request(`${backendBase}/api/auth/driver/login`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ email, password }),
+  });
+  assertStatus(login, [200, 201], label);
+  const data = unwrap(login.json);
+  if (!data?.access_token) fail(`${label} did not return an access token`);
+  secretValues.add(data.access_token);
+  return {
+    accessToken: data.access_token,
+    driverId: decodeJwtPayload(data.access_token)?.sub,
+  };
+}
+
+function parseDriverRuntimeEvidence(output, expectedOrderId) {
+  const match = output.match(
+    /^PRODUCTION_SIM_DRIVER_RUNTIME_EVIDENCE=([A-Za-z0-9_-]+)$/m,
+  );
+  if (!match) fail("final verification did not report driver runtime evidence");
+  let value;
+  try {
+    value = JSON.parse(Buffer.from(match[1], "base64url").toString("utf8"));
+  } catch {
+    fail("driver runtime evidence was not valid base64url JSON");
+  }
+  const exact = {
+    result: "PASS",
+    orderId: expectedOrderId,
+    noAuthAvailableStatus: 401,
+    wrongRoleAvailableStatus: 403,
+    availableStatus: 200,
+    activeStatus: 200,
+    acceptStatus: 201,
+    crossReadStatus: 403,
+    crossAcceptStatus: 409,
+    crossStatusUpdateStatus: 403,
+    illegalTransitionStatus: 409,
+    finalStatus: "DELIVERED",
+  };
+  for (const [field, expected] of Object.entries(exact)) {
+    if (value?.[field] !== expected)
+      fail(`driver runtime evidence ${field} did not equal ${expected}`);
+  }
+  if (
+    !value.driverAId ||
+    !value.driverBId ||
+    value.driverAId === value.driverBId ||
+    value.finalDriverId !== value.driverAId ||
+    JSON.stringify(value.lifecycle) !==
+      JSON.stringify(["READY_FOR_PICKUP", "ACCEPTED", "PICKED_UP", "DELIVERED"])
+  ) {
+    fail("driver runtime evidence did not prove lifecycle ownership");
+  }
+  return value;
+}
+
+async function verifyDriverPersistenceHttp(
+  backendBase,
+  orderId,
+  driverA,
+  driverB,
+  checkpoint,
+) {
+  const ownerRead = await request(`${backendBase}/api/orders/${orderId}`, {
+    headers: { authorization: `Bearer ${driverA.accessToken}` },
+  });
+  assertStatus(ownerRead, [200], `${checkpoint} Driver A order read`);
+  const ownerOrder = unwrap(ownerRead.json);
+  if (
+    ownerOrder?.id !== orderId ||
+    ownerOrder?.status !== "DELIVERED" ||
+    ownerOrder?.driverId !== driverA.driverId
+  )
+    fail(`${checkpoint} Driver A ownership/state was not preserved`);
+  const foreignRead = await request(`${backendBase}/api/orders/${orderId}`, {
+    headers: { authorization: `Bearer ${driverB.accessToken}` },
+  });
+  assertStatus(foreignRead, [403], `${checkpoint} Driver B order read`);
+  const foreignPayload = foreignRead.json;
+  if (
+    foreignPayload?.data ||
+    foreignPayload?.order ||
+    foreignPayload?.customer ||
+    foreignPayload?.restaurant
+  )
+    fail(`${checkpoint} Driver B response leaked protected order data`);
+  for (const driver of [driverA, driverB]) {
+    const active = await request(`${backendBase}/api/drivers/orders/active`, {
+      headers: { authorization: `Bearer ${driver.accessToken}` },
+    });
+    assertStatus(active, [200], `${checkpoint} active orders`);
+    if (active.text.includes(orderId))
+      fail(`${checkpoint} delivered order remained active`);
+  }
+  const alias = await request(
+    `${backendBase}/api/drivers/${driverA.driverId}/orders/active`,
+    { headers: { authorization: `Bearer ${driverB.accessToken}` } },
+  );
+  assertStatus(alias, [403], `${checkpoint} cross-driver alias`);
+  return { result: "PASS", checkpoint };
 }
 
 async function verifyRefreshFlow(
@@ -1077,6 +1181,7 @@ async function main() {
   const jwtSecret = `sim_jwt_${randomBytes(32).toString("hex")}`;
   const jwtRefreshSecret = `sim_refresh_${randomBytes(32).toString("hex")}`;
   const driverPassword = `sim_driver_${randomBytes(12).toString("hex")}`;
+  const driverBPassword = `sim_driver_b_${randomBytes(12).toString("hex")}`;
   const restaurantPassword = `sim_restaurant_${randomBytes(12).toString("hex")}`;
   const seedCustomerPassword = `sim_customer_${randomBytes(12).toString("hex")}`;
   const seedRestaurantPassword = `sim_seed_restaurant_${randomBytes(12).toString("hex")}`;
@@ -1086,6 +1191,7 @@ async function main() {
     jwtSecret,
     jwtRefreshSecret,
     driverPassword,
+    driverBPassword,
     restaurantPassword,
     seedCustomerPassword,
     seedRestaurantPassword,
@@ -1099,6 +1205,7 @@ async function main() {
     PROD_SIM_JWT_SECRET: jwtSecret,
     PROD_SIM_JWT_REFRESH_SECRET: jwtRefreshSecret,
     PROD_SIM_DRIVER_PASSWORD: driverPassword,
+    PROD_SIM_DRIVER_B_PASSWORD: driverBPassword,
     TEST_DRIVER_PASSWORD: driverPassword,
     PROD_SIM_RESTAURANT_PASSWORD: restaurantPassword,
     PROD_SIM_SEED_CUSTOMER_PASSWORD: seedCustomerPassword,
@@ -1220,6 +1327,16 @@ async function main() {
     );
     compose(
       [
+        "run",
+        "--rm",
+        "tooling",
+        "node",
+        "scripts/create-production-sim-driver-b.js",
+      ],
+      { env: environment },
+    );
+    compose(
+      [
         "up",
         "-d",
         "--wait",
@@ -1329,14 +1446,19 @@ async function main() {
     await checkFrontend("driver-web", driverPort, "/login");
 
     assertBackendSecretEnvironment(environment);
-    const refreshToken = await verifyAuthSecretContract(
+    const driverA = await verifyAuthSecretContract(
       backendBase,
       driverPassword,
       jwtSecret,
       jwtRefreshSecret,
       environment,
     );
-    const refreshDriverId = decodeJwtPayload(refreshToken).sub;
+    const driverB = await loginDriver(
+      backendBase,
+      "production-sim-driver-b@example.test",
+      driverBPassword,
+      "Driver B login",
+    );
     const finalVerification = run(
       "pwsh",
       [
@@ -1358,6 +1480,16 @@ async function main() {
       fail("final verification did not report its lifecycle order identifier");
     }
     const lifecycleOrderId = requireOrderId(orderIdMatch[1]);
+    const driverRuntimeLifecycle = parseDriverRuntimeEvidence(
+      finalVerification.output,
+      lifecycleOrderId,
+    );
+    if (driverRuntimeLifecycle.driverAId !== driverA.driverId)
+      fail("final verification Driver A did not match authenticated Driver A");
+    if (driverRuntimeLifecycle.driverBId !== driverB.driverId)
+      fail("final verification Driver B did not match authenticated Driver B");
+    evidence.summary.driverRuntimeLifecycle = driverRuntimeLifecycle;
+    evidence.write("driver-runtime-lifecycle.json", driverRuntimeLifecycle);
     const beforeRestart = databaseSnapshot(lifecycleOrderId);
     const beforeRestartStructured = structuredOrderSnapshot(beforeRestart);
     const persistenceBefore = {
@@ -1387,10 +1519,10 @@ async function main() {
     assertBackendSecretEnvironment(environment);
     await verifyRefreshFlow(
       backendBase,
-      refreshToken,
+      driverA.refreshToken,
       jwtSecret,
       jwtRefreshSecret,
-      refreshDriverId,
+      driverA.driverId,
       environment,
     );
     await verifyRestaurantLogin(backendBase, restaurantPassword);
@@ -1401,7 +1533,19 @@ async function main() {
     );
     if (databaseSnapshot(lifecycleOrderId) !== beforeRestart)
       fail("order state changed during controlled restart");
+    evidence.summary.driverRuntimeLifecycle.afterControlledRestart =
+      await verifyDriverPersistenceHttp(
+        backendBase,
+        lifecycleOrderId,
+        driverA,
+        driverB,
+        "controlled restart",
+      );
     compose(["run", "--rm", "migration"], { env: environment });
+    const backendContainerBeforeRecreate = compose(["ps", "-q", "backend"], {
+      env: environment,
+      quiet: true,
+    }).output.trim();
     compose(
       [
         "up",
@@ -1425,16 +1569,35 @@ async function main() {
     assertBackendSecretEnvironment(environment);
     await verifyRefreshFlow(
       backendBase,
-      refreshToken,
+      driverA.refreshToken,
       jwtSecret,
       jwtRefreshSecret,
-      refreshDriverId,
+      driverA.driverId,
       environment,
     );
     await verifyRestaurantLogin(backendBase, restaurantPassword);
     await checkFrontend("driver-web after recreation", driverPort, "/login");
     if (databaseSnapshot(lifecycleOrderId) !== beforeRestart)
       fail("order state changed during application recreation");
+    const backendContainerAfterRecreate = compose(["ps", "-q", "backend"], {
+      env: environment,
+      quiet: true,
+    }).output.trim();
+    if (
+      !backendContainerBeforeRecreate ||
+      !backendContainerAfterRecreate ||
+      backendContainerBeforeRecreate === backendContainerAfterRecreate
+    )
+      fail("backend container recreation was not proven");
+    evidence.summary.driverRuntimeLifecycle.afterApplicationRecreate =
+      await verifyDriverPersistenceHttp(
+        backendBase,
+        lifecycleOrderId,
+        driverA,
+        driverB,
+        "application recreation",
+      );
+    evidence.summary.driverRuntimeLifecycle.backendContainerRecreated = true;
 
     const bootstrapPostgresLogs = run(
       "docker",
@@ -1632,10 +1795,10 @@ async function main() {
     assertBackendSecretEnvironment(environment);
     await verifyRefreshFlow(
       backendBase,
-      refreshToken,
+      driverA.refreshToken,
       jwtSecret,
       jwtRefreshSecret,
-      refreshDriverId,
+      driverA.driverId,
       environment,
     );
     await verifyRestaurantLogin(backendBase, restaurantPassword);
@@ -1645,6 +1808,18 @@ async function main() {
       "/restaurants",
     );
     const afterPostgresRecreate = databaseSnapshot(lifecycleOrderId);
+    evidence.summary.driverRuntimeLifecycle.afterPostgresRecreate =
+      await verifyDriverPersistenceHttp(
+        backendBase,
+        lifecycleOrderId,
+        driverA,
+        driverB,
+        "PostgreSQL recreation",
+      );
+    evidence.write(
+      "driver-runtime-lifecycle.json",
+      evidence.summary.driverRuntimeLifecycle,
+    );
     const afterPostgresRecreateStructured = structuredOrderSnapshot(
       afterPostgresRecreate,
     );

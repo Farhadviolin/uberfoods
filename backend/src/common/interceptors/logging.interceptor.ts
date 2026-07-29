@@ -52,16 +52,28 @@ export class LoggingInterceptor implements NestInterceptor {
         error: (error) => {
           const duration = Date.now() - now;
           const statusCode = error.status || error.getStatus?.() || 500;
-
-          this.logger.error(`Request failed: ${method} ${url}`, error.stack, {
+          const failureContext = {
             requestId,
             route: `${method} ${url}`,
             statusCode,
             durationMs: duration,
             userId: user?.sub,
             ip,
-            error: error.message,
-          });
+            message: error.message,
+          };
+
+          if (statusCode >= 500) {
+            this.logger.error(
+              `Request failed: ${method} ${url}`,
+              error.stack,
+              failureContext,
+            );
+          } else {
+            this.logger.warn(
+              `Request rejected: ${method} ${url}`,
+              failureContext,
+            );
+          }
         },
       }),
     );

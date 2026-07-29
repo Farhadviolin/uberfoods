@@ -45,6 +45,7 @@ services:
       PAYPAL_CLIENT_SECRET: test_paypal_secret_not_for_network
       PAYPAL_WEBHOOK_ID: test_paypal_webhook_not_for_network
       TEST_DRIVER_PASSWORD: ${PROD_SIM_DRIVER_PASSWORD:?set by verifier}
+      PROD_SIM_DRIVER_B_PASSWORD: ${PROD_SIM_DRIVER_B_PASSWORD:?set by verifier}
       SEED_CUSTOMER_PASSWORD: ${PROD_SIM_SEED_CUSTOMER_PASSWORD:?set by verifier}
       SEED_RESTAURANT_PASSWORD: ${PROD_SIM_SEED_RESTAURANT_PASSWORD:?set by verifier}
       SEED_DRIVER_PASSWORD: ${PROD_SIM_SEED_DRIVER_PASSWORD:?set by verifier}
