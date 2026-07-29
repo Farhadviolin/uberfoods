@@ -11,6 +11,10 @@ import { join } from "path";
 import * as fs from "fs";
 import * as Sentry from "@sentry/node";
 import { validateStripeConfig } from "./config/stripe.validation";
+import {
+  createHttpCorsOptions,
+  resolveCorsOrigins,
+} from "./common/config/cors.config";
 
 function validateEnv() {
   const requiredAlways = ["JWT_SECRET", "DATABASE_URL"];
@@ -109,51 +113,15 @@ async function bootstrap() {
   console.log("[BOOT] Full stack (MVP) mode");
   const configService = app.get(ConfigService);
 
+  const allowedOrigins = configService.get<string>("ALLOWED_ORIGINS");
+  const corsOrigins = resolveCorsOrigins(allowedOrigins);
   const { RedisSocketAdapter } =
     await import("./common/adapters/redis-socket.adapter");
   const redisUrl = process.env.REDIS_URL || process.env.REDIS_SOCKET_URL;
-  app.useWebSocketAdapter(new RedisSocketAdapter(app, redisUrl));
+  app.useWebSocketAdapter(new RedisSocketAdapter(app, redisUrl, corsOrigins));
 
   app.setGlobalPrefix("api");
-
-  const allowedOrigins = configService.get<string>("ALLOWED_ORIGINS");
-  const corsOrigins = allowedOrigins
-    ? allowedOrigins
-        .split(",")
-        .map((origin) => origin.trim())
-        .filter(Boolean)
-    : process.env.NODE_ENV === "production"
-      ? (() => {
-          throw new Error(
-            "ALLOWED_ORIGINS environment variable is required in production.",
-          );
-        })()
-      : [
-          "http://localhost:3102",
-          "http://localhost:3002",
-          "http://localhost:3003",
-          "http://localhost:3004",
-          "http://localhost:5173",
-        ];
-
-  app.enableCors({
-    origin: (origin, callback) => {
-      if (process.env.NODE_ENV !== "production") {
-        callback(null, true);
-        return;
-      }
-      if (origin === undefined || corsOrigins.includes(origin)) {
-        callback(null, true);
-      } else {
-        callback(new Error("Not allowed by CORS"));
-      }
-    },
-    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
-    credentials: true,
-    preflightContinue: false,
-    optionsSuccessStatus: 204,
-  });
+  app.enableCors(createHttpCorsOptions(corsOrigins));
 
   app.use(
     helmet.default({

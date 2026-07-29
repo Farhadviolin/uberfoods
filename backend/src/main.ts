@@ -12,6 +12,10 @@ import { join } from "path";
 import * as fs from "fs";
 import * as Sentry from "@sentry/node";
 import { validateStripeConfig } from "./config/stripe.validation";
+import {
+  createHttpCorsOptions,
+  resolveCorsOrigins,
+} from "./common/config/cors.config";
 
 function validateEnv() {
   // Always required in ALL environments (fail-fast)
@@ -131,61 +135,16 @@ async function bootstrap() {
   const configService = app.get(ConfigService);
 
   // Socket.IO Adapter für WebSocket-Unterstützung mit Redis-Skalierung
+  const allowedOrigins = configService.get<string>("ALLOWED_ORIGINS");
+  const corsOrigins = resolveCorsOrigins(allowedOrigins);
   const { RedisSocketAdapter } =
     await import("./common/adapters/redis-socket.adapter");
   const redisUrl = process.env.REDIS_URL || process.env.REDIS_SOCKET_URL;
-  app.useWebSocketAdapter(new RedisSocketAdapter(app, redisUrl));
+  app.useWebSocketAdapter(new RedisSocketAdapter(app, redisUrl, corsOrigins));
 
   // Globaler API Prefix - alle Routen werden mit /api prefixiert
   app.setGlobalPrefix("api");
-
-  // CORS konfigurieren - Production-ready
-  const allowedOrigins = configService.get<string>("ALLOWED_ORIGINS");
-  const corsOrigins = allowedOrigins
-    ? allowedOrigins
-        .split(",")
-        .map((origin) => origin.trim())
-        .filter(Boolean)
-    : process.env.NODE_ENV === "production"
-      ? (() => {
-          // Production ohne ALLOWED_ORIGINS: Fehler statt Fallback
-          throw new Error(
-            "ALLOWED_ORIGINS environment variable is required in production. " +
-              "Set it to a comma-separated list of allowed origins (e.g., 'https://yourdomain.com,https://admin.yourdomain.com')",
-          );
-        })()
-      : [
-          "http://localhost:3102", // Customer Web
-          "http://localhost:3002", // Admin Panel
-          "http://localhost:3003", // Restaurant Web
-          "http://localhost:3004", // Driver App
-          "http://localhost:5173", // Vite Default Port
-        ];
-
-  app.enableCors({
-    origin: (origin, callback) => {
-      // In Development: Erlaube alle Origins (inkl. null für curl-Requests)
-      if (process.env.NODE_ENV !== "production") {
-        callback(null, true);
-        return;
-      }
-
-      // In Production:
-      // - undefined origin (kein Origin-Header, z.B. curl/server-to-server) = erlauben
-      // - "null" string (ungültiger Origin-Header) = blocken (Sicherheitsrisiko)
-      // - gültige Origins aus ALLOWED_ORIGINS = erlauben
-      if (origin === undefined || corsOrigins.includes(origin)) {
-        callback(null, true);
-      } else {
-        callback(new Error("Not allowed by CORS"));
-      }
-    },
-    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
-    credentials: true,
-    preflightContinue: false,
-    optionsSuccessStatus: 204,
-  });
+  app.enableCors(createHttpCorsOptions(corsOrigins));
 
   // Security Headers (Helmet) mit Stripe-kompatibler CSP (gehärtet: ohne unsafe-eval)
   app.use(

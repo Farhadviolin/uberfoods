@@ -6,7 +6,7 @@ try {
 
 Write-Host "=== verify-local: Ports + Prozesse + HTTP Checks ==="
 
-$ports = @(3000,3002,3003,3004,5173)
+$ports = @(3000,3002,3003,3004,3102)
 
 Write-Host "`n[1] LISTENERS"
 $listen = Get-NetTCPConnection -State Listen | Where-Object { $_.LocalPort -in $ports } |
@@ -33,12 +33,11 @@ function Check-Http {
 }
 
 Write-Host "`n[3] HTTP CHECKS"
-Check-Http -Name "Backend Health" -Url "http://localhost:3000/api/health"
-Check-Http -Name "Customer Web"   -Url "http://localhost:5173/"
-Check-Http -Name "Admin (localhost)" -Url "http://localhost:3002/"
-Check-Http -Name "Admin (127.0.0.1)" -Url "http://127.0.0.1:3002/"
-Check-Http -Name "Restaurant Web" -Url "http://localhost:3003/"
-Check-Http -Name "Driver App"     -Url "http://localhost:3004/"
+Check-Http -Name "Backend Health" -Url "http://127.0.0.1:3000/api/health"
+Check-Http -Name "Customer Web"   -Url "http://127.0.0.1:3102/"
+Check-Http -Name "Admin Panel"    -Url "http://127.0.0.1:3002/"
+Check-Http -Name "Restaurant Web" -Url "http://127.0.0.1:3003/"
+Check-Http -Name "Driver App"     -Url "http://127.0.0.1:3004/"
 
 Write-Host "`nDONE."
-Write-Host "If Admin localhost fails but 127.0.0.1 works: IPv6 binding. dev:fixed uses --host :: to fix it."
+Write-Host "All local frontend checks use the exact CORS-approved 127.0.0.1 origins."

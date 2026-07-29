@@ -4,6 +4,10 @@ import { createAdapter } from "@socket.io/redis-adapter";
 import { createClient } from "redis";
 import { INestApplication } from "@nestjs/common";
 import { Logger } from "@nestjs/common";
+import {
+  createSocketCorsOptions,
+  resolveCorsOrigins,
+} from "../config/cors.config";
 
 export class RedisSocketAdapter extends IoAdapter {
   private readonly logger = new Logger(RedisSocketAdapter.name);
@@ -12,6 +16,7 @@ export class RedisSocketAdapter extends IoAdapter {
   constructor(
     private app: INestApplication,
     private redisUrl?: string,
+    private readonly corsOrigins = resolveCorsOrigins(),
   ) {
     super(app);
     this.checkRedisAvailability();
@@ -48,37 +53,12 @@ export class RedisSocketAdapter extends IoAdapter {
   }
 
   createIOServer(port: number, options?: ServerOptions): Server {
-    const corsOrigins = [
-      "http://localhost:3002", // Admin Panel
-      "http://localhost:3001", // Customer Web
-      "http://localhost:3003", // Restaurant Web
-      "http://localhost:3004", // Driver App
-      "http://localhost:5173", // Vite Default Port
-    ];
-
     // Get the HTTP server from NestJS
     const httpServer = this.app.getHttpServer();
 
     const serverOptions: ServerOptions = {
       ...options,
-      cors: {
-        origin: (origin: any, callback: any) => {
-          // In Development: Allow all origins
-          if (process.env.NODE_ENV !== "production") {
-            callback(null, true);
-            return;
-          }
-          // In Production: Only allowed origins
-          if (!origin || corsOrigins.includes(origin)) {
-            callback(null, true);
-          } else {
-            callback(new Error("Not allowed by CORS"));
-          }
-        },
-        methods: ["GET", "POST"],
-        credentials: true,
-        allowedHeaders: ["Content-Type", "Authorization"],
-      },
+      cors: createSocketCorsOptions(this.corsOrigins),
       transports: ["websocket", "polling"],
       allowEIO3: true,
       pingTimeout: 60000,

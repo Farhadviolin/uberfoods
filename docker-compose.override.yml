@@ -17,7 +17,7 @@ services:
       - JWT_REFRESH_SECRET=${JWT_REFRESH_SECRET:?JWT_REFRESH_SECRET is required}
       - PORT=3000
       - UPLOAD_DIR=./uploads
-      - ALLOWED_ORIGINS=http://localhost:3001,http://localhost:3002,http://localhost:3003,http://localhost:3004
+      - ALLOWED_ORIGINS=http://127.0.0.1:3102,http://127.0.0.1:3002,http://127.0.0.1:3003,http://127.0.0.1:3004
       - ENABLE_SWAGGER=true
       - LOG_LEVEL=debug
       - ALLOW_DEV_AUTH=false

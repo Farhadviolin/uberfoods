@@ -98,15 +98,14 @@ $customerPath   = Join-Path $repoRoot "frontend\customer-web"
 $restaurantPath = Join-Path $repoRoot "frontend\restaurant-web"
 $driverPath     = Join-Path $repoRoot "frontend\driver-app"
 
-# Admin must be reachable via localhost (IPv6) + 127.0.0.1 (IPv4)
-Start-AppWindow -Name "Admin Panel"     -Path $adminPath      -NpmScript "dev:fixed"
-Start-AppWindow -Name "Customer Web"    -Path $customerPath   -NpmScript "dev" -ExtraArgs "--host :: --port 5173 --strictPort"
-Start-AppWindow -Name "Restaurant Web"  -Path $restaurantPath -NpmScript "dev" -ExtraArgs "--host :: --port 3003 --strictPort"
-Start-AppWindow -Name "Driver App"      -Path $driverPath     -NpmScript "dev" -ExtraArgs "--host :: --port 3004 --strictPort"
+Start-AppWindow -Name "Admin Panel"     -Path $adminPath      -NpmScript "dev" -ExtraArgs "--host 127.0.0.1 --port 3002 --strictPort"
+Start-AppWindow -Name "Customer Web"    -Path $customerPath   -NpmScript "dev:e2e"
+Start-AppWindow -Name "Restaurant Web"  -Path $restaurantPath -NpmScript "dev" -ExtraArgs "--host 127.0.0.1 --port 3003 --strictPort"
+Start-AppWindow -Name "Driver App"      -Path $driverPath     -NpmScript "dev" -ExtraArgs "--host 127.0.0.1 --port 3004 --strictPort"
 
 Write-Host "`n[3/4] Warten, bis Dev-Server lauschen..."
 
-foreach ($p in @(3002,5173,3003,3004)) {
+foreach ($p in @(3102,3002,3003,3004)) {
   if (Wait-For-Port -Port $p -TimeoutSeconds 45) {
     Write-Host ("[OK] Port {0} lauscht." -f $p)
   } else {
@@ -114,19 +113,18 @@ foreach ($p in @(3002,5173,3003,3004)) {
   }
 }
 
-if (Wait-For-Http200 -Url "http://localhost:3000/api/health" -TimeoutSeconds 45) {
+if (Wait-For-Http200 -Url "http://127.0.0.1:3000/api/health" -TimeoutSeconds 45) {
   Write-Host "[OK] Backend Health 200."
 } else {
   Write-Host "[WARN] Backend Health nicht 200 innerhalb Timeout."
 }
 
 Write-Host "`nVerfügbare URLs:"
-Write-Host "  Backend Health:      http://localhost:3000/api/health"
-Write-Host "  Admin Panel (IPv6):  http://localhost:3002/"
-Write-Host "  Admin Panel (IPv4):  http://127.0.0.1:3002/"
-Write-Host "  Customer Web:        http://localhost:5173/"
-Write-Host "  Restaurant Web:      http://localhost:3003/"
-Write-Host "  Driver App:          http://localhost:3004/"
+Write-Host "  Backend Health:      http://127.0.0.1:3000/api/health"
+Write-Host "  Admin Panel:         http://127.0.0.1:3002/"
+Write-Host "  Customer Web:        http://127.0.0.1:3102/"
+Write-Host "  Restaurant Web:      http://127.0.0.1:3003/"
+Write-Host "  Driver App:          http://127.0.0.1:3004/"
 
 if ($SkipSmoke) {
   Write-Host "`n[4/4] Smoke-Test übersprungen (SkipSmoke gesetzt)."

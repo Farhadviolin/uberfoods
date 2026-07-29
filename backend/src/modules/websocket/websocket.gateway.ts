@@ -9,13 +9,14 @@ import {
   WebSocketServer,
 } from "@nestjs/websockets";
 import { Server, Socket } from "socket.io";
+import {
+  createSocketCorsOptions,
+  resolveCorsOrigins,
+} from "../../common/config/cors.config";
 
 @Injectable()
 @NestWebSocketGateway({
-  cors: {
-    origin: true,
-    credentials: true,
-  },
+  cors: createSocketCorsOptions(resolveCorsOrigins()),
   path: "/socket.io",
 })
 export class WebSocketGateway
