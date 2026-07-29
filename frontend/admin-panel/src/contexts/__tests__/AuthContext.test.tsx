@@ -70,10 +70,7 @@ describe('AuthContext', () => {
       data: { success: true, data: {
         access_token: 'fake-token',
         refresh_token: 'fake-refresh-token',
-        id: '1',
-        email: 'test@example.com',
-        name: 'Test User',
-        role: 'admin',
+        user: { id: '1', email: 'test@example.com', name: 'Test User', userType: 'ADMIN' },
       } },
     });
 
@@ -111,10 +108,7 @@ describe('AuthContext', () => {
       data: { success: true, data: {
         access_token: 'fake-token',
         refresh_token: 'fake-refresh-token',
-        id: '1',
-        email: 'test@example.com',
-        name: 'Test User',
-        role: 'admin',
+        user: { id: '1', email: 'test@example.com', name: 'Test User', userType: 'ADMIN' },
       } },
     });
 

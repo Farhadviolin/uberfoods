@@ -11,6 +11,7 @@ const driver = {
   email: 'driver@test.com',
   phone: '+4312345678',
   isActive: true,
+  userType: 'driver',
 };
 
 describe('useAuth contract', () => {

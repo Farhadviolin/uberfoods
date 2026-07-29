@@ -92,6 +92,8 @@ export class AuthService {
           select: {
             id: true,
             email: true,
+            name: true,
+            role: true,
             password: true,
             isActive: true,
           },
@@ -114,6 +116,8 @@ export class AuthService {
           select: {
             id: true,
             email: true,
+            name: true,
+            phone: true,
             password: true,
             isActive: true,
           },
@@ -144,6 +148,8 @@ export class AuthService {
             select: {
               id: true,
               email: true,
+              name: true,
+              role: true,
               password: true,
               isActive: true,
             },
