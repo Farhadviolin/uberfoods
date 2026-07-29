@@ -345,7 +345,6 @@ export function auditRuntimeLogs(
       isValidDate(line.timestamp) &&
       line.timestamp >= shutdownWindowStart &&
       line.timestamp <= shutdownWindowEnd &&
-      line.timestamp > shutdownStartedAt.timestamp &&
       line.timestamp < shutdownCompletedAt.timestamp;
 
     for (const diagnosticLine of lifecycleSevereDiagnostics) {
@@ -361,7 +360,16 @@ export function auditRuntimeLogs(
           normalizedMessage: diagnosticLine.normalizedMessage,
           classification: "EXPECTED_CONTROLLED_POSTGRES_SHUTDOWN",
           matchedRule,
-          lifecyclePosition: "after-shutdown-start-before-shutdown-complete",
+          lifecyclePosition:
+            "after-control-plane-stop-start-before-postgres-shutdown-complete",
+          controlPlaneWindow: {
+            startedAt: shutdownWindowStart.toISOString(),
+            endedAt: shutdownWindowEnd.toISOString(),
+          },
+          postgresShutdownMarkers: {
+            startedAt: shutdownStartedAt.timestamp.toISOString(),
+            completedAt: shutdownCompletedAt.timestamp.toISOString(),
+          },
           evidenceReferences: [
             "postgres-recreate.json",
             "persistence-before.json",
@@ -388,6 +396,9 @@ export function auditRuntimeLogs(
     classifiedExpectedShutdownDiagnostics,
     classifiedBootstrapShutdownDiagnostics,
     classifiedRecreateShutdownDiagnostics,
+    expectedControlledShutdownDiagnostics:
+      classifiedRecreateShutdownDiagnostics,
+    unexpectedFatalDiagnostics: unexpected,
     unexplainedFatalDiagnostics: unexpected,
     lifecycleState,
   };

@@ -384,8 +384,48 @@ test("classifies a structured PostgreSQL shutdown with both optional FATAL diagn
   assert.ok(
     result.classifiedExpectedShutdownDiagnostics.every(
       ({ lifecyclePosition }) =>
-        lifecyclePosition === "after-shutdown-start-before-shutdown-complete",
+        lifecyclePosition ===
+        "after-control-plane-stop-start-before-postgres-shutdown-complete",
     ),
+  );
+});
+
+test("classifies the nanosecond CI administrator disconnect within the proven control-plane stop window", () => {
+  const ciRequestedAt = new Date("2026-07-29T08:07:00.989Z");
+  const ciEndedAt = new Date("2026-07-29T08:07:02.000Z");
+  const ciLogs = [
+    "postgres-1 | 2026-07-29T08:07:01.073813346Z 2026-07-29 08:07:01.073 UTC [206] FATAL: terminating connection due to administrator command",
+    "postgres-1 | 2026-07-29T08:07:01.074100000Z 2026-07-29 08:07:01.074 UTC [1] LOG: received fast shutdown request",
+    "postgres-1 | 2026-07-29T08:07:01.900000000Z 2026-07-29 08:07:01.900 UTC [1] LOG: database system is shut down",
+  ].join("\n");
+  const context = {
+    ...validContext,
+    recreateRequestedAt: ciRequestedAt,
+    shutdownWindowStart: ciRequestedAt,
+    shutdownWindowEnd: ciEndedAt,
+    oldPostgresContainerEndedAt: ciEndedAt,
+    newPostgresContainerStartedAt: new Date("2026-07-29T08:07:03.000Z"),
+    controlledStop: {
+      ...validContext.controlledStop,
+      startedAt: ciRequestedAt.toISOString(),
+      endedAt: ciEndedAt.toISOString(),
+    },
+  };
+
+  const result = auditRuntimeLogs(ciLogs, context);
+
+  assert.deepEqual(result.unexpectedFatalDiagnostics, []);
+  assert.equal(result.expectedControlledShutdownDiagnostics.length, 1);
+  assert.equal(
+    result.expectedControlledShutdownDiagnostics[0].timestamp,
+    "2026-07-29T08:07:01.073Z",
+  );
+  assert.deepEqual(
+    result.expectedControlledShutdownDiagnostics[0].controlPlaneWindow,
+    {
+      startedAt: ciRequestedAt.toISOString(),
+      endedAt: ciEndedAt.toISOString(),
+    },
   );
 });
 
@@ -466,10 +506,23 @@ test("rejects shutdown markers from different containers", () =>
     `${oldContainerId} | ${shutdownStartLine}\n${newContainerId} | ${shutdownCompleteLine}`,
   ));
 
-test("rejects an optional FATAL before shutdown start", () =>
-  expectRejected(
+test("accepts an optional FATAL after the controlled stop starts but before the PostgreSQL marker", () => {
+  const result = auditRuntimeLogs(
     [
       administratorLine.replace(/10:00:04\.500/g, "10:00:03.500"),
+      shutdownStartLine,
+      shutdownCompleteLine,
+    ].join("\n"),
+    validContext,
+  );
+  assert.equal(result.unexpected.length, 0);
+  assert.equal(result.expectedControlledShutdownDiagnostics.length, 1);
+});
+
+test("rejects an optional FATAL before the controlled stop begins", () =>
+  expectRejected(
+    [
+      administratorLine.replace(/10:00:04\.500/g, "09:59:59.999"),
       shutdownStartLine,
       shutdownCompleteLine,
     ].join("\n"),

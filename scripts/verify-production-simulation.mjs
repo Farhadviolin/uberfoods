@@ -349,6 +349,9 @@ function auditLogs(logs, context, label) {
         result.classifiedBootstrapShutdownDiagnostics,
       classifiedRecreateShutdownDiagnostics:
         result.classifiedRecreateShutdownDiagnostics,
+      expectedControlledShutdownDiagnostics:
+        result.expectedControlledShutdownDiagnostics,
+      unexpectedFatalDiagnostics: result.unexpectedFatalDiagnostics,
       unexplainedFatalDiagnostics: result.unexplainedFatalDiagnostics,
       lifecycleState: result.lifecycleState,
     };
@@ -1958,6 +1961,9 @@ async function main() {
         bootstrapAudit.classifiedBootstrapShutdownDiagnostics,
       classifiedRecreateShutdownDiagnostics:
         lifecycleAudit.classifiedRecreateShutdownDiagnostics,
+      expectedControlledShutdownDiagnostics:
+        lifecycleAudit.expectedControlledShutdownDiagnostics,
+      unexpectedFatalDiagnostics: lifecycleAudit.unexpectedFatalDiagnostics,
       unexplainedFatalDiagnostics: lifecycleAudit.unexplainedFatalDiagnostics,
       lifecycleState: lifecycleAudit.lifecycleState,
     };
@@ -1987,6 +1993,9 @@ async function main() {
         bootstrapAudit.classifiedBootstrapShutdownDiagnostics,
       classifiedRecreateShutdownDiagnostics:
         lifecycleAudit.classifiedRecreateShutdownDiagnostics,
+      expectedControlledShutdownDiagnostics:
+        lifecycleAudit.expectedControlledShutdownDiagnostics,
+      unexpectedFatalDiagnostics: lifecycleAudit.unexpectedFatalDiagnostics,
       unexplainedFatalDiagnostics: lifecycleAudit.unexplainedFatalDiagnostics,
       lifecycleState: lifecycleAudit.lifecycleState,
       secretScan: {
