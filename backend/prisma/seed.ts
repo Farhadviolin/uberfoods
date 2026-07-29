@@ -32,6 +32,8 @@ async function main() {
   const restaurant1 = await prisma.restaurant.upsert({
     where: { email: 'restaurant@uberfoods.local' },
     update: {
+      password: hashedRestaurantPassword,
+      mustChangePassword: false,
       isActive: true,
       status: 'OPEN',
     },
@@ -235,7 +237,9 @@ async function main() {
   const hashedCustomerPassword = await bcrypt.hash(customerPassword, 10);
   const customer1 = await prisma.customer.upsert({
     where: { email: 'customer@uberfoods.local' },
-    update: {},
+    update: {
+      password: hashedCustomerPassword,
+    },
     create: {
       email: 'customer@uberfoods.local',
       password: hashedCustomerPassword,
@@ -290,7 +294,10 @@ async function main() {
   const hashedAdminPassword = await bcrypt.hash(adminPassword, 10);
   await prisma.admin.upsert({
     where: { email: 'admin@uberfoods.com' },
-    update: {},
+    update: {
+      password: hashedAdminPassword,
+      isActive: true,
+    },
     create: {
       email: 'admin@uberfoods.com',
       password: hashedAdminPassword,
