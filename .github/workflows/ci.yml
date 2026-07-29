@@ -299,6 +299,49 @@ jobs:
       working-directory: ./frontend/customer-web
       run: npx eslint src --ext .ts,.tsx
 
+  render-staging-contract:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v5
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v5
+      with:
+        node-version: '24'
+        cache: 'npm'
+        cache-dependency-path: |
+          backend/package-lock.json
+          frontend/admin-panel/package-lock.json
+
+    - name: Install YAML validator dependencies
+      working-directory: ./backend
+      run: npm ci
+
+    - name: Verify Render staging blueprint contract
+      run: npm run verify:render-staging
+
+    - name: Install Admin dependencies
+      working-directory: ./frontend/admin-panel
+      run: npm ci
+
+    - name: Run Admin Render configuration tests
+      working-directory: ./frontend/admin-panel
+      run: npm test -- --runInBand --runTestsByPath src/config.render.spec.ts
+
+    - name: Build and inspect Admin staging bundle
+      shell: bash
+      env:
+        VITE_API_URL: https://uberfoods-backend-staging.onrender.com
+        VITE_WS_URL: wss://uberfoods-backend-staging.onrender.com
+        VITE_CUSTOMER_WEB_URL: https://uberfoods-customer-web-staging.onrender.com
+        VITE_DRIVER_APP_URL: https://uberfoods-driver-app-staging.onrender.com
+        VITE_RESTAURANT_WEB_URL: https://uberfoods-restaurant-web-staging.onrender.com
+      run: |
+        npm --prefix frontend/admin-panel run build
+        node scripts/verify-admin-staging-bundle.mjs
+
   admin-jest:
     runs-on: ubuntu-latest
 
@@ -932,7 +975,7 @@ jobs:
 
   build:
     runs-on: ubuntu-latest
-    needs: [dependency-audit, api-verification, driver-jest, customer-typecheck, customer-quality, admin-jest, ui-e2e-lifecycle, frontend-e2e, production-simulation]
+    needs: [dependency-audit, api-verification, driver-jest, customer-typecheck, customer-quality, admin-jest, render-staging-contract, ui-e2e-lifecycle, frontend-e2e, production-simulation]
 
     steps:
     - name: Checkout code

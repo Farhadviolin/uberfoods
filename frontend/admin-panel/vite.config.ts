@@ -1,12 +1,33 @@
 import { defineConfig } from 'vite'
+import { loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
 import { resolve } from 'path'
 
 // https://vitejs.dev/config/
-export default defineConfig(({ mode }) => ({
+export default defineConfig(({ mode }) => {
+  const env = loadEnv(mode, process.cwd(), '')
+  const appEnvironment = {
+    DEV: mode !== 'production',
+    PROD: mode === 'production',
+    VITE_API_URL: env.VITE_API_URL,
+    VITE_WS_URL: env.VITE_WS_URL,
+    VITE_APP_NAME: env.VITE_APP_NAME,
+    VITE_SKIP_AUTH: env.VITE_SKIP_AUTH,
+    VITE_DEV_AUTH_TOKEN: env.VITE_DEV_AUTH_TOKEN,
+    VITE_CUSTOMER_WEB_URL: env.VITE_CUSTOMER_WEB_URL,
+    VITE_DRIVER_APP_URL: env.VITE_DRIVER_APP_URL,
+    VITE_RESTAURANT_WEB_URL: env.VITE_RESTAURANT_WEB_URL,
+    VITE_SENTRY_DSN: env.VITE_SENTRY_DSN,
+    VITE_SENTRY_ENVIRONMENT: env.VITE_SENTRY_ENVIRONMENT,
+  }
+
+  return {
   plugins: [
     react(),
   ],
+  define: {
+    __APP_ENV__: JSON.stringify(appEnvironment),
+  },
   resolve: {
     alias: {
       '@': resolve(__dirname, './src'),
@@ -108,4 +129,5 @@ export default defineConfig(({ mode }) => ({
       '@tanstack/react-query',
     ],
   },
-}))
+  }
+})

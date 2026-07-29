@@ -117,7 +117,7 @@ services:
       - key: VITE_API_BASE_URL
         value: https://uberfoods-backend-staging.onrender.com/api
       - key: VITE_WS_URL
-        value: https://uberfoods-backend-staging.onrender.com
+        value: wss://uberfoods-backend-staging.onrender.com
       - key: VITE_APP_ENV
         value: staging
       - key: VITE_APP_NAME
@@ -142,6 +142,10 @@ services:
         sync: false
       - key: VITE_SENTRY_ENVIRONMENT
         value: staging
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
 
   - type: web
     name: uberfoods-admin-panel-staging
@@ -155,7 +159,13 @@ services:
       - key: VITE_API_URL
         value: https://uberfoods-backend-staging.onrender.com/api
       - key: VITE_WS_URL
-        value: https://uberfoods-backend-staging.onrender.com
+        value: wss://uberfoods-backend-staging.onrender.com
+      - key: VITE_CUSTOMER_WEB_URL
+        value: https://uberfoods-customer-web-staging.onrender.com
+      - key: VITE_DRIVER_APP_URL
+        value: https://uberfoods-driver-app-staging.onrender.com
+      - key: VITE_RESTAURANT_WEB_URL
+        value: https://uberfoods-restaurant-web-staging.onrender.com
       - key: VITE_APP_NAME
         value: UberFoods Admin
       - key: VITE_APP_TITLE
@@ -168,6 +178,10 @@ services:
         sync: false
       - key: VITE_SENTRY_ENVIRONMENT
         value: staging
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
 
   - type: web
     name: uberfoods-restaurant-web-staging
@@ -181,13 +195,17 @@ services:
       - key: VITE_API_URL
         value: https://uberfoods-backend-staging.onrender.com/api
       - key: VITE_WS_URL
-        value: https://uberfoods-backend-staging.onrender.com
+        value: wss://uberfoods-backend-staging.onrender.com
       - key: VITE_APP_NAME
         value: UberFoods Restaurant
       - key: VITE_SENTRY_DSN
         sync: false
       - key: VITE_SENTRY_ENVIRONMENT
         value: staging
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
 
   - type: web
     name: uberfoods-driver-app-staging
@@ -201,7 +219,7 @@ services:
       - key: VITE_API_URL
         value: https://uberfoods-backend-staging.onrender.com/api
       - key: VITE_WS_URL
-        value: https://uberfoods-backend-staging.onrender.com
+        value: wss://uberfoods-backend-staging.onrender.com
       - key: VITE_APP_NAME
         value: UberFoods Driver
       - key: VITE_GOOGLE_MAPS_API_KEY
@@ -212,3 +230,7 @@ services:
         sync: false
       - key: VITE_SENTRY_ENVIRONMENT
         value: staging
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
