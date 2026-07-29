@@ -60,6 +60,7 @@ jobs:
       DRIVER_TEST_EMAIL: ci-driver@example.test
       DRIVER_TEST_PASSWORD: ci-driver-password-placeholder
       TEST_DRIVER_PASSWORD: ci-driver-password-placeholder
+      PROD_SIM_DRIVER_B_PASSWORD: ci-driver-b-password-placeholder
       RESTAURANT_TEST_EMAIL: ci-restaurant@example.test
       RESTAURANT_TEST_PASSWORD: ci-restaurant-password-placeholder
     services:
@@ -156,6 +157,12 @@ jobs:
     - name: Create test driver
       working-directory: ./backend
       run: node scripts/create-test-driver.js
+      env:
+        DATABASE_URL: postgresql://postgres:postgres123@localhost:5434/uberfoods
+
+    - name: Create production simulation Driver B
+      working-directory: ./backend
+      run: node scripts/create-production-sim-driver-b.js
       env:
         DATABASE_URL: postgresql://postgres:postgres123@localhost:5434/uberfoods
 

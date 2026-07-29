@@ -19,6 +19,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       TEST_DRIVER_PASSWORD: local-development-driver-password-placeholder
+      PROD_SIM_DRIVER_B_PASSWORD: local-development-driver-b-password-placeholder
 
     services:
       postgres:
@@ -62,6 +63,12 @@ jobs:
     - name: Create test driver
       working-directory: ./backend
       run: node scripts/create-test-driver.js
+      env:
+        DATABASE_URL: postgresql://postgres:postgres123@localhost:5434/uberfoods
+
+    - name: Create production simulation Driver B
+      working-directory: ./backend
+      run: node scripts/create-production-sim-driver-b.js
       env:
         DATABASE_URL: postgresql://postgres:postgres123@localhost:5434/uberfoods
 

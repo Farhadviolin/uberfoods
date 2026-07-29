@@ -16,6 +16,14 @@ const verifier = readFileSync(
   path.join(repoRoot, "scripts/verify-production-simulation.mjs"),
   "utf8",
 );
+const apiVerificationWorkflows = [
+  ".github/workflows/ci.yml",
+  ".github/workflows/api-verification.yml",
+  ".github/workflows/local-development.yml",
+].map((relativePath) => ({
+  relativePath,
+  source: readFileSync(path.join(repoRoot, relativePath), "utf8"),
+}));
 
 test("bootstrap healthcheck cannot query the application database before initdb creates it", () => {
   assert.match(
@@ -56,4 +64,24 @@ test("production simulation provisions and proves two-driver runtime isolation",
   assert.match(verifier, /illegalTransitionStatus: 409/);
   assert.match(verifier, /verifyDriverPersistenceHttp/);
   assert.match(verifier, /backend container recreation was not proven/);
+});
+
+test("every API verification workflow provisions the second production-simulation driver", () => {
+  for (const { relativePath, source } of apiVerificationWorkflows) {
+    assert.match(
+      source,
+      /PROD_SIM_DRIVER_B_PASSWORD:\s+\S+/,
+      `${relativePath} must configure Driver B's runtime credential`,
+    );
+    assert.match(
+      source,
+      /node scripts\/create-production-sim-driver-b\.js/,
+      `${relativePath} must provision Driver B before final verification`,
+    );
+    assert.ok(
+      source.indexOf("node scripts/create-production-sim-driver-b.js") <
+        source.indexOf("final-verification.ps1"),
+      `${relativePath} must provision Driver B before final verification runs`,
+    );
+  }
 });
