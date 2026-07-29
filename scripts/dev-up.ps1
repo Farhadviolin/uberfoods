@@ -17,6 +17,18 @@ $scriptsDir = Split-Path -Parent $PSCommandPath
 $repoRoot = (Resolve-Path (Join-Path $scriptsDir "..")).Path
 Set-Location $repoRoot
 
+# Keep local authentication fail-closed without persisting or printing secrets.
+if (-not $env:JWT_SECRET) {
+  $env:JWT_SECRET = [Convert]::ToHexString(
+    [Security.Cryptography.RandomNumberGenerator]::GetBytes(32)
+  )
+}
+if (-not $env:JWT_REFRESH_SECRET) {
+  $env:JWT_REFRESH_SECRET = [Convert]::ToHexString(
+    [Security.Cryptography.RandomNumberGenerator]::GetBytes(32)
+  )
+}
+
 function Assert-Dir {
   param([string]$Path, [string]$Name)
   if (-not (Test-Path -LiteralPath $Path)) {

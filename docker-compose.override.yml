@@ -13,13 +13,14 @@ services:
       - NODE_ENV=development
       - DATABASE_URL=postgresql://postgres:postgres123@postgres:5432/uberfoods
       - REDIS_URL=redis://redis:6379
-      - JWT_SECRET=dev-secret-key-min-32-characters-long-for-development-only-change-in-production
+      - JWT_SECRET=${JWT_SECRET:?JWT_SECRET is required}
+      - JWT_REFRESH_SECRET=${JWT_REFRESH_SECRET:?JWT_REFRESH_SECRET is required}
       - PORT=3000
       - UPLOAD_DIR=./uploads
       - ALLOWED_ORIGINS=http://localhost:3001,http://localhost:3002,http://localhost:3003,http://localhost:3004
       - ENABLE_SWAGGER=true
       - LOG_LEVEL=debug
-      - ALLOW_DEV_AUTH=true
+      - ALLOW_DEV_AUTH=false
     volumes:
       - ./backend:/app
       - /app/node_modules
