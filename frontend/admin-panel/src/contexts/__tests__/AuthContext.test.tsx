@@ -67,14 +67,14 @@ describe('AuthContext', () => {
     const user = userEvent.setup();
 
     mockApi.post.mockResolvedValueOnce({
-      data: {
+      data: { success: true, data: {
         access_token: 'fake-token',
         refresh_token: 'fake-refresh-token',
         id: '1',
         email: 'test@example.com',
         name: 'Test User',
         role: 'admin',
-      },
+      } },
     });
 
     renderWithProviders(<TestComponent />);
@@ -108,14 +108,14 @@ describe('AuthContext', () => {
 
   it('should handle logout', async () => {
     mockApi.post.mockResolvedValueOnce({
-      data: {
+      data: { success: true, data: {
         access_token: 'fake-token',
         refresh_token: 'fake-refresh-token',
         id: '1',
         email: 'test@example.com',
         name: 'Test User',
         role: 'admin',
-      },
+      } },
     });
 
     const user = userEvent.setup();

@@ -9,6 +9,8 @@ const driver = {
   id: 'driver-123',
   name: 'Test Driver',
   email: 'driver@test.com',
+  phone: '+4312345678',
+  isActive: true,
 };
 
 describe('useAuth contract', () => {

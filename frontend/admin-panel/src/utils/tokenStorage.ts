@@ -34,7 +34,9 @@ export function getStoredUser(): StoredUser | null {
   const raw = getSessionItem(USER_KEY);
   if (!raw) return null;
   try {
-    return JSON.parse(raw) as StoredUser;
+    const user = JSON.parse(raw) as unknown;
+    if (!user || typeof user !== 'object') throw new Error('Invalid stored user');
+    return user as StoredUser;
   } catch {
     removeSessionItem(USER_KEY);
     return null;

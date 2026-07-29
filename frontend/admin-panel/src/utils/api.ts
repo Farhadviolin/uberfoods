@@ -4,6 +4,7 @@ import { offlineService } from '../services/offline';
 import { clearAuthData, getAccessToken, getRefreshToken, getStoredUser, setAuthData } from './tokenStorage';
 import { logger } from './logger';
 import { config } from '../config';
+import { parseAdminAuthEnvelope } from './authSession';
 
 // Global Toast Registry für automatische Error-Toasts
 let globalToastFunction: ((message: string, type: 'success' | 'error' | 'info' | 'warning') => void) | null = null;
@@ -181,16 +182,16 @@ api.interceptors.response.use(
           refresh_token: refreshToken,
         });
 
-        const { access_token, refresh_token: newRefreshToken, ...userData } = response.data;
+        const session = parseAdminAuthEnvelope(response.data, getStoredUser());
         setAuthData({
-          accessToken: access_token,
-          refreshToken: newRefreshToken ?? refreshToken,
-          user: getStoredUser() ?? (userData as any),
+          accessToken: session.accessToken,
+          refreshToken: session.refreshToken ?? refreshToken,
+          user: session.user,
         });
-        api.defaults.headers.common['Authorization'] = `Bearer ${access_token}`;
-        originalRequest.headers.Authorization = `Bearer ${access_token}`;
+        api.defaults.headers.common['Authorization'] = `Bearer ${session.accessToken}`;
+        originalRequest.headers.Authorization = `Bearer ${session.accessToken}`;
 
-        processQueue(null, access_token);
+        processQueue(null, session.accessToken);
         isRefreshing = false;
 
         return api(originalRequest);

@@ -2,6 +2,7 @@ import { createContext, useContext, useState, useEffect, useCallback, ReactNode 
 import api from '../utils/api';
 import { logger } from '../utils/logger';
 import { Driver } from '../types';
+import { isDriver, isUsableToken, parseDriverAuthEnvelope } from '../utils/authSession';
 
 // ECHTE JWT-AUTHENTIFIZIERUNG - KEINE MOCK-DATEN MEHR
 
@@ -30,9 +31,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const storedToken = localStorage.getItem('driver_token');
     const storedDriver = localStorage.getItem('driver_data') || localStorage.getItem('driver_user');
 
-    if (storedToken && storedDriver) {
+    if (isUsableToken(storedToken) && storedDriver) {
       try {
-        const driverData = JSON.parse(storedDriver);
+        const driverData = JSON.parse(storedDriver) as unknown;
+        if (!isDriver(driverData)) throw new Error('Invalid stored driver');
         setDriver(driverData);
         setToken(storedToken);
         // Token in API-Headers setzen
@@ -45,6 +47,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         localStorage.removeItem('driver_data');
         localStorage.removeItem('driver_user');
       }
+    } else {
+      localStorage.removeItem('driver_token');
+      localStorage.removeItem('driver_refresh_token');
+      localStorage.removeItem('driver_data');
+      localStorage.removeItem('driver_user');
     }
 
     setLoading(false);
@@ -76,21 +83,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         password,
       });
 
-      const { access_token, refresh_token, mustChangePassword: mustChange, ...driverData } = response.data;
-      const needsPasswordChange = mustChange === true;
-      
-      localStorage.setItem('driver_token', access_token);
-      if (refresh_token) {
-        localStorage.setItem('driver_refresh_token', refresh_token);
+      const session = parseDriverAuthEnvelope(response.data);
+      localStorage.setItem('driver_token', session.accessToken);
+      if (session.refreshToken) {
+        localStorage.setItem('driver_refresh_token', session.refreshToken);
       }
-      const storedDriver = { ...driverData, mustChangePassword: needsPasswordChange };
+      const storedDriver = { ...session.driver, mustChangePassword: session.mustChangePassword };
       localStorage.setItem('driver_data', JSON.stringify(storedDriver));
       localStorage.setItem('driver_user', JSON.stringify(storedDriver));
       
-      setToken(access_token);
-      setDriver(storedDriver as Driver);
-      setMustChangePassword(needsPasswordChange);
-      api.defaults.headers.common['Authorization'] = `Bearer ${access_token}`;
+      setToken(session.accessToken);
+      setDriver(storedDriver);
+      setMustChangePassword(session.mustChangePassword);
+      api.defaults.headers.common['Authorization'] = `Bearer ${session.accessToken}`;
     } catch (error: any) {
       throw new Error(error.response?.data?.message || 'Login fehlgeschlagen');
     }
@@ -161,7 +166,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         login,
         logout,
         changePassword,
-        isAuthenticated: !!token,
+        isAuthenticated: isUsableToken(token) && isDriver(driver),
         loading,
         updateLocation,
       }}

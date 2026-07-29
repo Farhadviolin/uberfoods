@@ -1,5 +1,6 @@
 import axios, { AxiosError } from 'axios';
 import { offlineService } from '../services/offline';
+import { parseDriverAuthEnvelope } from './authSession';
 
 // Global Toast Registry für automatische Error-Toasts
 let globalToastFunction: ((message: string, type: 'success' | 'error' | 'info' | 'warning') => void) | null = null;
@@ -134,15 +135,17 @@ api.interceptors.response.use(
           refresh_token: refreshToken,
         });
 
-        const { access_token, refresh_token: newRefreshToken } = response.data;
-        localStorage.setItem('driver_token', access_token);
-        if (newRefreshToken) {
-          localStorage.setItem('driver_refresh_token', newRefreshToken);
+        const rawDriver = localStorage.getItem('driver_user') || localStorage.getItem('driver_data');
+        const fallbackDriver = rawDriver ? JSON.parse(rawDriver) : null;
+        const session = parseDriverAuthEnvelope(response.data, fallbackDriver);
+        localStorage.setItem('driver_token', session.accessToken);
+        if (session.refreshToken) {
+          localStorage.setItem('driver_refresh_token', session.refreshToken);
         }
-        api.defaults.headers.common['Authorization'] = `Bearer ${access_token}`;
-        originalRequest.headers.Authorization = `Bearer ${access_token}`;
+        api.defaults.headers.common['Authorization'] = `Bearer ${session.accessToken}`;
+        originalRequest.headers.Authorization = `Bearer ${session.accessToken}`;
 
-        processQueue(null, access_token);
+        processQueue(null, session.accessToken);
         isRefreshing = false;
 
         return api(originalRequest);

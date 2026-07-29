@@ -3,6 +3,7 @@ import api from '../utils/api';
 import { config } from '../config';
 import { clearAuthData, getAccessToken, getRefreshToken, getStoredUser, setAuthData, StoredUser } from '../utils/tokenStorage';
 import { logger } from '../utils/logger';
+import { isAdminUser, isUsableToken, parseAdminAuthEnvelope } from '../utils/authSession';
 
 interface User {
   id: string;
@@ -87,12 +88,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         refresh_token: storedRefreshToken,
       });
 
-      const { access_token, refresh_token: newRefreshToken, ...userData } = response.data;
-
-      setAuthData({ accessToken: access_token, refreshToken: newRefreshToken ?? storedRefreshToken, user: userData });
-      setToken(access_token);
-      setUser(userData);
-      api.defaults.headers.common['Authorization'] = `Bearer ${access_token}`;
+      const session = parseAdminAuthEnvelope(response.data, getStoredUser());
+      setAuthData({ accessToken: session.accessToken, refreshToken: session.refreshToken ?? storedRefreshToken, user: session.user });
+      setToken(session.accessToken);
+      setUser(session.user);
+      api.defaults.headers.common['Authorization'] = `Bearer ${session.accessToken}`;
       resetSessionTimeout();
       return true;
     } catch (error) {
@@ -149,9 +149,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const storedToken = getAccessToken();
       const storedUser = getStoredUser();
       
-      if (storedToken && storedUser) {
+      if (isUsableToken(storedToken) && isAdminUser(storedUser)) {
         try {
-          const userData = storedUser as StoredUser;
+          const userData = storedUser;
           setToken(storedToken);
           setUser(userData);
           api.defaults.headers.common['Authorization'] = `Bearer ${storedToken}`;
@@ -183,13 +183,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         password,
       });
 
-      const { access_token, refresh_token, ...userData } = response.data;
-      
-      setAuthData({ accessToken: access_token, refreshToken: refresh_token ?? null, user: userData });
-      setRefreshToken(refresh_token ?? null);
-      setToken(access_token);
-      setUser(userData);
-      api.defaults.headers.common['Authorization'] = `Bearer ${access_token}`;
+      const session = parseAdminAuthEnvelope(response.data);
+      setAuthData({ accessToken: session.accessToken, refreshToken: session.refreshToken, user: session.user });
+      setRefreshToken(session.refreshToken);
+      setToken(session.accessToken);
+      setUser(session.user);
+      api.defaults.headers.common['Authorization'] = `Bearer ${session.accessToken}`;
       resetSessionTimeout();
     } catch (error: any) {
       throw new Error(error.response?.data?.message || 'Login fehlgeschlagen');
@@ -215,7 +214,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     login,
     logout,
     refreshAuth,
-    isAuthenticated: Boolean(token),
+    isAuthenticated: isUsableToken(token) && isAdminUser(user),
     loading,
   }), [user, token, refreshToken, login, logout, refreshAuth, loading]);
 
