@@ -122,7 +122,7 @@ export function useWebSocketConnection({
         socketRefCount.set(driverId, 1);
       }
       
-      socket.emit('join-room', `driver-${driverId}`);
+      socket.emit('join-room', `driver_${driverId}`);
     });
 
     socket.on('disconnect', (reason) => {
@@ -213,7 +213,7 @@ export function useWebSocketConnection({
       setConnectionError(null);
       circuitBreakerRef.current.failureCount = 0;
       circuitBreakerRef.current.isOpen = false;
-      socket.emit('join-room', `driver-${driverId}`);
+      socket.emit('join-room', `driver_${driverId}`);
     });
   }, [driverId]);
 

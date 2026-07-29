@@ -103,3 +103,19 @@ export function createSocketCorsOptions(allowedOrigins: readonly string[]) {
     allowedHeaders: ["Content-Type", "Authorization"],
   };
 }
+
+export function createSocketAllowRequest(allowedOrigins: readonly string[]) {
+  return (
+    request: { headers: { origin?: string | string[] } },
+    callback: (error: string | null, allow: boolean) => void,
+  ) => {
+    const origin = request.headers.origin;
+    callback(
+      null,
+      isAllowedCorsOrigin(
+        typeof origin === "string" ? origin : undefined,
+        allowedOrigins,
+      ),
+    );
+  };
+}

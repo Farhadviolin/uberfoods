@@ -275,12 +275,8 @@ export function useWebSocket(callbacks: AdminWebSocketCallbacks = {}) {
       circuit.isOpen = false;
       circuit.lastFailureTime = 0;
 
-      // Join admin room for general updates (match backend room pattern: admin_<id>)
-      const storedUser = getStoredUser();
-      let adminRoom = 'admin_dev-admin-123';
-      if (storedUser?.id) {
-        adminRoom = `admin_${storedUser.id}`;
-      }
+      // The server assigns every authenticated admin to this aggregate room.
+      const adminRoom = 'admin-room';
       socket.emit('join-room', adminRoom);
       joinedRoomsRef.current.add(adminRoom);
 

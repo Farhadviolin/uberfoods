@@ -469,7 +469,7 @@ export function useWebSocket(
         logger.debug('Neue Socket-Instanz erstellt und in globale Map gespeichert', 'WebSocket', { driverId, refCount: 1 });
       }
       
-      socketRef.current?.emit('join-room', `driver-${driverId}`);
+      socketRef.current?.emit('join-room', `driver_${driverId}`);
     });
 
     socketRef.current.on('disconnect', (reason) => {
@@ -607,7 +607,7 @@ export function useWebSocket(
       circuitBreakerRef.current.lastFailureTime = 0;
       
       // Rejoin room nach Reconnect
-      socketRef.current?.emit('join-room', `driver-${driverId}`);
+      socketRef.current?.emit('join-room', `driver_${driverId}`);
     });
 
     socketRef.current.on('reconnect_failed', () => {

@@ -181,7 +181,7 @@ export function useWebSocket(
       
       // Join customer room wenn customerId vorhanden
       if (customerId) {
-        socketRef.current?.emit('join-room', `customer-${customerId}`);
+        socketRef.current?.emit('join-room', `customer_${customerId}`);
       }
 
       // Join additional room wenn angegeben
@@ -230,7 +230,7 @@ export function useWebSocket(
       setConnectionError(null);
       // Rejoin rooms nach Reconnect
       if (customerId) {
-        socketRef.current?.emit('join-room', `customer-${customerId}`);
+        socketRef.current?.emit('join-room', `customer_${customerId}`);
       }
       if (room) {
         socketRef.current?.emit('join-room', room);

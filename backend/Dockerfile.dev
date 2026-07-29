@@ -1,11 +1,12 @@
 # Alpine 3.16 has OpenSSL 1.1.x required by Prisma engine (3.17+ uses OpenSSL 3.x)
 FROM node:20-alpine3.16
 
-WORKDIR /app
+WORKDIR /app/backend
 
 # Copy package files
-COPY package*.json ./
-COPY prisma ./prisma/
+COPY backend/package*.json ./
+COPY backend/prisma ./prisma/
+COPY scripts /app/scripts
 
 # Install dependencies with legacy peer deps to handle version conflicts
 RUN NODE_OPTIONS="--max-old-space-size=4096" npm install --legacy-peer-deps
@@ -14,7 +15,7 @@ RUN NODE_OPTIONS="--max-old-space-size=4096" npm install --legacy-peer-deps
 RUN npx prisma generate
 
 # Copy source code
-COPY . .
+COPY backend .
 
 # Build the application (Full MVP stack)
 RUN npm run build

@@ -22,8 +22,6 @@ services:
       - LOG_LEVEL=debug
       - ALLOW_DEV_AUTH=false
     volumes:
-      - ./backend:/app
-      - /app/node_modules
-      - ./backend/uploads:/app/uploads
+      - ./backend/uploads:/app/backend/uploads
     ports:
       - "3000:3000"

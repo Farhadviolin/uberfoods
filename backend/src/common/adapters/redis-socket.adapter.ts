@@ -5,6 +5,7 @@ import { createClient } from "redis";
 import { INestApplication } from "@nestjs/common";
 import { Logger } from "@nestjs/common";
 import {
+  createSocketAllowRequest,
   createSocketCorsOptions,
   resolveCorsOrigins,
 } from "../config/cors.config";
@@ -59,6 +60,7 @@ export class RedisSocketAdapter extends IoAdapter {
     const serverOptions: ServerOptions = {
       ...options,
       cors: createSocketCorsOptions(this.corsOrigins),
+      allowRequest: createSocketAllowRequest(this.corsOrigins),
       transports: ["websocket", "polling"],
       allowEIO3: true,
       pingTimeout: 60000,

@@ -1,5 +1,6 @@
 import {
   createCorsOriginValidator,
+  createSocketAllowRequest,
   isAllowedCorsOrigin,
   resolveCorsOrigins,
 } from "./cors.config";
@@ -61,5 +62,20 @@ describe("CORS origin policy", () => {
       "message",
       "Not allowed by CORS",
     );
+  });
+
+  it("rejects unconfigured Socket.IO handshake origins", () => {
+    const allowRequest = createSocketAllowRequest(allowedOrigins);
+    const allowed = jest.fn();
+    const rejected = jest.fn();
+
+    allowRequest({ headers: { origin: "http://127.0.0.1:3004" } }, allowed);
+    allowRequest(
+      { headers: { origin: "https://unexpected.invalid" } },
+      rejected,
+    );
+
+    expect(allowed).toHaveBeenCalledWith(null, true);
+    expect(rejected).toHaveBeenCalledWith(null, false);
   });
 });
