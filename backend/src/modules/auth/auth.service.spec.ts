@@ -9,6 +9,8 @@ import * as bcrypt from 'bcrypt';
 
 jest.mock('bcrypt');
 
+const VALID_BCRYPT_HASH = `$2b$10$${'a'.repeat(53)}`;
+
 describe('AuthService', () => {
   let service: AuthService;
   let prisma: PrismaService;
@@ -110,7 +112,7 @@ describe('AuthService', () => {
       const mockUser = {
         id: 'user_1',
         email: 'test@example.com',
-        password: process.env.TEST_PASSWORD_HASH || 'mock-hashed-password',
+        password: VALID_BCRYPT_HASH,
         role: 'CUSTOMER',
         name: 'Test User',
       };
@@ -142,7 +144,7 @@ describe('AuthService', () => {
       const mockUser = {
         id: 'user_1',
         email: 'test@example.com',
-        password: process.env.TEST_PASSWORD_HASH || 'mock-hashed-password',
+        password: VALID_BCRYPT_HASH,
       };
 
       mockPrismaService.customer.findUnique.mockResolvedValue(mockUser);
@@ -164,7 +166,7 @@ describe('AuthService', () => {
       const mockUser = {
         id: 'user_1',
         email: 'test@example.com',
-        password: 'hashed-password',
+        password: VALID_BCRYPT_HASH,
         role: 'CUSTOMER',
       };
 
@@ -190,12 +192,21 @@ describe('AuthService', () => {
   });
 
   describe('driverLogin', () => {
+    it.each([undefined, '', 'not-a-bcrypt-hash'])('rejects an unusable stored hash without calling bcrypt.compare', async (password) => {
+      mockPrismaService.driver.findUnique.mockResolvedValue({
+        id: 'driver_1', email: 'driver@example.com', password, isActive: true,
+      });
+
+      await expect(service.driverLogin('driver@example.com', 'wrong-password')).rejects.toThrow(UnauthorizedException);
+      expect(bcrypt.compare).not.toHaveBeenCalled();
+    });
+
     it('should reject invalid driver password in every environment', async () => {
       const previousNodeEnv = process.env.NODE_ENV;
       const mockDriver = {
         id: 'driver_1',
         email: 'driver@example.com',
-        password: 'hashed-password',
+        password: VALID_BCRYPT_HASH,
         isActive: true,
       };
 
@@ -207,7 +218,7 @@ describe('AuthService', () => {
         service.driverLogin('driver@example.com', 'wrong-password')
       ).rejects.toThrow(UnauthorizedException);
 
-      expect(bcrypt.compare).toHaveBeenCalledWith('wrong-password', 'hashed-password');
+      expect(bcrypt.compare).toHaveBeenCalledWith('wrong-password', VALID_BCRYPT_HASH);
       expect(mockPrismaService.auditLog.create).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({

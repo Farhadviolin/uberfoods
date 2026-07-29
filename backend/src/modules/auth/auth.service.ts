@@ -67,6 +67,10 @@ export class AuthService {
     return email.toLowerCase().trim();
   }
 
+  private hasUsablePasswordHash(value: unknown): value is string {
+    return typeof value === "string" && /^\$2[aby]\$\d{2}\$.{53}$/.test(value);
+  }
+
   async validateUser(email: string, password: string, role?: string) {
     try {
       console.log(
@@ -237,7 +241,7 @@ export class AuthService {
           `[E2E-AUTH] Password field check: user.password exists = ${!!user.password}`,
         );
       }
-      if (!user.password) {
+      if (!this.hasUsablePasswordHash(user.password)) {
         if (isE2E) {
           this.logger.log(
             `[E2E-AUTH] RESULT: No password field - throwing "Password authentication not available"`,
@@ -402,7 +406,7 @@ export class AuthService {
       `Driver found: ${driver.id}, has password: ${!!driver.password}`,
     );
 
-    if (!driver.password) {
+    if (!this.hasUsablePasswordHash(driver.password)) {
       throw new UnauthorizedException(
         "Password authentication not available for this account",
       );

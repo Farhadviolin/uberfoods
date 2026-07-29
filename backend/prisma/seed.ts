@@ -250,27 +250,31 @@ async function main() {
   });
 
   // Erstelle Beispiel-Fahrer
-  const hashedDriverPassword = await bcrypt.hash(driverPassword, 10);
-  console.log('Creating driver with password hash length:', hashedDriverPassword.length);
+  const existingSeedDriver = await prisma.driver.findUnique({
+    where: { email: 'driver@uberfoods.local' },
+    select: { password: true },
+  });
+  const hasUsableSeedDriverPassword = typeof existingSeedDriver?.password === 'string' && /^\$2[aby]\$\d{2}\$.{53}$/.test(existingSeedDriver.password);
+  const hashedDriverPassword = hasUsableSeedDriverPassword ? undefined : await bcrypt.hash(driverPassword, 10);
 
   const driver1 = await prisma.driver.upsert({
     where: { email: 'driver@uberfoods.local' },
     update: {
-      password: hashedDriverPassword,
+      ...(hashedDriverPassword ? { password: hashedDriverPassword } : {}),
       mustChangePassword: false,
       isActive: true,
     },
     create: {
       name: 'John Driver',
       email: 'driver@uberfoods.local',
-      password: hashedDriverPassword,
+      password: hashedDriverPassword!,
       phone: '+49 151 87654321',
       mustChangePassword: false,
       isActive: true,
     },
   });
 
-  console.log('Driver created/updated:', driver1.email);
+  console.log('Local driver fixture created or verified');
 
   await prisma.address.upsert({
     where: { id: 'address-max-musterstrasse' },
