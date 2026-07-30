@@ -14,6 +14,28 @@ export interface Order {
   };
 }
 
+function normalizeOrderList(payload: unknown): Order[] {
+  if (Array.isArray(payload)) {
+    return payload as Order[];
+  }
+
+  if (!payload || typeof payload !== 'object' || !('data' in payload)) {
+    return [];
+  }
+
+  const data = (payload as { data?: unknown }).data;
+  if (Array.isArray(data)) {
+    return data as Order[];
+  }
+
+  if (data && typeof data === 'object' && 'data' in data) {
+    const nestedData = (data as { data?: unknown }).data;
+    return Array.isArray(nestedData) ? nestedData as Order[] : [];
+  }
+
+  return [];
+}
+
 export function useOrders() {
   const { user } = useAuth();
   const token = localStorage.getItem('customer_token');
@@ -28,9 +50,7 @@ export function useOrders() {
       }
       try {
         const response = await api.get('/orders/my');
-        const payload = response.data;
-        // Support both shapes: Order[] OR { data: Order[] }
-        return Array.isArray(payload) ? payload : (payload?.data ?? []);
+        return normalizeOrderList(response.data);
       } catch (error: unknown) {
         const axiosError = error as AxiosErrorWithResponse;
         // Bei 401/403 Fehlern (kein Login) leere Liste zurückgeben

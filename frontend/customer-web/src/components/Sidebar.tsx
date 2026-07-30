@@ -73,7 +73,9 @@ export function Sidebar({ onCollapseChange }: SidebarProps) {
       label: t('sidebar.orders'),
       icon: <Package size={20} />,
       path: '/orders',
-      badge: orders?.filter((o: { status: string }) => o.status === 'PENDING' || o.status === 'PREPARING').length,
+      badge: Array.isArray(orders)
+        ? orders.filter((o: { status: string }) => o.status === 'PENDING' || o.status === 'PREPARING').length
+        : undefined,
     },
     {
       id: 'favorites',

@@ -124,6 +124,45 @@ describe('useOrders Hook (Customer)', () => {
       expect(result.current.data).toEqual(mockOrders);
     });
 
+    it('unwraps a nested standardized paginated response', async () => {
+      const mockOrders: Order[] = [createOrder({ status: 'PENDING' })];
+      mockApi.get.mockResolvedValueOnce({
+        data: {
+          success: true,
+          data: {
+            data: mockOrders,
+            pagination: { page: 1, limit: 20, total: 1, totalPages: 1 },
+          },
+        },
+      });
+
+      const { result } = renderHook(() => useOrders(), {
+        wrapper: createWrapper(authenticatedState),
+      });
+
+      await waitFor(() => {
+        expect(result.current.isSuccess).toBe(true);
+      });
+
+      expect(result.current.data).toEqual(mockOrders);
+    });
+
+    it('fails closed to an empty list for a malformed response', async () => {
+      mockApi.get.mockResolvedValueOnce({
+        data: { success: true, data: { unexpected: 'shape' } },
+      });
+
+      const { result } = renderHook(() => useOrders(), {
+        wrapper: createWrapper(authenticatedState),
+      });
+
+      await waitFor(() => {
+        expect(result.current.isSuccess).toBe(true);
+      });
+
+      expect(result.current.data).toEqual([]);
+    });
+
     it('returns an empty order list', async () => {
       mockApi.get.mockResolvedValueOnce({ data: { data: [] } });
 

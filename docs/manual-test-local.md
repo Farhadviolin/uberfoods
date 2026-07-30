@@ -42,6 +42,29 @@ auch in getrennten Terminals ausgeführt werden:
 Keine Environment-Werte, Tokens oder Passwörter in Terminalprotokolle oder
 Screenshots übernehmen.
 
+### Isolierte Produktionssimulation
+
+Wenn die Standardports bereits belegt sind oder eine garantiert frische
+Datenbasis benötigt wird, ist der kanonische isolierte Einstieg im
+Repository-Root:
+
+```powershell
+npm run verify:production-simulation
+```
+
+Der Verifier verwendet einen eigenen Compose-Projektnamen, dynamische
+Loopback-Ports und ein eigenes PostgreSQL-Volume. Er führt Prisma Generate,
+alle vorhandenen Migrationen sowie den Seed zweimal aus und prüft
+Idempotenz, Backend- und Frontend-Health, den API-Lifecycle und Persistenz
+nach Backend-, Anwendungs- und PostgreSQL-Recreate. Die tatsächlichen Ports
+werden ausschließlich aus seiner Ausgabe beziehungsweise den
+Container-Mappings übernommen. Die temporären Test-Secrets werden nicht
+protokolliert.
+
+Der Verifier bereinigt am Ende ausschließlich seinen eigenen Compose-Namespace
+und sein eigenes Test-Volume. Die Browser-UI-Abnahme bleibt ein separater,
+zusätzlicher Schritt; ein grüner API-Verifier ersetzt sie nicht.
+
 ## Preflight und Health
 
 Vor dem Start müssen fremde Prozesse und Container ausgeschlossen werden:
@@ -276,3 +299,26 @@ nach Reload eine ungültige scheinbare Sitzung. Restaurant zeigt den
 Onboarding-Wizard vor dem Login und blockiert dadurch die Auth-Oberfläche.
 Order-Lifecycle, Realtime-Abnahme, Rollen-Reload/Logout und responsive
 Kernaktionen sind deshalb nicht als bestanden zu werten.
+
+## P1-LOCAL-INTEGRATED-BROWSER-012-Protokoll vom 30. Juli 2026
+
+Die Abnahme startete auf Commit
+`58827cc3c98a133330bb5281ad0b2acadd889441`. Die isolierte
+Produktionssimulation `uberfoods_prod_sim_7b0ef312` bestand Fresh-DB,
+Migrationen, beide Seed-Läufe, Idempotenz, Health aller Dienste, den
+API-Rollen-Lifecycle und die Persistenzprüfungen. Ihr eigener Namespace und
+ihr Test-Volume wurden anschließend erfolgreich entfernt.
+
+Der erste Browser-P1 trat auf `http://127.0.0.1:3102/login` auf:
+`TypeError: orders?.filter is not a function` in `Sidebar`. Die
+Order-List-Normalisierung berücksichtigte den verschachtelten standardisierten
+Pagination-Envelope nicht, und die Badge-Berechnung war gegenüber einer
+bereits gecachten Fehlform nicht abgesichert. Nach der Korrektur rendert die
+Loginseite wieder ohne Error Boundary. Ein positiver Regressionstest prüft den
+verschachtelten Envelope; ein negativer Regressionstest normalisiert eine
+unbekannte Antwortform fail-closed auf eine leere Liste.
+
+Gemäß der Regel, beim ersten P0/P1 den breiten Lauf zu stoppen, wurden der
+Mehrrollen-Browser-Lifecycle, die vollständige Negativmatrix und die
+WebSocket-UI-Abnahme in diesem Lauf nicht fortgesetzt. Das Finding bleibt bis
+zu einem neuen vollständigen Browserlauf `PARTIAL`.
