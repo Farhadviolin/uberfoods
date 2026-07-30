@@ -393,7 +393,12 @@ export class AuthService {
   }
 
   async driverLogin(email: string, password: string) {
-    if (typeof email !== "string" || typeof password !== "string" || !email.trim() || !password) {
+    if (
+      typeof email !== "string" ||
+      typeof password !== "string" ||
+      !email.trim() ||
+      !password
+    ) {
       throw new UnauthorizedException("Invalid credentials");
     }
     const normalizedEmail = this.normalizeEmail(email);
