@@ -1,17 +1,11 @@
 import { test, expect } from '@playwright/test';
+import { installDriverSession } from './fixtures/driverSession';
 
 test.describe('Chat-Funktionalität', () => {
   test.beforeEach(async ({ page }) => {
-    // Mock Login
-    await page.addInitScript(() => {
-      localStorage.setItem('driver_token', 'mock-token');
-      localStorage.setItem('driver_user', JSON.stringify({
-        id: 'driver-123',
-        name: 'Test Driver',
-        email: 'driver@test.com',
-      }));
-    });
+    const accessToken = await installDriverSession(page);
     await page.route('**/api/drivers/driver-123/orders/active', async (route) => {
+      expect(route.request().headers().authorization).toBe(`Bearer ${accessToken}`);
       await route.fulfill({
         status: 200,
         contentType: 'application/json',

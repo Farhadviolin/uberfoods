@@ -19,8 +19,8 @@ export const isDriver = (value: unknown): value is Driver =>
   typeof value.isActive === 'boolean' && (driverRole(value.role) || driverRole(value.userType));
 
 export function parseDriverAuthEnvelope(value: unknown, fallbackDriver?: Driver | null): DriverAuthSession {
-  if (!isRecord(value) || value.success !== true || !isRecord(value.data)) throw new Error('Ungültige Auth-Antwort');
-  const payload = value.data;
+  if (!isRecord(value)) throw new Error('Ungültige Auth-Antwort');
+  const payload = value.success === true && isRecord(value.data) ? value.data : value;
   if (!isUsableToken(payload.access_token)) throw new Error('Ungültiger Zugriffstoken');
   const candidate = isDriver(payload.user) ? payload.user : isDriver(payload) ? payload : fallbackDriver;
   if (!isDriver(candidate)) throw new Error('Ungültige Fahrer-Identität');

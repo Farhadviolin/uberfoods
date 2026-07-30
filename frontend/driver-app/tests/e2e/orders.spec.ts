@@ -1,16 +1,9 @@
 import { test, expect } from '@playwright/test';
+import { installDriverSession } from './fixtures/driverSession';
 
 test.describe('Bestellungsverwaltung', () => {
   test.beforeEach(async ({ page }) => {
-    // Mock Login - setze Token direkt
-    await page.addInitScript(() => {
-      localStorage.setItem('driver_token', 'mock-token');
-      localStorage.setItem('driver_user', JSON.stringify({
-        id: 'driver-123',
-        name: 'Test Driver',
-        email: 'driver@test.com',
-      }));
-    });
+    await installDriverSession(page);
     await page.route('**/api/drivers/driver-123/orders/active', async (route) => {
       await route.fulfill({
         status: 200,
