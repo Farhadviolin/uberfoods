@@ -22,10 +22,10 @@ export const isAdminUser = (value: unknown): value is AdminUserRecord =>
 export const isUsableToken = (value: unknown): value is string => nonEmptyString(value);
 
 export function parseAdminAuthEnvelope(value: unknown, fallbackUser?: StoredUser | null): AdminAuthSession {
-  if (!isRecord(value) || value.success !== true || !isRecord(value.data)) {
+  if (!isRecord(value)) {
     throw new Error('Ungültige Auth-Antwort');
   }
-  const payload = value.data;
+  const payload = value.success === true && isRecord(value.data) ? value.data : value;
   if (!isUsableToken(payload.access_token)) throw new Error('Ungültiger Zugriffstoken');
   const candidate = isAdminUser(payload.user) ? payload.user : isAdminUser(payload) ? payload : fallbackUser;
   if (!isAdminUser(candidate)) throw new Error('Ungültige Admin-Identität');
