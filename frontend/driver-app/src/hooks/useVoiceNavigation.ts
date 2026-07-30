@@ -54,8 +54,9 @@ export function useVoiceNavigation(options: VoiceNavigationOptions = {}) {
       // Speech Recognition Setup
       if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
         recognitionSupported = true;
-        const SpeechRecognition = window.webkitSpeechRecognition || window.SpeechRecognition;
-        recognitionRef.current = new SpeechRecognition();
+        const RecognitionConstructor = window.webkitSpeechRecognition ?? window.SpeechRecognition;
+        if (!RecognitionConstructor) return;
+        recognitionRef.current = new RecognitionConstructor();
 
         const recognition = recognitionRef.current;
         recognition.continuous = false;

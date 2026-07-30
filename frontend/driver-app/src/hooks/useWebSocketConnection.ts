@@ -81,7 +81,7 @@ export function useWebSocketConnection({
 
     // Prüfe existierende Verbindung
     const existingSocket = globalSocketMap.get(driverId);
-    if (existingSocket && (existingSocket.connected || existingSocket.io?.connecting)) {
+    if (existingSocket && (existingSocket.connected || existingSocket.active)) {
       socketRef.current = existingSocket;
       setIsConnected(existingSocket.connected);
       const count = socketRefCount.get(driverId) || 0;
@@ -138,7 +138,7 @@ export function useWebSocketConnection({
           circuit.isOpen = true;
           if (socket) {
             try {
-              socket.io.reconnect(false);
+              socket.io.reconnection(false);
             } catch (e) {
               // Ignoriere Fehler
             }
@@ -168,7 +168,7 @@ export function useWebSocketConnection({
           circuit.isOpen = true;
           if (socket) {
             try {
-              socket.io.reconnect(false);
+              socket.io.reconnection(false);
             } catch (e) {
               // Ignoriere Fehler
             }
@@ -240,29 +240,30 @@ export function useWebSocketConnection({
     
     if (socketRef.current && !socketRef.current.connected) {
       if (socketRef.current.io) {
-        socketRef.current.io.reconnect(true);
+        socketRef.current.io.reconnection(true);
       }
       socketRef.current.connect();
     }
   }, []);
 
   useEffect(() => {
+    const activeDriverId = driverId;
     if (autoConnect && driverId) {
       connect();
     }
 
     return () => {
-      if (socketRef.current) {
-        const refCount = socketRefCount.get(driverId) || 0;
+      if (socketRef.current && activeDriverId) {
+        const refCount = socketRefCount.get(activeDriverId) || 0;
         if (refCount > 1) {
-          socketRefCount.set(driverId, refCount - 1);
+          socketRefCount.set(activeDriverId, refCount - 1);
         } else {
-          socketRefCount.delete(driverId);
+          socketRefCount.delete(activeDriverId);
           if (socketRef.current) {
             try {
               socketRef.current.removeAllListeners();
               if (socketRef.current.io) {
-                socketRef.current.io.reconnect(false);
+                socketRef.current.io.reconnection(false);
               }
               if (socketRef.current.connected) {
                 socketRef.current.disconnect();
@@ -271,7 +272,7 @@ export function useWebSocketConnection({
               // Ignoriere Fehler
             }
           }
-          globalSocketMap.delete(driverId);
+          globalSocketMap.delete(activeDriverId);
         }
         socketRef.current = null;
       }

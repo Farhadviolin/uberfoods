@@ -39,7 +39,7 @@ export function NotificationsCenter() {
     try {
       setLoading(true);
       const result = await DriverService.getNotifications(driver.id, 50);
-      let filtered = result.data.notifications || result.data || [];
+      let filtered = result.data || [];
       
       if (filter !== 'all') {
         if (filter === 'unread') {

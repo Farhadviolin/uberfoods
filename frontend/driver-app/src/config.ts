@@ -2,9 +2,11 @@
 import { getEnvBool, getEnvVar } from './utils/env';
 
 // Helper function to safely access import.meta.env
-function getImportMetaEnv(): any {
-  // Sicherer Fallback für verschiedene Umgebungen
-  return {};
+function getImportMetaEnv(): { DEV: boolean; PROD: boolean } {
+  return {
+    DEV: getEnvBool('DEV'),
+    PROD: getEnvBool('PROD'),
+  };
 }
 
 // Helper to validate production URLs
@@ -23,8 +25,7 @@ function validateProductionUrl(url: string, name: string): string {
 
 // Get API URL with production validation and canonical resolution logic
 const resolveApiBaseUrl = (): string => {
-  const env = getImportMetaEnv();
-  const apiUrl = getEnvVar('VITE_API_URL', 'http://localhost:3000');
+  const apiUrl = getEnvVar<string>('VITE_API_URL', 'http://localhost:3000') ?? 'http://localhost:3000';
 
   // Primary: VITE_API_URL if set
   if (apiUrl !== 'http://localhost:3000') {
@@ -56,7 +57,7 @@ const resolveWsUrl = (): string => {
   const env = getImportMetaEnv();
 
   // Primary: VITE_WS_URL if explicitly set
-  const wsUrl = getEnvVar('VITE_WS_URL', '');
+  const wsUrl = getEnvVar<string>('VITE_WS_URL', '');
   if (wsUrl) {
     return validateProductionUrl(wsUrl, 'WebSocket URL');
   }
@@ -73,7 +74,7 @@ const resolveWsUrl = (): string => {
 
   // Production: Use API URL directly (HTTP/HTTPS, Socket.IO handles WebSocket upgrade)
   // Socket.IO connects directly to Backend and handles WebSocket upgrade
-  const apiUrl = getEnvVar('VITE_API_URL', 'http://localhost:3000');
+  const apiUrl = getEnvVar<string>('VITE_API_URL', 'http://localhost:3000') ?? 'http://localhost:3000';
   if (apiUrl.startsWith('http://') || apiUrl.startsWith('https://')) {
     return validateProductionUrl(apiUrl, 'WebSocket URL');
   }
@@ -87,7 +88,7 @@ export const config = {
   // WebSocket URL: Socket.IO benötigt HTTP/HTTPS URL, nicht WebSocket URL!
   // Socket.IO macht selbst das Upgrade zu WebSocket über den Transport
   wsUrl: resolveWsUrl(),
-  appName: getEnvVar('VITE_APP_NAME', 'UberFoods Driver'),
+  appName: getEnvVar<string>('VITE_APP_NAME', 'UberFoods Driver') ?? 'UberFoods Driver',
   isDevelopment: getEnvBool('DEV'),
   isProduction: getEnvBool('PROD'),
   // WebSocket Konfiguration

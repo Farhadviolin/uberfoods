@@ -28,7 +28,7 @@ interface EarningsHistory {
 
 export function EarningsDashboard() {
   const { driver } = useAuth();
-  const { subscription, insights } = useSubscription();
+  const { subscription } = useSubscription();
   const [earnings, setEarnings] = useState<EarningsPeriod | null>(null);
   const [history, setHistory] = useState<EarningsHistory[]>([]);
   const [loading, setLoading] = useState(false);

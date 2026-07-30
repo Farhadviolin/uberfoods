@@ -92,7 +92,7 @@ export class MapsService {
   private directionsService: any = null;
   private placesService: any = null;
   private geocoder: any = null;
-  private isInitialized = false;
+  private initialized = false;
 
   static getInstance(): MapsService {
     if (!MapsService.instance) {
@@ -103,7 +103,7 @@ export class MapsService {
 
   async initialize(apiKey: string): Promise<void> {
     return new Promise((resolve, reject) => {
-      if (this.isInitialized) {
+      if (this.initialized) {
         resolve();
         return;
       }
@@ -111,7 +111,7 @@ export class MapsService {
       // Check if Google Maps is already loaded
       if (window.google && window.google.maps) {
         this.setupServices();
-        this.isInitialized = true;
+        this.initialized = true;
         resolve();
         return;
       }
@@ -124,7 +124,7 @@ export class MapsService {
 
       script.onload = () => {
         this.setupServices();
-        this.isInitialized = true;
+        this.initialized = true;
         logger.info('Google Maps initialized successfully');
         resolve();
       };
@@ -157,7 +157,7 @@ export class MapsService {
     waypoints: RoutePoint[] = [],
     options: RouteOptions = {}
   ): Promise<RouteResult> {
-    if (!this.isInitialized || !this.directionsService) {
+    if (!this.initialized || !this.directionsService) {
       throw new Error('Maps service not initialized');
     }
 
@@ -217,7 +217,7 @@ export class MapsService {
   }
 
   async geocodeAddress(address: string): Promise<GeocodeResult[]> {
-    if (!this.isInitialized || !this.geocoder) {
+    if (!this.initialized || !this.geocoder) {
       throw new Error('Maps service not initialized');
     }
 
@@ -234,7 +234,7 @@ export class MapsService {
   }
 
   async reverseGeocode(location: LatLng): Promise<GeocodeResult[]> {
-    if (!this.isInitialized || !this.geocoder) {
+    if (!this.initialized || !this.geocoder) {
       throw new Error('Maps service not initialized');
     }
 
@@ -255,7 +255,7 @@ export class MapsService {
     location?: LatLng,
     radius: number = 5000
   ): Promise<PlaceResult[]> {
-    if (!this.isInitialized || !this.placesService) {
+    if (!this.initialized || !this.placesService) {
       throw new Error('Maps service not initialized');
     }
 
@@ -282,7 +282,7 @@ export class MapsService {
   }
 
   async getPlaceDetails(placeId: string): Promise<PlaceResult> {
-    if (!this.isInitialized || !this.placesService) {
+    if (!this.initialized || !this.placesService) {
       throw new Error('Maps service not initialized');
     }
 
@@ -302,7 +302,7 @@ export class MapsService {
   }
 
   calculateDistance(point1: LatLng, point2: LatLng): number {
-    if (!this.isInitialized || !this.googleMaps) {
+    if (!this.initialized || !this.googleMaps) {
       // Fallback to simple calculation
       return this.haversineDistance(point1, point2);
     }
@@ -314,7 +314,7 @@ export class MapsService {
   }
 
   calculateBearing(point1: LatLng, point2: LatLng): number {
-    if (!this.isInitialized || !this.googleMaps) {
+    if (!this.initialized || !this.googleMaps) {
       // Fallback calculation
       return this.calculateBearingFallback(point1, point2);
     }
@@ -455,7 +455,7 @@ export class MapsService {
   }
 
   isInitialized(): boolean {
-    return this.isInitialized;
+    return this.initialized;
   }
 
   getGoogleMaps(): any {

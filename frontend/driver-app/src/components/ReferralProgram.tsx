@@ -1,38 +1,18 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useReferral } from '../hooks/useReferral';
-import { DriverService } from '../services/driverService';
 import { extractErrorMessage } from '../utils/errorHandler';
 import './ReferralProgram.css';
 
-interface Referral {
-  id: string;
-  code: string;
-  referredDriverId?: string;
-  status: 'pending' | 'completed' | 'rewarded';
-  rewardAmount: number;
-  createdAt: string;
-  completedAt?: string;
-}
-
-interface ReferralStats {
-  totalReferrals: number;
-  completedReferrals: number;
-  totalRewards: number;
-  pendingRewards: number;
-}
-
 export function ReferralProgram() {
   const { driver } = useAuth();
-  const [applyingCode, setApplyingCode] = useState(false);
+  const [, setApplyingCode] = useState(false);
   const [codeInput, setCodeInput] = useState('');
 
   const {
     referralCode,
     referrals,
     stats,
-    isLoading,
-    error,
     refetch,
     applyReferralCode,
     claimReward,

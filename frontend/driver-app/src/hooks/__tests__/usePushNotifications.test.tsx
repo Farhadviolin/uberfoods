@@ -1,23 +1,25 @@
 import { renderHook } from '@testing-library/react';
 import { usePushNotifications } from '../usePushNotifications';
-import { renderWithProviders } from '../../test-utils';
+import { TestWrapper } from '../../test-utils';
 
 // Mock the usePushNotifications hook
 jest.mock('../usePushNotifications', () => ({
   usePushNotifications: () => ({
-    notifications: [],
-    permission: 'granted',
-    requestPermission: jest.fn(),
+    isSupported: true,
+    isSubscribed: false,
+    publicKey: null,
+    subscribe: jest.fn(),
+    unsubscribe: jest.fn(),
   }),
 }));
 
 describe('usePushNotifications Hook', () => {
   it('returns notification state', () => {
     const { result } = renderHook(() => usePushNotifications(), {
-      wrapper: renderWithProviders().wrapper,
+      wrapper: TestWrapper,
     });
 
-    expect(result.current.notifications).toEqual([]);
-    expect(result.current.permission).toBe('granted');
+    expect(result.current.isSupported).toBe(true);
+    expect(result.current.isSubscribed).toBe(false);
   });
 });

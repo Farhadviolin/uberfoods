@@ -65,7 +65,6 @@ export function animateScrollTo(
     
     const distance = target - start;
     const startTime = performance.now();
-    let animationFrameId: number;
 
     const animateStep = (currentTime: number) => {
       const elapsed = currentTime - startTime;
@@ -80,13 +79,13 @@ export function animateScrollTo(
       }
 
       if (progress < 1) {
-        animationFrameId = requestAnimationFrame(animateStep);
+        requestAnimationFrame(animateStep);
       } else {
         resolve();
       }
     };
 
-    animationFrameId = requestAnimationFrame(animateStep);
+    requestAnimationFrame(animateStep);
   });
 }
 
@@ -99,7 +98,6 @@ export function fadeIn(element: HTMLElement, duration: number = 300): Promise<vo
     element.style.display = 'block';
 
     const startTime = performance.now();
-    let animationFrameId: number;
 
     const animateStep = (currentTime: number) => {
       const elapsed = currentTime - startTime;
@@ -109,13 +107,13 @@ export function fadeIn(element: HTMLElement, duration: number = 300): Promise<vo
       element.style.opacity = String(easedProgress);
 
       if (progress < 1) {
-        animationFrameId = requestAnimationFrame(animateStep);
+        requestAnimationFrame(animateStep);
       } else {
         resolve();
       }
     };
 
-    animationFrameId = requestAnimationFrame(animateStep);
+    requestAnimationFrame(animateStep);
   });
 }
 
@@ -126,7 +124,6 @@ export function fadeOut(element: HTMLElement, duration: number = 300): Promise<v
   return new Promise((resolve) => {
     const startOpacity = parseFloat(getComputedStyle(element).opacity) || 1;
     const startTime = performance.now();
-    let animationFrameId: number;
 
     const animateStep = (currentTime: number) => {
       const elapsed = currentTime - startTime;
@@ -136,14 +133,14 @@ export function fadeOut(element: HTMLElement, duration: number = 300): Promise<v
       element.style.opacity = String(startOpacity * (1 - easedProgress));
 
       if (progress < 1) {
-        animationFrameId = requestAnimationFrame(animateStep);
+        requestAnimationFrame(animateStep);
       } else {
         element.style.display = 'none';
         resolve();
       }
     };
 
-    animationFrameId = requestAnimationFrame(animateStep);
+    requestAnimationFrame(animateStep);
   });
 }
 

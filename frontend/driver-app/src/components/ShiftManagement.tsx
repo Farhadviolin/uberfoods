@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { DriverService } from '../services/driverService';
 import { useWebSocket } from '../hooks/useWebSocket';
-import api from '../utils/api';
 import './ShiftManagement.css';
 
 interface Shift {
@@ -39,7 +38,6 @@ export function ShiftManagement() {
   const [currentShift, setCurrentShift] = useState<Shift | null>(null);
   const [loading, setLoading] = useState(false);
   const [shiftTime, setShiftTime] = useState(0);
-  const [breakTime, setBreakTime] = useState(0);
   const [shiftHistory, setShiftHistory] = useState<ShiftHistory[]>([]);
   const [analytics, setAnalytics] = useState<ShiftAnalytics | null>(null);
   const [showHistory, setShowHistory] = useState(false);
@@ -62,7 +60,7 @@ export function ShiftManagement() {
       setCurrentShift(shift);
       fetchShiftAnalytics();
     },
-    onShiftEnded: (shift) => {
+    onShiftEnded: (_shift) => {
       setCurrentShift(null);
       setShiftTime(0);
       fetchShiftHistory();

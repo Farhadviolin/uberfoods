@@ -1,4 +1,4 @@
-import { Order, Driver, AcceptanceScore, TrafficData, DriverPerformance, RouteOptimization } from '../types';
+import { Order, Driver, AcceptanceScore, TrafficData, DriverPerformance } from '../types';
 import api from '../utils/api';
 import { logger } from '../utils/logger';
 import { getEnvVar } from '../utils/env';
@@ -222,7 +222,7 @@ export class SmartAcceptanceEngine {
   /**
    * Earnings-Vorhersage
    */
-  private async predictEarnings(order: Order, driver: Driver) {
+  private async predictEarnings(order: Order, _driver: Driver) {
     const baseAmount = order.totalAmount;
 
     // Provision (typischerweise 20-30%)
@@ -254,7 +254,7 @@ export class SmartAcceptanceEngine {
    * Hinweis: Diese Methode wird nur im lokalen Fallback verwendet.
    * Die Backend-API /drivers/:id/acceptance/analyze verwendet bereits alle Performance-Daten.
    */
-  private async getPerformanceMetrics(driver: Driver): Promise<DriverPerformance> {
+  private async getPerformanceMetrics(_driver: Driver): Promise<DriverPerformance> {
     // Fallback-Performance-Daten (wird nur verwendet, wenn Backend-API nicht verfügbar ist)
     // Die Backend-API /drivers/:id/acceptance/analyze holt bereits alle Performance-Daten
     return {
@@ -275,7 +275,7 @@ export class SmartAcceptanceEngine {
   /**
    * Einzelne Faktoren berechnen (0-100)
    */
-  private calculateFactors(order: Order, driver: Driver, traffic: TrafficData, route: any, earnings: any, performance: DriverPerformance) {
+  private calculateFactors(_order: Order, _driver: Driver, traffic: TrafficData, route: any, earnings: any, performance: DriverPerformance) {
     return {
       traffic: Math.max(0, 100 - traffic.congestionLevel),
       earnings: Math.min(100, (earnings.amount / 10) * 100), // Skaliere auf 0-100
@@ -289,7 +289,7 @@ export class SmartAcceptanceEngine {
   /**
    * Gesamtscore mit Gewichtung berechnen
    */
-  private calculateOverallScore(factors: any, driver: Driver): number {
+  private calculateOverallScore(factors: any, _driver: Driver): number {
     const weights = {
       traffic: 0.25,      // 25% - sehr wichtig bei Stau
       earnings: 0.20,     // 20% - finanzielle Motivation
@@ -368,9 +368,9 @@ export class SmartAcceptanceEngine {
   /**
    * Konfidenz der Vorhersage berechnen
    */
-  private calculateConfidence(factors: any): number {
+  private calculateConfidence(factors: Record<string, number>): number {
     // Hohe Konfidenz wenn alle Faktoren konsistent sind
-    const variance = Object.values(factors).reduce((acc: number, val: number) => {
+    const variance = Object.values(factors).reduce((acc, val) => {
       return acc + Math.pow(val - 60, 2); // Abweichung vom Mittelwert
     }, 0) / Object.keys(factors).length;
 

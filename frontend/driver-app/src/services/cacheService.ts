@@ -308,7 +308,7 @@ export class CacheService {
   }
 
   // Legacy method for backward compatibility
-  private evictLRU(): void {
+  evictLRU(): void {
     this.evictByPriority();
   }
 

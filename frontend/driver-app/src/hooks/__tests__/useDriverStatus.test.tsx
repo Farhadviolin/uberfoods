@@ -1,4 +1,4 @@
-import { renderHook, waitFor, act } from '@testing-library/react';
+import { renderHook, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ReactNode } from 'react';
 import {
@@ -6,8 +6,6 @@ import {
   useUpdateDriverStatus,
   useDriverStats
 } from '../useDriverStatus';
-import { AuthProvider } from '../../contexts/AuthContext';
-import { ToastProvider } from '../../contexts/ToastContext';
 
 // Mock API
 jest.mock('../../services/api');
@@ -16,7 +14,7 @@ import api from '../../services/api';
 const mockApi = api as jest.Mocked<typeof api>;
 
 // Test wrapper
-const createWrapper = (initialAuthState = { user: null, token: null }) => {
+const createWrapper = () => {
   const queryClient = new QueryClient({
     defaultOptions: {
       queries: { retry: false },
@@ -26,11 +24,7 @@ const createWrapper = (initialAuthState = { user: null, token: null }) => {
 
   return ({ children }: { children: ReactNode }) => (
     <QueryClientProvider client={queryClient}>
-      <AuthProvider initialAuthState={initialAuthState}>
-        <ToastProvider>
-          {children}
-        </ToastProvider>
-      </AuthProvider>
+      {children}
     </QueryClientProvider>
   );
 };
@@ -76,7 +70,7 @@ describe('useDriverStatus', () => {
       mockApi.get.mockResolvedValueOnce({ data: mockStatus });
 
       const { result } = renderHook(() => useDriverStatus(), {
-        wrapper: createWrapper({ user: { id: 'driver-1' }, token: 'token' }),
+        wrapper: createWrapper(),
       });
 
       await waitFor(() => {
@@ -91,7 +85,7 @@ describe('useDriverStatus', () => {
       mockApi.get.mockRejectedValueOnce(new Error('Status fetch failed'));
 
       const { result } = renderHook(() => useDriverStatus(), {
-        wrapper: createWrapper({ user: { id: 'driver-1' }, token: 'token' }),
+        wrapper: createWrapper(),
       });
 
       await waitFor(() => {
@@ -126,7 +120,7 @@ describe('useDriverStatus', () => {
       mockApi.put.mockResolvedValueOnce({ data: mockResponse });
 
       const { result } = renderHook(() => useUpdateDriverStatus(), {
-        wrapper: createWrapper({ user: { id: 'driver-1' }, token: 'token' }),
+        wrapper: createWrapper(),
       });
 
       result.current.mutate(updateData);
@@ -153,7 +147,7 @@ describe('useDriverStatus', () => {
       mockApi.put.mockResolvedValueOnce({ data: mockResponse });
 
       const { result } = renderHook(() => useUpdateDriverStatus(), {
-        wrapper: createWrapper({ user: { id: 'driver-1' }, token: 'token' }),
+        wrapper: createWrapper(),
       });
 
       result.current.mutate(updateData);
@@ -182,7 +176,7 @@ describe('useDriverStatus', () => {
       mockApi.put.mockResolvedValueOnce({ data: mockResponse });
 
       const { result } = renderHook(() => useUpdateDriverStatus(), {
-        wrapper: createWrapper({ user: { id: 'driver-1' }, token: 'token' }),
+        wrapper: createWrapper(),
       });
 
       result.current.mutate(updateData);
@@ -208,7 +202,7 @@ describe('useDriverStatus', () => {
       });
 
       const { result } = renderHook(() => useUpdateDriverStatus(), {
-        wrapper: createWrapper({ user: { id: 'driver-1' }, token: 'token' }),
+        wrapper: createWrapper(),
       });
 
       result.current.mutate(updateData);
@@ -270,7 +264,7 @@ describe('useDriverStatus', () => {
       mockApi.get.mockResolvedValueOnce({ data: mockStats });
 
       const { result } = renderHook(() => useDriverStats(), {
-        wrapper: createWrapper({ user: { id: 'driver-1' }, token: 'token' }),
+        wrapper: createWrapper(),
       });
 
       await waitFor(() => {
@@ -285,7 +279,7 @@ describe('useDriverStatus', () => {
       mockApi.get.mockRejectedValueOnce(new Error('Stats fetch failed'));
 
       const { result } = renderHook(() => useDriverStats(), {
-        wrapper: createWrapper({ user: { id: 'driver-1' }, token: 'token' }),
+        wrapper: createWrapper(),
       });
 
       await waitFor(() => {

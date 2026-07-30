@@ -1,10 +1,8 @@
 import { useState } from 'react';
 import { useSubscription } from '../hooks/useSubscription';
-import { useAuth } from '../contexts/AuthContext';
 import './SubscriptionQuickActions.css';
 
 export function SubscriptionQuickActions() {
-  const { driver } = useAuth();
   const { subscription, isTrialEndingSoon, trialDaysRemaining, upgradeSubscription } = useSubscription();
   const [showMenu, setShowMenu] = useState(false);
 
@@ -12,7 +10,7 @@ export function SubscriptionQuickActions() {
 
   const handleUpgrade = async (tier: string) => {
     const result = await upgradeSubscription(tier);
-    if (result.success) {
+    if (result?.success) {
       setShowMenu(false);
     }
   };

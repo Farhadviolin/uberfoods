@@ -4,7 +4,7 @@
   "description": "UberFoods Delivery Platform",
   "scripts": {
     "build": "npm --prefix backend run build && npm --prefix frontend/admin-panel run build && npm --prefix frontend/customer-web run build && npm --prefix frontend/restaurant-web run build && npm --prefix frontend/driver-app run build",
-    "typecheck": "npm --prefix frontend/admin-panel run typecheck && npm --prefix frontend/customer-web run type-check && npm --prefix frontend/restaurant-web run typecheck",
+    "typecheck": "npm --prefix frontend/admin-panel run typecheck && npm --prefix frontend/customer-web run type-check && npm --prefix frontend/restaurant-web run typecheck && npm --prefix frontend/driver-app run typecheck",
     "test:smoke": "powershell -NoLogo -NoProfile -ExecutionPolicy Bypass -File scripts/smoke-mvp.ps1",
     "test:e2e:full": "npm --prefix frontend/customer-web run test:e2e:full-platform",
     "test:backend": "npm --prefix backend run test:backend",

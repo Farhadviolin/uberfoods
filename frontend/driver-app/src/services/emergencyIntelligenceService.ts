@@ -1,7 +1,6 @@
 import { Driver } from '../types';
 import { logger } from '../utils/logger';
 import api from '../utils/api';
-import { extractErrorMessage } from '../utils/errorHandler';
 
 export interface EmergencyEvent {
   id: string;
@@ -27,7 +26,7 @@ export interface HealthMetrics {
   fatigueLevel: number; // 0-100
   stressLevel: number; // 0-100
   sleepHours: number;
-  lastBreak: Date;
+  lastBreak: Date | null;
   drivingHours: number;
   hydrationLevel?: number; // 0-100
 }
@@ -38,7 +37,7 @@ export interface VehicleDiagnostics {
   engineTemp: number;
   tirePressure: { front: number; rear: number };
   brakeCondition: number; // 0-100
-  lastService: Date;
+  lastService: Date | null;
   issues: VehicleIssue[];
 }
 
@@ -194,7 +193,9 @@ export class EmergencyIntelligenceService {
         }
 
         // Break Reminder
-        const timeSinceLastBreak = Date.now() - healthMetrics.lastBreak.getTime();
+          const timeSinceLastBreak = healthMetrics.lastBreak
+            ? Date.now() - healthMetrics.lastBreak.getTime()
+            : Number.POSITIVE_INFINITY;
         if (timeSinceLastBreak > 2 * 60 * 60 * 1000) { // 2 Stunden
           await this.triggerEmergency('health', 'medium', 'Pause seit 2 Stunden nicht gemacht', {
             hoursSinceBreak: timeSinceLastBreak / (60 * 60 * 1000)
@@ -269,7 +270,7 @@ export class EmergencyIntelligenceService {
   /**
    * Behavior Monitoring (Driving Pattern Analysis)
    */
-  private startBehaviorMonitoring(driver: Driver): void {
+  private startBehaviorMonitoring(_driver: Driver): void {
     logger.info('👁️ Starting Behavior Monitoring', 'EmergencyIntelligenceService');
 
     // Monitor für aggressive Fahrweise, plötzliche Stops, etc.
@@ -497,7 +498,6 @@ export class EmergencyIntelligenceService {
         lastBreak: backendData.lastBreak ? new Date(backendData.lastBreak) : null,
         drivingHours: backendData.drivingHours,
         hydrationLevel: backendData.hydrationLevel,
-        warnings: backendData.warnings || []
       };
     } catch (error: unknown) {
       logger.error('Health Metrics API fehlgeschlagen', 'EmergencyIntelligenceService', error);
@@ -534,7 +534,7 @@ export class EmergencyIntelligenceService {
   /**
    * System Health Check
    */
-  private async performSystemCheck(driver: Driver): Promise<void> {
+  private async performSystemCheck(_driver: Driver): Promise<void> {
     // Check if monitoring is still active
     if (!this.monitoringActive) return;
 

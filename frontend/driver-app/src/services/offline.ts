@@ -232,7 +232,7 @@ export class OfflineService {
         if (result.status === 'fulfilled') {
           const { success, request, error } = result.value;
           if (!success && request) {
-            const isConflict = typeof error?.message === 'string' && error.message.includes('Conflict');
+            const isConflict = error instanceof Error && error.message.includes('Conflict');
             if (isConflict) {
               continue;
             }
@@ -418,7 +418,7 @@ export class OfflineService {
       // Import offlineStorage dynamically to avoid circular dependencies
       const { offlineStorage } = await import('./offlineStorage');
       
-      const [orders, profile, earnings, unsyncedLocations] = await Promise.all([
+      const [orders, profile, _earnings, unsyncedLocations] = await Promise.all([
         offlineStorage.getOrders(),
         offlineStorage.getDriverProfile(),
         offlineStorage.getEarnings(),

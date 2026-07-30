@@ -1,6 +1,6 @@
 import './Skeleton.css';
 
-interface SkeletonProps {
+export interface SkeletonProps {
   width?: string | number;
   height?: string | number;
   variant?: 'text' | 'circular' | 'rectangular';

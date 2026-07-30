@@ -25,7 +25,16 @@ describe('AdvancedRoutingService', () => {
 
     const driverLocation = { lat: 48.2000, lng: 16.3700 };
 
-    const result = await service.optimizeRoute(orders as any, driverLocation);
+    const driver = {
+      id: 'driver-1',
+      email: 'driver@example.com',
+      name: 'Test Driver',
+      phone: '+431234567',
+      isActive: true,
+      role: 'driver' as const,
+      location: driverLocation,
+    };
+    const result = await service.optimizeRoute(orders as any, driver, driverLocation);
 
     expect(result).toHaveProperty('optimizedRoute');
     expect(result).toHaveProperty('efficiency');

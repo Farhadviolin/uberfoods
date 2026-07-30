@@ -9,7 +9,12 @@ import './Geofencing.css';
 
 interface GeofencingProps {
   order: Order;
-  onCheckIn?: (type: 'restaurant' | 'customer', result: { success: boolean; message?: string }) => void;
+  onCheckIn?: (type: 'restaurant' | 'customer', result: {
+    success: boolean;
+    message?: string;
+    distance?: number;
+    geofence?: { type: string; center: { lat: number; lng: number } };
+  }) => void;
 }
 
 export function Geofencing({ order, onCheckIn }: GeofencingProps) {
@@ -24,13 +29,7 @@ export function Geofencing({ order, onCheckIn }: GeofencingProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const {
-    geofences,
-    checkLocation,
-    isCheckingLocation,
-    locationCheckResult,
-    refetch: refetchGeofences,
-  } = useGeofencing(order.id);
+  const { checkLocation } = useGeofencing(order.id);
 
   // Prüfe automatisch ob Check-in möglich ist
   useEffect(() => {

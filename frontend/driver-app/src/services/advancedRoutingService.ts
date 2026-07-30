@@ -361,7 +361,6 @@ export class AdvancedRoutingService {
 
     if (!traffic) return 1000; // Hohe Strafe bei fehlenden Daten
 
-    const distance = this.calculateDistance(from.location, to.location);
     const timeCost = traffic.prediction15min;
 
     // Zusätzliche Kosten basierend auf Traffic-Stau
@@ -478,7 +477,7 @@ export class AdvancedRoutingService {
   /**
    * Hilfsfunktionen
    */
-  private calculateDistance(from: { lat: number; lng: number }, to: { lat: number; lng: number }): number {
+  calculateDistance(from: { lat: number; lng: number }, to: { lat: number; lng: number }): number {
     const R = 6371; // Erdradius in km
     const dLat = (to.lat - from.lat) * Math.PI / 180;
     const dLon = (to.lng - from.lng) * Math.PI / 180;
@@ -491,7 +490,7 @@ export class AdvancedRoutingService {
     return R * c;
   }
 
-  private getCongestionMultiplier(from: { lat: number; lng: number }, to: { lat: number; lng: number }): number {
+  private getCongestionMultiplier(_from: { lat: number; lng: number }, _to: { lat: number; lng: number }): number {
     // Vereinfachte Logik für Rush-Hour-Erkennung
     const currentHour = new Date().getHours();
     const isRushHour = (currentHour >= 7 && currentHour <= 9) || (currentHour >= 17 && currentHour <= 19);
@@ -526,7 +525,7 @@ export class AdvancedRoutingService {
       ...orders.flatMap(order => [
         {
           id: `restaurant_${order.id}`,
-          location: order.restaurant.location || order.restaurant.address,
+          location: order.restaurant.location || currentLocation || driver.location || { lat: 48.2082, lng: 16.3738 },
           type: 'restaurant' as const,
           orderId: order.id,
           name: order.restaurant.name,
@@ -535,7 +534,7 @@ export class AdvancedRoutingService {
         },
         {
           id: `customer_${order.id}`,
-          location: order.customerLocation || order.address,
+          location: order.customerLocation || currentLocation || driver.location || { lat: 48.2082, lng: 16.3738 },
           type: 'customer' as const,
           orderId: order.id,
           name: order.customer.name,

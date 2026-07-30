@@ -41,7 +41,7 @@ export function Documents() {
 
     try {
       setLoading(true);
-      const result = await DriverService.getDocuments(driver.id);
+      const result = await DriverService.getDocumentsStatus(driver.id);
       setDocuments(result.data.documents || result.data || []);
     } catch (err: any) {
       console.error('Fehler beim Laden der Dokumente:', err);

@@ -1,7 +1,7 @@
 import { InputHTMLAttributes, forwardRef } from 'react';
 import './Switch.css';
 
-interface SwitchProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 'type'> {
+interface SwitchProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 'type' | 'size'> {
   label?: string;
   error?: string;
   size?: 'small' | 'medium' | 'large';

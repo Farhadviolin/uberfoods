@@ -4,7 +4,7 @@ import './Card.css';
 export type CardVariant = 'default' | 'outlined' | 'elevated' | 'flat';
 export type CardPadding = 'none' | 'sm' | 'md' | 'lg';
 
-interface CardProps extends HTMLAttributes<HTMLDivElement> {
+export interface CardProps extends HTMLAttributes<HTMLDivElement> {
   variant?: CardVariant;
   padding?: CardPadding;
   hoverable?: boolean;

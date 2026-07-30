@@ -1,10 +1,12 @@
 import { screen } from '@testing-library/react';
 import { renderWithProviders } from '../../test-utils';
 import { Chat } from '../Chat';
+import { createOrder } from '../../test-fixtures/order';
+import type { Order } from '../../types';
 
 // Mock the Chat component entirely for now to avoid complex hook dependencies
 jest.mock('../Chat', () => ({
-  Chat: ({ order, onClose }: { order: any, onClose?: () => void }) => (
+  Chat: ({ order, onClose }: { order: Order, onClose?: () => void }) => (
     <div data-testid="chat-component">
       <input placeholder="chat.placeholder" />
       <button>chat.send</button>
@@ -14,16 +16,7 @@ jest.mock('../Chat', () => ({
   ),
 }));
 
-const mockOrder = {
-  id: 'order-123',
-  status: 'IN_TRANSIT',
-  totalAmount: 25.50,
-  restaurant: { name: 'Test Restaurant', address: 'Test St. 1' },
-  customer: { name: 'Test Customer', phone: '+49123456789' },
-  address: 'Delivery St. 2',
-  items: [{ dish: { name: 'Pizza' }, quantity: 1, price: 25.50 }],
-  createdAt: new Date().toISOString(),
-};
+const mockOrder = createOrder();
 
 describe('Chat', () => {
   it('rendert Chat-Interface', () => {

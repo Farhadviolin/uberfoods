@@ -434,10 +434,9 @@ export const OrderCard = memo(function OrderCard({
 
       <Geofencing
         order={order}
-        onCheckIn={(type, result) => {
-          if (result.autoStatusUpdate) {
-            // Auto-Update wurde durchgeführt - State wird über onStatusUpdate aktualisiert
-            onStatusUpdate(order.id, result.newStatus || order.status);
+        onCheckIn={(_type, result) => {
+          if (result.success) {
+            onStatusUpdate(order.id, order.status);
           }
         }}
       />
@@ -472,7 +471,7 @@ export const OrderCard = memo(function OrderCard({
           <PhotoUpload
             orderId={order.id}
             type="delivery"
-            onUploadSuccess={(photoUrl) => {
+            onUploadSuccess={(_photoUrl) => {
               logger.info('Foto hochgeladen', 'OrderCard');
               setShowPhotoUpload(false);
             }}

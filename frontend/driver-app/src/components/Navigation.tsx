@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { GoogleMap, DirectionsRenderer, Marker, useJsApiLoader } from '@react-google-maps/api';
+import type { Libraries } from '@react-google-maps/api';
 import api from '../utils/api';
 import { Order, RouteOptimization } from '../types';
 import { useVoiceNavigation } from '../hooks/useVoiceNavigation';
@@ -9,7 +10,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useTranslation } from 'react-i18next';
 import './Navigation.css';
 
-const libraries = ['places'] as const;
+const libraries: Libraries = ['places'];
 
 interface NavigationProps {
   orders: Order[];
@@ -40,7 +41,7 @@ export function Navigation({ orders, driverLocation, onRouteOptimized }: Navigat
   const [error, setError] = useState<string | null>(null);
   const [eta, setEta] = useState<{ [orderId: string]: number }>({});
   const [voiceEnabled] = useState(true);
-  const { announceDirection, announceArrival, isSupported: voiceSupported } = useVoiceNavigation({ 
+  const { announceDirection } = useVoiceNavigation({
     enabled: voiceEnabled,
     language: (i18n.language || 'de').startsWith('en') ? 'en-US' : 'de-DE',
   });
@@ -172,7 +173,7 @@ export function Navigation({ orders, driverLocation, onRouteOptimized }: Navigat
         optimizeWaypoints: true,
         travelMode: window.google.maps.TravelMode.DRIVING,
       },
-      (result, status) => {
+      (result: google.maps.DirectionsResult | null, status: google.maps.DirectionsStatus) => {
         if (status === window.google.maps.DirectionsStatus.OK && result) {
           setDirections(result);
         } else {

@@ -1,4 +1,3 @@
-import axios from 'axios';
 import { API_BASE_URL } from '../api';
 
 // Mock the entire api module
@@ -76,11 +75,11 @@ import { api } from '../api';
 
 // Create a mock axios for tests that need it
 const mockAxios = {
-  get: api.get,
-  post: api.post,
-  put: api.put,
-  patch: api.patch,
-  delete: api.delete
+  get: jest.mocked(api.get),
+  post: jest.mocked(api.post),
+  put: jest.mocked(api.put),
+  patch: jest.mocked(api.patch),
+  delete: jest.mocked(api.delete)
 };
 
 describe('Driver API Utils', () => {

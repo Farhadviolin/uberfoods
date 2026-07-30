@@ -46,7 +46,10 @@ export function deepMerge<T extends Record<string, any>>(
     for (const key in source) {
       if (isObject(source[key])) {
         if (!target[key]) Object.assign(target, { [key]: {} });
-        deepMerge(target[key], source[key]);
+        deepMerge(
+          target[key] as Record<string, any>,
+          source[key] as Record<string, any>
+        );
       } else {
         Object.assign(target, { [key]: source[key] });
       }
@@ -66,7 +69,7 @@ function isObject(item: any): item is Record<string, any> {
 export function pick<T, K extends keyof T>(obj: T, keys: K[]): Pick<T, K> {
   const result = {} as Pick<T, K>;
   keys.forEach((key) => {
-    if (key in obj) {
+    if (Object.prototype.hasOwnProperty.call(obj, key)) {
       result[key] = obj[key];
     }
   });

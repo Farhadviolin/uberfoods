@@ -1,15 +1,17 @@
 import { createContext, useContext, useState, useCallback, ReactNode } from 'react';
 
 interface ToastContextType {
-  showToast: (message: string, type: 'success' | 'error' | 'info') => void;
+  showToast: (message: string, type: ToastType) => void;
 }
+
+type ToastType = 'success' | 'error' | 'info' | 'warning';
 
 const ToastContext = createContext<ToastContextType | undefined>(undefined);
 
 export function ToastProvider({ children }: { children: ReactNode }) {
-  const [toasts, setToasts] = useState<Array<{ id: number; message: string; type: 'success' | 'error' | 'info' }>>([]);
+  const [toasts, setToasts] = useState<Array<{ id: number; message: string; type: ToastType }>>([]);
 
-  const showToast = useCallback((message: string, type: 'success' | 'error' | 'info') => {
+  const showToast = useCallback((message: string, type: ToastType) => {
     const id = Date.now() + Math.random();
     setToasts(prev => [...prev, { id, message, type }]);
     
@@ -42,7 +44,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
             style={{
               padding: '12px 20px',
               borderRadius: '8px',
-              backgroundColor: toast.type === 'success' ? '#10b981' : toast.type === 'error' ? '#ef4444' : '#3b82f6',
+              backgroundColor: toast.type === 'success' ? '#10b981' : toast.type === 'error' ? '#ef4444' : toast.type === 'warning' ? '#f59e0b' : '#3b82f6',
               color: 'white',
               boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
               cursor: 'pointer',

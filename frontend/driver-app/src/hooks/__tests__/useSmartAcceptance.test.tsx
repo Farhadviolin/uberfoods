@@ -1,23 +1,24 @@
 import { renderHook } from '@testing-library/react';
 import { useSmartAcceptance } from '../useSmartAcceptance';
-import { renderWithProviders } from '../../test-utils';
+import { TestWrapper } from '../../test-utils';
 
 // Mock the useSmartAcceptance hook
 jest.mock('../useSmartAcceptance', () => ({
   useSmartAcceptance: () => ({
-    shouldAccept: true,
-    confidence: 0.85,
-    reasoning: 'Good match',
+    isAnalyzing: false,
+    pendingOrders: [],
+    autoAcceptThreshold: 85,
+    updateInterval: 5,
   }),
 }));
 
 describe('useSmartAcceptance Hook', () => {
   it('returns acceptance decision', () => {
-    const { result } = renderHook(() => useSmartAcceptance(), {
-      wrapper: renderWithProviders().wrapper,
+    const { result } = renderHook(() => useSmartAcceptance(null, []), {
+      wrapper: TestWrapper,
     });
 
-    expect(result.current.shouldAccept).toBe(true);
-    expect(result.current.confidence).toBe(0.85);
+    expect(result.current.isAnalyzing).toBe(false);
+    expect(result.current.autoAcceptThreshold).toBe(85);
   });
 });

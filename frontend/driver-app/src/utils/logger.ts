@@ -148,20 +148,29 @@ class Logger {
     }
   }
 
-  debug(message: string, context?: string) {
-    this.log(LogLevel.DEBUG, message, context);
+  debug(message: string, context?: string, data?: unknown) {
+    this.log(LogLevel.DEBUG, message, context, data);
   }
 
-  info(message: string, context?: string, data?: any) {
-    this.log(LogLevel.INFO, message, context, data);
+  info(message: string, data?: unknown): void;
+  info(message: string, context: string, data?: unknown): void;
+  info(message: string, contextOrData?: string | unknown, data?: unknown) {
+    const context = typeof contextOrData === 'string' ? contextOrData : undefined;
+    this.log(LogLevel.INFO, message, context, context ? data : contextOrData);
   }
 
-  warn(message: string, context?: string, error?: any) {
-    this.log(LogLevel.WARN, message, context, error);
+  warn(message: string, error?: unknown): void;
+  warn(message: string, context: string, error?: unknown): void;
+  warn(message: string, contextOrError?: string | unknown, error?: unknown) {
+    const context = typeof contextOrError === 'string' ? contextOrError : undefined;
+    this.log(LogLevel.WARN, message, context, context ? error : contextOrError);
   }
 
-  error(message: string, context?: string, error?: any) {
-    this.log(LogLevel.ERROR, message, context, error);
+  error(message: string, error?: unknown): void;
+  error(message: string, context: string, error?: unknown): void;
+  error(message: string, contextOrError?: string | unknown, error?: unknown) {
+    const context = typeof contextOrError === 'string' ? contextOrError : undefined;
+    this.log(LogLevel.ERROR, message, context, context ? error : contextOrError);
   }
 }
 

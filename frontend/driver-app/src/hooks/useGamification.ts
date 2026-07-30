@@ -37,7 +37,7 @@ export function useGamification() {
   const [level, setLevel] = useState<Level | null>(null);
   const [rewards, setRewards] = useState<Reward[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [error] = useState<string | null>(null);
 
   const fetchPoints = useCallback(async () => {
     if (!driver?.id) return;

@@ -1,12 +1,12 @@
-import { Driver, Achievement, GamificationStats, DailyChallenge, WeeklyQuest, PerformanceMetrics } from '../types';
+import { Achievement, GamificationStats, DailyChallenge, WeeklyQuest, PerformanceMetrics } from '../types';
 import { logger } from '../utils/logger';
 import api from '../utils/api';
 
 export class GamificationService {
   private static instance: GamificationService;
   private achievements: Achievement[] = [];
-  private dailyChallenges: DailyChallenge[] = [];
-  private weeklyQuests: WeeklyQuest[] = [];
+  public dailyChallenges: DailyChallenge[] = [];
+  public weeklyQuests: WeeklyQuest[] = [];
 
   public static getInstance(): GamificationService {
     if (!GamificationService.instance) {
@@ -39,7 +39,7 @@ export class GamificationService {
   /**
    * Berechnet das Level basierend auf XP
    */
-  private async calculateLevel(driverId: string): Promise<any> {
+  public async calculateLevel(_driverId: string): Promise<any> {
     // Simulierte XP-Berechnung basierend auf Performance
     const baseXP = Math.floor(Math.random() * 5000) + 1000;
     const level = Math.floor(baseXP / 1000) + 1;
@@ -73,7 +73,7 @@ export class GamificationService {
   /**
    * Holt alle Achievements mit Fortschritt
    */
-  private async getAchievements(driverId: string): Promise<Achievement[]> {
+  public async getAchievements(_driverId: string): Promise<Achievement[]> {
     // Simuliere verschiedene Achievement-Fortschritte
     return this.achievements.map(achievement => ({
       ...achievement,
@@ -90,7 +90,7 @@ export class GamificationService {
   /**
    * Berechnet aktuelle Streaks
    */
-  private async calculateStreaks(driverId: string): Promise<any> {
+  public async calculateStreaks(_driverId: string): Promise<any> {
     return {
       currentDeliveryStreak: Math.floor(Math.random() * 15) + 1,
       longestDeliveryStreak: Math.floor(Math.random() * 50) + 10,
@@ -103,7 +103,7 @@ export class GamificationService {
   /**
    * Holt verfügbare Badges
    */
-  private async getBadges(driverId: string): Promise<string[]> {
+  public async getBadges(_driverId: string): Promise<string[]> {
     const allBadges = [
       'Erste Lieferung', '5-Sterne Fahrer', 'Schnellster Fahrer',
       'Sicherheits-Champion', 'Kundenliebling', 'Meister des Multitasking',
@@ -117,7 +117,7 @@ export class GamificationService {
   /**
    * Holt verfügbare Titel
    */
-  private async getTitles(driverId: string): Promise<string[]> {
+  public async getTitles(_driverId: string): Promise<string[]> {
     const allTitles = [
       'Neuling', 'Fahrer', 'Profi', 'Experte', 'Meister',
       'Legende', 'Champion', 'VIP-Fahrer', 'Elite-Fahrer'
@@ -129,7 +129,7 @@ export class GamificationService {
   /**
    * Holt wöchentlichen Fortschritt
    */
-  private async getWeeklyProgress(driverId: string): Promise<any> {
+  public async getWeeklyProgress(_driverId: string): Promise<any> {
     return {
       deliveries: Math.floor(Math.random() * 50) + 10,
       earnings: Math.floor(Math.random() * 500) + 200,
@@ -141,7 +141,7 @@ export class GamificationService {
   /**
    * Holt Leaderboard-Position
    */
-  private async getLeaderboardPosition(driverId: string): Promise<any> {
+  public async getLeaderboardPosition(driverId: string): Promise<any> {
     try {
       // Echter API-Call zum Backend
       const response = await api.get(`/drivers/leaderboard`, {

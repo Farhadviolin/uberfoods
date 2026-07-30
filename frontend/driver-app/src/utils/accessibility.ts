@@ -89,7 +89,7 @@ export function getNextFocusableElement(currentElement: HTMLElement): HTMLElemen
     document.querySelectorAll<HTMLElement>(
       'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
     )
-  ).filter((el) => !el.disabled && el.offsetParent !== null);
+  ).filter((el) => (!('disabled' in el) || !el.disabled) && el.offsetParent !== null);
 
   const currentIndex = focusableElements.indexOf(currentElement);
   return focusableElements[currentIndex + 1] || focusableElements[0] || null;
@@ -103,7 +103,7 @@ export function getPreviousFocusableElement(currentElement: HTMLElement): HTMLEl
     document.querySelectorAll<HTMLElement>(
       'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
     )
-  ).filter((el) => !el.disabled && el.offsetParent !== null);
+  ).filter((el) => (!('disabled' in el) || !el.disabled) && el.offsetParent !== null);
 
   const currentIndex = focusableElements.indexOf(currentElement);
   return focusableElements[currentIndex - 1] || focusableElements[focusableElements.length - 1] || null;

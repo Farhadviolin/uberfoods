@@ -1,13 +1,4 @@
 // Offline Storage Service using IndexedDB for persistent data storage
-interface OfflineData {
-  orders: any[];
-  driverProfile: any;
-  earnings: any[];
-  documents: any[];
-  settings: any;
-  lastSync: number;
-}
-
 export class OfflineStorageService {
   private static instance: OfflineStorageService;
   private dbName = 'driver_app_offline';

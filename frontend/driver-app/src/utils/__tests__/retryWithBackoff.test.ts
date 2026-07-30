@@ -15,7 +15,9 @@ describe('retryWithBackoff', () => {
     const result = await retryWithBackoff(fn);
     
     expect(result.success).toBe(true);
-    expect(result.data).toBe('success');
+    if (result.success) {
+      expect(result.data).toBe('success');
+    }
     expect(fn).toHaveBeenCalledTimes(1);
   });
 
@@ -37,7 +39,9 @@ describe('retryWithBackoff', () => {
     const result = await promise;
 
     expect(result.success).toBe(true);
-    expect(result.data).toBe('success');
+    if (result.success) {
+      expect(result.data).toBe('success');
+    }
     expect(fn).toHaveBeenCalledTimes(3);
   });
 

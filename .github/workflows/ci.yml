@@ -247,6 +247,10 @@ jobs:
       working-directory: ./frontend/driver-app
       run: npm ci
 
+    - name: Run complete driver app typecheck
+      working-directory: ./frontend/driver-app
+      run: npm run typecheck
+
     - name: Run complete driver app Jest suite
       working-directory: ./frontend/driver-app
       run: npm test -- --runInBand

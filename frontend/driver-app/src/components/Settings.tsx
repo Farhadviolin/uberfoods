@@ -33,7 +33,7 @@ export function Settings() {
   const { driver } = useAuth();
   const [settings, setSettings] = useState<DriverSettings | null>(null);
   const [loading, setLoading] = useState(false);
-  const [saving, setSaving] = useState(false);
+  const [, setSaving] = useState(false);
   const [subscription, setSubscription] = useState<any>(null);
   const [loadingSubscription, setLoadingSubscription] = useState(false);
 

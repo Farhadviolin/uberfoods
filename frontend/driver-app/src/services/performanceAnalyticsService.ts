@@ -7,8 +7,8 @@ const allowSimulation = getEnvBool('VITE_ALLOW_SIMULATION');
 
 export class PerformanceAnalyticsService {
   private static instance: PerformanceAnalyticsService;
-  private coachingTips: AICoachingTip[] = [];
-  private goals: GoalProgress[] = [];
+  public coachingTips: AICoachingTip[] = [];
+  public goals: GoalProgress[] = [];
 
   public static getInstance(): PerformanceAnalyticsService {
     if (!PerformanceAnalyticsService.instance) {
@@ -70,7 +70,7 @@ export class PerformanceAnalyticsService {
   /**
    * Generiert monatliche Performance-Metriken
    */
-  private async generateMonthlyMetrics(driverId: string) {
+  public async generateMonthlyMetrics(driverId: string) {
     if (!allowSimulation) {
       throw new Error('Monthly metrics Simulation ist deaktiviert (VITE_ALLOW_SIMULATION=false)');
     }
@@ -91,7 +91,7 @@ export class PerformanceAnalyticsService {
   /**
    * Berechnet aktuelle Streaks
    */
-  private async calculateStreaks(driverId: string) {
+  public async calculateStreaks(_driverId: string) {
     if (!allowSimulation) {
       throw new Error('Streak Simulation ist deaktiviert (VITE_ALLOW_SIMULATION=false)');
     }
@@ -105,7 +105,7 @@ export class PerformanceAnalyticsService {
   /**
    * Berechnet Effizienz-Metriken
    */
-  private async calculateEfficiencyMetrics(driverId: string) {
+  public async calculateEfficiencyMetrics(_driverId: string) {
     if (!allowSimulation) {
       throw new Error('Effizienz-Simulation ist deaktiviert (VITE_ALLOW_SIMULATION=false)');
     }
@@ -120,7 +120,7 @@ export class PerformanceAnalyticsService {
   /**
    * Generiert AI-Coaching-Tipps basierend auf Performance
    */
-  async generateAICoachingTips(driver: Driver, metrics: PerformanceMetrics): Promise<AICoachingTip[]> {
+  async generateAICoachingTips(_driver: Driver, metrics: PerformanceMetrics): Promise<AICoachingTip[]> {
     const tips: AICoachingTip[] = [];
 
     // Zeitbasierte Tipps
@@ -272,7 +272,7 @@ export class PerformanceAnalyticsService {
   /**
    * Erstellt personalisierte Ziele basierend auf Performance
    */
-  async createPersonalizedGoals(driver: Driver, metrics: PerformanceMetrics): Promise<GoalProgress[]> {
+  async createPersonalizedGoals(_driver: Driver, metrics: PerformanceMetrics): Promise<GoalProgress[]> {
     const goals: GoalProgress[] = [];
 
     // Verdienst-Ziel

@@ -33,6 +33,11 @@ function GlobalToastRegistrar({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+function EmergencyDashboardRoute() {
+  const { driver } = useAuth();
+  return driver ? <EmergencyDashboard driver={driver} /> : <Navigate to="/login" replace />;
+}
+
 // Loading Fallback für Routes
 const RouteLoadingFallback = () => (
   <div className="loading-container">
@@ -151,7 +156,7 @@ function AppContent() {
             element={
               <ProtectedRoute>
                 <Suspense fallback={<RouteLoadingFallback />}>
-                  <EmergencyDashboard />
+                  <EmergencyDashboardRoute />
                 </Suspense>
               </ProtectedRoute>
             }

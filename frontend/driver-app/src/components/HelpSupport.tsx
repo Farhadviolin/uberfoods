@@ -33,7 +33,7 @@ export function HelpSupport() {
   const [tickets, setTickets] = useState<SupportTicket[]>([]);
   const [activeTab, setActiveTab] = useState<'faq' | 'tickets' | 'create'>('faq');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
-  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [, setShowCreateForm] = useState(false);
   const [ticketForm, setTicketForm] = useState({
     subject: '',
     message: '',

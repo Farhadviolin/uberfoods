@@ -57,25 +57,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setLoading(false);
   }, []);
 
-  const validateToken = async (token: string) => {
-    try {
-      // Versuche Profil abzurufen um Token zu validieren
-      const response = await api.get('/drivers/me');
-      setDriver(response.data);
-      localStorage.setItem('driver_user', JSON.stringify(response.data));
-    } catch (error: any) {
-      // Token ungültig - entferne Session
-      logger.error('Token-Validierung fehlgeschlagen', 'AuthContext', error);
-      localStorage.removeItem('driver_token');
-      localStorage.removeItem('driver_user');
-      delete api.defaults.headers.common['Authorization'];
-      setToken(null);
-      setDriver(null);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const login = async (email: string, password: string) => {
     try {
       const response = await api.post('/auth/driver/login', {

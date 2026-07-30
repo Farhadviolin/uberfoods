@@ -4,7 +4,6 @@ import { config } from '../config';
 import { Order } from '../types';
 import { logger } from '../utils/logger';
 import { useAppState } from '../services/stateManager';
-import { DriverService } from '../services/driverService';
 
 // Socket.IO benötigt HTTP/HTTPS URL, NICHT WebSocket URL!
 // Socket.IO macht selbst das Upgrade zu WebSocket über den Transport
@@ -37,13 +36,13 @@ const globalSocketMap = new Map<string, Socket>();
 const socketRefCount = new Map<string, number>();
 
 // Logging-Helper: Nur in Development loggen
-const log = (message: string, ...args: any[]) => {
+const log = (_message: string, ..._args: any[]) => {
   if (config.isDevelopment) {
     // WebSocket debug logging disabled in production
   }
 };
 
-const logWarn = (message: string, ...args: any[]) => {
+const logWarn = (_message: string, ..._args: any[]) => {
   if (config.isDevelopment) {
     // WebSocket warnings handled by error boundaries
   }
@@ -191,7 +190,6 @@ export function useWebSocket(
         message,
       };
       socketRef.current.emit('order_update', orderData);
-      options.onOrderUpdate?.(orderData);
     }
   }, [options]);
 
@@ -243,7 +241,7 @@ export function useWebSocket(
         socketRefCount.delete(previousDriverId);
         // Entferne Socket aus globaler Map nur wenn keine Referenzen mehr und nicht connected
         const prevSocket = globalSocketMap.get(previousDriverId);
-        if (prevSocket === socketRef.current && !prevSocket.connected && !prevSocket.io?.connecting) {
+        if (prevSocket === socketRef.current && !prevSocket.connected && !prevSocket.active) {
           globalSocketMap.delete(previousDriverId);
           logger.debug('Socket aus globaler Map entfernt für vorherigen driverId', 'WebSocket', { previousDriverId });
         }
@@ -270,7 +268,7 @@ export function useWebSocket(
 
     // ✅ WICHTIG: Prüfe globale Socket-Instanz zuerst
     const existingGlobalSocket = globalSocketMap.get(driverId);
-    if (existingGlobalSocket && (existingGlobalSocket.connected || existingGlobalSocket.io?.connecting)) {
+    if (existingGlobalSocket && (existingGlobalSocket.connected || existingGlobalSocket.active)) {
       // Verwende existierende globale Socket-Instanz
       socketRef.current = existingGlobalSocket;
       currentDriverIdRef.current = driverId;
@@ -299,7 +297,7 @@ export function useWebSocket(
     // ✅ WICHTIG: Prüfe ob bereits eine lokale Verbindung für diesen driverId existiert
     // ODER ob eine Verbindung gerade erstellt wird (connecting)
     if (socketRef.current && currentDriverIdRef.current === driverId) {
-      if (socketRef.current.connected || socketRef.current.io?.connecting) {
+      if (socketRef.current.connected || socketRef.current.active) {
         // Verbindung existiert bereits ODER wird gerade erstellt - keine neue erstellen
         // Speichere in globaler Map für andere useWebSocket-Aufrufe
         globalSocketMap.set(driverId, socketRef.current);
@@ -329,7 +327,6 @@ export function useWebSocket(
     currentDriverIdRef.current = driverId;
 
     // Exponential backoff für Reconnection
-    let reconnectAttempts = 0;
     let reconnectTimeout: NodeJS.Timeout | null = null;
 
     // Visibility API: Reconnect wenn Tab wieder aktiv wird
@@ -356,7 +353,7 @@ export function useWebSocket(
           }
           
           // Nur reconnecten wenn Socket existiert und nicht bereits verbunden/verbindend
-          if (socketRef.current && !socketRef.current.connected && !socketRef.current.io?.connecting) {
+          if (socketRef.current && !socketRef.current.connected && !socketRef.current.active) {
             logger.info('Tab wieder sichtbar - versuche Reconnect...', 'WebSocket');
             // Sofort reconnect versuchen wenn Tab wieder sichtbar wird
             socketRef.current.connect();
@@ -405,7 +402,7 @@ export function useWebSocket(
     // Versuche Verbindung nur wenn Backend verfügbar ist UND Token vorhanden ist
     // ✅ WICHTIG: Prüfe nochmal globale Map (Race Condition Schutz)
     const existingSocket = globalSocketMap.get(driverId);
-    if (existingSocket && (existingSocket.connected || existingSocket.io?.connecting)) {
+    if (existingSocket && (existingSocket.connected || existingSocket.active)) {
       socketRef.current = existingSocket;
       currentDriverIdRef.current = driverId;
       setIsConnected(existingSocket.connected);
@@ -454,7 +451,6 @@ export function useWebSocket(
       log('✅ WebSocket connected');
       setIsConnected(true);
       setConnectionError(null);
-      reconnectAttempts = 0;
       
       // Circuit Breaker zurücksetzen bei erfolgreicher Verbindung
       circuitBreakerRef.current.failureCount = 0;
@@ -488,7 +484,7 @@ export function useWebSocket(
           // Stoppe Reconnection komplett
           if (socketRef.current) {
             try {
-              socketRef.current.io.reconnect(false);
+              socketRef.current.io.reconnection(false);
             } catch (e) {
               // Ignoriere Fehler beim Deaktivieren der Reconnection
             }
@@ -536,7 +532,7 @@ export function useWebSocket(
           // Stoppe Reconnection komplett
           if (socketRef.current) {
             try {
-              socketRef.current.io.reconnect(false);
+              socketRef.current.io.reconnection(false);
             } catch (e) {
               // Ignoriere Fehler beim Deaktivieren der Reconnection
             }
@@ -591,7 +587,6 @@ export function useWebSocket(
     });
 
     socketRef.current.on('reconnect_attempt', (attemptNumber) => {
-      reconnectAttempts = attemptNumber;
       log(`🔄 Reconnection attempt ${attemptNumber}/${config.wsConfig.reconnectionAttempts}`);
     });
 
@@ -599,7 +594,6 @@ export function useWebSocket(
       log(`✅ Reconnected after ${attemptNumber} attempts`);
       setIsConnected(true);
       setConnectionError(null);
-      reconnectAttempts = 0;
       
       // Circuit Breaker zurücksetzen bei erfolgreicher Reconnection
       circuitBreakerRef.current.failureCount = 0;
@@ -617,7 +611,7 @@ export function useWebSocket(
     });
 
     // Enhanced event handlers for new WebSocket features
-    socketRef.current.on('connected', (data: any) => {
+    socketRef.current.on('connected', (_data: unknown) => {
       log('🎉 WebSocket fully authenticated and connected');
       setIsConnected(true);
       setConnectionError(null);
@@ -680,8 +674,16 @@ export function useWebSocket(
 
     socketRef.current.on('restaurant-status-change', (data: { restaurantId: string; status: string; message?: string }) => {
       logger.info('Restaurant status change:', data);
-      // Update restaurant status in orders
-      actions.updateRestaurantStatus(data.restaurantId, data.status);
+      const orders = [
+        ...state.orders.pending,
+        ...state.orders.active,
+        ...state.orders.completed,
+      ];
+      orders
+        .filter((order) => order.restaurant.id === data.restaurantId)
+        .forEach((order) => actions.updateOrder(order.id, {
+          restaurant: { ...order.restaurant, status: data.status },
+        }));
     });
 
     socketRef.current.on('order_assigned', (data: any) => {
@@ -882,7 +884,7 @@ export function useWebSocket(
         // Deaktiviere Reconnection, um weitere Verbindungsversuche zu verhindern
         try {
           if (socket.io) {
-            socket.io.reconnect(false);
+            socket.io.reconnection(false);
           }
         } catch (error) {
           // Ignoriere Fehler wenn io nicht verfügbar ist
@@ -891,33 +893,25 @@ export function useWebSocket(
         // Prüfe Verbindungsstatus vor disconnect
         // Das verhindert den Fehler "WebSocket is closed before the connection is established"
         const isConnected = socket.connected;
-        const hasIO = socket.io !== undefined && socket.io !== null;
-        const isConnecting = hasIO && (socket.io.connecting || socket.io.reconnecting);
-
-        // Prüfe ob Transport wirklich aktiv ist (Verbindung wirklich etabliert)
-        const hasActiveTransport = hasIO && socket.io.engine && socket.io.engine.transport && socket.io.engine.transport.readyState === 'open';
+        const isConnecting = socket.active && !socket.connected;
 
         // Nur disconnect wenn Verbindung wirklich etabliert ist UND Transport aktiv
-        if (isConnected && hasActiveTransport) {
+        if (isConnected) {
           // Graceful disconnect wenn verbunden und Transport aktiv
           try {
             // Prüfe nochmal ob Socket wirklich connected ist (Race Condition Schutz)
-            if (socket.connected && socket.io?.engine?.transport?.readyState === 'open') {
+            if (socket.connected) {
               socket.disconnect();
             }
           } catch (error) {
             // Ignoriere Fehler - Verbindung wird bereits geschlossen
             // Das verhindert "WebSocket is closed before the connection is established"
           }
-        } else if (isConnecting && hasIO) {
+        } else if (isConnecting) {
           // Wenn gerade im Verbindungsaufbau, schließe auf niedrigerer Ebene
           try {
             // Versuche Engine zu schließen, wenn verfügbar
-            if (socket.io.engine && socket.io.engine.close) {
-              socket.io.engine.close();
-            } else if (socket.io.disconnect) {
-              socket.io.disconnect();
-            }
+            socket.disconnect();
           } catch (error) {
             // Ignoriere Fehler beim Schließen einer Verbindung im Aufbau
             // Das ist normal wenn die Verbindung noch nicht etabliert ist
@@ -929,7 +923,7 @@ export function useWebSocket(
 
         // ✅ WICHTIG: Entferne aus globaler Map nur wenn wirklich disconnected UND keine Referenzen mehr
         // Prüfe ob andere useWebSocket-Aufrufe diese Socket noch verwenden
-        if (!socket.connected && !socket.io?.connecting) {
+        if (!socket.connected && !socket.active) {
           const socketInMap = globalSocketMap.get(driverId);
           const refCount = socketRefCount.get(driverId) || 0;
           
@@ -1009,7 +1003,7 @@ export function useWebSocket(
       if (socketRef.current && !socketRef.current.connected) {
         // Aktiviere Reconnection wieder
         if (socketRef.current.io) {
-          socketRef.current.io.reconnect(true);
+          socketRef.current.io.reconnection(true);
         }
         socketRef.current.connect();
       }
@@ -1024,8 +1018,8 @@ export function useWebSocket(
     // Connection health
     getConnectionHealth: () => ({
       isConnected,
-      lastHeartbeat: socketRef.current?.io?.engine?.lastHeartbeat || null,
-      ping: socketRef.current?.io?.engine?.ping || null,
+      lastHeartbeat: null,
+      ping: null,
       transport: socketRef.current?.io?.engine?.transport?.name || null,
     })
   };

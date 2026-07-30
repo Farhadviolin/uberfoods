@@ -130,7 +130,7 @@ class ErrorTrackingService {
   /**
    * Sende Fehler an externen Service (z.B. Sentry)
    */
-  private sendToService(error: TrackedError): void {
+  private sendToService(_error: TrackedError): void {
     // In Production: Hier würde Sentry oder ähnlicher Service aufgerufen
     // Beispiel:
     // if (window.Sentry) {

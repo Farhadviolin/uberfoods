@@ -1,14 +1,12 @@
 import { performanceMonitor } from '../performanceMonitor';
-import { logger } from '../../utils/logger';
 
 jest.mock('../../utils/logger');
 
 // Mock Performance API
-const mockPerformanceObserver = jest.fn();
 const mockObserve = jest.fn();
 const mockDisconnect = jest.fn();
 
-(global as any).PerformanceObserver = jest.fn().mockImplementation((callback) => {
+(global as any).PerformanceObserver = jest.fn().mockImplementation((_callback) => {
   return {
     observe: mockObserve,
     disconnect: mockDisconnect,

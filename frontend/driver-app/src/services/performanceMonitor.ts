@@ -164,7 +164,7 @@ class PerformanceMonitor {
   /**
    * Sende Metrik an Analytics
    */
-  private sendToAnalytics(name: string, value: number, rating: string): void {
+  private sendToAnalytics(_name: string, _value: number, _rating: string): void {
     // In Production: Hier würde Analytics-Service aufgerufen
     // Beispiel:
     // analytics.track('performance_metric', {

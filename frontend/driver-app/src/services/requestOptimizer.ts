@@ -13,6 +13,7 @@ export interface RequestOptions {
   };
   priority?: 'low' | 'normal' | 'high';
   tags?: string[];
+  cacheKey?: string;
 }
 
 export interface QueuedRequest {
@@ -178,8 +179,8 @@ export class RequestOptimizer {
   private applyDebounce(
     requestKey: string,
     url: string,
-    method: string,
-    data: any,
+    _method: string,
+    _data: any,
     delay: number
   ): Promise<string> {
     return new Promise((resolve) => {
@@ -203,8 +204,8 @@ export class RequestOptimizer {
   private applyThrottle(
     requestKey: string,
     url: string,
-    method: string,
-    data: any,
+    _method: string,
+    _data: any,
     delay: number
   ): Promise<string> {
     return new Promise((resolve) => {
@@ -408,7 +409,7 @@ export class RequestOptimizer {
     logger.info(`Request queued for offline: ${requestKey}`);
 
     // Return a promise that will resolve when back online
-    return new Promise((resolve, reject) => {
+    return new Promise((_resolve, reject) => {
       // This promise will resolve when the request is synced
       // Implementation depends on your offline sync strategy
       reject(new Error('Offline mode - request will be synced when online'));

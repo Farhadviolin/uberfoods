@@ -6,7 +6,7 @@ if (!('geolocation' in navigator)) {
 }
 
 const mockGeolocation = {
-  getCurrentPosition: jest.fn((success, error) => {
+  getCurrentPosition: jest.fn((success, _error) => {
     success({
       coords: {
         latitude: 48.2082,
@@ -16,7 +16,7 @@ const mockGeolocation = {
       timestamp: Date.now(),
     } as GeolocationPosition);
   }),
-  watchPosition: jest.fn((success, error) => {
+  watchPosition: jest.fn((success, _error) => {
     const id = Date.now();
     success({
       coords: {
@@ -61,9 +61,8 @@ const mockIndexedDB = {
     };
     // Simulate successful open
     setTimeout(() => {
-      if (request.onsuccess) {
-        request.onsuccess({} as any);
-      }
+      const successHandler = request.onsuccess as ((event: Event) => void) | null;
+      successHandler?.(new Event('success'));
     }, 0);
     return request;
   }),
@@ -154,7 +153,7 @@ Object.defineProperty(HTMLElement.prototype, 'offsetWidth', {
 // Mock performance.now for timers
 global.performance = {
   ...global.performance,
-  now: jest.fn(() => mockDate.getTime()),
+  now: jest.fn(() => Date.now()),
 };
 
 // Use fake timers by default for deterministic behavior

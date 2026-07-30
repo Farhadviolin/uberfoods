@@ -258,7 +258,7 @@ export class MetaGlassesService {
   /**
    * Konvertiert eine Route zu AR Navigation Steps
    */
-  private async convertRouteToARSteps(route: RouteOptimization, orders: Order[]): Promise<ARNavigationStep[]> {
+  private async convertRouteToARSteps(route: RouteOptimization, _orders: Order[]): Promise<ARNavigationStep[]> {
     const steps: ARNavigationStep[] = [];
 
     for (let i = 0; i < route.optimizedRoute.length - 1; i++) {
@@ -498,7 +498,7 @@ export class MetaGlassesService {
     }
   }
 
-  private findNearbyLandmarks(location: { lat: number; lng: number }): string[] {
+  private findNearbyLandmarks(_location: { lat: number; lng: number }): string[] {
     // Simuliere nahegelegene Orientierungspunkte
     const landmarks = [
       'Tankstelle', 'Supermarkt', 'Bank', 'Kirche', 'Schule', 'Park', 'Restaurant'
@@ -549,7 +549,7 @@ export class MetaGlassesService {
     try {
       const { DriverService } = await import('./driverService');
       const response = await DriverService.getMetaGlassesDevices(driverId);
-      return response.devices || [];
+      return response.data?.devices || response.data || [];
     } catch (error) {
       logger.error('❌ Failed to get devices', 'MetaGlassesService', error);
       return [];

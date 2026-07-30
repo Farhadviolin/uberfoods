@@ -118,7 +118,7 @@ export function usePushNotifications() {
       // Erstelle Push-Subscription
       const subscription = await registration.pushManager.subscribe({
         userVisibleOnly: true,
-        applicationServerKey: base64ToUint8Array(publicKey),
+        applicationServerKey: Uint8Array.from(base64ToUint8Array(publicKey)).buffer,
       });
 
       const pushSubscription: PushSubscription = {

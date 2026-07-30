@@ -3,7 +3,7 @@
  * Monitors application health and connectivity
  */
 
-interface HealthStatus {
+export interface HealthStatus {
   status: 'healthy' | 'degraded' | 'unhealthy';
   timestamp: number;
   checks: {

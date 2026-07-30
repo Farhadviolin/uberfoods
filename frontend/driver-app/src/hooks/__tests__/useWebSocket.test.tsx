@@ -1,6 +1,6 @@
 import { renderHook } from '@testing-library/react';
 import { useWebSocket } from '../useWebSocket';
-import { renderWithProviders } from '../../test-utils';
+import { TestWrapper } from '../../test-utils';
 
 // Mock the useWebSocket hook
 jest.mock('../useWebSocket', () => ({
@@ -14,11 +14,11 @@ jest.mock('../useWebSocket', () => ({
 
 describe('useWebSocket Hook', () => {
   it('returns socket state', () => {
-    const { result } = renderHook(() => useWebSocket(), {
-      wrapper: renderWithProviders().wrapper,
+    const { result } = renderHook(() => useWebSocket('driver-1'), {
+      wrapper: TestWrapper,
     });
 
     expect(result.current.isConnected).toBe(true);
-    expect(result.current.socket.connected).toBe(true);
+    expect(result.current.socket?.connected).toBe(true);
   });
 });

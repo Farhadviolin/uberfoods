@@ -31,7 +31,6 @@ export class BackgroundLocationService {
     backgroundMode: false,
   };
   private locationCallbacks: Array<(location: LocationData) => void> = [];
-  private worker: Worker | null = null;
 
   private constructor() {
     this.setupServiceWorker();

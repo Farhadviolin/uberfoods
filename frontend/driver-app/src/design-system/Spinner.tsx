@@ -1,5 +1,4 @@
 import { HTMLAttributes } from 'react';
-import { motion } from 'framer-motion';
 import { clsx } from 'clsx';
 import './Spinner.css';
 

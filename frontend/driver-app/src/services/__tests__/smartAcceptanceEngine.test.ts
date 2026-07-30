@@ -19,7 +19,7 @@ describe('SmartAcceptanceEngine', () => {
       location: { lat: 48.2082, lng: 16.3738 },
     };
 
-    const result = await engine.analyzeOrder(order as any, driver as any, {
+    const result = await engine.analyzeOrder(order as any, driver as any, [], {
       lat: 48.2082,
       lng: 16.3738,
     });
@@ -41,7 +41,7 @@ describe('SmartAcceptanceEngine', () => {
       location: { lat: 48.2082, lng: 16.3738 },
     };
 
-    const result = await engine.analyzeOrder(order as any, driver as any, {
+    const result = await engine.analyzeOrder(order as any, driver as any, [], {
       lat: 48.2082,
       lng: 16.3738,
     });

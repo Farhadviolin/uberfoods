@@ -1,12 +1,12 @@
 import { renderHook } from '@testing-library/react';
 import { useLocation } from '../useLocation';
-import { renderWithProviders } from '../../test-utils';
+import { TestWrapper } from '../../test-utils';
 
 // Mock the useLocation hook
 jest.mock('../useLocation', () => ({
   useLocation: () => ({
     location: { lat: 48.2, lng: 16.3 },
-    loading: false,
+    isTracking: false,
     error: null,
   }),
 }));
@@ -14,10 +14,10 @@ jest.mock('../useLocation', () => ({
 describe('useLocation Hook', () => {
   it('returns location data', () => {
     const { result } = renderHook(() => useLocation(), {
-      wrapper: renderWithProviders().wrapper,
+      wrapper: TestWrapper,
     });
 
-    expect(result.current.location.lat).toBe(48.2);
-    expect(result.current.loading).toBe(false);
+    expect(result.current.location).toEqual({ lat: 48.2, lng: 16.3 });
+    expect(result.current.isTracking).toBe(false);
   });
 });

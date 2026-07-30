@@ -7,10 +7,12 @@ export interface Order {
   notes?: string;
   createdAt: string;
   driverId?: string | null;
+  cancelReason?: string;
   restaurant: {
     id: string;
     name: string;
     address: string;
+    status?: string;
     location?: { lat: number; lng: number };
   };
   customer: {
@@ -35,6 +37,7 @@ export interface Driver {
   phone: string;
   isActive: boolean;
   role: 'driver' | 'DRIVER';
+  currentStatus?: string;
   mustChangePassword?: boolean;
   location?: { lat: number; lng: number };
   performance?: DriverPerformance;

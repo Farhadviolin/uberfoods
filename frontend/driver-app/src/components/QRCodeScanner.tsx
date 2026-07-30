@@ -15,7 +15,7 @@ export function QRCodeScanner({ onScanSuccess, onScanFailure, onClose, orderId }
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const [scanning, setScanning] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [cameraPermission, setCameraPermission] = useState<boolean | null>(null);
+  const [, setCameraPermission] = useState<boolean | null>(null);
 
   useEffect(() => {
     startScanning();

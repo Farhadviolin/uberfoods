@@ -37,6 +37,12 @@ export interface ErrorHandlerOptions {
   };
 }
 
+const toErrorDetails = (value: unknown): ErrorDetails | undefined => {
+  if (value === undefined) return undefined;
+  if (typeof value === 'object' && value !== null) return value as ErrorDetails;
+  return { value };
+};
+
 export class ErrorHandler {
   private static instance: ErrorHandler;
   private errorQueue: AppError[] = [];
@@ -62,7 +68,7 @@ export class ErrorHandler {
     const appError: AppError = {
       code: this.getErrorCode(error),
       message: this.getErrorMessage(error),
-      details: error.response?.data,
+      details: toErrorDetails(error.response?.data),
       timestamp: new Date(),
       userId: this.getCurrentUserId(),
       context
@@ -137,7 +143,7 @@ export class ErrorHandler {
     const appError: AppError = {
       code: 'WEBSOCKET_ERROR',
       message: 'Connection error occurred',
-      details: error,
+      details: toErrorDetails(error),
       timestamp: new Date(),
       userId: this.getCurrentUserId(),
       context
@@ -199,12 +205,10 @@ export class ErrorHandler {
   }
 
   private getErrorMessage(error: AxiosError): string {
-    if (error.response?.data?.message) {
-      return error.response.data.message;
-    }
-
-    if (error.response?.data?.error) {
-      return error.response.data.error;
+    const data = error.response?.data;
+    if (typeof data === 'object' && data !== null) {
+      if ('message' in data && typeof data.message === 'string') return data.message;
+      if ('error' in data && typeof data.error === 'string') return data.error;
     }
 
     switch (error.response?.status) {
@@ -277,7 +281,7 @@ export class ErrorHandler {
           try {
             // Retry the original request
             if (error.config) {
-              const result = await this.retryRequest(error.config);
+              await this.retryRequest(error.config);
               resolve({
                 code: 'SUCCESS',
                 message: 'Request succeeded after retry',
@@ -391,7 +395,7 @@ export function setupGlobalErrorHandlers(): void {
   // Handle unhandled promise rejections
   window.addEventListener('unhandledrejection', (event) => {
     const errorHandler = ErrorHandler.getInstance();
-    const appError = errorHandler.handleAppError(
+    errorHandler.handleAppError(
       new Error(event.reason?.message || 'Unhandled promise rejection'),
       { reason: event.reason },
       { showToast: false } // Don't show toast for unhandled rejections
@@ -402,7 +406,7 @@ export function setupGlobalErrorHandlers(): void {
   // Handle global JavaScript errors
   window.addEventListener('error', (event) => {
     const errorHandler = ErrorHandler.getInstance();
-    const appError = errorHandler.handleAppError(
+    errorHandler.handleAppError(
       new Error(event.message),
       {
         filename: event.filename,

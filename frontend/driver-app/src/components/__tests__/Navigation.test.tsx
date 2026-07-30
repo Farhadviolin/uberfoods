@@ -17,7 +17,7 @@ jest.mock('../Navigation', () => ({
 
 describe('Navigation Component', () => {
   it('renders navigation menu', () => {
-    renderWithProviders(<Navigation />);
+    renderWithProviders(<Navigation orders={[]} />);
 
     expect(screen.getByTestId('navigation')).toBeInTheDocument();
     expect(screen.getByText('Home')).toBeInTheDocument();

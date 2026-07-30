@@ -1,5 +1,4 @@
 import { forwardRef, InputHTMLAttributes, ReactNode } from 'react';
-import { motion } from 'framer-motion';
 import { clsx } from 'clsx';
 import { X } from 'lucide-react';
 import './Input.css';
@@ -59,7 +58,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
         )}
         <div className={clsx('input-container', `input-container--${variant}`, `input-container--${size}`)}>
           {leftIcon && <span className="input-icon-left">{leftIcon}</span>}
-          <motion.input
+          <input
             ref={ref}
             className={clsx(
               'input',
@@ -75,8 +74,6 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
             value={value}
             onChange={onChange}
             disabled={disabled}
-            whileFocus={{ scale: 1.01 }}
-            transition={{ duration: 0.2 }}
             {...props}
           />
           {showClearButton && (

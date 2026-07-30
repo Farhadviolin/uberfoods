@@ -323,7 +323,7 @@ export class PaymentService {
     logger.warn(`Payout failed: ${payout.id}`);
   }
 
-  private static async updateOrderPaymentStatus(orderId: string, status: string, transactionId?: string): Promise<void> {
+  private static async updateOrderPaymentStatus(orderId: string, status: string, _transactionId?: string): Promise<void> {
     // This would update the order payment status in the database
     // Implementation depends on your Prisma setup
     logger.info(`Updating order ${orderId} payment status to ${status}`);

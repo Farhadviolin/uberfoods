@@ -3,10 +3,8 @@ import api from '../utils/api';
 import { logger } from '../utils/logger';
 import { useAuth } from '../contexts/AuthContext';
 import { Order } from '../types';
-import { OrderCard } from './OrderCard';
 import { DriverMap } from './DriverMap';
 import { Navigation } from './Navigation';
-import { SkeletonOrderCard } from './SkeletonLoader';
 
 // Lazy Load große Komponenten für Code Splitting
 const Documents = lazy(() => import('./Documents').then(m => ({ default: m.Documents })));
@@ -53,6 +51,9 @@ const LoadingFallback = () => (
   </div>
 );
 import '../styles/app-layout.css';
+
+const isOfflineError = (error: unknown): error is { isOffline?: boolean; code?: string } =>
+  typeof error === 'object' && error !== null;
 import './Dashboard.css';
 
 type DriverStatus = 'online' | 'offline' | 'on_break';
@@ -160,7 +161,7 @@ export function Dashboard() {
       }
     } catch (err: unknown) {
       // Verbessertes Error Handling
-      if (err.isOffline) {
+      if (isOfflineError(err) && err.isOffline) {
         setError('Offline-Modus: Bestellungen werden geladen, sobald die Verbindung wiederhergestellt ist.');
         // Versuche aus Offline Storage zu laden
         try {
@@ -373,7 +374,7 @@ export function Dashboard() {
         throw result.error;
       }
     } catch (err: unknown) {
-      if (err.isOffline || err.code === 'ERR_NETWORK') {
+      if (isOfflineError(err) && (err.isOffline || err.code === 'ERR_NETWORK')) {
         setError('Offline: Bestellung wird später akzeptiert.');
         offlineService.queueRequest(`/orders/${orderId}/accept`, {
           method: 'POST',
@@ -427,7 +428,7 @@ export function Dashboard() {
         throw result.error;
       }
     } catch (err: unknown) {
-      if (err.isOffline || err.code === 'ERR_NETWORK') {
+      if (isOfflineError(err) && (err.isOffline || err.code === 'ERR_NETWORK')) {
         setError('Offline: Ablehnung wird später synchronisiert.');
         offlineService.queueRequest(`/orders/${orderId}/reject`, {
           method: 'POST',
@@ -528,13 +529,13 @@ export function Dashboard() {
       setSuccess('Status erfolgreich aktualisiert!');
       // Optimistisches Update
       setOrders((prev) => 
-        prev.map((o) => o.id === orderId ? { ...o, status: status as any } : o)
+        prev.map((o) => o.id === orderId ? { ...o, status } : o)
       );
       setTimeout(() => setSuccess(null), 3000);
       // Lade nach kurzer Verzögerung aktualisierte Daten
       setTimeout(() => fetchOrders(), 1000);
     } catch (err: unknown) {
-      if (err.isOffline) {
+      if (isOfflineError(err) && err.isOffline) {
         setError('Offline: Status wird gespeichert und später synchronisiert.');
       } else {
         let errorMessage = 'Fehler beim Aktualisieren des Status. Bitte versuchen Sie es erneut.';

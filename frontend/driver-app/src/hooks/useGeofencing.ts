@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation } from '@tanstack/react-query';
 import api from '../utils/api';
 import { useAuth } from '../contexts/AuthContext';
 import { isAuthError, isAxiosErrorResponse } from '../utils/errorHandler';
@@ -29,7 +29,6 @@ interface LocationCheckResult {
 
 export function useGeofencing(orderId?: string) {
   const { driver } = useAuth();
-  const queryClient = useQueryClient();
 
   // Get geofences for order
   const geofencesQuery = useQuery({
