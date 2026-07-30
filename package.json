@@ -18,6 +18,8 @@
     "dev:admin": "npm --prefix frontend/admin-panel run dev:fixed",
     "verify:local": "powershell -NoLogo -NoProfile -ExecutionPolicy Bypass -File scripts/verify-local.ps1",
     "verify:local:no-docker": "powershell -NoLogo -NoProfile -ExecutionPolicy Bypass -File scripts/verify-local-no-docker.ps1",
+    "verify:driver-login-runtime": "node scripts/verify-driver-login-runtime.mjs",
+    "test:driver-login-runtime": "node --test scripts/__tests__/driver-login-runtime-utils.test.mjs",
     "verify:production-simulation": "node scripts/verify-production-simulation.mjs",
     "verify:render-staging": "node scripts/verify-render-blueprint-contract.mjs && node --test scripts/__tests__/render-blueprint-contract.test.mjs",
     "prisma:generate": "npm --prefix backend run prisma:generate",

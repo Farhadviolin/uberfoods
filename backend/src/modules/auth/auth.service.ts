@@ -393,6 +393,9 @@ export class AuthService {
   }
 
   async driverLogin(email: string, password: string) {
+    if (typeof email !== "string" || typeof password !== "string" || !email.trim() || !password) {
+      throw new UnauthorizedException("Invalid credentials");
+    }
     const normalizedEmail = this.normalizeEmail(email);
     this.logger.log(`Driver login attempt for: ${normalizedEmail}`);
     const driver = await this.prisma.driver.findUnique({

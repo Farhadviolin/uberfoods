@@ -1,0 +1,22 @@
+# This image is used only by docker-compose.driver-login-local.yml. The verifier
+# exercises migration, seed, health, and driver authentication; none launches a browser.
+FROM node:20-alpine3.16
+
+WORKDIR /app/backend
+
+COPY backend/package*.json ./
+COPY backend/prisma ./prisma/
+COPY scripts /app/scripts
+
+# Keep the production-capable Puppeteer package installed, but avoid downloading
+# Chrome for this isolated authentication-only verification image.
+ENV PUPPETEER_SKIP_DOWNLOAD=true
+RUN NODE_OPTIONS="--max-old-space-size=4096" npm install --legacy-peer-deps
+
+RUN npx prisma generate
+
+COPY backend .
+RUN npm run build
+
+EXPOSE 3000
+CMD ["node", "dist/main.full.js"]

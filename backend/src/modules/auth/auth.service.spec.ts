@@ -192,6 +192,12 @@ describe('AuthService', () => {
   });
 
   describe('driverLogin', () => {
+    it.each([undefined, ''])('rejects a missing driver password before querying or comparing', async (password) => {
+      await expect(service.driverLogin('driver@example.com', password as unknown as string)).rejects.toThrow(UnauthorizedException);
+      expect(mockPrismaService.driver.findUnique).not.toHaveBeenCalled();
+      expect(bcrypt.compare).not.toHaveBeenCalled();
+    });
+
     it.each([undefined, '', 'not-a-bcrypt-hash'])('rejects an unusable stored hash without calling bcrypt.compare', async (password) => {
       mockPrismaService.driver.findUnique.mockResolvedValue({
         id: 'driver_1', email: 'driver@example.com', password, isActive: true,
