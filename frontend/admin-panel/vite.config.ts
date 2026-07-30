@@ -2,6 +2,7 @@ import { defineConfig } from 'vite'
 import { loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
 import { resolve } from 'path'
+import { resolveApiProxyTarget } from './src/viteProxy'
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
@@ -39,7 +40,7 @@ export default defineConfig(({ mode }) => {
     strictPort: true,
     proxy: {
       '/api': {
-        target: mode === 'e2e' ? 'http://127.0.0.1:3102' : 'http://127.0.0.1:3000',
+        target: resolveApiProxyTarget(),
         changeOrigin: true,
       },
     },
