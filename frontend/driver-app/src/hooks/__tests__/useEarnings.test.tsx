@@ -16,10 +16,14 @@ const driver = {
   id: 'driver-123',
   name: 'Test Driver',
   email: 'driver@test.com',
+  phone: '+43123456789',
+  isActive: true,
+  role: 'DRIVER' as const,
 };
 
 describe('driver earnings contract', () => {
   beforeEach(() => {
+    localStorage.clear();
     jest.clearAllMocks();
     localStorage.setItem('driver_token', 'test-token');
     localStorage.setItem('driver_user', JSON.stringify(driver));
@@ -35,6 +39,8 @@ describe('driver earnings contract', () => {
       throw new Error(`Unexpected request: ${url}`);
     });
   });
+
+  afterEach(() => localStorage.clear());
 
   it('loads and displays the current driver earnings', async () => {
     renderWithProviders(<EarningsDashboard />);

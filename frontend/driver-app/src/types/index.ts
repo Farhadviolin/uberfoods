@@ -34,6 +34,7 @@ export interface Driver {
   name: string;
   phone: string;
   isActive: boolean;
+  role: 'driver' | 'DRIVER';
   mustChangePassword?: boolean;
   location?: { lat: number; lng: number };
   performance?: DriverPerformance;

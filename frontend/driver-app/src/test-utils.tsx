@@ -24,14 +24,12 @@ const createTestQueryClient = () =>
 interface TestWrapperProps {
   children: React.ReactNode;
   initialEntries?: string[];
-  initialAuthState?: any;
-  initialAppState?: any;
+  initialAppState?: Record<string, unknown>;
 }
 
 export const TestWrapper: React.FC<TestWrapperProps> = ({
   children,
   initialEntries = ['/'],
-  initialAuthState = { user: null, token: null },
   initialAppState = {}
 }) => {
   const queryClient = createTestQueryClient();
@@ -40,7 +38,7 @@ export const TestWrapper: React.FC<TestWrapperProps> = ({
     <QueryClientProvider client={queryClient}>
       <MemoryRouter initialEntries={initialEntries}>
         <AppStateProvider initialState={initialAppState}>
-          <AuthProvider initialAuthState={initialAuthState}>
+          <AuthProvider>
             <ToastProvider>
               {children}
             </ToastProvider>
@@ -54,21 +52,19 @@ export const TestWrapper: React.FC<TestWrapperProps> = ({
 // Enhanced render function with providers
 interface CustomRenderOptions extends Omit<RenderOptions, 'wrapper'> {
   initialEntries?: string[];
-  initialAuthState?: any;
-  initialAppState?: any;
+  initialAppState?: Record<string, unknown>;
 }
 
 export const renderWithProviders = (
   ui: ReactElement,
   options: CustomRenderOptions = {}
 ) => {
-  const { initialEntries, initialAuthState, initialAppState, ...renderOptions } = options;
+  const { initialEntries, initialAppState, ...renderOptions } = options;
 
   return render(ui, {
     wrapper: ({ children }) => (
       <TestWrapper
         initialEntries={initialEntries}
-        initialAuthState={initialAuthState}
         initialAppState={initialAppState}
       >
         {children}

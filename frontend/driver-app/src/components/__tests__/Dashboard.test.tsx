@@ -49,15 +49,21 @@ const driver = {
   id: 'driver-123',
   name: 'Test Driver',
   email: 'driver@test.com',
+  phone: '+43123456789',
+  isActive: true,
+  role: 'DRIVER' as const,
 };
 
 describe('Dashboard Component', () => {
   beforeEach(() => {
+    localStorage.clear();
     jest.clearAllMocks();
     localStorage.setItem('driver_token', 'test-token');
     localStorage.setItem('driver_user', JSON.stringify(driver));
     mockedApi.get.mockResolvedValue({ data: [] });
   });
+
+  afterEach(() => localStorage.clear());
 
   it('mounts the authenticated driver dashboard and loads both order feeds', async () => {
     renderWithProviders(<Dashboard />);
