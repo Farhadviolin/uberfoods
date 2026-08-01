@@ -1,7 +1,7 @@
 import { NestFactory } from "@nestjs/core";
-import { ValidationPipe } from "@nestjs/common";
 import { SwaggerModule, DocumentBuilder } from "@nestjs/swagger";
 import { AppModuleE2E } from "./app.module.e2e";
+import { configureHttpApplication } from "./common/bootstrap/configure-http-app";
 import * as dotenv from "dotenv";
 import { resolve } from "path";
 
@@ -114,17 +114,7 @@ async function bootstrap() {
     credentials: true,
   });
 
-  // Global validation pipe
-  app.useGlobalPipes(
-    new ValidationPipe({
-      whitelist: true,
-      forbidNonWhitelisted: true,
-      transform: true,
-    }),
-  );
-
-  // API prefix
-  app.setGlobalPrefix("api");
+  configureHttpApplication(app);
 
   // Swagger documentation
   const config = new DocumentBuilder()
@@ -135,12 +125,6 @@ async function bootstrap() {
     .build();
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup("api/docs", app, document);
-
-  // Health check endpoint
-  console.log("[BOOT] 🏥 Setting up health check endpoint...");
-  app.getHttpAdapter().get("/api/health", (req, res) => {
-    res.json({ status: "ok", timestamp: new Date().toISOString() });
-  });
 
   // Add request logging middleware for E2E debugging
   app.use((req, res, next) => {

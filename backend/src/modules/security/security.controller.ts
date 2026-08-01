@@ -1,4 +1,11 @@
-import { Body, Controller, Get, Post, UseGuards } from "@nestjs/common";
+import {
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  Post,
+  UseGuards,
+} from "@nestjs/common";
 import {
   ApiBearerAuth,
   ApiOperation,
@@ -43,6 +50,7 @@ export class SecurityController {
   @Post("threats/detect")
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
+  @HttpCode(200)
   @ApiOperation({ summary: "Detect security threats" })
   @ApiResponse({ status: 200, description: "Threats detected" })
   detectThreat(@Body() body: { ip: string; action: string }) {

@@ -172,6 +172,31 @@ export class CustomerController {
     });
   }
 
+  @Get("me/dashboard-stats")
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: "Get current customer dashboard statistics" })
+  async getDashboardStats(@Request() req: AuthenticatedRequest) {
+    const customerId = this.getCurrentCustomerId(req);
+    const [totalOrders, completedOrders, totalSpent] = await Promise.all([
+      this.prisma.order.count({ where: { customerId } }),
+      this.prisma.order.count({
+        where: { customerId, status: "DELIVERED" },
+      }),
+      this.prisma.order.aggregate({
+        where: { customerId },
+        _sum: { totalAmount: true },
+      }),
+    ]);
+
+    return {
+      stats: {
+        totalOrders,
+        completedOrders,
+        totalSpent: totalSpent._sum.totalAmount ?? 0,
+      },
+    };
+  }
+
   @Post("me/favorites")
   @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: "Add favorite restaurant for current customer" })

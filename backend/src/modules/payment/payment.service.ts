@@ -25,7 +25,8 @@ export class PaymentService {
     amount: number,
     currency: string,
   ): Promise<any> {
-    return { id: "pi_test", client_secret: "secret" };
+    // The order payment controller exposes the canonical camelCase contract.
+    return { paymentIntentId: "pi_test", clientSecret: "secret" };
   }
 
   async createPayPalOrder(

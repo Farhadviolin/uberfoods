@@ -209,6 +209,7 @@ async function seedRBAC(prisma) {
     'settings:read', 'settings:update',
     'rbac:read', 'rbac:update', 'rbac:create', 'rbac:delete',
     'customer:read', 'customer:update', 'customer:create', 'customer:delete',
+    'customers:read',
     'restaurant:read', 'restaurant:update', 'restaurant:create', 'restaurant:delete',
     'dish:read', 'dish:update', 'dish:create', 'dish:delete',
     'marketing:read', 'marketing:update', 'marketing:create', 'marketing:delete',

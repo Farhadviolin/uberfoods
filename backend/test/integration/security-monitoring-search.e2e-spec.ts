@@ -1,8 +1,9 @@
 import { Test, TestingModule } from "@nestjs/testing";
 import { INestApplication } from "@nestjs/common";
 import * as request from "supertest";
-import { AppModule } from "../../src/app.module";
+import { AppModuleE2E } from "../../src/app.module.e2e";
 import { getTestEmail, getTestPassword } from "../utils/test-credentials";
+import { configureHttpApplication } from "../../src/common/bootstrap/configure-http-app";
 
 describe("Security, Monitoring & Search Integration (e2e)", () => {
   let app: INestApplication;
@@ -10,10 +11,11 @@ describe("Security, Monitoring & Search Integration (e2e)", () => {
 
   beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
-      imports: [AppModule],
+      imports: [AppModuleE2E],
     }).compile();
 
     app = moduleFixture.createNestApplication();
+    configureHttpApplication(app);
     await app.init();
 
     // Get auth token (mock login)
@@ -24,9 +26,11 @@ describe("Security, Monitoring & Search Integration (e2e)", () => {
         password: getTestPassword("ADMIN"),
       });
 
-    if (loginResponse.body.accessToken) {
-      authToken = loginResponse.body.accessToken;
-    }
+    authToken =
+      loginResponse.body.access_token ??
+      loginResponse.body.accessToken ??
+      loginResponse.body.data?.access_token ??
+      loginResponse.body.data?.accessToken;
   });
 
   afterAll(async () => {

@@ -1,5 +1,5 @@
 import { Test, TestingModule } from "@nestjs/testing";
-import { INestApplication, ValidationPipe } from "@nestjs/common";
+import { INestApplication } from "@nestjs/common";
 import * as request from "supertest";
 import {
   getExpiredTestToken,
@@ -9,6 +9,7 @@ import {
 } from "../utils/test-credentials";
 import { AppModuleE2E } from "../../src/app.module.e2e";
 import { PrismaService } from "../../src/prisma/prisma.service";
+import { configureHttpApplication } from "../../src/common/bootstrap/configure-http-app";
 
 describe("Auth Flow E2E", () => {
   let app: INestApplication;
@@ -36,22 +37,7 @@ describe("Auth Flow E2E", () => {
       credentials: true,
     });
 
-    // Global validation pipe
-    app.useGlobalPipes(
-      new ValidationPipe({
-        whitelist: true,
-        forbidNonWhitelisted: true,
-        transform: true,
-      }),
-    );
-
-    // API prefix
-    app.setGlobalPrefix("api");
-
-    // Health check endpoint like in main.e2e.ts
-    app.getHttpAdapter().get("/api/health", (req, res) => {
-      res.json({ status: "ok", timestamp: new Date().toISOString() });
-    });
+    configureHttpApplication(app);
 
     await app.init();
   });
@@ -67,8 +53,10 @@ describe("Auth Flow E2E", () => {
   });
 
   describe("Customer Authentication Flow", () => {
-    const testEmail = getTestEmail("CUSTOMER_LOGIN");
-    const testPassword = getTestPassword("CUSTOMER_LOGIN");
+    // Registration must use a suite-local identity. The seeded login account
+    // is reserved for the login/role fixtures used by other E2E suites.
+    const testEmail = getTestEmail("GENERIC");
+    const testPassword = getTestPassword("GENERIC");
 
     it("Step 1: Customer Registration", async () => {
       const response = await request(app.getHttpServer())
@@ -132,14 +120,17 @@ describe("Auth Flow E2E", () => {
     it("Step 5: Invalid Token Rejection", async () => {
       await request(app.getHttpServer())
         .get("/api/customers/profile")
-        .set("Authorization", `Bearer ${getTestToken("TEST_INVALID_TOKEN", "invalid")}`)
+        .set(
+          "Authorization",
+          `Bearer ${getTestToken("TEST_INVALID_TOKEN", "invalid")}`,
+        )
         .expect(200); // Customer profile returns mock data even for invalid tokens
     });
 
     it("Step 6: Expired Token Handling", async () => {
       // Use an expired token (mock scenario) - this is a test-only JWT token, not a real credential
       const expiredToken = getExpiredTestToken();
-      
+
       await request(app.getHttpServer())
         .get("/api/customers/profile")
         .set("Authorization", `Bearer ${expiredToken}`)
@@ -220,7 +211,10 @@ describe("Auth Flow E2E", () => {
         .set("Authorization", `Bearer ${customerToken}`)
         .expect(201); // API returns 201 for logout
 
-      expect(response.body).toHaveProperty("message", "Logged out successfully");
+      expect(response.body).toHaveProperty(
+        "message",
+        "Logged out successfully",
+      );
     });
 
     it("should reject requests after logout", async () => {

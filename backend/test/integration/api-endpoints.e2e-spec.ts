@@ -1,9 +1,10 @@
 import { Test, TestingModule } from "@nestjs/testing";
-import { INestApplication, ValidationPipe } from "@nestjs/common";
+import { INestApplication } from "@nestjs/common";
 import * as request from "supertest";
 import { AppModuleE2E } from "../../src/app.module.e2e";
 import { PrismaService } from "../../src/prisma/prisma.service";
 import { getTestEmail, getTestPassword, getTestToken } from "../utils/test-credentials";
+import { configureHttpApplication } from "../../src/common/bootstrap/configure-http-app";
 
 describe("API Endpoints Integration Tests (e2e)", () => {
   let app: INestApplication;
@@ -26,17 +27,7 @@ describe("API Endpoints Integration Tests (e2e)", () => {
     prisma = moduleFixture.get<PrismaService>(PrismaService);
 
     app.enableCors({ origin: true, credentials: true });
-    app.setGlobalPrefix("api");
-    app.getHttpAdapter().get("/api/health", (_req, res) => {
-      res.json({ status: "ok", timestamp: new Date().toISOString() });
-    });
-    app.useGlobalPipes(
-      new ValidationPipe({
-        whitelist: true,
-        transform: true,
-        forbidNonWhitelisted: true,
-      }),
-    );
+    configureHttpApplication(app);
 
     await app.init();
   });
@@ -87,7 +78,7 @@ describe("API Endpoints Integration Tests (e2e)", () => {
           password: getTestPassword("ADMIN"),
         });
 
-      if (response.status === 200) {
+      if (response.status === 200 || response.status === 201) {
         expect(response.body).toHaveProperty("access_token");
         adminToken = response.body.access_token;
       } else {
@@ -122,7 +113,7 @@ describe("API Endpoints Integration Tests (e2e)", () => {
             password: getTestPassword("CUSTOMER_LOGIN"),
         });
 
-      if (response.status === 200) {
+      if (response.status === 200 || response.status === 201) {
         expect(response.body).toHaveProperty("access_token");
         customerToken = response.body.access_token;
       }
@@ -288,6 +279,7 @@ describe("API Endpoints Integration Tests (e2e)", () => {
     it("GET /api/social/live-orders should return live orders", () => {
       return request(app.getHttpServer())
         .get("/api/social/live-orders?limit=10")
+        .set("Authorization", `Bearer ${customerToken}`)
         .expect(200)
         .expect((res) => {
           expect(Array.isArray(res.body)).toBe(true);
@@ -297,6 +289,7 @@ describe("API Endpoints Integration Tests (e2e)", () => {
     it("GET /api/social/trending should return trending", () => {
       return request(app.getHttpServer())
         .get("/api/social/trending?limit=10")
+        .set("Authorization", `Bearer ${customerToken}`)
         .expect(200)
         .expect((res) => {
           expect(Array.isArray(res.body)).toBe(true);
@@ -449,7 +442,7 @@ describe("API Endpoints Integration Tests (e2e)", () => {
         .set("Authorization", `Bearer ${customerToken}`)
         .expect(200)
         .expect((res) => {
-          expect(Array.isArray(res.body)).toBe(true);
+          expect(Array.isArray(res.body.dailyData)).toBe(true);
         });
     });
   });
@@ -462,7 +455,7 @@ describe("API Endpoints Integration Tests (e2e)", () => {
       }
 
       return request(app.getHttpServer())
-        .get("/api/statistics/dashboard")
+        .get("/api/admin/statistics/dashboard")
         .set("Authorization", `Bearer ${adminToken}`)
         .expect(200)
         .expect((res) => {

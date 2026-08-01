@@ -1,9 +1,10 @@
-import { INestApplication, Logger, ValidationPipe } from "@nestjs/common";
+import { INestApplication, Logger } from "@nestjs/common";
 import { Test, TestingModule } from "@nestjs/testing";
 import * as bcrypt from "bcrypt";
 import * as request from "supertest";
 import { AppModule } from "../../src/app.module.full";
 import { PrismaService } from "../../src/prisma/prisma.service";
+import { configureHttpApplication } from "../../src/common/bootstrap/configure-http-app";
 
 const prefix = "uf-audit-006-runtime";
 const password = "DriverTest123";
@@ -50,14 +51,7 @@ describe("UF-AUDIT-006 driver order security over HTTP", () => {
     }).compile();
 
     app = moduleFixture.createNestApplication();
-    app.setGlobalPrefix("api");
-    app.useGlobalPipes(
-      new ValidationPipe({
-        whitelist: true,
-        forbidNonWhitelisted: true,
-        transform: true,
-      }),
-    );
+    configureHttpApplication(app);
     await app.init();
 
     prisma = app.get(PrismaService);

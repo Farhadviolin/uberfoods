@@ -1,7 +1,8 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication } from '@nestjs/common';
 import * as request from 'supertest';
-import { AppModule } from '../../src/app.module';
+import { AppModuleE2E } from '../../src/app.module.e2e';
+import { configureHttpApplication } from '../../src/common/bootstrap/configure-http-app';
 
 describe('RBAC Integration Tests (e2e)', () => {
   let app: INestApplication;
@@ -11,10 +12,11 @@ describe('RBAC Integration Tests (e2e)', () => {
 
   beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
-      imports: [AppModule],
+      imports: [AppModuleE2E],
     }).compile();
 
     app = moduleFixture.createNestApplication();
+    configureHttpApplication(app);
     await app.init();
 
     // TODO: Create test users and get tokens

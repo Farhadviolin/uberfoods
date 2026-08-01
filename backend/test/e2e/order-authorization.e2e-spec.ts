@@ -1,4 +1,4 @@
-import { INestApplication, ValidationPipe } from "@nestjs/common";
+import { INestApplication } from "@nestjs/common";
 import { JwtService } from "@nestjs/jwt";
 import { Test, TestingModule } from "@nestjs/testing";
 import { AdminRole } from "@prisma/client";
@@ -6,6 +6,7 @@ import * as bcrypt from "bcrypt";
 import * as request from "supertest";
 import { AppModule } from "../../src/app.module.full";
 import { PrismaService } from "../../src/prisma/prisma.service";
+import { configureHttpApplication } from "../../src/common/bootstrap/configure-http-app";
 
 const prefix = "p0-order-authz";
 const password = "OrderSecurity123";
@@ -48,14 +49,7 @@ describe("P0 order authorization and atomic driver claim over HTTP", () => {
     }).compile();
 
     app = moduleFixture.createNestApplication();
-    app.setGlobalPrefix("api");
-    app.useGlobalPipes(
-      new ValidationPipe({
-        whitelist: true,
-        forbidNonWhitelisted: true,
-        transform: true,
-      }),
-    );
+    configureHttpApplication(app);
     await app.init();
 
     prisma = app.get(PrismaService);

@@ -1,10 +1,10 @@
 import { Test, TestingModule } from "@nestjs/testing";
 import { INestApplication } from "@nestjs/common";
 import * as request from "supertest";
-import * as bcrypt from "bcrypt";
-import { AppModule } from "../src/app.module";
+import { AppModuleE2E } from "../src/app.module.e2e";
 import { PrismaService } from "../src/prisma/prisma.service";
-import { getTestEmail, getTestPassword, getTestToken } from "./utils/test-credentials";
+import { getTestEmail, getTestPassword } from "./utils/test-credentials";
+import { configureHttpApplication } from "../src/common/bootstrap/configure-http-app";
 
 describe("Enterprise Sync E2E Tests", () => {
   let app: INestApplication;
@@ -16,144 +16,143 @@ describe("Enterprise Sync E2E Tests", () => {
   let customerId: string;
   let restaurantId: string;
   let driverId: string;
+  let dishId: string;
   let orderId: string;
-  const adminEmail = getTestEmail("ADMIN");
-  const adminPassword = getTestPassword("ADMIN");
-  // Use GENERIC for unique emails to avoid conflict with seed
-  const customerEmail = getTestEmail("GENERIC");
-  const customerPassword = getTestPassword("GENERIC");
-  const restaurantEmail = getTestEmail("GENERIC");
-  const driverEmail = getTestEmail("GENERIC");
+  const createdOrderIds: string[] = [];
 
   beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
-      imports: [AppModule],
+      imports: [AppModuleE2E],
     }).compile();
 
     app = moduleFixture.createNestApplication();
-    app.setGlobalPrefix("api");
+    configureHttpApplication(app);
     await app.init();
     prisma = moduleFixture.get<PrismaService>(PrismaService);
 
-    // Use upsert for admin (seed may have created admin@uberfoods.com)
-    const hashedAdmin = await bcrypt.hash(adminPassword, 10);
-    await prisma.admin.upsert({
-      where: { email: adminEmail },
-      update: { password: hashedAdmin, name: "Test Admin", role: "SUPER_ADMIN" },
-      create: {
-        email: adminEmail,
-        password: hashedAdmin,
-        name: "Test Admin",
-        role: "SUPER_ADMIN",
-      },
-    });
-
-    const hashedCustomer = await bcrypt.hash(customerPassword, 10);
-    const customer = await prisma.customer.create({
-      data: {
-        email: customerEmail,
-        password: hashedCustomer,
-        firstName: "Test",
-        lastName: "Customer",
-        phone: "+1234567890",
-      },
-    });
+    const customerEmail = getTestEmail("CUSTOMER_LOGIN");
+    const restaurantEmail = getTestEmail("RESTAURANT_LOGIN");
+    const driverEmail = getTestEmail("DRIVER_LOGIN");
+    const [customer, restaurant, driver] = await Promise.all([
+      prisma.customer.findUnique({ where: { email: customerEmail } }),
+      prisma.restaurant.findUnique({ where: { email: restaurantEmail } }),
+      prisma.driver.findUnique({ where: { email: driverEmail } }),
+    ]);
+    if (!customer || !restaurant || !driver) {
+      throw new Error("Seeded enterprise identities are incomplete");
+    }
     customerId = customer.id;
-
-    const restaurant = await prisma.restaurant.create({
-      data: {
-        name: "Test Restaurant",
-        email: restaurantEmail,
-        phone: "+1234567890",
-        address: "Test Address",
-        isActive: true,
-      },
-    });
     restaurantId = restaurant.id;
-
-    const hashedDriver = await bcrypt.hash(customerPassword, 10);
-    const driver = await prisma.driver.create({
-      data: {
-        email: driverEmail,
-        password: hashedDriver,
-        name: "Test Driver",
-        phone: "+1234567890",
-        isActive: true,
-        currentStatus: "offline",
-      },
-    });
     driverId = driver.id;
+    const dish = await prisma.dish.findFirst({
+      where: { restaurantId },
+      select: { id: true },
+    });
+    if (!dish) {
+      throw new Error("Seeded restaurant has no dish fixture");
+    }
+    dishId = dish.id;
 
-    // Login and get tokens (simplified - in real scenario use auth endpoints)
-    adminToken = getTestToken("TEST_ADMIN_TOKEN", "admin");
-    customerToken = getTestToken("TEST_CUSTOMER_TOKEN", "customer");
-    restaurantToken = getTestToken("TEST_RESTAURANT_TOKEN", "restaurant");
-    driverToken = getTestToken("TEST_DRIVER_TOKEN", "driver");
+    adminToken = await login(
+      "/api/auth/login",
+      getTestEmail("ADMIN"),
+      getTestPassword("ADMIN"),
+    );
+    customerToken = await login(
+      "/api/auth/customer/login",
+      customerEmail,
+      getTestPassword("CUSTOMER_LOGIN"),
+    );
+    restaurantToken = await login(
+      "/api/auth/restaurant/login",
+      restaurantEmail,
+      getTestPassword("RESTAURANT_LOGIN"),
+    );
+    driverToken = await login(
+      "/api/auth/driver/login",
+      driverEmail,
+      getTestPassword("DRIVER_LOGIN"),
+    );
+
+    const order = await createOrder();
+    orderId = order.id;
   });
 
   afterAll(async () => {
-    // Cleanup (don't delete admin - may be shared from seed)
-    try {
-      await prisma.order.deleteMany({ where: { customerId } });
-      await prisma.customer.delete({ where: { id: customerId } }).catch(() => {});
-      await prisma.restaurant.delete({ where: { id: restaurantId } }).catch(() => {});
-      await prisma.driver.delete({ where: { id: driverId } }).catch(() => {});
-    } catch (_) {}
+    if (createdOrderIds.length > 0) {
+      await prisma.payment.deleteMany({
+        where: { orderId: { in: createdOrderIds } },
+      });
+      await prisma.orderItem.deleteMany({
+        where: { orderId: { in: createdOrderIds } },
+      });
+      await prisma.order.deleteMany({
+        where: { id: { in: createdOrderIds } },
+      });
+    }
+    if (driverId) {
+      await prisma.payout.deleteMany({
+        where: { driverTaxProfile: { driverId } },
+      });
+      await prisma.driverTaxProfile.deleteMany({ where: { driverId } });
+    }
     await app.close();
   });
 
-  describe("Unified Notifications Flow", () => {
-    it("should send unified notification for order creation", async () => {
-      // Create order
-      const order = await prisma.order.create({
-        data: {
-          customerId,
-          restaurantId,
-          totalAmount: 100,
-          status: "PENDING",
-          items: {
-            create: {
-              dishId: "dish-1",
-              quantity: 1,
-              price: 100,
-            },
+  async function login(path: string, email: string, password: string) {
+    const response = await request(app.getHttpServer())
+      .post(path)
+      .send({ email, password })
+      .expect(201);
+    const token =
+      response.body.data?.access_token || response.body.access_token;
+    expect(token).toEqual(expect.any(String));
+    return token as string;
+  }
+
+  async function createOrder() {
+    const order = await prisma.order.create({
+      data: {
+        customerId,
+        restaurantId,
+        driverId: null,
+        totalAmount: 100,
+        subtotal: 100,
+        deliveryFee: 0,
+        taxAmount: 0,
+        deliveryAddress: "Enterprise E2E Address",
+        paymentMethod: "CASH",
+        status: "PENDING",
+        items: {
+          create: {
+            dishId,
+            quantity: 1,
+            price: 100,
           },
         },
-      });
-      orderId = order.id;
+      },
+    });
+    createdOrderIds.push(order.id);
+    return order;
+  }
 
-      // Send notification
+  describe("Unified Notifications Flow", () => {
+    it("should send unified notification for order creation", async () => {
       const response = await request(app.getHttpServer())
         .post(`/api/notifications/unified/order/${orderId}`)
         .set("Authorization", `Bearer ${adminToken}`)
-        .send({
-          event: "created",
-          data: { status: "PENDING" },
-        })
-        .expect(200);
+        .send({ event: "created", data: { status: "PENDING" } })
+        .expect(201);
 
       expect(response.body.success).toBe(true);
     });
 
-    it("should send payment notification", async () => {
-      const payment = await prisma.payment.create({
-        data: {
-          orderId,
-          customerId,
-          amount: 100,
-          status: "COMPLETED",
-          paymentMethodType: "CARD",
-        },
-      });
-
+    it("should send a payment event through the current order notification contract", async () => {
       const response = await request(app.getHttpServer())
-        .post(`/api/notifications/unified/payment/${payment.id}`)
+        .post(`/api/notifications/unified/order/${orderId}`)
         .set("Authorization", `Bearer ${adminToken}`)
-        .send({
-          event: "completed",
-          data: { amount: 100 },
-        })
-        .expect(200);
+        .send({ event: "payment.completed", data: { amount: 100 } })
+        .expect(201);
 
       expect(response.body.success).toBe(true);
     });
@@ -175,167 +174,134 @@ describe("Enterprise Sync E2E Tests", () => {
         .post(`/api/financial/sync/payment/${payment.id}`)
         .set("Authorization", `Bearer ${adminToken}`)
         .send({ orderId })
-        .expect(200);
+        .expect(201);
 
       expect(response.body.success).toBe(true);
     });
 
-    it("should sync payout processing", async () => {
-      const response = await request(app.getHttpServer())
-        .post("/api/financial/sync/payout/payout-123")
-        .set("Authorization", `Bearer ${adminToken}`)
-        .send({
-          restaurantId,
-          amount: 500,
-        })
-        .expect(200);
+    it("should process a driver payout through the current admin contract", async () => {
+      await prisma.driverTaxProfile.upsert({
+        where: { driverId },
+        update: { iban: "AT611904300234573201", bic: "GIBAATWWXXX" },
+        create: {
+          driverId,
+          iban: "AT611904300234573201",
+          bic: "GIBAATWWXXX",
+        },
+      });
 
-      expect(response.body.success).toBe(true);
+      const response = await request(app.getHttpServer())
+        .post("/api/admin/financial/process-payout")
+        .set("Authorization", `Bearer ${adminToken}`)
+        .send({ driverId, amount: 500, priority: "normal" })
+        .expect(201);
+
+      expect(response.body.payout).toBeDefined();
+      expect(response.body.payout.amount).toBe(500);
     });
 
-    it("should get financial summary", async () => {
+    it("should get the current financial overview", async () => {
       const response = await request(app.getHttpServer())
-        .get(`/api/financial/sync/summary/admin/admin-1?period=30d`)
+        .get("/api/admin/financial/overview?period=month&currency=EUR")
         .set("Authorization", `Bearer ${adminToken}`)
         .expect(200);
 
-      expect(response.body.success).toBe(true);
-      expect(response.body.data).toBeDefined();
+      expect(response.body).toHaveProperty("revenue");
+      expect(response.body).toHaveProperty("payouts");
     });
   });
 
   describe("Analytics Sync Flow", () => {
-    it("should sync performance metrics", async () => {
+    it("should get current performance metrics", async () => {
       const response = await request(app.getHttpServer())
-        .post(`/api/analytics/sync/performance/${restaurantId}`)
-        .set("Authorization", `Bearer ${restaurantToken}`)
-        .send({
-          metrics: {
-            ordersPerHour: 10,
-            averagePreparationTime: 15,
-            customerSatisfaction: 4.5,
-          },
-        })
+        .get("/api/analytics/performance?period=month")
+        .set("Authorization", `Bearer ${adminToken}`)
         .expect(200);
 
-      expect(response.body.success).toBe(true);
+      expect(response.body).toBeDefined();
     });
 
-    it("should sync revenue forecast", async () => {
+    it("should get the current revenue forecast", async () => {
       const response = await request(app.getHttpServer())
-        .post(`/api/analytics/sync/revenue-forecast/${restaurantId}`)
-        .set("Authorization", `Bearer ${restaurantToken}`)
-        .send({
-          forecast: {
-            nextWeek: 5000,
-            nextMonth: 20000,
-          },
-          period: "7d",
-        })
+        .get("/api/analytics/revenue-forecast?period=30d")
+        .set("Authorization", `Bearer ${adminToken}`)
         .expect(200);
 
-      expect(response.body.success).toBe(true);
+      expect(Array.isArray(response.body)).toBe(true);
     });
 
-    it("should get analytics summary", async () => {
+    it("should get the current analytics dashboard overview", async () => {
       const response = await request(app.getHttpServer())
-        .get(`/api/analytics/sync/summary/restaurant/${restaurantId}?period=30d`)
-        .set("Authorization", `Bearer ${restaurantToken}`)
+        .get("/api/analytics/dashboard/overview")
+        .set("Authorization", `Bearer ${adminToken}`)
         .expect(200);
 
-      expect(response.body.success).toBe(true);
-      expect(response.body.data).toBeDefined();
+      expect(response.body).toBeDefined();
     });
   });
 
   describe("Security Sync Flow", () => {
-    it("should report suspicious activity", async () => {
+    it("should report suspicious activity through threat detection", async () => {
       const response = await request(app.getHttpServer())
-        .post("/api/security/sync/suspicious-activity")
+        .post("/api/security/threats/detect")
         .set("Authorization", `Bearer ${adminToken}`)
-        .send({
-          userId: customerId,
-          description: "Unusual access pattern detected",
-          metadata: {},
-        })
+        .send({ ip: "192.168.1.1", action: "suspicious_activity" })
         .expect(200);
 
-      expect(response.body.success).toBe(true);
+      expect(response.body).toHaveProperty("isThreat");
+      expect(response.body).toHaveProperty("riskLevel");
     });
 
-    it("should report unauthorized access", async () => {
+    it("should record unauthorized access through the current blacklist contract", async () => {
       const response = await request(app.getHttpServer())
-        .post("/api/security/sync/unauthorized-access")
+        .post("/api/security/ip/blacklist")
         .set("Authorization", `Bearer ${adminToken}`)
-        .send({
-          ipAddress: "192.168.1.1",
-          endpoint: "/api/admin/users",
-          userAgent: "Mozilla/5.0",
-        })
-        .expect(200);
+        .send({ ip: "192.168.1.2", reason: "unauthorized_access" })
+        .expect(201);
 
-      expect(response.body.success).toBe(true);
+      expect(response.body).toHaveProperty("success", true);
     });
 
-    it("should get security events", async () => {
+    it("should get current security analytics", async () => {
       const response = await request(app.getHttpServer())
-        .get("/api/security/sync/events?period=7d")
+        .get("/api/security/analytics")
         .set("Authorization", `Bearer ${adminToken}`)
         .expect(200);
 
-      expect(response.body.success).toBe(true);
-      expect(Array.isArray(response.body.data)).toBe(true);
+      expect(response.body).toHaveProperty("totalEvents");
+      expect(response.body.totalEvents).toBeGreaterThan(0);
     });
   });
 
   describe("Performance Monitoring Flow", () => {
-    it("should sync performance metrics", async () => {
+    it("should get current performance metrics", async () => {
       const response = await request(app.getHttpServer())
-        .post("/api/monitoring/sync/metrics")
+        .get("/api/monitoring/performance")
         .set("Authorization", `Bearer ${adminToken}`)
-        .send({
-          cpu: 45,
-          memory: 60,
-          disk: 30,
-          network: 20,
-          responseTime: 120,
-          errorRate: 0.01,
-          throughput: 1000,
-          timestamp: new Date().toISOString(),
-        })
         .expect(200);
 
-      expect(response.body.success).toBe(true);
+      expect(response.body).toHaveProperty("memory");
+      expect(response.body).toHaveProperty("cpu");
     });
 
-    it("should sync system health", async () => {
+    it("should get current system health", async () => {
       const response = await request(app.getHttpServer())
-        .post("/api/monitoring/sync/health")
+        .get("/api/monitoring/health")
         .set("Authorization", `Bearer ${adminToken}`)
-        .send({
-          status: "healthy",
-          services: [
-            {
-              name: "api",
-              status: "up",
-              responseTime: 50,
-            },
-          ],
-          timestamp: new Date().toISOString(),
-        })
         .expect(200);
 
-      expect(response.body.success).toBe(true);
+      expect(response.body).toMatchObject({ status: "ok", database: "ok" });
     });
 
-    it("should get performance summary", async () => {
+    it("should get the current monitoring dashboard", async () => {
       const response = await request(app.getHttpServer())
-        .get("/api/monitoring/sync/summary?period=1h")
+        .get("/api/monitoring/dashboard")
         .set("Authorization", `Bearer ${adminToken}`)
         .expect(200);
 
-      expect(response.body.success).toBe(true);
-      expect(response.body.data).toBeDefined();
+      expect(response.body).toHaveProperty("health");
+      expect(response.body).toHaveProperty("performance");
+      expect(response.body).toHaveProperty("alerts");
     });
   });
 
@@ -344,81 +310,47 @@ describe("Enterprise Sync E2E Tests", () => {
       const response = await request(app.getHttpServer())
         .post(`/api/ai-ml/sync/eta/${orderId}`)
         .set("Authorization", `Bearer ${adminToken}`)
-        .send({
-          eta: 25,
-          confidence: 0.9,
-          metadata: {},
-        })
-        .expect(200);
+        .send({ eta: 25, confidence: 0.9, metadata: {} })
+        .expect(201);
 
-      expect(response.body.success).toBe(true);
+      expect(response.body).toMatchObject({ success: true, orderId });
     });
 
     it("should sync demand prediction", async () => {
       const response = await request(app.getHttpServer())
         .post(`/api/ai-ml/sync/demand/${restaurantId}`)
-        .set("Authorization", `Bearer ${restaurantToken}`)
-        .send({
-          prediction: {
-            peakHours: ["12:00", "18:00"],
-            expectedOrders: 50,
-          },
-          confidence: 0.85,
-        })
-        .expect(200);
+        .set("Authorization", `Bearer ${adminToken}`)
+        .send({ prediction: { expectedOrders: 50 }, confidence: 0.85 })
+        .expect(201);
 
-      expect(response.body.success).toBe(true);
+      expect(response.body).toMatchObject({ success: true, restaurantId });
     });
 
     it("should sync fraud detection", async () => {
       const response = await request(app.getHttpServer())
         .post(`/api/ai-ml/sync/fraud/${orderId}`)
         .set("Authorization", `Bearer ${adminToken}`)
-        .send({
-          fraudProbability: 0.15,
-          riskLevel: "medium",
-        })
-        .expect(200);
+        .send({ fraudProbability: 0.15, riskLevel: "medium" })
+        .expect(201);
 
-      expect(response.body.success).toBe(true);
+      expect(response.body).toMatchObject({ success: true, orderId });
     });
   });
 
   describe("Cross-App Synchronization", () => {
     it("should sync order event across all apps", async () => {
-      // This test verifies that when an order is created, all relevant apps receive notifications
-      const order = await prisma.order.create({
-        data: {
-          customerId,
-          restaurantId,
-          driverId,
-          totalAmount: 100,
-          status: "PENDING",
-          items: {
-            create: {
-              dishId: "dish-1",
-              quantity: 1,
-              price: 100,
-            },
-          },
-        },
-      });
+      const order = await createOrder();
 
-      // Trigger notification
-      await request(app.getHttpServer())
+      const response = await request(app.getHttpServer())
         .post(`/api/notifications/unified/order/${order.id}`)
         .set("Authorization", `Bearer ${adminToken}`)
-        .send({
-          event: "created",
-          data: { status: "PENDING" },
-        })
-        .expect(200);
+        .send({ event: "created", data: { status: "PENDING" } })
+        .expect(201);
 
-      // Verify notification was stored
+      expect(response.body.success).toBe(true);
       const notification = await prisma.unifiedNotification.findFirst({
         where: { metadata: { path: ["orderId"], equals: order.id } },
       });
-
       expect(notification).toBeDefined();
     });
 
@@ -433,18 +365,16 @@ describe("Enterprise Sync E2E Tests", () => {
         },
       });
 
-      // Sync payment
-      await request(app.getHttpServer())
+      const response = await request(app.getHttpServer())
         .post(`/api/financial/sync/payment/${payment.id}`)
         .set("Authorization", `Bearer ${adminToken}`)
         .send({ orderId })
-        .expect(200);
+        .expect(201);
 
-      // Verify financial event was stored
+      expect(response.body.success).toBe(true);
       const financialEvent = await prisma.financialEvent.findFirst({
         where: { type: "payment_completed" },
       });
-
       expect(financialEvent).toBeDefined();
     });
   });

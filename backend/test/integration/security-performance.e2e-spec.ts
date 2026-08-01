@@ -1,8 +1,9 @@
 import { Test, TestingModule } from "@nestjs/testing";
 import { INestApplication } from "@nestjs/common";
 import * as request from "supertest";
-import { AppModule } from "../../src/app.module";
+import { AppModuleE2E } from "../../src/app.module.e2e";
 import { getTestEmail, getTestPassword } from "../utils/test-credentials";
+import { configureHttpApplication } from "../../src/common/bootstrap/configure-http-app";
 
 describe("Security Performance E2E", () => {
   let app: INestApplication;
@@ -10,10 +11,11 @@ describe("Security Performance E2E", () => {
 
   beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
-      imports: [AppModule],
+      imports: [AppModuleE2E],
     }).compile();
 
     app = moduleFixture.createNestApplication();
+    configureHttpApplication(app);
     await app.init();
 
     // Get admin token for authenticated tests

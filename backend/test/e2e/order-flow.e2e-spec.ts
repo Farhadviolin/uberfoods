@@ -1,7 +1,8 @@
 import { Test, TestingModule } from "@nestjs/testing";
-import { INestApplication, ValidationPipe } from "@nestjs/common";
+import { INestApplication } from "@nestjs/common";
 import * as request from "supertest";
 import { AppModuleE2E } from "../../src/app.module.e2e";
+import { configureHttpApplication } from "../../src/common/bootstrap/configure-http-app";
 
 describe("Order Flow E2E", () => {
   let app: INestApplication;
@@ -24,22 +25,7 @@ describe("Order Flow E2E", () => {
       credentials: true,
     });
 
-    // Global validation pipe
-    app.useGlobalPipes(
-      new ValidationPipe({
-        whitelist: true,
-        forbidNonWhitelisted: true,
-        transform: true,
-      }),
-    );
-
-    // API prefix
-    app.setGlobalPrefix("api");
-
-    // Health check endpoint like in main.e2e.ts
-    app.getHttpAdapter().get("/api/health", (req, res) => {
-      res.json({ status: "ok", timestamp: new Date().toISOString() });
-    });
+    configureHttpApplication(app);
 
     await app.init();
   });

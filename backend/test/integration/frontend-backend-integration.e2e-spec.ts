@@ -1,5 +1,5 @@
 import { Test, TestingModule } from "@nestjs/testing";
-import { INestApplication, ValidationPipe } from "@nestjs/common";
+import { INestApplication } from "@nestjs/common";
 import * as request from "supertest";
 import { AppModuleE2E } from "../../src/app.module.e2e";
 import {
@@ -7,6 +7,7 @@ import {
   getTestPassword,
   getTestToken,
 } from "../utils/test-credentials";
+import { configureHttpApplication } from "../../src/common/bootstrap/configure-http-app";
 
 /**
  * Frontend-Backend Integration Tests
@@ -65,14 +66,7 @@ describe("Frontend-Backend Integration (e2e)", () => {
 
     app = moduleFixture.createNestApplication();
 
-    app.setGlobalPrefix("api");
-    app.useGlobalPipes(
-      new ValidationPipe({
-        whitelist: true,
-        transform: true,
-        forbidNonWhitelisted: true,
-      }),
-    );
+    configureHttpApplication(app);
 
     await app.init();
   });

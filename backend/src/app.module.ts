@@ -15,6 +15,7 @@ import { AnalyticsModule } from "./modules/analytics/analytics.module";
 import { InventoryModule } from "./modules/inventory/inventory.module";
 import { AutomationModule } from "./modules/automation/automation.module";
 import { ReportingModule } from "./modules/reporting/reporting.module";
+import { SearchModule } from "./modules/search/search.module";
 
 // Common Modules
 import { HealthModule } from "./common/health/health.module";
@@ -50,6 +51,7 @@ import { AuditLedgerService } from "./common/audit/audit-ledger.service";
     DriverModule,
     AdminModule,
     RestaurantModule,
+    SearchModule,
     SocialMediaModule,
     AnalyticsModule,
     InventoryModule,

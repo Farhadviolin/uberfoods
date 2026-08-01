@@ -1,9 +1,9 @@
 import { NestFactory } from "@nestjs/core";
-import { ValidationPipe } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { SwaggerModule, DocumentBuilder } from "@nestjs/swagger";
 import { SocketIOAdapter } from "./common/adapters/socket-io.adapter";
 import { AppModule } from "./app.module";
+import { configureHttpApplication } from "./common/bootstrap/configure-http-app";
 import { HttpExceptionFilter } from "./common/filters/http-exception.filter";
 import * as helmet from "helmet";
 import * as express from "express";
@@ -143,7 +143,7 @@ async function bootstrap() {
   app.useWebSocketAdapter(new RedisSocketAdapter(app, redisUrl, corsOrigins));
 
   // Globaler API Prefix - alle Routen werden mit /api prefixiert
-  app.setGlobalPrefix("api");
+  configureHttpApplication(app);
   app.enableCors(createHttpCorsOptions(corsOrigins));
 
   // Security Headers (Helmet) mit Stripe-kompatibler CSP (gehärtet: ohne unsafe-eval)
@@ -222,18 +222,6 @@ async function bootstrap() {
   const { LoggingInterceptor } =
     await import("./common/interceptors/logging.interceptor");
   app.useGlobalInterceptors(new LoggingInterceptor());
-
-  // Validation mit Sanitization
-  app.useGlobalPipes(
-    new ValidationPipe({
-      whitelist: true,
-      transform: true,
-      forbidNonWhitelisted: true,
-      transformOptions: {
-        enableImplicitConversion: true,
-      },
-    }),
-  );
 
   // Raw Body für Stripe Webhooks
   app.use("/api/payment/webhook", express.raw({ type: "application/json" }));
