@@ -199,10 +199,13 @@ export class JwtAuthGuard extends AuthGuard("jwt") {
     }
 
     // Check if user is active (skip in dev mode, or for drivers in E2E testing)
+    const isDriverUser = user.role?.toLowerCase() === "driver";
     const userStatus =
-      user.currentStatus ||
-      user.status ||
-      (user.isActive === true ? "ACTIVE" : undefined);
+      isDriverUser && user.isActive === true
+        ? "ACTIVE"
+        : user.currentStatus ||
+          user.status ||
+          (user.isActive === true ? "ACTIVE" : undefined);
     const skipStatusCheck =
       allowDevAuth || (nodeEnv !== "production" && user.role === "driver");
     if (
