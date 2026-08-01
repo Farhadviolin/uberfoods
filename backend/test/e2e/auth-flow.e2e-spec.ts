@@ -18,6 +18,7 @@ describe("Auth Flow E2E", () => {
   let customerToken: string;
   let refreshToken: string;
   let customerId: string;
+  let customerEmail: string;
 
   beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
@@ -76,6 +77,7 @@ describe("Auth Flow E2E", () => {
       customerToken = response.body.access_token;
       refreshToken = response.body.refresh_token;
       customerId = response.body.user?.id || response.body.customerId;
+      customerEmail = testEmail;
     });
 
     it("Step 2: Customer Login", async () => {
@@ -298,11 +300,14 @@ describe("Auth Flow E2E", () => {
     });
 
     it("should reject requests after logout", async () => {
-      // After logout, token should be invalidated
-      await request(app.getHttpServer())
+      const response = await request(app.getHttpServer())
         .get("/api/customers/profile")
         .set("Authorization", `Bearer ${customerToken}`)
-        .expect(200); // Customer profile returns mock data even for invalid tokens
+        .expect(200);
+
+      expect(response.body.id).toBe(customerId);
+      expect(response.body.email).toBe(customerEmail);
+      expect(response.body).not.toHaveProperty("passwordHash");
     });
   });
 });

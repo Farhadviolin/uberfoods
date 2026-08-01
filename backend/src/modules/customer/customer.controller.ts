@@ -11,9 +11,12 @@ import {
   Query,
   Headers,
   Param,
+  UnauthorizedException,
 } from "@nestjs/common";
 import { ApiTags, ApiBearerAuth, ApiOperation } from "@nestjs/swagger";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
+import { RolesGuard } from "../auth/guards/roles.guard";
+import { Roles } from "../../common/decorators/roles.decorator";
 import { PrismaService } from "../../prisma/prisma.service";
 import { CustomerService } from "./customer.service";
 
@@ -36,53 +39,42 @@ export class CustomerController {
   ) {}
 
   @Get("profile")
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles("CUSTOMER")
+  @ApiBearerAuth()
   @ApiOperation({ summary: "Get customer profile" })
-  async getProfile(
-    @Request() req: AuthenticatedRequest,
-    @Query("userId") userIdQuery?: string,
-    @Headers("x-user-id") userIdHeader?: string,
-  ) {
-    // For E2E testing, accept user ID from query param or header
-    const userId = userIdQuery || userIdHeader || req.user?.sub || req.user?.id;
-
-    if (userId) {
-      // Try to find real customer first
-      const customer = await this.prisma.customer.findUnique({
-        where: { id: userId },
-        select: {
-          id: true,
-          email: true,
-          name: true,
-          firstName: true,
-          lastName: true,
-          phone: true,
-          address: true,
-          createdAt: true,
-          updatedAt: true,
-          isActive: true,
-          emailVerified: true,
-        },
-      });
-
-      if (customer) {
-        return customer;
-      }
+  async getProfile(@Request() req: AuthenticatedRequest) {
+    const customerId = req.user?.sub || req.user?.id;
+    if (!customerId) {
+      throw new UnauthorizedException("Customer identity not found");
     }
 
-    // For E2E testing, return mock data if no real customer found
-    return {
-      id: userId || "test-user-123",
-      email: "test@example.com",
-      name: "Test Customer",
-      firstName: "Test",
-      lastName: "Customer",
-      phone: "+1234567890",
-      address: "Test Address",
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      isActive: true,
-      emailVerified: true,
-    };
+    const customer = await this.prisma.customer.findUnique({
+      where: { id: customerId },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        firstName: true,
+        lastName: true,
+        phone: true,
+        address: true,
+        createdAt: true,
+        updatedAt: true,
+        isActive: true,
+        emailVerified: true,
+      },
+    });
+
+    if (!customer) {
+      throw new UnauthorizedException("Customer not found");
+    }
+
+    if (!customer.isActive) {
+      throw new UnauthorizedException("Account is inactive");
+    }
+
+    return customer;
   }
 
   @Put("profile")
