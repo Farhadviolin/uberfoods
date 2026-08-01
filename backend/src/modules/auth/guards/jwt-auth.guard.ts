@@ -199,6 +199,10 @@ export class JwtAuthGuard extends AuthGuard("jwt") {
     }
 
     // Check if user is active (skip in dev mode, or for drivers in E2E testing)
+    if (user.isActive === false) {
+      throw new UnauthorizedException("Account is inactive");
+    }
+
     const isDriverUser = user.role?.toLowerCase() === "driver";
     const userStatus =
       isDriverUser && user.isActive === true

@@ -1,8 +1,8 @@
 import { Test, TestingModule } from "@nestjs/testing";
 import { INestApplication } from "@nestjs/common";
+import { JwtService } from "@nestjs/jwt";
 import * as request from "supertest";
 import {
-  getExpiredTestToken,
   getTestEmail,
   getTestPassword,
   getTestToken,
@@ -14,6 +14,7 @@ import { configureHttpApplication } from "../../src/common/bootstrap/configure-h
 describe("Auth Flow E2E", () => {
   let app: INestApplication;
   let prisma: PrismaService;
+  let jwtService: JwtService;
   let customerToken: string;
   let refreshToken: string;
   let customerId: string;
@@ -25,6 +26,7 @@ describe("Auth Flow E2E", () => {
 
     app = moduleFixture.createNestApplication();
     prisma = app.get(PrismaService);
+    jwtService = app.get(JwtService);
 
     // Configure CORS like in main.e2e.ts
     app.enableCors({
@@ -106,35 +108,113 @@ describe("Auth Flow E2E", () => {
     });
 
     it("Step 4: Access Protected Route with Token", async () => {
-      // For E2E testing, use a fixed user ID since auth flow setup is complex
-      const testUserId = "test-user-123";
-
       const response = await request(app.getHttpServer())
-        .get("/api/customers/profile")
-        .query({ userId: testUserId })
-        .expect(200); // Customer profile returns 200 OK
+        .get("/api/orders")
+        .set("Authorization", `Bearer ${customerToken}`)
+        .expect(200); // Authenticated customer order list
 
       expect(response.body).toBeDefined();
     });
 
     it("Step 5: Invalid Token Rejection", async () => {
       await request(app.getHttpServer())
-        .get("/api/customers/profile")
-        .set(
-          "Authorization",
-          `Bearer ${getTestToken("TEST_INVALID_TOKEN", "invalid")}`,
-        )
-        .expect(200); // Customer profile returns mock data even for invalid tokens
+        .get("/api/orders")
+        .set("Authorization", "Bearer not-a-jwt")
+        .expect(401);
     });
 
-    it("Step 6: Expired Token Handling", async () => {
-      // Use an expired token (mock scenario) - this is a test-only JWT token, not a real credential
-      const expiredToken = getExpiredTestToken();
+    it("Step 6: Rejects a cryptographically valid but expired JWT", async () => {
+      const serverNow = Math.floor(Date.now() / 1000);
+      const expiredToken = jwtService.sign(
+        {
+          sub: customerId || "expired-jwt-test-user",
+          email: testEmail,
+          role: "customer",
+          type: "CUSTOMER",
+        },
+        { expiresIn: -120 },
+      );
+      const claims = jwtService.decode(expiredToken) as {
+        iat?: number;
+        exp?: number;
+      };
+      const issuedAt = claims.iat;
+      const expiresAt = claims.exp;
+
+      expect(issuedAt).toEqual(expect.any(Number));
+      expect(expiresAt).toEqual(expect.any(Number));
+      expect(expiresAt).toBeLessThan(serverNow - 60);
+      expect(expiresAt).toBeLessThan(issuedAt as number);
+      console.log(
+        `[JWT-EXPIRY-DIAGNOSTIC] now=${serverNow} iat=${issuedAt} exp=${expiresAt} delta=${(expiresAt as number) - serverNow}`,
+      );
 
       await request(app.getHttpServer())
-        .get("/api/customers/profile")
+        .get("/api/orders")
         .set("Authorization", `Bearer ${expiredToken}`)
-        .expect(200); // Customer profile returns mock data even for invalid tokens
+        .expect(401);
+    });
+
+    it("Step 7: Rejects a JWT signed with the wrong secret", async () => {
+      const wrongSecretToken = new JwtService({
+        secret: "jwt-expiry-negative-test-wrong-secret",
+      }).sign({
+        sub: customerId || "wrong-signature-test-user",
+        email: testEmail,
+        role: "customer",
+        type: "CUSTOMER",
+      });
+
+      await request(app.getHttpServer())
+        .get("/api/orders")
+        .set("Authorization", `Bearer ${wrongSecretToken}`)
+        .expect(401);
+    });
+
+    it("Step 8: Rejects a valid JWT for an unknown database identity", async () => {
+      const unknownIdentityToken = jwtService.sign({
+        sub: "unknown-expiry-test-user",
+        email: "unknown-expiry-test@example.test",
+        role: "customer",
+        type: "CUSTOMER",
+      });
+
+      await request(app.getHttpServer())
+        .get("/api/orders")
+        .set("Authorization", `Bearer ${unknownIdentityToken}`)
+        .expect(401);
+    });
+
+    it("Step 9: Rejects a valid JWT for a deactivated customer", async () => {
+      const customer = await prisma.customer.findUnique({
+        where: { id: customerId },
+        select: { isActive: true },
+      });
+      expect(customer).not.toBeNull();
+
+      await prisma.customer.update({
+        where: { id: customerId },
+        data: { isActive: false },
+      });
+
+      try {
+        const deactivatedToken = jwtService.sign({
+          sub: customerId,
+          email: testEmail,
+          role: "customer",
+          type: "CUSTOMER",
+        });
+
+        await request(app.getHttpServer())
+          .get("/api/orders")
+          .set("Authorization", `Bearer ${deactivatedToken}`)
+          .expect(401);
+      } finally {
+        await prisma.customer.update({
+          where: { id: customerId },
+          data: { isActive: customer?.isActive ?? true },
+        });
+      }
     });
   });
 
