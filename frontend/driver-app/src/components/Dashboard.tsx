@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useCallback, Suspense, lazy } from 'react';
+import { useNavigate } from 'react-router-dom';
 import api from '../utils/api';
 import { logger } from '../utils/logger';
 import { useAuth } from '../contexts/AuthContext';
@@ -60,7 +61,8 @@ type DriverStatus = 'online' | 'offline' | 'on_break';
 type ViewType = 'dashboard' | 'orders' | 'map' | 'navigation' | 'earnings' | 'ratings' | 'shift' | 'documents' | 'notifications' | 'settings' | 'expenses' | 'history' | 'help' | 'emergency_intelligence' | 'performance_analytics' | 'meta_glasses' | 'gamification' | 'referral' | 'subscription';
 
 export function Dashboard() {
-  const { driver } = useAuth();
+  const { driver, logout } = useAuth();
+  const navigate = useNavigate();
   const { t, i18n } = useTranslation();
   // ✅ WICHTIG: Stabilisiere driverId mit useMemo - verhindert unnötige Re-Renders
   const driverId = useMemo(() => driver?.id || null, [driver?.id]);
@@ -703,6 +705,10 @@ export function Dashboard() {
   };
 
   const locale = i18n.language || 'de-DE';
+  const handleLogout = useCallback(() => {
+    logout();
+    navigate('/login', { replace: true });
+  }, [logout, navigate]);
 
   return (
     <div className="app-layout" data-testid="driver-dashboard">
@@ -783,6 +789,14 @@ export function Dashboard() {
           <div className="header-actions">
             <LanguageSwitcher />
             <ThemeToggle />
+            <button
+              type="button"
+              className="logout-button"
+              data-testid="driver-logout"
+              onClick={handleLogout}
+            >
+              {t('auth.logout', { defaultValue: 'Abmelden' })}
+            </button>
             <button
               onClick={toggleDriverStatus}
               className={`status-indicator ${driverStatus === 'online' ? 'connected' : 'disconnected'}`}

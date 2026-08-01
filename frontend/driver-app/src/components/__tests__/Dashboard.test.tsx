@@ -1,4 +1,5 @@
-import { screen, waitFor } from '@testing-library/react';
+import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { Route, Routes } from 'react-router-dom';
 import { renderWithProviders } from '../../test-utils';
 import api from '../../utils/api';
 import { Dashboard } from '../Dashboard';
@@ -59,8 +60,14 @@ describe('Dashboard Component', () => {
     localStorage.clear();
     jest.clearAllMocks();
     localStorage.setItem('driver_token', 'test-token');
+    localStorage.setItem('driver_data', JSON.stringify(driver));
     localStorage.setItem('driver_user', JSON.stringify(driver));
-    mockedApi.get.mockResolvedValue({ data: [] });
+    mockedApi.get.mockImplementation(async (url) => {
+      if (url === '/auth/me') {
+        return { data: { id: driver.id, role: 'driver', isActive: true } } as never;
+      }
+      return { data: [] } as never;
+    });
   });
 
   afterEach(() => localStorage.clear());
@@ -78,7 +85,12 @@ describe('Dashboard Component', () => {
   });
 
   it('shows a load error when both order feeds fail', async () => {
-    mockedApi.get.mockRejectedValue(new Error('backend unavailable'));
+    mockedApi.get.mockImplementation(async (url) => {
+      if (url === '/auth/me') {
+        return { data: { id: driver.id, role: 'driver', isActive: true } } as never;
+      }
+      throw new Error('backend unavailable');
+    });
 
     renderWithProviders(<Dashboard />);
 
@@ -86,5 +98,23 @@ describe('Dashboard Component', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'Fehler beim Laden der Bestellungen. Bitte versuchen Sie es später erneut.',
     );
+  });
+
+  it('provides a visible accessible logout that navigates to login', async () => {
+    renderWithProviders(
+      <Routes>
+        <Route path="/" element={<Dashboard />} />
+        <Route path="/login" element={<div>Loginseite</div>} />
+      </Routes>,
+    );
+
+    const logout = await screen.findByRole('button', { name: 'Abmelden' });
+    expect(logout).toBeVisible();
+    fireEvent.click(logout);
+
+    expect(await screen.findByText('Loginseite')).toBeInTheDocument();
+    expect(localStorage.getItem('driver_token')).toBeNull();
+    expect(localStorage.getItem('driver_data')).toBeNull();
+    expect(localStorage.getItem('driver_user')).toBeNull();
   });
 });

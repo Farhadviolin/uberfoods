@@ -38,6 +38,15 @@ describe('driver auth session contract', () => {
     expect(() => parseDriverAuthEnvelope(response)).toThrow();
   });
 
+  it('normalizes the backend driver profile when role is only carried by the JWT', () => {
+    const { role: _role, ...backendDriver } = driver;
+
+    expect(parseDriverAuthEnvelope({
+      access_token: 'access-token',
+      user: backendDriver,
+    }).driver).toEqual({ ...backendDriver, role: 'driver' });
+  });
+
   it('rejects incomplete persisted driver data', () => {
     expect(isDriver({ id: driver.id, email: driver.email, name: driver.name })).toBe(false);
   });

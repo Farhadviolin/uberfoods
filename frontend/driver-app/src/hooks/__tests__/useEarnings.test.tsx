@@ -26,8 +26,12 @@ describe('driver earnings contract', () => {
     localStorage.clear();
     jest.clearAllMocks();
     localStorage.setItem('driver_token', 'test-token');
+    localStorage.setItem('driver_data', JSON.stringify(driver));
     localStorage.setItem('driver_user', JSON.stringify(driver));
     mockedApi.get.mockImplementation(async (url) => {
+      if (url === '/auth/me') {
+        return { data: { id: driver.id, role: 'driver', isActive: true } } as never;
+      }
       if (url === '/drivers/driver-123/earnings?period=day') {
         return {
           data: { today: 100, week: 500, month: 2000, total: 5000 },

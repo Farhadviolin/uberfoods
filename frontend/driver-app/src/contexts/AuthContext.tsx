@@ -2,7 +2,14 @@ import { createContext, useContext, useState, useEffect, useCallback, ReactNode 
 import api from '../utils/api';
 import { logger } from '../utils/logger';
 import { Driver } from '../types';
-import { isDriver, isUsableToken, parseDriverAuthEnvelope } from '../utils/authSession';
+import {
+  clearDriverAuthArtifacts,
+  DRIVER_AUTH_RESET_EVENT,
+  isDriver,
+  parseDriverAuthEnvelope,
+  readPersistedDriverSession,
+} from '../utils/authSession';
+import { markDriverSessionActive } from '../utils/api';
 
 // ECHTE JWT-AUTHENTIFIZIERUNG - KEINE MOCK-DATEN MEHR
 
@@ -26,36 +33,52 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [mustChangePassword, setMustChangePassword] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    // ECHTE JWT-AUTHENTIFIZIERUNG - Token aus localStorage laden
-    const storedToken = localStorage.getItem('driver_token');
-    const storedDriver = localStorage.getItem('driver_data') || localStorage.getItem('driver_user');
-
-    if (isUsableToken(storedToken) && storedDriver) {
-      try {
-        const driverData = JSON.parse(storedDriver) as unknown;
-        if (!isDriver(driverData)) throw new Error('Invalid stored driver');
-        setDriver(driverData);
-        setToken(storedToken);
-        // Token in API-Headers setzen
-        api.defaults.headers.common['Authorization'] = `Bearer ${storedToken}`;
-        localStorage.setItem('driver_data', JSON.stringify(driverData));
-        localStorage.setItem('driver_user', JSON.stringify(driverData));
-      } catch (error) {
-        logger.error('Fehler beim Laden der gespeicherten Auth-Daten', 'AuthContext', error);
-        localStorage.removeItem('driver_token');
-        localStorage.removeItem('driver_data');
-        localStorage.removeItem('driver_user');
-      }
-    } else {
-      localStorage.removeItem('driver_token');
-      localStorage.removeItem('driver_refresh_token');
-      localStorage.removeItem('driver_data');
-      localStorage.removeItem('driver_user');
-    }
-
-    setLoading(false);
+  const clearSession = useCallback(() => {
+    clearDriverAuthArtifacts();
+    delete api.defaults.headers.common['Authorization'];
+    setToken(null);
+    setDriver(null);
+    setMustChangePassword(false);
   }, []);
+
+  useEffect(() => {
+    const handleAuthReset = () => clearSession();
+    window.addEventListener(DRIVER_AUTH_RESET_EVENT, handleAuthReset);
+
+    const hydrate = async () => {
+      const persisted = readPersistedDriverSession();
+      if (!persisted) {
+        clearSession();
+        setLoading(false);
+        return;
+      }
+
+      api.defaults.headers.common['Authorization'] = `Bearer ${persisted.accessToken}`;
+      try {
+        const response = await api.get('/auth/me');
+        const serverIdentity = response.data?.data || response.data;
+        if (
+          !isDriver({ ...persisted.driver, ...serverIdentity }) ||
+          serverIdentity.id !== persisted.driver.id ||
+          serverIdentity.isActive !== true
+        ) {
+          throw new Error('Ungültige serverseitige Fahrer-Identität');
+        }
+        localStorage.setItem('driver_data', JSON.stringify(persisted.driver));
+        localStorage.setItem('driver_user', JSON.stringify(persisted.driver));
+        setDriver(persisted.driver);
+        setToken(persisted.accessToken);
+        setMustChangePassword(persisted.driver.mustChangePassword === true);
+      } catch {
+        clearSession();
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    void hydrate();
+    return () => window.removeEventListener(DRIVER_AUTH_RESET_EVENT, handleAuthReset);
+  }, [clearSession]);
 
   const login = async (email: string, password: string) => {
     try {
@@ -65,6 +88,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
 
       const session = parseDriverAuthEnvelope(response.data);
+      markDriverSessionActive();
       localStorage.setItem('driver_token', session.accessToken);
       if (session.refreshToken) {
         localStorage.setItem('driver_refresh_token', session.refreshToken);
@@ -102,13 +126,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const logout = () => {
-    localStorage.removeItem('driver_token');
-    localStorage.removeItem('driver_refresh_token');
-    localStorage.removeItem('driver_data');
-    localStorage.removeItem('driver_user');
-    delete api.defaults.headers.common['Authorization'];
-    setToken(null);
-    setDriver(null);
+    clearSession();
   };
 
   const updateLocation = useCallback(async (lat: number, lng: number) => {
@@ -147,7 +165,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         login,
         logout,
         changePassword,
-        isAuthenticated: isUsableToken(token) && isDriver(driver),
+        isAuthenticated: Boolean(token) && isDriver(driver),
         loading,
         updateLocation,
       }}

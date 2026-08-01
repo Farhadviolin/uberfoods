@@ -1,6 +1,8 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
+const driverApiProxyTarget = process.env.DRIVER_API_PROXY_TARGET || 'http://localhost:3000';
+
 export default defineConfig({
   plugins: [
     react(),
@@ -31,13 +33,13 @@ export default defineConfig({
     },
     proxy: {
       '/api': {
-        target: 'http://localhost:3000',
+        target: driverApiProxyTarget,
         changeOrigin: true,
         secure: false, // Für Development
         ws: false, // Kein WebSocket für API
       },
       '/socket.io': {
-        target: 'http://localhost:3000',
+        target: driverApiProxyTarget,
         changeOrigin: true,
         ws: true, // WebSocket Support
         secure: false, // Für Development

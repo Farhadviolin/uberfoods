@@ -3,6 +3,7 @@ import { io, Socket } from 'socket.io-client';
 import { config } from '../config';
 import { Order } from '../types';
 import { logger } from '../utils/logger';
+import { resetDriverAuthSession } from '../utils/authSession';
 import { useAppState } from '../services/stateManager';
 
 // Socket.IO benötigt HTTP/HTTPS URL, NICHT WebSocket URL!
@@ -572,14 +573,8 @@ export function useWebSocket(
       ) {
         logError('❌ WebSocket authentication failed');
         setConnectionError('Authentifizierung fehlgeschlagen. Bitte melden Sie sich erneut an.');
-        // Token entfernen und zu Login weiterleiten
-        localStorage.removeItem('driver_token');
-        localStorage.removeItem('driver_user');
-        if (!window.location.pathname.includes('/login')) {
-          setTimeout(() => {
-            window.location.href = '/login';
-          }, 2000);
-        }
+        // Zentralen Auth-Reset verwenden, damit Context und alle Storage-Keys synchron bleiben.
+        resetDriverAuthSession();
       } else {
         setConnectionError('WebSocket-Verbindung fehlgeschlagen. App funktioniert im Offline-Modus.');
       }

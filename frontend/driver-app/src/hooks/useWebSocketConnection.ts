@@ -7,6 +7,7 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { config } from '../config';
 import { logger } from '../utils/logger';
+import { resetDriverAuthSession } from '../utils/authSession';
 
 const getWebSocketUrl = (url: string, isDevelopment: boolean): string => {
   if (url.startsWith('ws://')) {
@@ -195,13 +196,7 @@ export function useWebSocketConnection({
           errorMessage.includes('Unauthorized') || 
           errorMessage.includes('token')) {
         setConnectionError('Authentifizierung fehlgeschlagen. Bitte melden Sie sich erneut an.');
-        localStorage.removeItem('driver_token');
-        localStorage.removeItem('driver_user');
-        if (!window.location.pathname.includes('/login')) {
-          setTimeout(() => {
-            window.location.href = '/login';
-          }, 2000);
-        }
+        resetDriverAuthSession();
       } else {
         setConnectionError('WebSocket-Verbindung fehlgeschlagen. App funktioniert im Offline-Modus.');
       }

@@ -1,6 +1,6 @@
 import axios, { AxiosError } from 'axios';
 import { offlineService } from '../services/offline';
-import { parseDriverAuthEnvelope } from './authSession';
+import { parseDriverAuthEnvelope, resetDriverAuthSession } from './authSession';
 
 // Global Toast Registry für automatische Error-Toasts
 let globalToastFunction: ((message: string, type: 'success' | 'error' | 'info' | 'warning') => void) | null = null;
@@ -24,6 +24,7 @@ const api = axios.create({
 
 // Token Refresh State Management
 let isRefreshing = false;
+let authResetInProgress = false;
 let failedQueue: Array<{
   resolve: (value?: any) => void;
   reject: (error?: any) => void;
@@ -38,6 +39,20 @@ const processQueue = (error: any, token: string | null = null) => {
     }
   });
   failedQueue = [];
+};
+
+export function markDriverSessionActive(): void {
+  authResetInProgress = false;
+}
+
+const resetAfterAuthFailure = (error: unknown) => {
+  processQueue(error, null);
+  isRefreshing = false;
+  if (!authResetInProgress) {
+    authResetInProgress = true;
+    resetDriverAuthSession();
+  }
+  return Promise.reject(error);
 };
 
 // Request Interceptor - fügt Token hinzu
@@ -117,17 +132,7 @@ api.interceptors.response.use(
 
       const refreshToken = localStorage.getItem('driver_refresh_token');
       if (!refreshToken) {
-        // Kein Refresh Token - logout
-        processQueue(error, null);
-        isRefreshing = false;
-        if (!window.location.pathname.includes('/login')) {
-          localStorage.removeItem('driver_token');
-          localStorage.removeItem('driver_refresh_token');
-          localStorage.removeItem('driver_user');
-          delete api.defaults.headers.common['Authorization'];
-          window.location.href = '/login';
-        }
-        return Promise.reject(error);
+        return resetAfterAuthFailure(error);
       }
 
       try {
@@ -150,31 +155,11 @@ api.interceptors.response.use(
 
         return api(originalRequest);
       } catch (refreshError) {
-        // Refresh failed - logout
-        processQueue(refreshError, null);
-        isRefreshing = false;
-        if (!window.location.pathname.includes('/login')) {
-          localStorage.removeItem('driver_token');
-          localStorage.removeItem('driver_refresh_token');
-          localStorage.removeItem('driver_user');
-          delete api.defaults.headers.common['Authorization'];
-          window.location.href = '/login';
-        }
-        return Promise.reject(refreshError);
+        return resetAfterAuthFailure(refreshError);
       }
     }
 
-    // Handle andere Auth Errors
-    if (status === 403 || status === 401) {
-      // Nur redirecten wenn nicht bereits auf Login-Seite - verhindert Redirect-Loop
-      if (!window.location.pathname.includes('/login')) {
-        localStorage.removeItem('driver_token');
-        localStorage.removeItem('driver_refresh_token');
-        localStorage.removeItem('driver_user');
-        delete api.defaults.headers.common['Authorization'];
-        window.location.href = '/login';
-      }
-    }
+    // 403 is a real authorization decision for an otherwise valid session.
 
     // Automatische Toast-Anzeige für bestimmte Fehler (außer Auth-Fehler)
     if (globalToastFunction && status && status >= 400 && status !== 401 && status !== 403) {
