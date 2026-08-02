@@ -53,6 +53,7 @@ async function main() {
   const restaurant2 = await prisma.restaurant.upsert({
     where: { email: 'burger-kingdom@example.com' },
     update: {
+      password: hashedRestaurantPassword,
       isActive: true,
       status: 'OPEN',
     },
@@ -62,6 +63,7 @@ async function main() {
       address: 'Friedrichstraße 45, 10117 Berlin',
       phone: '+49 30 87654321',
       email: 'burger-kingdom@example.com',
+      password: hashedRestaurantPassword,
       imageUrl: null,
       isActive: true,
       status: 'OPEN', // Explicitly set status for /restaurants/public endpoint
@@ -71,6 +73,7 @@ async function main() {
   const restaurant3 = await prisma.restaurant.upsert({
     where: { email: 'sushi-master@example.com' },
     update: {
+      password: hashedRestaurantPassword,
       isActive: true,
       status: 'OPEN',
     },
@@ -80,6 +83,7 @@ async function main() {
       address: 'Kurfürstendamm 78, 10707 Berlin',
       phone: '+49 30 11223344',
       email: 'sushi-master@example.com',
+      password: hashedRestaurantPassword,
       imageUrl: null,
       isActive: true,
       status: 'OPEN', // Explicitly set status for /restaurants/public endpoint

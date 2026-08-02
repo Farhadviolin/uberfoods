@@ -4,6 +4,11 @@ import { AppModuleE2E } from "./app.module.e2e";
 import { configureHttpApplication } from "./common/bootstrap/configure-http-app";
 import * as dotenv from "dotenv";
 import { resolve } from "path";
+import {
+  createHttpCorsOptions,
+  resolveCorsOrigins,
+} from "./common/config/cors.config";
+import { RedisSocketAdapter } from "./common/adapters/redis-socket.adapter";
 
 // Fatal error handlers - CRASH on errors to fail E2E tests properly
 process.on("unhandledRejection", (error) => {
@@ -54,7 +59,7 @@ function loadE2EEnv() {
 
   for (const candidate of candidates) {
     try {
-      const result = dotenv.config({ path: candidate, override: true });
+      const result = dotenv.config({ path: candidate, override: false });
       if (!result.error) {
         loaded = true;
         loadedPath = candidate;
@@ -104,15 +109,13 @@ async function bootstrap() {
   // Enable CORS for frontend development
 
   // Enable CORS for frontend development
-  app.enableCors({
-    origin: [
-      "http://localhost:3102", // customer-web
-      "http://localhost:3002", // admin-panel
-      "http://localhost:3003", // restaurant-web
-      "http://localhost:3004", // driver-app
-    ],
-    credentials: true,
-  });
+  const corsOrigins = resolveCorsOrigins(process.env.ALLOWED_ORIGINS);
+  app.enableCors(createHttpCorsOptions(corsOrigins));
+
+  const redisUrl = process.env.REDIS_URL || process.env.REDIS_SOCKET_URL;
+  const socketAdapter = new RedisSocketAdapter(app, redisUrl, corsOrigins);
+  await socketAdapter.initialize();
+  app.useWebSocketAdapter(socketAdapter);
 
   configureHttpApplication(app);
 

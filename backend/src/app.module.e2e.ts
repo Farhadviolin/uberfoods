@@ -33,6 +33,7 @@ import { AiMlSyncModule } from "./modules/ai-ml-sync/ai-ml-sync.module";
 import { UnifiedNotificationsModule } from "./modules/unified-notifications/unified-notifications.module";
 import { FinancialSyncModule } from "./modules/financial-sync/financial-sync.module";
 import { HealthModule } from "./common/health/health.module";
+import { WebsocketModule } from "./modules/websocket/websocket.module";
 
 // Simplified for E2E - minimal setup
 // import { HttpExceptionFilter } from './common/filters/http-exception.filter';
@@ -89,6 +90,7 @@ import { HealthModule } from "./common/health/health.module";
     UnifiedNotificationsModule,
     FinancialSyncModule,
     HealthModule,
+    WebsocketModule,
   ],
   providers: [
     // Simplified for E2E - no complex providers

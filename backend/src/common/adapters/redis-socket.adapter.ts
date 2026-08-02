@@ -13,6 +13,9 @@ import {
 export class RedisSocketAdapter extends IoAdapter {
   private readonly logger = new Logger(RedisSocketAdapter.name);
   private redisAdapterEnabled = false;
+  private pubClient?: ReturnType<typeof createClient>;
+  private subClient?: ReturnType<typeof createClient>;
+  private initialized = false;
 
   constructor(
     private app: INestApplication,
@@ -20,10 +23,11 @@ export class RedisSocketAdapter extends IoAdapter {
     private readonly corsOrigins = resolveCorsOrigins(),
   ) {
     super(app);
-    this.checkRedisAvailability();
   }
 
-  private async checkRedisAvailability(): Promise<void> {
+  async initialize(): Promise<void> {
+    if (this.initialized) return;
+    this.initialized = true;
     if (!this.redisUrl) {
       this.redisUrl = process.env.REDIS_URL || process.env.REDIS_SOCKET_URL;
     }
@@ -36,14 +40,21 @@ export class RedisSocketAdapter extends IoAdapter {
     }
 
     try {
-      // Test Redis connection
-      const testClient = createClient({ url: this.redisUrl });
-      await testClient.connect();
-      await testClient.ping();
-      await testClient.disconnect();
-
+      const pubClient = createClient({ url: this.redisUrl });
+      const subClient = createClient({ url: this.redisUrl });
+      pubClient.on("error", (error) =>
+        this.logger.error("Redis pub client error", error),
+      );
+      subClient.on("error", (error) =>
+        this.logger.error("Redis sub client error", error),
+      );
+      await Promise.all([pubClient.connect(), subClient.connect()]);
+      await pubClient.ping();
+      this.pubClient = pubClient;
+      this.subClient = subClient;
       this.redisAdapterEnabled = true;
       this.logger.log("Redis adapter enabled and connection verified");
+      this.logger.log("Redis publisher and subscriber ready");
     } catch (error) {
       this.logger.error(
         "Redis connection failed, falling back to local adapter",
@@ -70,55 +81,21 @@ export class RedisSocketAdapter extends IoAdapter {
 
     const server = super.createIOServer(httpServer, serverOptions);
 
-    // Setup Redis adapter if available
-    if (this.redisAdapterEnabled && this.redisUrl) {
+    // Setup Redis adapter after initialize() completed before Nest app startup.
+    if (this.redisAdapterEnabled && this.pubClient && this.subClient) {
       try {
         this.logger.log("Setting up Redis adapter for WebSocket scaling");
-
-        // Create Redis pub/sub clients
-        const pubClient = createClient({ url: this.redisUrl });
-        const subClient = createClient({ url: this.redisUrl });
-
-        // Handle Redis connection events
-        pubClient.on("error", (err) => {
-          this.logger.error("Redis pub client error", err);
-        });
-
-        subClient.on("error", (err) => {
-          this.logger.error("Redis sub client error", err);
-        });
-
-        pubClient.on("connect", () => {
-          this.logger.log("Redis pub client connected");
-        });
-
-        subClient.on("connect", () => {
-          this.logger.log("Redis sub client connected");
-        });
-
-        // Connect to Redis
-        Promise.all([pubClient.connect(), subClient.connect()])
-          .then(() => {
-            const redisAdapter = createAdapter(pubClient, subClient);
-            server.adapter(redisAdapter);
-            this.logger.log(
-              "Redis adapter successfully configured for horizontal scaling",
-            );
-          })
-          .catch((error) => {
-            this.logger.error(
-              "Failed to connect Redis adapter clients, continuing with local adapter",
-              error,
-            );
-            this.redisAdapterEnabled = false;
-          });
+        server.adapter(createAdapter(this.pubClient, this.subClient));
+        this.logger.log(
+          "Redis adapter successfully configured for horizontal scaling",
+        );
 
         // Cleanup on process exit
         const cleanup = async () => {
           this.logger.log("Cleaning up Redis connections");
           await Promise.allSettled([
-            pubClient.disconnect(),
-            subClient.disconnect(),
+            this.pubClient?.disconnect(),
+            this.subClient?.disconnect(),
           ]);
         };
 

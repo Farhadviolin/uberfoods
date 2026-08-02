@@ -16,6 +16,7 @@ import { InventoryModule } from "./modules/inventory/inventory.module";
 import { AutomationModule } from "./modules/automation/automation.module";
 import { ReportingModule } from "./modules/reporting/reporting.module";
 import { SearchModule } from "./modules/search/search.module";
+import { WebsocketModule } from "./modules/websocket/websocket.module";
 
 // Common Modules
 import { HealthModule } from "./common/health/health.module";
@@ -57,6 +58,7 @@ import { AuditLedgerService } from "./common/audit/audit-ledger.service";
     InventoryModule,
     AutomationModule,
     ReportingModule,
+    WebsocketModule,
 
     // Common Infrastructure
     HealthModule,

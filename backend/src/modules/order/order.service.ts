@@ -275,7 +275,7 @@ export class OrderService {
         await import("../websocket/websocket.gateway");
       const wsGateway = this.moduleRef.get(WebSocketGateway, { strict: false });
 
-      if (!wsGateway) return;
+      if (!wsGateway?.server) return;
 
       const orderData = {
         id: order.id,

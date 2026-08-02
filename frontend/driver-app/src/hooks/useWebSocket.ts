@@ -125,27 +125,31 @@ export function useWebSocket(
               });
             });
 
-            const locationData = {
-              lat: position.coords.latitude,
-              lng: position.coords.longitude,
-              heading: position.coords.heading,
-              speed: position.coords.speed,
-              accuracy: position.coords.accuracy,
-              timestamp: new Date(),
-            };
+            const activeOrderIds = state.orders.active
+              .map((order) => order.id)
+              .filter((orderId): orderId is string => Boolean(orderId));
+            for (const orderId of activeOrderIds) {
+              const locationData = {
+                orderId,
+                lat: position.coords.latitude,
+                lng: position.coords.longitude,
+                heading: position.coords.heading,
+                speed: position.coords.speed,
+                accuracy: position.coords.accuracy,
+                timestamp: new Date(),
+              };
 
-            socketRef.current?.emit('location_update', locationData);
-            actions.updateLocation(locationData);
-
-            // Call location update callback
-            options.onLocationUpdate?.(locationData);
+              socketRef.current?.emit('location_update', locationData);
+              actions.updateLocation(locationData);
+              options.onLocationUpdate?.(locationData);
+            }
           } catch (error) {
             logger.warn('Failed to get location:', error);
           }
         }
       }, 30000);
     }
-  }, [locationTrackingEnabled, options.enableLocationTracking, actions, options]);
+  }, [locationTrackingEnabled, options.enableLocationTracking, actions, options, state.orders.active]);
 
   const stopLocationTracking = useCallback(() => {
     setLocationTrackingEnabled(false);

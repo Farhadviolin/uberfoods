@@ -364,6 +364,7 @@ export class AuthService {
   async login(
     user: UserData,
     includeRefreshToken: boolean = false,
+    sessionId?: string,
   ): Promise<LoginResult> {
     const userType =
       typeof user.userType === "string"
@@ -377,6 +378,7 @@ export class AuthService {
       type: user.userType ?? role.toUpperCase(),
       isActive: user.isActive,
       currentStatus: user.currentStatus,
+      ...(sessionId ? { sessionId } : {}),
     };
 
     const result: LoginResult = {
@@ -565,7 +567,7 @@ export class AuthService {
     }
 
     // Include refresh token for MFA login
-    const tokens = await this.login(validation.user, true);
+    const tokens = await this.login(validation.user, true, session.id);
 
     if (isE2E) {
       this.logger.log(

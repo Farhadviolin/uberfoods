@@ -94,14 +94,14 @@ export function LiveTracking() {
   useEffect(() => {
     if (socket && order?.driver) {
       const driverId = order.driver.id;
-      socket.emit('join-room', `driver-${driverId}`);
+      socket.emit('join-room', `order_${order.id}`);
 
       socket.on('driver-location-update', (location: DriverLocation) => {
         setDriverLocation(location);
       });
 
       return () => {
-        socket.emit('leave-room', `driver-${driverId}`);
+        socket.emit('leave-room', `order_${order.id}`);
         socket.off('driver-location-update');
       };
     }

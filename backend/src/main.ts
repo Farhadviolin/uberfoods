@@ -140,7 +140,9 @@ async function bootstrap() {
   const { RedisSocketAdapter } =
     await import("./common/adapters/redis-socket.adapter");
   const redisUrl = process.env.REDIS_URL || process.env.REDIS_SOCKET_URL;
-  app.useWebSocketAdapter(new RedisSocketAdapter(app, redisUrl, corsOrigins));
+  const socketAdapter = new RedisSocketAdapter(app, redisUrl, corsOrigins);
+  await socketAdapter.initialize();
+  app.useWebSocketAdapter(socketAdapter);
 
   // Globaler API Prefix - alle Routen werden mit /api prefixiert
   configureHttpApplication(app);

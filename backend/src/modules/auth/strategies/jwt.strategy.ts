@@ -64,6 +64,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
         sub: admin.id,
         email: admin.email ?? email,
         role: roleUpper || String(admin.role).toUpperCase(),
+        userType: "admin",
         type: "ADMIN",
       };
     }
@@ -96,6 +97,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
           sub: user.id,
           email: user.email ?? email,
           role,
+          userType: role,
           type: type ?? "CUSTOMER",
           currentStatus:
             role === "restaurant"
@@ -117,6 +119,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       sub: userId || "dev-user-123",
       email,
       role: role || "customer",
+      userType: role || "customer",
       type: type || "CUSTOMER",
       status: "ACTIVE",
       isActive: true,

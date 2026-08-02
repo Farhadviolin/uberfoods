@@ -19,12 +19,27 @@ const createClient = (overrides: Record<string, unknown> = {}) =>
 
 describe("WebSocketGateway", () => {
   let jwtService: jest.Mocked<Pick<JwtService, "verifyAsync">>;
+  let prisma: {
+    admin: { findUnique: jest.Mock };
+    customer: { findUnique: jest.Mock };
+    driver: { findUnique: jest.Mock };
+    restaurant: { findUnique: jest.Mock };
+    order: { findUnique: jest.Mock; findFirst: jest.Mock };
+  };
   let gateway: WebSocketGateway;
   let middleware: SocketMiddleware;
 
   beforeEach(() => {
     jwtService = { verifyAsync: jest.fn() };
-    gateway = new WebSocketGateway(jwtService as unknown as JwtService);
+    const activeUser = jest.fn().mockResolvedValue({ id: "1", isActive: true });
+    prisma = {
+      admin: { findUnique: activeUser },
+      customer: { findUnique: activeUser },
+      driver: { findUnique: activeUser },
+      restaurant: { findUnique: activeUser },
+      order: { findUnique: jest.fn(), findFirst: jest.fn() },
+    };
+    gateway = new WebSocketGateway(jwtService as unknown as JwtService, prisma as never);
     gateway.afterInit({
       use: jest.fn((handler: SocketMiddleware) => {
         middleware = handler;
@@ -70,8 +85,8 @@ describe("WebSocketGateway", () => {
       await expect(authenticate(client)).resolves.toBeUndefined();
       gateway.handleConnection(client);
       expect(client.join).toHaveBeenCalledWith(room);
-      expect(gateway.joinRoom(client, room)).toEqual({ success: true, room });
-      expect(gateway.joinRoom(client, "customer_other")).toEqual({
+      await expect(gateway.joinRoom(client, room)).resolves.toEqual({ success: true, room });
+      await expect(gateway.joinRoom(client, "customer_other")).resolves.toEqual({
         success: false,
         error: "room access denied",
       });
