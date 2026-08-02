@@ -210,7 +210,7 @@ export function OrderCard({ order }: OrderCardProps) {
                   type="button"
                   onClick={(e) => {
                     e.stopPropagation();
-                    handleStatusChange("READY_FOR_PICKUP");
+                    handleStatusChange("CONFIRMED");
                   }}
                   className="fb-button"
                   data-testid="restaurant-order-ready-button"
@@ -219,7 +219,7 @@ export function OrderCard({ order }: OrderCardProps) {
                     padding: "6px 12px",
                   }}
                 >
-                  Bereit
+                  Annehmen
                 </button>
               )}
               {isReadyForPickup && (
@@ -259,7 +259,7 @@ export function OrderCard({ order }: OrderCardProps) {
                   type="button"
                   onClick={(e) => {
                     e.stopPropagation();
-                    handleStatusChange("READY");
+                    handleStatusChange("READY_FOR_PICKUP");
                   }}
                   className="fb-button"
                   style={{
@@ -267,7 +267,7 @@ export function OrderCard({ order }: OrderCardProps) {
                     padding: "6px 12px",
                   }}
                 >
-                  Fertig
+                  Bereit zur Abholung
                 </button>
               )}
             </div>

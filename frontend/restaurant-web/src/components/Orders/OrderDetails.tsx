@@ -172,12 +172,14 @@ export function OrderDetails({
   ]);
 
   const displayStatus = order.status || "PENDING";
+  const nextStatus = {
+    PENDING: { value: "CONFIRMED", label: "Bestätigen" },
+    CONFIRMED: { value: "PREPARING", label: "In Zubereitung" },
+    PREPARING: { value: "READY_FOR_PICKUP", label: "Bereit zur Abholung" },
+  }[displayStatus as "PENDING" | "CONFIRMED" | "PREPARING"];
   const statusOptions = [
-    { value: "CONFIRMED", label: "Bestätigt" },
-    { value: "PREPARING", label: "In Zubereitung" },
-    { value: "READY_FOR_PICKUP", label: "Bereit zur Abholung" },
-    { value: "READY", label: "Fertig" },
-    { value: "CANCELLED", label: "Storniert" },
+    { value: displayStatus, label: formatOrderStatus(displayStatus) },
+    ...(nextStatus ? [nextStatus] : []),
   ];
 
   // Fallback Locations (können später aus Order/Address geholt werden)

@@ -12,6 +12,7 @@ import {
   HttpException,
   HttpStatus,
   BadRequestException,
+  ForbiddenException,
   Logger,
   Res,
   Request,
@@ -789,7 +790,8 @@ export class RestaurantController {
   }
 
   @Get(":id/orders")
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles("RESTAURANT")
   @ApiOperation({
     summary: "Get restaurant orders",
     description: "Retrieve all orders for a specific restaurant",
@@ -800,7 +802,15 @@ export class RestaurantController {
   })
   @ApiResponse({ status: 401, description: "Unauthorized" })
   @ApiResponse({ status: 403, description: "Forbidden" })
-  async getRestaurantOrders(@Param("id") id: string) {
+  async getRestaurantOrders(
+    @Param("id") id: string,
+    @GetUser() actor: AuthenticatedRequest["user"],
+  ) {
+    const authenticatedRestaurantId = actor?.id || actor?.sub;
+    if (!authenticatedRestaurantId || authenticatedRestaurantId !== id) {
+      throw new ForbiddenException("Restaurant ownership required");
+    }
+
     try {
       const orders = await this.prisma.order.findMany({
         where: { restaurantId: id },

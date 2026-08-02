@@ -98,6 +98,34 @@ describe("OrderCard status updates", () => {
     });
   });
 
+  it("moves a pending order through the real restaurant lifecycle", async () => {
+    const pendingOrder = { ...baseOrder, status: "PENDING" };
+    render(<OrderCard order={pendingOrder} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Annehmen" }));
+    await waitFor(() =>
+      expect(mockMutateAsync).toHaveBeenCalledWith({
+        orderId: "order-card-1",
+        status: "CONFIRMED",
+      }),
+    );
+  });
+
+  it("sets READY_FOR_PICKUP after preparation instead of skipping the state machine", async () => {
+    const preparingOrder = { ...baseOrder, status: "PREPARING" };
+    render(<OrderCard order={preparingOrder} />);
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Bereit zur Abholung" }),
+    );
+    await waitFor(() =>
+      expect(mockMutateAsync).toHaveBeenCalledWith({
+        orderId: "order-card-1",
+        status: "READY_FOR_PICKUP",
+      }),
+    );
+  });
+
   it("handles an order without a version without inventing one", async () => {
     const { version: _version, ...orderWithoutVersion } = baseOrder;
     render(<OrderCard order={orderWithoutVersion} />);
