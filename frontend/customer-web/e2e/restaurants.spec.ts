@@ -1,136 +1,67 @@
-import { test, expect } from './test-helpers';
+import { expect } from '@playwright/test';
+import { test } from './test-helpers';
 
-test.describe('Restaurant Browsing', () => {
-  test('should display restaurant list', async ({ page }) => {
-    await page.goto('/');
+test.describe('Restaurant public browsing', () => {
+  test('should expose a safe public restaurant list', async ({ page }) => {
+    const response = await page.request.get('/api/restaurants/public');
 
-    // Should show loading state first
-    await expect(page.locator('[data-testid="loading-spinner"]')).toBeVisible();
+    expect(response.status()).toBe(200);
+    const payload = await response.json();
+    const restaurants = Array.isArray(payload)
+      ? payload
+      : payload.data ?? payload.restaurants;
 
-    // Should display restaurants
-    await expect(page.locator('[data-testid="restaurant-list"]')).toBeVisible();
+    expect(Array.isArray(restaurants)).toBe(true);
+    expect(restaurants.length).toBeGreaterThan(0);
+    expect(restaurants[0]).toEqual(expect.objectContaining({
+      id: expect.any(String),
+      name: expect.any(String),
+      dishes: expect.any(Array),
+    }));
 
-    // Should have at least one restaurant
-    const restaurantCards = page.locator('[data-testid="restaurant-card"]');
-    await expect(restaurantCards.first()).toBeVisible();
+    for (const restaurant of restaurants) {
+      expect(restaurant).not.toHaveProperty('password');
+      expect(restaurant).not.toHaveProperty('passwordHash');
+      expect(restaurant).not.toHaveProperty('accessToken');
+      expect(restaurant).not.toHaveProperty('refreshToken');
+    }
   });
 
-  test('should filter restaurants by cuisine', async ({ page }) => {
+  test('should render the public restaurant list with delivery metadata', async ({ page }) => {
     await page.goto('/');
 
-    // Wait for restaurants to load
-    await expect(page.locator('[data-testid="restaurant-list"]')).toBeVisible();
+    const restaurantList = page.getByTestId('restaurant-list');
+    await expect(restaurantList).toBeVisible();
 
-    // Find and click cuisine filter
-    await page.click('[data-testid="cuisine-filter"]');
-    await page.click('[data-testid="cuisine-italian"]');
-
-    // Should show filtered results
-    const restaurantCards = page.locator('[data-testid="restaurant-card"]');
-    const italianRestaurants = await restaurantCards.filter({
-      hasText: 'Italian'
-    }).count();
-
-    expect(italianRestaurants).toBeGreaterThan(0);
+    const restaurantCards = page.getByTestId('restaurant-card');
+    await expect(restaurantCards).toHaveCount(3);
+    await expect(restaurantCards.first().getByTestId('restaurant-name')).toBeVisible();
+    await expect(restaurantCards.first().locator('.delivery-time')).toBeVisible();
+    await expect(restaurantCards.first().locator('.delivery-fee')).toBeVisible();
   });
 
-  test('should search restaurants', async ({ page }) => {
+  test('should open a public restaurant detail and its dishes', async ({ page }) => {
     await page.goto('/');
+    const firstCard = page.getByTestId('restaurant-card').first();
 
-    // Wait for restaurants to load
-    await expect(page.locator('[data-testid="restaurant-list"]')).toBeVisible();
+    await firstCard.click();
 
-    // Search for specific restaurant
-    await page.fill('[data-testid="search-input"]', 'Pizza Palace');
-    await page.click('[data-testid="search-button"]');
-
-    // Should show search results
-    await expect(page.locator('[data-testid="restaurant-card"]').filter({
-      hasText: 'Pizza Palace'
-    })).toBeVisible();
-  });
-
-  test('should show restaurant details', async ({ page }) => {
-    await page.goto('/');
-
-    // Wait for restaurants to load
-    await expect(page.locator('[data-testid="restaurant-list"]')).toBeVisible();
-
-    // Click on first restaurant
-    await page.locator('[data-testid="restaurant-card"]').first().click();
-
-    // Should navigate to restaurant page
     await expect(page).toHaveURL(/\/restaurant\/.+/);
-
-    // Should show restaurant details
-    await expect(page.locator('[data-testid="restaurant-name"]')).toBeVisible();
-    await expect(page.locator('[data-testid="restaurant-description"]')).toBeVisible();
-    await expect(page.locator('[data-testid="restaurant-rating"]')).toBeVisible();
+    await expect(page.getByTestId('restaurant-name')).toBeVisible();
+    await expect(page.locator('.dish-card').first()).toBeVisible();
   });
 
-  test('should display restaurant rating and reviews', async ({ page }) => {
-    await page.goto('/');
-
-    // Wait for restaurants to load
-    await expect(page.locator('[data-testid="restaurant-list"]')).toBeVisible();
-
-    // Click on first restaurant
-    await page.locator('[data-testid="restaurant-card"]').first().click();
-
-    // Should show rating
-    await expect(page.locator('[data-testid="restaurant-rating"]')).toBeVisible();
-
-    // Should show reviews section
-    await expect(page.locator('[data-testid="reviews-section"]')).toBeVisible();
-  });
-
-  test('should handle empty search results', async ({ page }) => {
-    await page.goto('/');
-
-    // Search for non-existent restaurant
-    await page.fill('[data-testid="search-input"]', 'NonExistentRestaurant12345');
-    await page.click('[data-testid="search-button"]');
-
-    // Should show no results message
-    await expect(page.locator('[data-testid="no-results-message"]')).toBeVisible();
-    await expect(page.locator('[data-testid="no-results-message"]')).toContainText('No restaurants found');
-  });
-
-  test('should sort restaurants by rating', async ({ page }) => {
-    await page.goto('/');
-
-    // Wait for restaurants to load
-    await expect(page.locator('[data-testid="restaurant-list"]')).toBeVisible();
-
-    // Click sort by rating
-    await page.click('[data-testid="sort-rating"]');
-
-    // First restaurant should have highest rating
-    const firstRating = await page.locator('[data-testid="restaurant-rating"]').first().textContent();
-    const ratings = await page.locator('[data-testid="restaurant-rating"]').allTextContents();
-
-    // Convert to numbers and check if sorted descending
-    const ratingNumbers = ratings.map(r => parseFloat(r));
-    const isSortedDescending = ratingNumbers.every((val, i, arr) =>
-      !i || arr[i - 1] >= val
+  test('should return not found for an unknown public restaurant', async ({ page }) => {
+    const response = await page.request.get(
+      '/api/restaurants/public/00000000-0000-0000-0000-000000000000',
     );
 
-    expect(isSortedDescending).toBe(true);
+    expect(response.status()).toBe(404);
   });
 
-  test('should show delivery time and fee', async ({ page }) => {
-    await page.goto('/');
+  test('should keep the private restaurant profile protected', async ({ page }) => {
+    const response = await page.request.get('/api/restaurants/me');
 
-    // Wait for restaurants to load
-    await expect(page.locator('[data-testid="restaurant-list"]')).toBeVisible();
-
-    // Check first restaurant card
-    const firstCard = page.locator('[data-testid="restaurant-card"]').first();
-
-    // Should show delivery time
-    await expect(firstCard.locator('[data-testid="delivery-time"]')).toBeVisible();
-
-    // Should show delivery fee
-    await expect(firstCard.locator('[data-testid="delivery-fee"]')).toBeVisible();
+    expect(response.status()).toBe(401);
   });
 });

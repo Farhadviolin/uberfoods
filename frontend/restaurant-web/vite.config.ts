@@ -3,6 +3,9 @@ import react from '@vitejs/plugin-react';
 import { copyFileSync } from 'fs';
 import { resolve } from 'path';
 
+const restaurantApiProxyTarget =
+  process.env.RESTAURANT_API_PROXY_TARGET || 'http://localhost:3000';
+
 // Plugin to copy service worker to public directory
 const serviceWorkerPlugin = () => {
   return {
@@ -55,7 +58,7 @@ export default defineConfig({
     host: true,
     proxy: {
       '/api': {
-        target: 'http://localhost:3000',
+        target: restaurantApiProxyTarget,
         changeOrigin: true,
         secure: false,
       },

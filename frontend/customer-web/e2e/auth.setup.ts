@@ -12,7 +12,7 @@ type AuthRole = 'customer' | 'admin' | 'restaurant' | 'driver';
 type ApiLoginRole = Exclude<AuthRole, 'customer'>;
 
 const authRoles = new Set(
-  (process.env.E2E_AUTH_ROLES ?? 'customer')
+  (process.env.E2E_AUTH_ROLES ?? 'customer,restaurant')
     .split(',')
     .map((role) => role.trim())
     .filter((role): role is AuthRole =>
@@ -23,7 +23,9 @@ const authRoles = new Set(
 console.log(`Creating auth state for roles: ${[...authRoles].join(',')}`);
 
 function registerAuthSetup(role: AuthRole, title: string, callback: any) {
-  if (authRoles.has(role)) {
+  // Restaurant authentication is a required prerequisite for the public
+  // restaurant E2E flow and must never disappear silently from discovery.
+  if (role === 'restaurant' || authRoles.has(role)) {
     setup(title, callback);
     return;
   }
@@ -356,7 +358,9 @@ registerAuthSetup('customer', 'authenticate as customer', async ({ page, context
 
 registerAuthSetup('restaurant', 'authenticate as restaurant', async ({ page, context }) => {
   const urls = testDataFactory.getFrontendUrls();
-  setup.skip(!urls.restaurant, "RESTAURANT_URL not set – skipping restaurant auth setup");
+  if (!urls.restaurant) {
+    throw new Error('RESTAURANT_URL is required for restaurant public E2E setup');
+  }
 
   const restaurant = testDataFactory.getTestRestaurant();
   await createStorageStateViaApi({
