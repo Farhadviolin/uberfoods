@@ -1,4 +1,6 @@
 import { useAuth } from "../contexts/AuthContext";
+import api from "../utils/api";
+import { useNavigate } from "react-router-dom";
 import { useWebSocket } from "../hooks/useWebSocket";
 import {
   useRestaurantStatus,
@@ -15,10 +17,26 @@ interface HeaderProps {
 }
 
 export function Header({ newOrdersCount, onNotificationClick }: HeaderProps) {
-  const { user, restaurantId } = useAuth();
+  const { user, restaurantId, logout } = useAuth();
+  const navigate = useNavigate();
   const { showToast } = useToast();
   const [showNotifications, setShowNotifications] = useState(false);
   const [showStatusMenu, setShowStatusMenu] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
+
+  const handleLogout = async () => {
+    if (loggingOut) return;
+    setLoggingOut(true);
+    try {
+      await api.post("/auth/logout");
+    } catch {
+      // Der lokale Auth-Zustand wird auch bei einem nicht erreichbaren Server gelöscht.
+    } finally {
+      logout();
+      setLoggingOut(false);
+      navigate("/login", { replace: true });
+    }
+  };
 
   const { data: statusData } = useRestaurantStatus(restaurantId);
   const updateStatus = useUpdateRestaurantStatus();
@@ -274,6 +292,16 @@ export function Header({ newOrdersCount, onNotificationClick }: HeaderProps) {
                 {newOrdersCount > 9 ? "9+" : newOrdersCount}
               </span>
             )}
+          </button>
+
+          <button
+            type="button"
+            className="fb-button-secondary"
+            onClick={() => void handleLogout()}
+            disabled={loggingOut}
+            aria-label="Abmelden"
+          >
+            {loggingOut ? "Abmeldung..." : "Abmelden"}
           </button>
         </div>
       </div>
