@@ -55,4 +55,23 @@ describe("Render staging Admin configuration", () => {
       "Local production URL is forbidden: VITE_DRIVER_APP_URL",
     );
   });
+
+  it("supports same-origin proxy paths for the isolated production simulation", () => {
+    jest.resetModules();
+    process.env = {
+      ...originalEnvironment,
+      PROD: "true",
+      DEV: "false",
+      VITE_API_URL: "/api",
+      VITE_WS_URL: "/socket.io",
+      VITE_CUSTOMER_WEB_URL: "https://customer.example.test",
+      VITE_DRIVER_APP_URL: "https://driver.example.test",
+      VITE_RESTAURANT_WEB_URL: "https://restaurant.example.test",
+    };
+
+    const { config } = require("./config");
+
+    expect(config.apiUrl).toBe("");
+    expect(config.wsUrl).toBe("/socket.io");
+  });
 });

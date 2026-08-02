@@ -69,14 +69,21 @@ function validateProductionUrl(
   return url;
 }
 
+function isSameOriginPath(url: string): boolean {
+  return url.startsWith('/') && !url.startsWith('//');
+}
+
 // Helper to validate app/deep-link URLs
 function validateAppUrl(url: string, variableName: string): string {
-  return validateProductionUrl(url, variableName, ['https:']);
+  return isSameOriginPath(url)
+    ? url
+    : validateProductionUrl(url, variableName, ['https:']);
 }
 
 // Get API URL with production validation
 const env = getImportMetaEnv();
 let apiUrl = getEnvVar('VITE_API_URL', developmentOrigin(3000), isEnabled(env.PROD));
+const sameOriginApiProxy = apiUrl === '/api';
 
 // Force relative URLs in development/E2E mode to use Vite proxy
 if (!env.PROD) {
@@ -84,8 +91,11 @@ if (!env.PROD) {
 }
 
 const isProduction = isEnabled(env.PROD);
+const sameOriginSimulation = sameOriginApiProxy && isProduction;
 const validatedApiUrl = isProduction
-  ? validateProductionUrl(apiUrl, 'VITE_API_URL', ['https:'])
+  ? sameOriginApiProxy
+    ? ''
+    : validateProductionUrl(apiUrl, 'VITE_API_URL', ['https:'])
   : apiUrl;
 
 // Get WebSocket URL with production validation
@@ -105,7 +115,9 @@ const getWsUrl = (): string => {
 
   // ✅ Production: explizite WS-URL aus ENV, mit Validierung
   const wsUrl = getEnvVar('VITE_WS_URL', developmentOrigin(3000), isProduction);
-  return validateProductionUrl(wsUrl, 'VITE_WS_URL', ['wss:']);
+  return isSameOriginPath(wsUrl)
+    ? wsUrl
+    : validateProductionUrl(wsUrl, 'VITE_WS_URL', ['wss:']);
 };
 
 const envConfig = getImportMetaEnv();
@@ -119,15 +131,27 @@ export const config = {
   devAuthToken: envConfig.VITE_DEV_AUTH_TOKEN as string | undefined,
   // Other App URLs for Deep-Links
   customerWebUrl: validateAppUrl(
-    getEnvVar('VITE_CUSTOMER_WEB_URL', developmentOrigin(3001), isProduction),
+    getEnvVar(
+      'VITE_CUSTOMER_WEB_URL',
+      sameOriginSimulation ? '/' : developmentOrigin(3001),
+      isProduction && !sameOriginSimulation,
+    ),
     'VITE_CUSTOMER_WEB_URL',
   ),
   driverAppUrl: validateAppUrl(
-    getEnvVar('VITE_DRIVER_APP_URL', developmentOrigin(3004), isProduction),
+    getEnvVar(
+      'VITE_DRIVER_APP_URL',
+      sameOriginSimulation ? '/' : developmentOrigin(3004),
+      isProduction && !sameOriginSimulation,
+    ),
     'VITE_DRIVER_APP_URL',
   ),
   restaurantWebUrl: validateAppUrl(
-    getEnvVar('VITE_RESTAURANT_WEB_URL', developmentOrigin(3003), isProduction),
+    getEnvVar(
+      'VITE_RESTAURANT_WEB_URL',
+      sameOriginSimulation ? '/' : developmentOrigin(3003),
+      isProduction && !sameOriginSimulation,
+    ),
     'VITE_RESTAURANT_WEB_URL',
   ),
   // Error Tracking

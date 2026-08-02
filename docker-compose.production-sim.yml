@@ -59,6 +59,9 @@ services:
   seed:
     extends:
       service: migration
+    depends_on:
+      migration:
+        condition: service_completed_successfully
     command: ["npm", "run", "prisma:seed"]
 
   tooling:
@@ -77,6 +80,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      seed:
+        condition: service_completed_successfully
     ports:
       - "127.0.0.1:${PROD_SIM_BACKEND_PORT:?set by verifier}:3000"
     healthcheck:

@@ -27,65 +27,6 @@ export default defineConfig(({ mode }) => ({
     },
   },
   build: {
-    rollupOptions: {
-      output: {
-        manualChunks: (id) => {
-          // Vendor chunks (function form)
-          if (id.includes('node_modules')) {
-            // React core
-            if (id.includes('react') || id.includes('react-dom')) {
-              return 'react-vendor';
-            }
-            // Router
-            if (id.includes('react-router-dom')) {
-              return 'router-vendor';
-            }
-            // Query
-            if (id.includes('@tanstack/react-query')) {
-              return 'query-vendor';
-            }
-            // UI Libraries
-            if (id.includes('lucide-react') || id.includes('@radix-ui')) {
-              return 'ui-vendor';
-            }
-            // Maps
-            if (id.includes('@react-google-maps') || id.includes('leaflet')) {
-              return 'maps-vendor';
-            }
-            // Payment
-            if (id.includes('@stripe')) {
-              return 'payment-vendor';
-            }
-            // Charts
-            if (id.includes('chart.js') || id.includes('recharts')) {
-              return 'charts-vendor';
-            }
-            // Forms
-            if (id.includes('react-hook-form') || id.includes('zod')) {
-              return 'forms-vendor';
-            }
-            // Date utilities
-            if (id.includes('date-fns')) {
-              return 'date-vendor';
-            }
-            // Animations
-            if (id.includes('framer-motion')) {
-              return 'animation-vendor';
-            }
-            // Utils
-            if (id.includes('lodash') || id.includes('clsx')) {
-              return 'utils-vendor';
-            }
-            // AI/ML
-            if (id.includes('tensorflow')) {
-              return 'ai-vendor';
-            }
-            // Default vendor chunk für den Rest
-            return 'vendor';
-          }
-        },
-      },
-    },
     chunkSizeWarningLimit: 1000,
     sourcemap: false, // Reduce bundle size
     minify: 'terser',
