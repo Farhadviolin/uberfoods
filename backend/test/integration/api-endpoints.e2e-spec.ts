@@ -14,6 +14,8 @@ describe("API Endpoints Integration Tests (e2e)", () => {
   let driverToken: string;
   let restaurantToken: string;
   let testRestaurantId: string;
+  let orderRestaurantId: string;
+  let otherRestaurantId: string;
   let testCustomerId: string;
   let testDriverId: string;
   let testOrderId: string;
@@ -30,6 +32,88 @@ describe("API Endpoints Integration Tests (e2e)", () => {
     configureHttpApplication(app);
 
     await app.init();
+
+    const restaurantLogin = await request(app.getHttpServer())
+      .post("/api/auth/restaurant/login")
+      .send({
+        email: getTestEmail("RESTAURANT_LOGIN"),
+        password: getTestPassword("RESTAURANT_LOGIN"),
+      });
+    const restaurantBody = restaurantLogin.body as {
+      access_token?: unknown;
+      user?: {
+        id?: unknown;
+        role?: unknown;
+        isActive?: unknown;
+      };
+      data?: {
+        access_token?: unknown;
+        user?: {
+          id?: unknown;
+          role?: unknown;
+          isActive?: unknown;
+        };
+      };
+    };
+    const restaurantUser = restaurantBody.data?.user ?? restaurantBody.user;
+    const restaurantAccessToken =
+      restaurantBody.data?.access_token ?? restaurantBody.access_token;
+    const responseKeys = Object.keys(restaurantLogin.body ?? {}).join(",");
+    const userKeys = Object.keys(restaurantUser ?? {}).join(",");
+
+    if (
+      ![200, 201].includes(restaurantLogin.status) ||
+      typeof restaurantAccessToken !== "string" ||
+      !restaurantAccessToken ||
+      !restaurantUser ||
+      restaurantUser.role !== "restaurant" ||
+      restaurantUser.isActive !== true ||
+      typeof restaurantUser.id !== "string" ||
+      !restaurantUser.id
+    ) {
+      throw new Error(
+        `Restaurant login failed: expected HTTP 201 with an active restaurant user; ` +
+          `received HTTP ${restaurantLogin.status}; responseKeys=${responseKeys}; ` +
+          `userKeys=${userKeys}`,
+      );
+    }
+
+    restaurantToken = restaurantAccessToken;
+    testRestaurantId = restaurantUser.id;
+
+    const customerLogin = await request(app.getHttpServer())
+      .post("/api/auth/customer/login")
+      .send({
+        email: getTestEmail("CUSTOMER_LOGIN"),
+        password: getTestPassword("CUSTOMER_LOGIN"),
+      })
+      .expect((response) => expect([200, 201]).toContain(response.status));
+    customerToken =
+      customerLogin.body?.data?.access_token ?? customerLogin.body?.access_token;
+    expect(customerToken).toEqual(expect.any(String));
+
+    const driverLogin = await request(app.getHttpServer())
+      .post("/api/auth/driver/login")
+      .send({
+        email: getTestEmail("DRIVER_LOGIN"),
+        password: getTestPassword("DRIVER_LOGIN"),
+      })
+      .expect((response) => expect([200, 201]).toContain(response.status));
+    driverToken =
+      driverLogin.body?.data?.access_token ?? driverLogin.body?.access_token;
+    expect(driverToken).toEqual(expect.any(String));
+
+    const restaurantResponse = await request(app.getHttpServer())
+      .get("/api/restaurants/public")
+      .expect(200);
+    const restaurants = restaurantResponse.body?.data ?? restaurantResponse.body;
+    const otherRestaurant = restaurants.find(
+      (restaurant: { id: string }) => restaurant.id !== testRestaurantId,
+    );
+    if (!otherRestaurant?.id) {
+      throw new Error("Seeded restaurant fixtures must include a second restaurant");
+    }
+    otherRestaurantId = otherRestaurant.id;
   });
 
   afterAll(async () => {
@@ -49,12 +133,6 @@ describe("API Endpoints Integration Tests (e2e)", () => {
         .deleteMany({ where: { id: testDriverId } })
         .catch(() => {});
     }
-    if (testRestaurantId) {
-      await prisma.restaurant
-        .deleteMany({ where: { id: testRestaurantId } })
-        .catch(() => {});
-    }
-
     await app.close();
   });
 
@@ -170,11 +248,11 @@ describe("API Endpoints Integration Tests (e2e)", () => {
       }
 
       const restaurant = restaurants[0];
-      testRestaurantId = restaurant.id;
+      orderRestaurantId = restaurant.id;
 
       // Get dishes for restaurant
       const dishesResponse = await request(app.getHttpServer())
-        .get(`/api/dishes/restaurant/${restaurant.id}`)
+        .get(`/api/dishes/restaurant/${orderRestaurantId}`)
         .set("Authorization", `Bearer ${customerToken}`)
         .expect(200);
 
@@ -190,7 +268,7 @@ describe("API Endpoints Integration Tests (e2e)", () => {
         .post("/api/orders/customer")
         .set("Authorization", `Bearer ${customerToken}`)
         .send({
-          restaurantId: restaurant.id,
+          restaurantId: orderRestaurantId,
           items: [
             {
               dishId: dish.id,
@@ -466,49 +544,79 @@ describe("API Endpoints Integration Tests (e2e)", () => {
 
   describe("Restaurant Web Endpoints", () => {
     it("GET /api/restaurants/:id/analytics should return analytics", async () => {
-      if (!restaurantToken) {
-        console.warn("Skipping - no restaurant token");
-        return;
-      }
-
-      const restaurantResponse = await request(app.getHttpServer())
-        .get("/api/restaurants/public")
-        .expect(200);
-
-      if (restaurantResponse.body.length > 0) {
-        return request(app.getHttpServer())
-          .get(
-            `/api/restaurants/${restaurantResponse.body[0].id}/analytics?period=30d`,
-          )
-          .set("Authorization", `Bearer ${restaurantToken}`)
-          .expect(200)
-          .expect((res) => {
-            expect(res.body).toHaveProperty("revenue");
-          });
-      }
+      return request(app.getHttpServer())
+        .get(`/api/restaurants/${testRestaurantId}/analytics?period=30d`)
+        .set("Authorization", `Bearer ${restaurantToken}`)
+        .expect(200)
+        .expect((res) => {
+          expect(res.body).toHaveProperty("totalRevenue");
+          expect(res.body).toHaveProperty("totalOrders");
+        });
     });
 
     it("GET /api/inventory/restaurant/:id/overview should return inventory", async () => {
-      if (!restaurantToken) {
-        console.warn("Skipping - no restaurant token");
-        return;
-      }
+      return request(app.getHttpServer())
+        .get(`/api/inventory/restaurant/${testRestaurantId}/overview`)
+        .set("Authorization", `Bearer ${restaurantToken}`)
+        .expect(200)
+        .expect((res) => {
+          expect(res.body).toHaveProperty("totalValue");
+          expect(res.body).toHaveProperty("totalItems");
+        });
+    });
 
-      const restaurantResponse = await request(app.getHttpServer())
-        .get("/api/restaurants/public")
-        .expect(200);
+    it("GET /api/restaurants/:id/analytics should reject missing auth", () => {
+      return request(app.getHttpServer())
+        .get(`/api/restaurants/${testRestaurantId}/analytics`)
+        .expect(401);
+    });
 
-      if (restaurantResponse.body.length > 0) {
-        return request(app.getHttpServer())
-          .get(
-            `/api/inventory/restaurant/${restaurantResponse.body[0].id}/overview`,
-          )
-          .set("Authorization", `Bearer ${restaurantToken}`)
-          .expect(200)
-          .expect((res) => {
-            expect(res.body).toHaveProperty("totalValue");
-          });
-      }
+    it("GET /api/restaurants/:id/analytics should reject customer auth", () => {
+      return request(app.getHttpServer())
+        .get(`/api/restaurants/${testRestaurantId}/analytics`)
+        .set("Authorization", `Bearer ${customerToken}`)
+        .expect(403);
+    });
+
+    it("GET /api/restaurants/:id/analytics should reject driver auth", () => {
+      return request(app.getHttpServer())
+        .get(`/api/restaurants/${testRestaurantId}/analytics`)
+        .set("Authorization", `Bearer ${driverToken}`)
+        .expect(403);
+    });
+
+    it("GET /api/restaurants/:id/analytics should reject another restaurant", () => {
+      return request(app.getHttpServer())
+        .get(`/api/restaurants/${otherRestaurantId}/analytics`)
+        .set("Authorization", `Bearer ${restaurantToken}`)
+        .expect(403);
+    });
+
+    it("GET /api/inventory/restaurant/:id/overview should reject missing auth", () => {
+      return request(app.getHttpServer())
+        .get(`/api/inventory/restaurant/${testRestaurantId}/overview`)
+        .expect(401);
+    });
+
+    it("GET /api/inventory/restaurant/:id/overview should reject customer auth", () => {
+      return request(app.getHttpServer())
+        .get(`/api/inventory/restaurant/${testRestaurantId}/overview`)
+        .set("Authorization", `Bearer ${customerToken}`)
+        .expect(403);
+    });
+
+    it("GET /api/inventory/restaurant/:id/overview should reject driver auth", () => {
+      return request(app.getHttpServer())
+        .get(`/api/inventory/restaurant/${testRestaurantId}/overview`)
+        .set("Authorization", `Bearer ${driverToken}`)
+        .expect(403);
+    });
+
+    it("GET /api/inventory/restaurant/:id/overview should reject another restaurant", () => {
+      return request(app.getHttpServer())
+        .get(`/api/inventory/restaurant/${otherRestaurantId}/overview`)
+        .set("Authorization", `Bearer ${restaurantToken}`)
+        .expect(403);
     });
   });
 });

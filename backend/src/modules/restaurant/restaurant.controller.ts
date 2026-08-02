@@ -26,7 +26,10 @@ import {
   ApiParam,
 } from "@nestjs/swagger";
 import { RestaurantService } from "./restaurant.service";
+import { Roles } from "../../common/decorators/roles.decorator";
+import { GetUser } from "../auth/decorators/get-user.decorator";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
+import { RolesGuard } from "../auth/guards/roles.guard";
 import { PrismaService } from "../../prisma/prisma.service";
 import { CreateRestaurantDto } from "./dto/create-restaurant.dto";
 import { UpdateRestaurantDto } from "./dto/update-restaurant.dto";
@@ -549,10 +552,20 @@ export class RestaurantController {
   }
 
   @Get(":id/analytics")
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles("RESTAURANT")
   async getAnalytics(
     @Param("id") id: string,
     @Query() query: { period?: string },
+    @GetUser("id") authenticatedRestaurantId: string,
   ) {
+    if (!authenticatedRestaurantId || id !== authenticatedRestaurantId) {
+      throw new HttpException(
+        "Restaurant ownership required",
+        HttpStatus.FORBIDDEN,
+      );
+    }
+
     return this.restaurantService.getAnalytics(id, query.period || "week");
   }
 

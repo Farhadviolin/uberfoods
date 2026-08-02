@@ -563,21 +563,13 @@ describe("Frontend-Backend Integration (e2e)", () => {
       it("GET /api/restaurants/:id/analytics - Get Analytics", async () => {
         if (!restaurantToken) return;
 
-        const restaurantResponse = await request(app.getHttpServer())
-          .get("/api/restaurants/public")
-          .expect(200);
-
-        const restItems =
-          restaurantResponse.body?.data ?? restaurantResponse.body;
-        if (restItems?.length > 0) {
-          return request(app.getHttpServer())
-            .get(`/api/restaurants/${restItems[0].id}/analytics?period=30d`)
-            .set("Authorization", `Bearer ${restaurantToken}`)
-            .expect(200)
-            .expect((res) => {
-              expect(res.body).toHaveProperty("totalRevenue");
-            });
-        }
+        return request(app.getHttpServer())
+          .get(`/api/restaurants/${restaurantId}/analytics?period=30d`)
+          .set("Authorization", `Bearer ${restaurantToken}`)
+          .expect(200)
+          .expect((res) => {
+            expect(res.body).toHaveProperty("totalRevenue");
+          });
       });
 
       it("GET /api/restaurants/:id/performance - Get Performance", async () => {
