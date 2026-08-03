@@ -16,6 +16,7 @@ const { PrismaClient } = require("@prisma/client");
 const bcrypt = require("bcrypt");
 
 const TARGET_RESTAURANT_ID = "cmsc0knb70000p90j906xki7n";
+const TARGET_MENU_FIXTURE_ID = "dish-local13-menu-fixture";
 const FIXTURE_FLAG = "restaurant-local13-040";
 const DEFAULT_HANDOFF_DIR = path.join(
   os.tmpdir(),
@@ -46,7 +47,10 @@ function parseHandoff(content) {
   for (const line of content.split(/\r?\n/)) {
     const separator = line.indexOf(":");
     if (separator <= 0) continue;
-    values.set(line.slice(0, separator).trim(), line.slice(separator + 1).trim());
+    values.set(
+      line.slice(0, separator).trim(),
+      line.slice(separator + 1).trim(),
+    );
   }
   return values;
 }
@@ -114,8 +118,7 @@ function writeHandoff(filePath, credentials, ownerA, ownerB, customer) {
 async function main() {
   requireLocalFixtureMode();
 
-  const handoffDir =
-    process.env.LOCAL_AUTH_HANDOFF_DIR || DEFAULT_HANDOFF_DIR;
+  const handoffDir = process.env.LOCAL_AUTH_HANDOFF_DIR || DEFAULT_HANDOFF_DIR;
   fs.mkdirSync(handoffDir, { recursive: true, mode: 0o700 });
   const handoffPath = path.join(handoffDir, HANDOFF_FILE_NAME);
   const credentials = readOrCreateCredentials(handoffPath);
@@ -127,7 +130,9 @@ async function main() {
       select: { id: true, email: true, isActive: true },
     });
     if (!ownerA) {
-      throw new Error("Target restaurant does not exist; refusing to create it.");
+      throw new Error(
+        "Target restaurant does not exist; refusing to create it.",
+      );
     }
 
     const ownerB = await prisma.restaurant.findFirst({
@@ -152,6 +157,19 @@ async function main() {
       );
     }
 
+    const existingMenuFixture = await prisma.dish.findUnique({
+      where: { id: TARGET_MENU_FIXTURE_ID },
+      select: { id: true, restaurantId: true },
+    });
+    if (
+      existingMenuFixture &&
+      existingMenuFixture.restaurantId !== TARGET_RESTAURANT_ID
+    ) {
+      throw new Error(
+        `Menu fixture ${TARGET_MENU_FIXTURE_ID} belongs to another restaurant; refusing to reassign it.`,
+      );
+    }
+
     const [ownerAHash, ownerBHash, customerHash] = await Promise.all([
       bcrypt.hash(credentials.ownerAPassword, 10),
       bcrypt.hash(credentials.ownerBPassword, 10),
@@ -161,24 +179,69 @@ async function main() {
     await prisma.$transaction([
       prisma.restaurant.update({
         where: { id: ownerA.id },
-        data: { password: ownerAHash, isActive: true, mustChangePassword: false },
+        data: {
+          password: ownerAHash,
+          isActive: true,
+          mustChangePassword: false,
+        },
       }),
       prisma.restaurant.update({
         where: { id: ownerB.id },
-        data: { password: ownerBHash, isActive: true, mustChangePassword: false },
+        data: {
+          password: ownerBHash,
+          isActive: true,
+          mustChangePassword: false,
+        },
       }),
       prisma.customer.update({
         where: { id: customer.id },
         data: { password: customerHash, isActive: true },
       }),
+      prisma.dish.upsert({
+        where: { id: TARGET_MENU_FIXTURE_ID },
+        update: {
+          name: "LOCAL-13 Abnahmegericht",
+          description: "Deterministisches lokales Restaurant-Menü-Fixture",
+          price: 9.9,
+          category: "LOCAL-13",
+          isAvailable: true,
+          isActive: true,
+        },
+        create: {
+          id: TARGET_MENU_FIXTURE_ID,
+          restaurantId: TARGET_RESTAURANT_ID,
+          name: "LOCAL-13 Abnahmegericht",
+          description: "Deterministisches lokales Restaurant-Menü-Fixture",
+          price: 9.9,
+          category: "LOCAL-13",
+          isAvailable: true,
+          isActive: true,
+        },
+      }),
     ]);
 
     writeHandoff(handoffPath, credentials, ownerA, ownerB, customer);
 
-    const [restaurantCount, dishCount, customerCount] = await Promise.all([
+    const [
+      restaurantCount,
+      dishCount,
+      customerCount,
+      restaurantDishCount,
+      fixtureDish,
+    ] = await Promise.all([
       prisma.restaurant.count(),
       prisma.dish.count(),
       prisma.customer.count(),
+      prisma.dish.count({ where: { restaurantId: TARGET_RESTAURANT_ID } }),
+      prisma.dish.findUnique({
+        where: { id: TARGET_MENU_FIXTURE_ID },
+        select: {
+          id: true,
+          restaurantId: true,
+          isAvailable: true,
+          isActive: true,
+        },
+      }),
     ]);
 
     console.log(
@@ -186,15 +249,19 @@ async function main() {
         {
           status: "provisioned",
           handoffPath,
-          ownerA: { id: ownerA.id, email: ownerA.email, role: "RESTAURANT" },
-          ownerB: { id: ownerB.id, email: ownerB.email, role: "RESTAURANT" },
-          nonRestaurant: {
-            id: customer.id,
-            email: customer.email,
-            role: "CUSTOMER",
+          targetRestaurant: {
+            id: ownerA.id,
+            role: "RESTAURANT",
+            isActive: ownerA.isActive,
           },
-          counts: { restaurants: restaurantCount, dishes: dishCount, customers: customerCount },
-          mutationScope: "existing auth records only",
+          counts: {
+            restaurants: restaurantCount,
+            dishes: dishCount,
+            customers: customerCount,
+            targetRestaurantDishes: restaurantDishCount,
+          },
+          fixtureDish,
+          mutationScope: "existing auth records and local menu fixture only",
         },
         null,
         2,
