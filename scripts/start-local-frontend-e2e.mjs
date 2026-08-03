@@ -28,6 +28,7 @@ if (app === "customer") {
   env.VITE_API_PROXY_TARGET = backendUrl;
 } else if (app === "restaurant") {
   env.RESTAURANT_API_PROXY_TARGET = backendUrl;
+  env.VITE_WS_URL = backendUrl;
 } else {
   env.DRIVER_API_PROXY_TARGET = backendUrl;
 }
