@@ -16,6 +16,33 @@ import { TopDishes } from "./TopDishes";
 import { SkeletonStats, SkeletonChart, SkeletonCard } from "../common/Skeleton";
 import "./Dashboard.css";
 
+function formatCurrencyMetric(value: number | null | undefined): string {
+  return typeof value === "number" && Number.isFinite(value)
+    ? new Intl.NumberFormat("de-DE", {
+        style: "currency",
+        currency: "EUR",
+      }).format(value)
+    : "—";
+}
+
+function formatCountMetric(value: number | null | undefined): string {
+  return typeof value === "number" && Number.isFinite(value)
+    ? String(value)
+    : "—";
+}
+
+function countStatuses(
+  ordersByStatus: Record<string, number>,
+  statuses: string[],
+): number {
+  const expectedStatuses = new Set(statuses.map((status) => status.toLowerCase()));
+  return Object.entries(ordersByStatus).reduce(
+    (total, [status, count]) =>
+      expectedStatuses.has(status.toLowerCase()) ? total + count : total,
+    0,
+  );
+}
+
 export function Dashboard() {
   const { restaurantId } = useAuth();
   const queryClient = useQueryClient();
@@ -29,7 +56,11 @@ export function Dashboard() {
     useRestaurantRevenue(period);
   const { data: ordersData = [], isLoading: ordersLoading } =
     useRestaurantOrders(restaurantId);
-  const { data: analytics, isLoading: analyticsLoading } =
+  const {
+    data: analytics,
+    isLoading: analyticsLoading,
+    isError: analyticsError,
+  } =
     useRestaurantAnalytics(period);
   const { data: performance, isLoading: performanceLoading } =
     useRestaurantPerformance(period);
@@ -89,6 +120,13 @@ export function Dashboard() {
 
   // Sicherstellen, dass orders immer ein Array ist (auch bei Fehlern)
   const orders = Array.isArray(ordersData) ? ordersData : [];
+
+  const completedAnalyticsOrders = analytics
+    ? countStatuses(analytics.ordersByStatus, ["DELIVERED", "COMPLETED"])
+    : null;
+  const cancelledAnalyticsOrders = analytics
+    ? countStatuses(analytics.ordersByStatus, ["CANCELLED", "CANCELED"])
+    : null;
 
   const isLoading = statsLoading || revenueLoading || ordersLoading;
 
@@ -212,6 +250,17 @@ export function Dashboard() {
             <div className="loading">
               <div>Lädt Analysen...</div>
             </div>
+          ) : analyticsError ? (
+            <div
+              role="alert"
+              style={{
+                textAlign: "center",
+                padding: "48px",
+                color: "var(--fb-text-secondary)",
+              }}
+            >
+              Analysedaten konnten nicht geladen werden.
+            </div>
           ) : analytics ? (
             <div style={{ display: "grid", gap: "24px" }}>
               {/* Revenue Analytics */}
@@ -246,10 +295,7 @@ export function Dashboard() {
                         fontWeight: 700,
                       }}
                     >
-                      {new Intl.NumberFormat("de-DE", {
-                        style: "currency",
-                        currency: "EUR",
-                      }).format(analytics.revenue.total)}
+                      {formatCurrencyMetric(analytics.totalRevenue)}
                     </div>
                   </div>
                   <div>
@@ -268,10 +314,7 @@ export function Dashboard() {
                         fontWeight: 700,
                       }}
                     >
-                      {new Intl.NumberFormat("de-DE", {
-                        style: "currency",
-                        currency: "EUR",
-                      }).format(analytics.revenue.average)}
+                      {formatCurrencyMetric(analytics.avgOrderValue)}
                     </div>
                   </div>
                   <div>
@@ -282,20 +325,15 @@ export function Dashboard() {
                         marginBottom: "4px",
                       }}
                     >
-                      Wachstum
+                      Zeitraum
                     </div>
                     <div
                       style={{
                         fontSize: "var(--fb-font-size-2xl)",
                         fontWeight: 700,
-                        color:
-                          analytics.revenue.growth >= 0
-                            ? "var(--fb-success)"
-                            : "var(--fb-error)",
                       }}
                     >
-                      {analytics.revenue.growth >= 0 ? "+" : ""}
-                      {analytics.revenue.growth.toFixed(1)}%
+                      {analytics.period || "—"}
                     </div>
                   </div>
                 </div>
@@ -333,7 +371,7 @@ export function Dashboard() {
                         fontWeight: 700,
                       }}
                     >
-                      {analytics.orders.total}
+                      {formatCountMetric(analytics.totalOrders)}
                     </div>
                   </div>
                   <div>
@@ -353,7 +391,7 @@ export function Dashboard() {
                         color: "var(--fb-success)",
                       }}
                     >
-                      {analytics.orders.completed}
+                      {formatCountMetric(completedAnalyticsOrders)}
                     </div>
                   </div>
                   <div>
@@ -373,111 +411,14 @@ export function Dashboard() {
                         color: "var(--fb-error)",
                       }}
                     >
-                      {analytics.orders.cancelled}
-                    </div>
-                  </div>
-                  <div>
-                    <div
-                      style={{
-                        fontSize: "var(--fb-font-size-sm)",
-                        color: "var(--fb-text-secondary)",
-                        marginBottom: "4px",
-                      }}
-                    >
-                      Ø Bearbeitungszeit
-                    </div>
-                    <div
-                      style={{
-                        fontSize: "var(--fb-font-size-2xl)",
-                        fontWeight: 700,
-                      }}
-                    >
-                      {Math.round(analytics.orders.averageTime)} Min
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Customer Analytics */}
-              <div
-                style={{
-                  padding: "20px",
-                  backgroundColor: "var(--fb-bg-secondary)",
-                  borderRadius: "var(--fb-radius-md)",
-                }}
-              >
-                <h2 style={{ marginBottom: "16px" }}>Kunden-Analysen</h2>
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
-                    gap: "16px",
-                  }}
-                >
-                  <div>
-                    <div
-                      style={{
-                        fontSize: "var(--fb-font-size-sm)",
-                        color: "var(--fb-text-secondary)",
-                        marginBottom: "4px",
-                      }}
-                    >
-                      Gesamtkunden
-                    </div>
-                    <div
-                      style={{
-                        fontSize: "var(--fb-font-size-2xl)",
-                        fontWeight: 700,
-                      }}
-                    >
-                      {analytics.customers.total}
-                    </div>
-                  </div>
-                  <div>
-                    <div
-                      style={{
-                        fontSize: "var(--fb-font-size-sm)",
-                        color: "var(--fb-text-secondary)",
-                        marginBottom: "4px",
-                      }}
-                    >
-                      Neue Kunden
-                    </div>
-                    <div
-                      style={{
-                        fontSize: "var(--fb-font-size-2xl)",
-                        fontWeight: 700,
-                        color: "var(--fb-success)",
-                      }}
-                    >
-                      {analytics.customers.new}
-                    </div>
-                  </div>
-                  <div>
-                    <div
-                      style={{
-                        fontSize: "var(--fb-font-size-sm)",
-                        color: "var(--fb-text-secondary)",
-                        marginBottom: "4px",
-                      }}
-                    >
-                      Wiederkehrende
-                    </div>
-                    <div
-                      style={{
-                        fontSize: "var(--fb-font-size-2xl)",
-                        fontWeight: 700,
-                        color: "var(--fb-primary)",
-                      }}
-                    >
-                      {analytics.customers.returning}
+                      {formatCountMetric(cancelledAnalyticsOrders)}
                     </div>
                   </div>
                 </div>
               </div>
 
               {/* Top Selling Dishes */}
-              {analytics.dishes.topSelling.length > 0 && (
+              {analytics.topDishes.length > 0 && (
                 <div
                   style={{
                     padding: "20px",
@@ -493,9 +434,9 @@ export function Dashboard() {
                       gap: "12px",
                     }}
                   >
-                    {analytics.dishes.topSelling.map((dish, idx) => (
+                    {analytics.topDishes.map((dish, idx) => (
                       <div
-                        key={dish.id}
+                        key={dish.dishId}
                         style={{
                           display: "flex",
                           justifyContent: "space-between",
@@ -528,27 +469,18 @@ export function Dashboard() {
                             {idx + 1}
                           </div>
                           <div>
-                            <div style={{ fontWeight: 600 }}>{dish.name}</div>
+                            <div style={{ fontWeight: 600 }}>
+                              Gericht {dish.dishId}
+                            </div>
                             <div
                               style={{
                                 fontSize: "var(--fb-font-size-sm)",
                                 color: "var(--fb-text-secondary)",
                               }}
                             >
-                              {dish.quantity}x verkauft
+                              {dish.count}x verkauft
                             </div>
                           </div>
-                        </div>
-                        <div
-                          style={{
-                            fontWeight: 700,
-                            color: "var(--fb-success)",
-                          }}
-                        >
-                          {new Intl.NumberFormat("de-DE", {
-                            style: "currency",
-                            currency: "EUR",
-                          }).format(dish.revenue)}
                         </div>
                       </div>
                     ))}
@@ -580,7 +512,9 @@ export function Dashboard() {
                         fontWeight: 700,
                       }}
                     >
-                      {ratingsSummary.average.toFixed(1)}
+                      {typeof ratingsSummary.average === "number"
+                        ? ratingsSummary.average.toFixed(1)
+                        : "—"}
                     </div>
                     <div>
                       <div
@@ -597,7 +531,7 @@ export function Dashboard() {
                           color: "var(--fb-text-secondary)",
                         }}
                       >
-                        {ratingsSummary.total} Bewertungen
+                        {formatCountMetric(ratingsSummary.count)} Bewertungen
                       </div>
                     </div>
                   </div>
@@ -632,7 +566,7 @@ export function Dashboard() {
                           <div
                             style={{
                               height: "100%",
-                              width: `${ratingsSummary.total > 0 ? (ratingsSummary.distribution[rating as keyof typeof ratingsSummary.distribution] / ratingsSummary.total) * 100 : 0}%`,
+                              width: `${ratingsSummary.count !== null && ratingsSummary.count > 0 && ratingsSummary.distribution[rating as keyof typeof ratingsSummary.distribution] !== null ? (ratingsSummary.distribution[rating as keyof typeof ratingsSummary.distribution]! / ratingsSummary.count) * 100 : 0}%`,
                               backgroundColor: "var(--fb-primary)",
                             }}
                           />
@@ -644,11 +578,11 @@ export function Dashboard() {
                             fontSize: "var(--fb-font-size-sm)",
                           }}
                         >
-                          {
+                          {formatCountMetric(
                             ratingsSummary.distribution[
                               rating as keyof typeof ratingsSummary.distribution
-                            ]
-                          }
+                            ],
+                          )}
                         </div>
                       </div>
                     ))}

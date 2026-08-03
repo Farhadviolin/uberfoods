@@ -116,37 +116,65 @@ export function useUpdateRestaurant() {
 
 // Analytics & Performance
 export interface AnalyticsData {
-  revenue: {
-    total: number;
-    average: number;
-    growth: number;
-  };
-  revenueForecast?: number;
-  orders: {
-    total: number;
-    completed: number;
-    cancelled: number;
-    averageTime: number;
-  };
-  customers: {
-    total: number;
-    new: number;
-    returning: number;
-  };
-  customerLifetimeValue?: number;
-  menuEngineeringScore?: number;
-  averageOrderValue?: number;
-  dishes: {
-    topSelling: Array<{
-      id: string;
-      name: string;
-      quantity: number;
-      revenue: number;
-    }>;
-  };
-  period: {
-    start: string;
-    end: string;
+  /** Canonical response of GET /restaurants/me/analytics. */
+  period: string;
+  totalRevenue: number | null;
+  totalOrders: number | null;
+  avgOrderValue: number | null;
+  ordersByStatus: Record<string, number>;
+  topDishes: Array<{
+    dishId: string;
+    count: number;
+  }>;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function finiteNumberOrNull(value: unknown): number | null {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+/**
+ * Keeps the backend analytics contract flat while making partial responses
+ * renderable. Missing numeric values remain visible as unavailable instead of
+ * being replaced with fabricated zeroes.
+ */
+export function normalizeRestaurantAnalytics(
+  payload: unknown,
+): AnalyticsData | null {
+  if (!isRecord(payload)) return null;
+
+  const rawStatusCounts = isRecord(payload.ordersByStatus)
+    ? payload.ordersByStatus
+    : {};
+  const ordersByStatus = Object.entries(rawStatusCounts).reduce(
+    (result, [status, value]) => {
+      const count = finiteNumberOrNull(value);
+      if (count !== null && count >= 0) result[status] = count;
+      return result;
+    },
+    {} as Record<string, number>,
+  );
+
+  const topDishes = Array.isArray(payload.topDishes)
+    ? payload.topDishes.reduce<AnalyticsData["topDishes"]>((result, item) => {
+        if (!isRecord(item) || typeof item.dishId !== "string") return result;
+        const count = finiteNumberOrNull(item.count);
+        if (count === null || count < 0) return result;
+        result.push({ dishId: item.dishId, count });
+        return result;
+      }, [])
+    : [];
+
+  return {
+    period: typeof payload.period === "string" ? payload.period : "",
+    totalRevenue: finiteNumberOrNull(payload.totalRevenue),
+    totalOrders: finiteNumberOrNull(payload.totalOrders),
+    avgOrderValue: finiteNumberOrNull(payload.avgOrderValue),
+    ordersByStatus,
+    topDishes,
   };
 }
 
@@ -162,14 +190,33 @@ export interface PerformanceData {
 }
 
 export interface RatingsSummary {
-  average: number;
-  total: number;
+  average: number | null;
+  count: number | null;
   distribution: {
-    5: number;
-    4: number;
-    3: number;
-    2: number;
-    1: number;
+    5: number | null;
+    4: number | null;
+    3: number | null;
+    2: number | null;
+    1: number | null;
+  };
+}
+
+export function normalizeRatingsSummary(payload: unknown): RatingsSummary | null {
+  if (!isRecord(payload)) return null;
+  const rawDistribution = isRecord(payload.distribution)
+    ? payload.distribution
+    : {};
+
+  return {
+    average: finiteNumberOrNull(payload.average),
+    count: finiteNumberOrNull(payload.count),
+    distribution: {
+      5: finiteNumberOrNull(rawDistribution[5]),
+      4: finiteNumberOrNull(rawDistribution[4]),
+      3: finiteNumberOrNull(rawDistribution[3]),
+      2: finiteNumberOrNull(rawDistribution[2]),
+      1: finiteNumberOrNull(rawDistribution[1]),
+    },
   };
 }
 
@@ -177,10 +224,12 @@ export function useRestaurantAnalytics(period: "7d" | "30d" | "90d" = "7d") {
   return useQuery({
     queryKey: ["restaurant-analytics", "me", period],
     queryFn: async () => {
-      const response = await api.get<AnalyticsData>(
+      const response = await api.get<unknown>(
         `/restaurants/me/analytics?period=${period}`,
       );
-      return unwrapApiData<AnalyticsData | null>(response.data, null);
+      return normalizeRestaurantAnalytics(
+        unwrapApiData<unknown>(response.data, null),
+      );
     },
     staleTime: 5 * 60 * 1000, // 5 Minuten
   });
@@ -204,10 +253,10 @@ export function useRestaurantRatingsSummary(restaurantId?: string | null) {
   return useQuery({
     queryKey: ["restaurant-ratings", id],
     queryFn: async () => {
-      const response = await api.get<RatingsSummary>(
+      const response = await api.get<unknown>(
         `/restaurants/${id}/ratings/summary`,
       );
-      return unwrapApiData<RatingsSummary | null>(response.data, null);
+      return normalizeRatingsSummary(unwrapApiData<unknown>(response.data, null));
     },
     staleTime: 2 * 60 * 1000,
   });

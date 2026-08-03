@@ -110,8 +110,8 @@ export function AdvancedAnalytics() {
         <div className="analytics-card">
           <h3>Durchschnittliche Bestellwert</h3>
           <div className="metric-value">
-            {analytics?.averageOrderValue
-              ? formatCurrency(analytics.averageOrderValue)
+            {analytics?.avgOrderValue !== null && analytics?.avgOrderValue !== undefined
+              ? formatCurrency(analytics.avgOrderValue)
               : "N/A"}
           </div>
           <p className="metric-description">
