@@ -7,6 +7,17 @@ export interface RetryOptions {
   onRetry?: (attempt: number) => void;
 }
 
+function getHttpStatus(error: unknown): number | undefined {
+  if (!error || typeof error !== "object") return undefined;
+
+  const candidate = error as {
+    statusCode?: unknown;
+    response?: { status?: unknown };
+  };
+  const status = candidate.statusCode ?? candidate.response?.status;
+  return typeof status === "number" ? status : undefined;
+}
+
 export function useRetry<T extends (...args: any[]) => Promise<any>>(
   fn: T,
   options: RetryOptions = {},
@@ -49,12 +60,10 @@ export function useRetry<T extends (...args: any[]) => Promise<any>>(
           attempt++;
 
           // Don't retry on certain errors
-          if (error && typeof error === "object" && "statusCode" in error) {
-            const statusCode = (error as any).statusCode;
-            // Don't retry on 4xx errors (except 429)
-            if (statusCode >= 400 && statusCode < 500 && statusCode !== 429) {
-              throw error;
-            }
+          const statusCode = getHttpStatus(error);
+          // Don't retry on 4xx errors (except 429), including raw Axios errors.
+          if (statusCode !== undefined && statusCode >= 400 && statusCode < 500 && statusCode !== 429) {
+            throw error;
           }
 
           if (attempt <= maxRetries) {

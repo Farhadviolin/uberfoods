@@ -1,4 +1,4 @@
-import { useState, useEffect, FormEvent } from "react";
+import { useState, useEffect, useCallback, FormEvent } from "react";
 import { useAuth } from "../../contexts/AuthContext";
 import { useToast } from "../../contexts/ToastContext";
 import api from "../../utils/api";
@@ -26,11 +26,48 @@ interface Location {
   totalRevenue: number;
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function normalizeLocations(payload: unknown): Location[] {
+  const candidate = isRecord(payload) ? payload.data : payload;
+  if (!Array.isArray(candidate)) {
+    throw new Error("Ungültiges Standortdatenformat.");
+  }
+
+  return candidate.filter(isRecord).map((location) => ({
+    id: String(location.id ?? ""),
+    name: String(location.name ?? ""),
+    address: String(location.address ?? ""),
+    city: String(location.city ?? ""),
+    postalCode: String(location.postalCode ?? ""),
+    country: String(location.country ?? ""),
+    phone: String(location.phone ?? ""),
+    email: String(location.email ?? ""),
+    isActive: Boolean(location.isActive),
+    operatingHours: isRecord(location.operatingHours)
+      ? (location.operatingHours as Record<string, string>)
+      : {},
+    managerId: location.managerId ? String(location.managerId) : undefined,
+    managerName: location.managerName
+      ? String(location.managerName)
+      : undefined,
+    totalOrders: Number.isFinite(Number(location.totalOrders))
+      ? Number(location.totalOrders)
+      : 0,
+    totalRevenue: Number.isFinite(Number(location.totalRevenue))
+      ? Number(location.totalRevenue)
+      : 0,
+  }));
+}
+
 export function MultiLocationManagement() {
   const { restaurantId } = useAuth();
   const { showToast } = useToast();
   const [locations, setLocations] = useState<Location[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [formData, setFormData] = useState({
     name: "",
@@ -43,18 +80,23 @@ export function MultiLocationManagement() {
     isActive: true,
   });
 
-  const fetchLocations = async () => {
+  const fetchLocations = useCallback(async () => {
+    if (!restaurantId) return;
+
     try {
       const response = await api.get(`/restaurants/${restaurantId}/locations`);
-      setLocations(response.data || []);
+      setLocations(normalizeLocations(response.data));
+      setLoadError(null);
     } catch (error: unknown) {
       const appError = handleApiError(error);
       logError(appError, "MultiLocationManagement.fetchLocations");
+      setLocations([]);
+      setLoadError(getErrorMessage(appError));
       showToast(getErrorMessage(appError), "error");
     } finally {
       setLoading(false);
     }
-  };
+  }, [restaurantId, showToast]);
 
   useEffect(() => {
     if (restaurantId) {
@@ -238,7 +280,11 @@ export function MultiLocationManagement() {
       )}
 
       <div className="locations-grid">
-        {locations.length === 0 ? (
+        {loadError ? (
+          <div role="alert" className="empty-state">
+            Standorte nicht verfügbar: {loadError}
+          </div>
+        ) : locations.length === 0 ? (
           <div className="empty-state">Keine Standorte vorhanden</div>
         ) : (
           locations.map((location) => (

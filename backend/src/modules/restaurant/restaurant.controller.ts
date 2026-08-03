@@ -13,6 +13,7 @@ import {
   HttpStatus,
   BadRequestException,
   ForbiddenException,
+  NotFoundException,
   Logger,
   Res,
   Request,
@@ -179,6 +180,38 @@ export class RestaurantController {
     });
   }
 
+  @Get(":id/menu")
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles("RESTAURANT")
+  @ApiOperation({ summary: "Get the authenticated restaurant menu" })
+  async getRestaurantMenu(
+    @Param("id") id: string,
+    @GetUser() actor: AuthenticatedRequest["user"],
+  ) {
+    this.assertRestaurantOwnership(id, actor);
+    return this.prisma.dish.findMany({
+      where: { restaurantId: id },
+      orderBy: { createdAt: "desc" },
+    });
+  }
+
+  @Get(":id/menu/:dishId")
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles("RESTAURANT")
+  @ApiOperation({ summary: "Get one authenticated restaurant menu item" })
+  async getRestaurantMenuItem(
+    @Param("id") id: string,
+    @Param("dishId") dishId: string,
+    @GetUser() actor: AuthenticatedRequest["user"],
+  ) {
+    this.assertRestaurantOwnership(id, actor);
+    const dish = await this.prisma.dish.findFirst({
+      where: { id: dishId, restaurantId: id },
+    });
+    if (!dish) throw new NotFoundException("Dish not found");
+    return dish;
+  }
+
   @Get("public/:id")
   async findPublicOne(@Param("id") id: string) {
     return this.restaurantService.findOne(id);
@@ -234,6 +267,16 @@ export class RestaurantController {
       throw new BadRequestException("Restaurant ID not found");
     }
     return restaurantId;
+  }
+
+  private assertRestaurantOwnership(
+    restaurantId: string,
+    actor?: AuthenticatedRequest["user"],
+  ): void {
+    const actorId = actor?.id || actor?.sub;
+    if (!actorId || actorId !== restaurantId) {
+      throw new ForbiddenException("Restaurant ownership required");
+    }
   }
 
   @Get("me")
@@ -468,6 +511,42 @@ export class RestaurantController {
     return this.restaurantService.getDeliveryFee(id, location);
   }
 
+  @Get(":id/delivery-fees")
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles("RESTAURANT")
+  @ApiOperation({ summary: "Get the authenticated restaurant delivery fees" })
+  async getDeliveryFees(
+    @Param("id") id: string,
+    @GetUser() actor: AuthenticatedRequest["user"],
+  ) {
+    this.assertRestaurantOwnership(id, actor);
+    const restaurant = await this.restaurantService.findOne(id);
+    return {
+      baseFee: restaurant.deliveryFee,
+      perKmFee: 0,
+      minOrderAmount: restaurant.minOrderAmount,
+      freeDeliveryThreshold: restaurant.freeDeliveryThreshold,
+    };
+  }
+
+  @Put(":id/delivery-fees")
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles("RESTAURANT")
+  @ApiOperation({
+    summary: "Update the authenticated restaurant delivery fees",
+  })
+  async updateDeliveryFees(
+    @Param("id") id: string,
+    @Body() body: { baseFee: number; minOrderAmount: number },
+    @GetUser() actor: AuthenticatedRequest["user"],
+  ) {
+    this.assertRestaurantOwnership(id, actor);
+    return this.restaurantService.update(id, {
+      deliveryFee: body.baseFee,
+      minOrderAmount: body.minOrderAmount,
+    });
+  }
+
   @Post(":id/delivery-fee")
   async calculateDeliveryFee(
     @Param("id") id: string,
@@ -612,16 +691,23 @@ export class RestaurantController {
   }
 
   @Get(":id/locations")
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles("RESTAURANT")
   @ApiOperation({
     summary: "Get restaurant locations",
     description: "Get all locations for a restaurant (multi-location support)",
   })
-  async getLocations(@Param("id") id: string) {
+  async getLocations(
+    @Param("id") id: string,
+    @GetUser() actor: AuthenticatedRequest["user"],
+  ) {
+    this.assertRestaurantOwnership(id, actor);
     return this.restaurantService.getLocations(id);
   }
 
   @Post(":id/locations")
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles("RESTAURANT")
   @ApiOperation({
     summary: "Create restaurant location",
     description: "Create a new location for a restaurant",
@@ -639,12 +725,15 @@ export class RestaurantController {
       email: string;
       isActive?: boolean;
     },
+    @GetUser() actor: AuthenticatedRequest["user"],
   ) {
+    this.assertRestaurantOwnership(id, actor);
     return this.restaurantService.createLocation(id, body);
   }
 
   @Patch(":id/locations/:locationId/toggle-status")
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles("RESTAURANT")
   @ApiOperation({
     summary: "Toggle location status",
     description: "Activate or deactivate a restaurant location",
@@ -652,12 +741,15 @@ export class RestaurantController {
   async toggleLocationStatus(
     @Param("id") id: string,
     @Param("locationId") locationId: string,
+    @GetUser() actor: AuthenticatedRequest["user"],
   ) {
+    this.assertRestaurantOwnership(id, actor);
     return this.restaurantService.toggleLocationStatus(id, locationId);
   }
 
   @Delete(":id/locations/:locationId")
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles("RESTAURANT")
   @ApiOperation({
     summary: "Delete location",
     description: "Delete a restaurant location",
@@ -665,11 +757,15 @@ export class RestaurantController {
   async deleteLocation(
     @Param("id") id: string,
     @Param("locationId") locationId: string,
+    @GetUser() actor: AuthenticatedRequest["user"],
   ) {
+    this.assertRestaurantOwnership(id, actor);
     return this.restaurantService.deleteLocation(id, locationId);
   }
 
   @Get(":id/reports")
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles("RESTAURANT")
   @ApiOperation({
     summary: "Get restaurant reports",
     description: "Get comprehensive reports for a restaurant",
@@ -689,7 +785,9 @@ export class RestaurantController {
   async getReports(
     @Param("id") id: string,
     @Query() query: { range?: string; type?: string },
+    @GetUser() actor: AuthenticatedRequest["user"],
   ) {
+    this.assertRestaurantOwnership(id, actor);
     return this.restaurantService.getReports(
       id,
       query.range || "30days",
@@ -698,6 +796,8 @@ export class RestaurantController {
   }
 
   @Get(":id/reports/export")
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles("RESTAURANT")
   @ApiOperation({
     summary: "Export restaurant report",
     description:
@@ -725,7 +825,9 @@ export class RestaurantController {
     @Param("id") id: string,
     @Query() query: { range?: string; type?: string; format?: string },
     @Res() res: Response,
+    @GetUser() actor: AuthenticatedRequest["user"],
   ) {
+    this.assertRestaurantOwnership(id, actor);
     const reportData = await this.restaurantService.getReports(
       id,
       query.range || "30days",

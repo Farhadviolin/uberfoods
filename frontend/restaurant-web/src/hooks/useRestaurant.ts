@@ -1,6 +1,14 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import api from "../utils/api";
 
+function unwrapApiData<T>(payload: unknown, fallback: T): T {
+  if (payload && typeof payload === "object" && !Array.isArray(payload) && "success" in payload) {
+    const envelope = payload as { success?: unknown; data?: unknown };
+    return envelope.success === true ? (envelope.data as T) : fallback;
+  }
+  return payload as T;
+}
+
 export interface Restaurant {
   id: string;
   name: string;
@@ -62,7 +70,7 @@ export function useRestaurant() {
     queryKey: ["restaurant", "me"],
     queryFn: async () => {
       const response = await api.get<Restaurant>("/restaurants/me");
-      return response.data;
+      return unwrapApiData<Restaurant | null>(response.data, null);
     },
   });
 }
@@ -74,7 +82,7 @@ export function useRestaurantStats(
     queryKey: ["restaurant-stats", "me", period],
     queryFn: async () => {
       const response = await api.get(`/restaurants/me/stats?period=${period}`);
-      return response.data || null;
+      return unwrapApiData<RestaurantStats | null>(response.data, null);
     },
   });
 }
@@ -86,7 +94,7 @@ export function useRestaurantRevenue(period: "7d" | "30d" | "90d" = "7d") {
       const response = await api.get<RevenueData[]>(
         `/restaurants/me/revenue?period=${period}`,
       );
-      return response.data || [];
+      return unwrapApiData<RevenueData[]>(response.data, []);
     },
     staleTime: 60 * 1000,
   });
@@ -172,7 +180,7 @@ export function useRestaurantAnalytics(period: "7d" | "30d" | "90d" = "7d") {
       const response = await api.get<AnalyticsData>(
         `/restaurants/me/analytics?period=${period}`,
       );
-      return response.data;
+      return unwrapApiData<AnalyticsData | null>(response.data, null);
     },
     staleTime: 5 * 60 * 1000, // 5 Minuten
   });
@@ -185,7 +193,7 @@ export function useRestaurantPerformance(period: "7d" | "30d" | "90d" = "7d") {
       const response = await api.get<PerformanceData>(
         `/restaurants/me/performance?period=${period}`,
       );
-      return response.data;
+      return unwrapApiData<PerformanceData | null>(response.data, null);
     },
     staleTime: 5 * 60 * 1000,
   });
@@ -199,7 +207,7 @@ export function useRestaurantRatingsSummary(restaurantId?: string | null) {
       const response = await api.get<RatingsSummary>(
         `/restaurants/${id}/ratings/summary`,
       );
-      return response.data;
+      return unwrapApiData<RatingsSummary | null>(response.data, null);
     },
     staleTime: 2 * 60 * 1000,
   });
@@ -230,7 +238,7 @@ export function useOperatingHours(restaurantId: string | null) {
       const response = await api.get<OperatingHours>(
         `/restaurants/${restaurantId}/operating-hours`,
       );
-      return response.data;
+      return unwrapApiData<OperatingHours | null>(response.data, null);
     },
     enabled: !!restaurantId,
   });
@@ -269,7 +277,7 @@ export function useUpdateOperatingHours() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({
+    mutationFn: async ({
       restaurantId,
       hours,
     }: {
@@ -295,7 +303,41 @@ export interface DeliveryZone {
   name: string;
   coordinates: Coordinate[];
   fee: number;
+  deliveryFee?: number;
   restaurantId: string;
+  isActive?: boolean;
+}
+
+type DeliveryZoneResponse = DeliveryZone[] | {
+  success: boolean;
+  data?: unknown;
+};
+
+function normalizeDeliveryZones(response: DeliveryZoneResponse): DeliveryZone[] {
+  const payload = typeof response === 'object' && response !== null && 'success' in response
+    ? response.success === true ? response.data : undefined
+    : response;
+  if (!Array.isArray(payload)) {
+    throw new Error('Ungültige Lieferzonen-Antwort.');
+  }
+
+  return payload.map((zone) => {
+    if (!zone || typeof zone !== 'object' || typeof (zone as DeliveryZone).name !== 'string') {
+      throw new Error('Ungültige Lieferzonen-Antwort.');
+    }
+    const value = zone as DeliveryZone;
+    const fee = typeof value.fee === 'number' ? value.fee : value.deliveryFee ?? 0;
+    return { ...value, fee, deliveryFee: value.deliveryFee ?? fee };
+  });
+}
+
+function serializeDeliveryZone(zone: DeliveryZone) {
+  return {
+    name: zone.name,
+    coordinates: zone.coordinates,
+    deliveryFee: zone.deliveryFee ?? zone.fee,
+    isActive: zone.isActive !== false,
+  };
 }
 
 export function useDeliveryZones(restaurantId: string | null) {
@@ -303,10 +345,10 @@ export function useDeliveryZones(restaurantId: string | null) {
     queryKey: ["delivery-zones", restaurantId],
     queryFn: async () => {
       if (!restaurantId) return [];
-      const response = await api.get<DeliveryZone[]>(
+      const response = await api.get<DeliveryZoneResponse>(
         `/restaurants/${restaurantId}/delivery-zones`,
       );
-      return response.data || [];
+      return normalizeDeliveryZones(response.data);
     },
     enabled: !!restaurantId,
   });
@@ -316,13 +358,31 @@ export function useCreateDeliveryZone() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({
+    mutationFn: async ({
       restaurantId,
       zone,
     }: {
       restaurantId: string;
       zone: Omit<DeliveryZone, "id" | "restaurantId">;
-    }) => api.post(`/restaurants/${restaurantId}/delivery-zones`, zone),
+    }) => {
+      const existing = await api.get<DeliveryZoneResponse>(
+        `/restaurants/${restaurantId}/delivery-zones`,
+      );
+      const existingZones = normalizeDeliveryZones(existing.data);
+      const zones = [
+        ...existingZones.map(serializeDeliveryZone),
+        {
+          name: zone.name,
+          coordinates: zone.coordinates,
+          deliveryFee: zone.deliveryFee ?? zone.fee,
+          isActive: zone.isActive !== false,
+        },
+      ];
+      const response = await api.put(`/restaurants/${restaurantId}/delivery-zones`, {
+        zones,
+      });
+      return response.data;
+    },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({
         queryKey: ["delivery-zones", variables.restaurantId],
@@ -335,7 +395,7 @@ export function useUpdateDeliveryZone() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({
+    mutationFn: async ({
       restaurantId,
       zoneId,
       zone,
@@ -343,8 +403,18 @@ export function useUpdateDeliveryZone() {
       restaurantId: string;
       zoneId: string;
       zone: Partial<DeliveryZone>;
-    }) =>
-      api.put(`/restaurants/${restaurantId}/delivery-zones/${zoneId}`, zone),
+    }) => {
+      const existing = await api.get<DeliveryZoneResponse>(
+        `/restaurants/${restaurantId}/delivery-zones`,
+      );
+      const zones = normalizeDeliveryZones(existing.data).map((current) =>
+        current.id === zoneId
+          ? serializeDeliveryZone({ ...current, ...zone })
+          : serializeDeliveryZone(current),
+      );
+      const response = await api.put(`/restaurants/${restaurantId}/delivery-zones`, { zones });
+      return response.data;
+    },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({
         queryKey: ["delivery-zones", variables.restaurantId],
@@ -357,13 +427,22 @@ export function useDeleteDeliveryZone() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({
+    mutationFn: async ({
       restaurantId,
       zoneId,
     }: {
       restaurantId: string;
       zoneId: string;
-    }) => api.delete(`/restaurants/${restaurantId}/delivery-zones/${zoneId}`),
+    }) => {
+      const existing = await api.get<DeliveryZoneResponse>(
+        `/restaurants/${restaurantId}/delivery-zones`,
+      );
+      const zones = normalizeDeliveryZones(existing.data)
+        .filter((zone) => zone.id !== zoneId)
+        .map(serializeDeliveryZone);
+      const response = await api.put(`/restaurants/${restaurantId}/delivery-zones`, { zones });
+      return response.data;
+    },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({
         queryKey: ["delivery-zones", variables.restaurantId],
@@ -377,17 +456,27 @@ export interface DeliveryFees {
   baseFee: number;
   perKmFee: number;
   minOrderAmount: number;
+  freeDeliveryThreshold?: number | null;
 }
 
 export function useDeliveryFees(restaurantId: string | null) {
-  return useQuery({
+  return useQuery<DeliveryFees | null>({
     queryKey: ["delivery-fees", restaurantId],
     queryFn: async () => {
       if (!restaurantId) return null;
-      const response = await api.get<DeliveryFees>(
-        `/restaurants/${restaurantId}/delivery-fees`,
-      );
-      return response.data;
+      const response = await api.get<
+        DeliveryFees | { data?: DeliveryFees }
+      >(`/restaurants/${restaurantId}/delivery-fees`);
+      const payload: unknown = response.data;
+      if (
+        payload &&
+        typeof payload === "object" &&
+        !Array.isArray(payload) &&
+        "data" in payload
+      ) {
+        return (payload as { data?: DeliveryFees }).data ?? null;
+      }
+      return (payload as DeliveryFees | null) ?? null;
     },
     enabled: !!restaurantId,
   });
@@ -403,7 +492,11 @@ export function useSetDeliveryFees() {
     }: {
       restaurantId: string;
       fees: DeliveryFees;
-    }) => api.put(`/restaurants/${restaurantId}/delivery-fees`, fees),
+    }) =>
+      api.put(`/restaurants/${restaurantId}/delivery-fees`, {
+        baseFee: fees.baseFee,
+        minOrderAmount: fees.minOrderAmount,
+      }),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({
         queryKey: ["delivery-fees", variables.restaurantId],

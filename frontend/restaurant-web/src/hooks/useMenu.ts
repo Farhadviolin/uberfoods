@@ -55,7 +55,7 @@ export function useMenu() {
     queryKey: ["menu", restaurantId],
     queryFn: async () => {
       if (!restaurantId) return [];
-      const response = await api.get(`/restaurants/${restaurantId}/menu`);
+      const response = await api.get(`/dishes/restaurant/${restaurantId}`);
       const payload = response.data as Dish[] | { data?: Dish[] };
       if (Array.isArray(payload)) return payload;
       return Array.isArray(payload?.data) ? payload.data : [];

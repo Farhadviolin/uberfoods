@@ -47,6 +47,98 @@ interface ReportData {
   locations: Array<{ name: string; revenue: number; orders: number }>;
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value && typeof value === "object" && !Array.isArray(value));
+}
+
+function isRevenueSeries(value: unknown, label: string): boolean {
+  return (
+    Array.isArray(value) &&
+    value.every(
+      (entry) =>
+        isRecord(entry) &&
+        typeof entry[label] === "string" &&
+        typeof entry.revenue === "number",
+    )
+  );
+}
+
+function isReportData(value: unknown): value is ReportData {
+  if (!isRecord(value)) return false;
+
+  const revenue = value.revenue;
+  const orders = value.orders;
+  const dishes = value.dishes;
+  const customers = value.customers;
+
+  return (
+    isRecord(revenue) &&
+    isRevenueSeries(revenue.daily, "date") &&
+    isRevenueSeries(revenue.weekly, "week") &&
+    isRevenueSeries(revenue.monthly, "month") &&
+    isRecord(orders) &&
+    Array.isArray(orders.byStatus) &&
+    orders.byStatus.every(
+      (entry) =>
+        isRecord(entry) &&
+        typeof entry.status === "string" &&
+        typeof entry.count === "number",
+    ) &&
+    Array.isArray(orders.byTime) &&
+    orders.byTime.every(
+      (entry) =>
+        isRecord(entry) &&
+        typeof entry.hour === "number" &&
+        typeof entry.count === "number",
+    ) &&
+    isRecord(dishes) &&
+    Array.isArray(dishes.topSelling) &&
+    dishes.topSelling.every(
+      (entry) =>
+        isRecord(entry) &&
+        typeof entry.name === "string" &&
+        typeof entry.quantity === "number" &&
+        typeof entry.revenue === "number",
+    ) &&
+    Array.isArray(dishes.categoryBreakdown) &&
+    dishes.categoryBreakdown.every(
+      (entry) =>
+        isRecord(entry) &&
+        typeof entry.category === "string" &&
+        typeof entry.revenue === "number",
+    ) &&
+    isRecord(customers) &&
+    isRecord(customers.newVsReturning) &&
+    typeof customers.newVsReturning.new === "number" &&
+    typeof customers.newVsReturning.returning === "number" &&
+    Array.isArray(customers.topCustomers) &&
+    customers.topCustomers.every(
+      (entry) =>
+        isRecord(entry) &&
+        typeof entry.name === "string" &&
+        typeof entry.orders === "number" &&
+        typeof entry.revenue === "number",
+    ) &&
+    Array.isArray(value.locations) &&
+    value.locations.every(
+      (entry) =>
+        isRecord(entry) &&
+        typeof entry.name === "string" &&
+        typeof entry.revenue === "number" &&
+        typeof entry.orders === "number",
+    )
+  );
+}
+
+function normalizeReportData(payload: unknown): ReportData | null {
+  if (isRecord(payload) && "success" in payload) {
+    if (payload.success !== true) return null;
+    return isReportData(payload.data) ? payload.data : null;
+  }
+
+  return isReportData(payload) ? payload : null;
+}
+
 const COLORS = [
   "#4338CA",
   "#10B981",
@@ -61,6 +153,7 @@ export function AdvancedReporting() {
   const { showToast } = useToast();
   const [reportData, setReportData] = useState<ReportData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [dateRange, setDateRange] = useState("30days");
   const [reportType, setReportType] = useState("overview");
 
@@ -118,13 +211,27 @@ export function AdvancedReporting() {
   }, [restaurantId, dateRange, reportType]);
 
   const fetchReportData = async () => {
+    if (!restaurantId) {
+      setReportData(null);
+      setError("Restaurant-Identität fehlt.");
+      setLoading(false);
+      return;
+    }
+
     try {
       setLoading(true);
-      const data = await retryFetchReport.execute();
+      setError(null);
+      const payload = await retryFetchReport.execute();
+      const data = normalizeReportData(payload);
+      if (!data) {
+        throw new Error("Ungültiges Berichtsdatenformat.");
+      }
       setReportData(data);
     } catch (error: unknown) {
       const appError = handleApiError(error);
       logError(appError, "AdvancedReporting.fetchReportData");
+      setReportData(null);
+      setError(getErrorMessage(appError));
       showToast(getErrorMessage(appError), "error");
     } finally {
       setLoading(false);
@@ -199,6 +306,21 @@ export function AdvancedReporting() {
   }
 
   if (!reportData) {
+    if (error) {
+      return (
+        <div className="empty-state" role="alert">
+          <p>{error}</p>
+          <button
+            type="button"
+            className="fb-button-secondary"
+            onClick={() => void fetchReportData()}
+          >
+            Erneut versuchen
+          </button>
+        </div>
+      );
+    }
+
     return <div className="empty-state">Keine Daten verfügbar</div>;
   }
 

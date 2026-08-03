@@ -1,4 +1,5 @@
 import { lazy, Suspense } from "react";
+import { FeatureNotAvailable } from "../common/FeatureNotAvailable";
 
 // Lazy load heavy components for better performance
 const Dashboard = lazy(() =>
@@ -20,26 +21,6 @@ const MealPlannerManagement = lazy(() =>
     default: m.MealPlannerManagement,
   })),
 );
-const Reviews = lazy(() =>
-  import("../Reviews/Reviews").then((m) => ({ default: m.Reviews })),
-);
-const Promotions = lazy(() =>
-  import("../Promotions/Promotions").then((m) => ({ default: m.Promotions })),
-);
-const CustomerSupport = lazy(() =>
-  import("../CustomerSupport").then((m) => ({ default: m.CustomerSupport })),
-);
-const SupplierManagement = lazy(() =>
-  import("../Supplier/SupplierManagement").then((m) => ({
-    default: m.SupplierManagement,
-  })),
-);
-const Finance = lazy(() =>
-  import("../Finance/Finance").then((m) => ({ default: m.Finance })),
-);
-const EARechnung = lazy(() =>
-  import("../Accounting/EARechnung").then((m) => ({ default: m.EARechnung })),
-);
 const AdvancedAnalytics = lazy(() =>
   import("../Analytics/AdvancedAnalytics").then((m) => ({
     default: m.AdvancedAnalytics,
@@ -48,32 +29,6 @@ const AdvancedAnalytics = lazy(() =>
 const AdvancedReporting = lazy(() =>
   import("../Reporting/AdvancedReporting").then((m) => ({
     default: m.AdvancedReporting,
-  })),
-);
-const UnifiedMonitoring = lazy(() =>
-  import("../UnifiedMonitoring").then((m) => ({
-    default: m.UnifiedMonitoring,
-  })),
-);
-const Inventory = lazy(() =>
-  import("../Inventory/Inventory").then((m) => ({ default: m.Inventory })),
-);
-const StaffManagement = lazy(() =>
-  import("../Staff/Staff").then((m) => ({ default: m.StaffManagement })),
-);
-const StaffScheduling = lazy(() =>
-  import("../Staff/StaffScheduling").then((m) => ({
-    default: m.StaffScheduling,
-  })),
-);
-const CampaignManager = lazy(() =>
-  import("../Marketing/CampaignManager").then((m) => ({
-    default: m.CampaignManager,
-  })),
-);
-const TableManagement = lazy(() =>
-  import("../TableManagement/TableManagement").then((m) => ({
-    default: m.TableManagement,
   })),
 );
 const MultiLocationManagement = lazy(() =>
@@ -116,33 +71,33 @@ export const MainContent = ({ activeTab }: MainContentProps) => {
       case "meal-planner":
         return <MealPlannerManagement />;
       case "reviews":
-        return <Reviews />;
+        return <FeatureNotAvailable feature="Bewertungen" />;
       case "promotions":
-        return <Promotions />;
+        return <FeatureNotAvailable feature="Aktionen" />;
       case "support":
-        return <CustomerSupport />;
+        return <FeatureNotAvailable feature="Support" />;
       case "suppliers":
-        return <SupplierManagement />;
+        return <FeatureNotAvailable feature="Lieferanten" />;
       case "finance":
-        return <Finance />;
+        return <FeatureNotAvailable feature="Finanzen" />;
       case "accounting":
-        return <EARechnung />;
+        return <FeatureNotAvailable feature="Buchhaltung (E/A)" />;
       case "analytics":
         return <AdvancedAnalytics />;
       case "reporting":
         return <AdvancedReporting />;
       case "monitoring":
-        return <UnifiedMonitoring />;
+        return <FeatureNotAvailable feature="Monitoring" />;
       case "inventory":
-        return <Inventory />;
+        return <FeatureNotAvailable feature="Inventar" />;
       case "staff":
-        return <StaffManagement />;
+        return <FeatureNotAvailable feature="Mitarbeiter" />;
       case "staff-scheduling":
-        return <StaffScheduling />;
+        return <FeatureNotAvailable feature="Schichtplanung" />;
       case "marketing":
-        return <CampaignManager />;
+        return <FeatureNotAvailable feature="Marketing" />;
       case "tables":
-        return <TableManagement />;
+        return <FeatureNotAvailable feature="Tische" />;
       case "locations":
         return <MultiLocationManagement />;
       case "profile":
