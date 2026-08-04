@@ -4,6 +4,7 @@ import { config } from '../config';
 import { Order } from '../types';
 import { logger } from '../utils/logger';
 import { useAppState } from '../services/stateManager';
+import { useAuth } from '../contexts/AuthContext';
 
 // Socket.IO benötigt HTTP/HTTPS URL, NICHT WebSocket URL!
 // Socket.IO macht selbst das Upgrade zu WebSocket über den Transport
@@ -34,6 +35,26 @@ const globalSocketMap = new Map<string, Socket>();
 // ✅ REFERENZ-ZÄHLUNG: Tracke wie viele Komponenten jede Socket-Instanz verwenden
 // Verhindert, dass Socket zu früh entfernt wird wenn mehrere Komponenten sie nutzen
 const socketRefCount = new Map<string, number>();
+
+const releaseGlobalSocket = (driverId: string, socket: Socket | null) => {
+  if (!socket || globalSocketMap.get(driverId) !== socket) return;
+
+  const refCount = socketRefCount.get(driverId) || 1;
+  if (refCount > 1) {
+    socketRefCount.set(driverId, refCount - 1);
+    return;
+  }
+
+  globalSocketMap.delete(driverId);
+  socketRefCount.delete(driverId);
+  try {
+    socket.removeAllListeners();
+    socket.io?.reconnection(false);
+    socket.disconnect();
+  } catch {
+    // Ignoriere Fehler beim Aufräumen einer bereits geschlossenen Verbindung
+  }
+};
 
 // Logging-Helper: Nur in Development loggen
 const log = (_message: string, ..._args: any[]) => {
@@ -85,9 +106,9 @@ export function useWebSocket(
   options: UseWebSocketOptions = {}
 ) {
   const { state, actions } = useAppState();
+  const { token: authToken } = useAuth();
   const socketRef = useRef<Socket | null>(null);
   const currentDriverIdRef = useRef<string | null>(null); // Track current driverId to prevent duplicate connections
-  const previousDriverIdRef = useRef<string | null>(null); // ✅ Track previous driverId to detect actual changes
   const [isConnected, setIsConnected] = useState(false);
   const [connectionError, setConnectionError] = useState<string | null>(null);
   const [locationTrackingEnabled, setLocationTrackingEnabled] = useState(false);
@@ -220,42 +241,9 @@ export function useWebSocket(
     // Das stellt sicher, dass die Callbacks immer aktuell sind, ohne den Effect neu zu triggern
     callbacksRef.current = options;
     
-    // ✅ WICHTIG: Prüfe ob driverId sich wirklich geändert hat
-    // Verhindert unnötige Re-Runs wenn driverId gleich bleibt
-    if (previousDriverIdRef.current === driverId) {
-      // driverId hat sich nicht geändert - kein Re-Run nötig
-      // ABER: Callbacks könnten sich geändert haben, also aktualisiere sie trotzdem
-      return () => {
-        // Cleanup nur wenn driverId sich ändert
-      };
-    }
-    
-    // ✅ WICHTIG: Aktualisiere previousDriverIdRef NUR wenn sich driverId wirklich geändert hat
-    const previousDriverId = previousDriverIdRef.current;
-    previousDriverIdRef.current = driverId;
-    
-    // ✅ WICHTIG: Cleanup vorherige Verbindung wenn driverId sich geändert hat
-    if (previousDriverId !== null && previousDriverId !== driverId && socketRef.current) {
-      // Reduziere Referenz-Zähler für vorherigen driverId
-      const prevRefCount = socketRefCount.get(previousDriverId) || 0;
-      if (prevRefCount > 1) {
-        socketRefCount.set(previousDriverId, prevRefCount - 1);
-        logger.debug('Socket-Referenz reduziert für vorherigen driverId', 'WebSocket', { previousDriverId, refCount: prevRefCount - 1 });
-      } else {
-        socketRefCount.delete(previousDriverId);
-        // Entferne Socket aus globaler Map nur wenn keine Referenzen mehr und nicht connected
-        const prevSocket = globalSocketMap.get(previousDriverId);
-        if (prevSocket === socketRef.current && !prevSocket.connected && !prevSocket.active) {
-          globalSocketMap.delete(previousDriverId);
-          logger.debug('Socket aus globaler Map entfernt für vorherigen driverId', 'WebSocket', { previousDriverId });
-        }
-      }
-    }
-    
     if (!driverId) {
       setIsConnected(false);
       currentDriverIdRef.current = null;
-      previousDriverIdRef.current = null; // ✅ WICHTIG: Reset auch previousDriverIdRef
       // Cleanup bestehende Verbindung wenn kein driverId
       if (socketRef.current) {
         try {
@@ -285,16 +273,8 @@ export function useWebSocket(
       
       // WICHTIG: Auch bei frühem Return Cleanup-Funktion zurückgeben
       return () => {
-        // ✅ REFERENZ-ZÄHLUNG: Reduziere Zähler beim Cleanup
-        const count = socketRefCount.get(driverId) || 0;
-        if (count > 1) {
-          socketRefCount.set(driverId, count - 1);
-          logger.debug('Socket-Referenz reduziert', 'WebSocket', { driverId, refCount: count - 1 });
-        } else {
-          // Letzte Referenz - entferne aus Map
-          socketRefCount.delete(driverId);
-          logger.debug('Letzte Socket-Referenz entfernt', 'WebSocket', { driverId });
-        }
+        releaseGlobalSocket(driverId, socketRef.current);
+        socketRef.current = null;
       };
     }
 
@@ -314,15 +294,8 @@ export function useWebSocket(
         logger.debug('WebSocket-Verbindung existiert bereits oder wird erstellt für driverId', 'WebSocket', { driverId, refCount: currentCount + 1 });
         // WICHTIG: Auch bei frühem Return Cleanup-Funktion zurückgeben, damit React korrekt aufräumt
         return () => {
-          // ✅ REFERENZ-ZÄHLUNG: Reduziere Zähler beim Cleanup
-          const count = socketRefCount.get(driverId) || 0;
-          if (count > 1) {
-            socketRefCount.set(driverId, count - 1);
-            logger.debug('Socket-Referenz reduziert', 'WebSocket', { driverId, refCount: count - 1 });
-          } else {
-            socketRefCount.delete(driverId);
-            logger.debug('Letzte Socket-Referenz entfernt', 'WebSocket', { driverId });
-          }
+          releaseGlobalSocket(driverId, socketRef.current);
+          socketRef.current = null;
         };
       }
     }
@@ -370,7 +343,7 @@ export function useWebSocket(
     document.addEventListener('visibilitychange', handleVisibilityChange);
 
     // Hole Token aus localStorage
-    const token = localStorage.getItem('driver_token');
+    const token = authToken || localStorage.getItem('driver_token');
 
     // WICHTIG: Prüfe ob Token vorhanden ist - ohne Token keine Verbindung möglich
     if (!token) {
@@ -417,15 +390,8 @@ export function useWebSocket(
       logger.debug('✅ Race Condition: Verwende existierende globale Socket-Instanz', 'WebSocket', { driverId, refCount: currentCount + 1 });
       
       return () => {
-        // ✅ REFERENZ-ZÄHLUNG: Reduziere Zähler beim Cleanup
-        const count = socketRefCount.get(driverId) || 0;
-        if (count > 1) {
-          socketRefCount.set(driverId, count - 1);
-          logger.debug('Socket-Referenz reduziert', 'WebSocket', { driverId, refCount: count - 1 });
-        } else {
-          socketRefCount.delete(driverId);
-          logger.debug('Letzte Socket-Referenz entfernt', 'WebSocket', { driverId });
-        }
+        releaseGlobalSocket(driverId, socketRef.current);
+        socketRef.current = null;
       };
     }
     
@@ -446,10 +412,13 @@ export function useWebSocket(
       auth: {
         token: token, // Token ist garantiert vorhanden
       },
-      extraHeaders: {
-        Authorization: `Bearer ${token}`, // Token ist garantiert vorhanden
-      },
     });
+
+    // Vor dem Handshake registrieren, damit parallel gemountete Hooks dieselbe
+    // authentifizierte Socket-Instanz erwerben statt eigene Verbindungen zu
+    // eröffnen.
+    globalSocketMap.set(driverId, socketRef.current);
+    socketRefCount.set(driverId, 1);
 
     socketRef.current.on('connect', () => {
       log('✅ WebSocket connected');
@@ -464,9 +433,9 @@ export function useWebSocket(
       // ✅ WICHTIG: Speichere Socket in globaler Map für andere useWebSocket-Aufrufe
       if (socketRef.current) {
         globalSocketMap.set(driverId, socketRef.current);
-        // ✅ REFERENZ-ZÄHLUNG: Initialisiere Zähler für neue Socket-Instanz
-        socketRefCount.set(driverId, 1);
-        logger.debug('Neue Socket-Instanz erstellt und in globale Map gespeichert', 'WebSocket', { driverId, refCount: 1 });
+        // Der Referenzzähler wird beim Erstellen/Reverwenden gesetzt und darf
+        // beim Connect-Event nicht zurückgesetzt werden.
+        logger.debug('Neue Socket-Instanz erstellt und in globale Map gespeichert', 'WebSocket', { driverId, refCount: socketRefCount.get(driverId) });
       }
       
       socketRef.current?.emit('join-room', `driver_${driverId}`);
@@ -871,6 +840,13 @@ export function useWebSocket(
 
       if (socketRef.current) {
         const socket = socketRef.current;
+        const refCount = socketRefCount.get(driverId) || 1;
+
+        if (globalSocketMap.get(driverId) === socket && refCount > 1) {
+          // Andere Komponenten verwenden dieselbe Verbindung weiter.
+          socketRefCount.set(driverId, refCount - 1);
+          socketRef.current = null;
+        } else {
 
         // Entferne alle Listener zuerst
         try {
@@ -936,17 +912,21 @@ export function useWebSocket(
         }
         
         // ✅ REFERENZ-ZÄHLUNG: Reduziere Zähler beim Cleanup
-        const refCount = socketRefCount.get(driverId) || 0;
-        if (refCount > 1) {
-          socketRefCount.set(driverId, refCount - 1);
-          logger.debug('Socket-Referenz reduziert beim Cleanup', 'WebSocket', { driverId, refCount: refCount - 1 });
-        } else if (refCount === 1) {
-          // Letzte Referenz - entferne aus Map
+        const remainingRefCount = socketRefCount.get(driverId) || 0;
+        if (remainingRefCount > 1) {
+          socketRefCount.set(driverId, remainingRefCount - 1);
+          logger.debug('Socket-Referenz reduziert beim Cleanup', 'WebSocket', { driverId, refCount: remainingRefCount - 1 });
+        } else if (remainingRefCount === 1) {
+          // Letzte Referenz - entferne auch die Socket-Instanz aus der Map.
           socketRefCount.delete(driverId);
+          if (globalSocketMap.get(driverId) === socket) {
+            globalSocketMap.delete(driverId);
+          }
           logger.debug('Letzte Socket-Referenz entfernt beim Cleanup', 'WebSocket', { driverId });
         }
 
         socketRef.current = null;
+        }
       }
       setIsConnected(false);
       setConnectionError(null);
@@ -954,7 +934,7 @@ export function useWebSocket(
       setStatusUpdatesEnabled(false);
       currentDriverIdRef.current = null; // Reset driverId tracking
     };
-  }, [driverId]);
+  }, [driverId, authToken]);
 
   return {
     // Connection state

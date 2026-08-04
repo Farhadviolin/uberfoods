@@ -3,9 +3,13 @@ import { getEnvBool, getEnvVar } from './utils/env';
 
 // Helper function to safely access import.meta.env
 function getImportMetaEnv(): { DEV: boolean; PROD: boolean } {
+  const viteEnv = (import.meta as ImportMeta & {
+    env?: { DEV?: boolean; PROD?: boolean };
+  }).env;
+
   return {
-    DEV: getEnvBool('DEV'),
-    PROD: getEnvBool('PROD'),
+    DEV: viteEnv?.DEV ?? getEnvBool('DEV'),
+    PROD: viteEnv?.PROD ?? getEnvBool('PROD'),
   };
 }
 
@@ -89,8 +93,8 @@ export const config = {
   // Socket.IO macht selbst das Upgrade zu WebSocket über den Transport
   wsUrl: resolveWsUrl(),
   appName: getEnvVar<string>('VITE_APP_NAME', 'UberFoods Driver') ?? 'UberFoods Driver',
-  isDevelopment: getEnvBool('DEV'),
-  isProduction: getEnvBool('PROD'),
+  isDevelopment: getImportMetaEnv().DEV,
+  isProduction: getImportMetaEnv().PROD,
   // WebSocket Konfiguration
   wsConfig: {
     reconnectionAttempts: 3, // Reduziert - Circuit Breaker stoppt früher
