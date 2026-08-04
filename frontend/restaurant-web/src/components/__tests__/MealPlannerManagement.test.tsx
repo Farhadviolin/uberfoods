@@ -11,12 +11,10 @@ describe("MealPlannerManagement empty state", () => {
   });
 
   it("renders and activates the empty-state action without an ErrorBoundary", async () => {
-    const fetchMock = jest
-      .spyOn(globalThis, "fetch")
-      .mockResolvedValue({
-        ok: true,
-        json: async () => [],
-      } as Response);
+    const fetchMock = jest.spyOn(globalThis, "fetch").mockResolvedValue({
+      ok: true,
+      json: async () => [],
+    } as Response);
     const scrollIntoView = jest.fn();
     Object.defineProperty(HTMLElement.prototype, "scrollIntoView", {
       configurable: true,
@@ -51,7 +49,28 @@ describe("MealPlannerManagement empty state", () => {
     });
 
     await waitFor(() => {
-      expect(screen.getByText(/Keine Pläne für diese Woche gefunden/)).toBeInTheDocument();
+      expect(
+        screen.getByText(/Keine Pläne für diese Woche gefunden/),
+      ).toBeInTheDocument();
+    });
+    expect(screen.queryByText("[object Object]")).not.toBeInTheDocument();
+  });
+
+  it("unwraps the backend response envelope for an empty weekly plan", async () => {
+    jest.spyOn(globalThis, "fetch").mockResolvedValue({
+      ok: true,
+      json: async () => ({ success: true, data: [] }),
+    } as Response);
+
+    render(<MealPlannerManagement />);
+    fireEvent.change(screen.getByLabelText("Wochenstart für Meal-Plan"), {
+      target: { value: "2025-01-06" },
+    });
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(/Keine Pläne für diese Woche gefunden/),
+      ).toBeInTheDocument();
     });
     expect(screen.queryByText("[object Object]")).not.toBeInTheDocument();
   });

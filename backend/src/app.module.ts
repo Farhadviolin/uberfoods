@@ -17,6 +17,7 @@ import { AutomationModule } from "./modules/automation/automation.module";
 import { ReportingModule } from "./modules/reporting/reporting.module";
 import { SearchModule } from "./modules/search/search.module";
 import { WebsocketModule } from "./modules/websocket/websocket.module";
+import { MealPlannerModule } from "./modules/meal-planner/meal-planner.module";
 
 // Common Modules
 import { HealthModule } from "./common/health/health.module";
@@ -59,6 +60,7 @@ import { AuditLedgerService } from "./common/audit/audit-ledger.service";
     AutomationModule,
     ReportingModule,
     WebsocketModule,
+    MealPlannerModule,
 
     // Common Infrastructure
     HealthModule,

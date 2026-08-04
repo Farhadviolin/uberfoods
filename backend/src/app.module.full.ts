@@ -29,6 +29,7 @@ import { NotificationModule } from "./modules/notification/notification.module";
 import { WebsocketModule } from "./modules/websocket/websocket.module";
 import { AuditModule } from "./modules/audit/audit.module";
 import { AdminModule } from "./modules/admin/admin.module";
+import { MealPlannerModule } from "./modules/meal-planner/meal-planner.module";
 
 // Guards, Filters, Interceptors
 import { HttpExceptionFilter } from "./common/filters/http-exception.filter";
@@ -82,6 +83,7 @@ import { RateLimitGuard } from "./common/guards/rate-limit.guard";
 
     // Admin module for baseline functionality
     AdminModule,
+    MealPlannerModule,
   ],
   providers: [
     // Core Services (MetricsService only via MetricsModule @Global())

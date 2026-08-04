@@ -12,6 +12,18 @@ interface MealPlan {
   dishIds?: string[];
 }
 
+function unwrapApiData<T>(payload: unknown, fallback: T): T {
+  if (
+    payload &&
+    typeof payload === "object" &&
+    "success" in payload &&
+    "data" in payload
+  ) {
+    return unwrapApiData((payload as { data: unknown }).data, fallback);
+  }
+  return payload as T;
+}
+
 export const MealPlannerManagement = React.memo(
   function MealPlannerManagement() {
     const { showToast } = useToast();
@@ -37,13 +49,14 @@ export const MealPlannerManagement = React.memo(
         );
         if (!res.ok) throw new Error("Failed to load weekly plan");
         const responseData = await res.json();
-        const data = Array.isArray(responseData)
-          ? responseData
-          : responseData &&
-              typeof responseData === "object" &&
-              "meals" in responseData &&
-              Array.isArray(responseData.meals)
-            ? responseData.meals
+        const unwrapped = unwrapApiData<unknown>(responseData, []);
+        const data = Array.isArray(unwrapped)
+          ? unwrapped
+          : unwrapped &&
+              typeof unwrapped === "object" &&
+              "meals" in unwrapped &&
+              Array.isArray(unwrapped.meals)
+            ? unwrapped.meals
             : [];
         setPlans(data);
       } catch (error) {
@@ -61,7 +74,7 @@ export const MealPlannerManagement = React.memo(
           `/api/meal-planner/shopping-list?startDate=${shoppingRange.start}&endDate=${shoppingRange.end}`,
         );
         if (!res.ok) throw new Error("Failed to fetch shopping list");
-        const data = await res.json();
+        const data = unwrapApiData<{ items?: unknown[] }>(await res.json(), {});
         showToast(
           `Einkaufsliste geladen (${(data?.items || []).length || 0} Einträge)`,
           "success",
