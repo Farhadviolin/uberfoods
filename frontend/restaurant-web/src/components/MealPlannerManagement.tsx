@@ -270,7 +270,7 @@ export const MealPlannerManagement = React.memo(
               icon="📋"
               action={
                 weekStart
-                  ? ({
+                  ? {
                       label: "Meal-Plan erstellen",
                       onClick: () => {
                         const form = document.querySelector(
@@ -281,7 +281,7 @@ export const MealPlannerManagement = React.memo(
                           block: "nearest",
                         });
                       },
-                    } as any)
+                    }
                   : undefined
               }
             />

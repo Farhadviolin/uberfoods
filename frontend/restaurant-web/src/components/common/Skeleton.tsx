@@ -140,6 +140,12 @@ export function SkeletonChart() {
   );
 }
 
+export interface EmptyStateAction {
+  label: string;
+  onClick: () => void;
+  disabled?: boolean;
+}
+
 export function EmptyState({
   title,
   description,
@@ -150,7 +156,7 @@ export function EmptyState({
   title: string;
   description?: string;
   icon?: React.ReactNode;
-  action?: React.ReactNode;
+  action?: EmptyStateAction;
   className?: string;
 }) {
   return (
@@ -161,7 +167,18 @@ export function EmptyState({
         {description && (
           <p className="empty-state-description">{description}</p>
         )}
-        {action && <div className="empty-state-action">{action}</div>}
+        {action && (
+          <div className="empty-state-action">
+            <button
+              type="button"
+              className="btn primary"
+              onClick={action.onClick}
+              disabled={action.disabled}
+            >
+              {action.label}
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
