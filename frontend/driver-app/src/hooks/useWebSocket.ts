@@ -3,7 +3,6 @@ import { io, Socket } from 'socket.io-client';
 import { config } from '../config';
 import { Order } from '../types';
 import { logger } from '../utils/logger';
-import { resetDriverAuthSession } from '../utils/authSession';
 import { useAppState } from '../services/stateManager';
 
 // Socket.IO benötigt HTTP/HTTPS URL, NICHT WebSocket URL!
@@ -576,9 +575,9 @@ export function useWebSocket(
         errorMessage.includes('token')
       ) {
         logError('❌ WebSocket authentication failed');
-        setConnectionError('Authentifizierung fehlgeschlagen. Bitte melden Sie sich erneut an.');
-        // Zentralen Auth-Reset verwenden, damit Context und alle Storage-Keys synchron bleiben.
-        resetDriverAuthSession();
+        // Eine Socket-Verbindung ist optional für die REST-basierte Driver-App.
+        // Ein Socket-Handshake darf deshalb keine gültige REST-Session löschen.
+        setConnectionError('WebSocket-Authentifizierung fehlgeschlagen. Echtzeit-Updates sind derzeit nicht verfügbar.');
       } else {
         setConnectionError('WebSocket-Verbindung fehlgeschlagen. App funktioniert im Offline-Modus.');
       }

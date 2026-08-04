@@ -5,6 +5,8 @@ import {
   Put,
   Body,
   Param,
+  Query,
+  Optional,
   UseGuards,
   ForbiddenException,
   Logger,
@@ -17,6 +19,7 @@ import { Roles } from "../../common/decorators/roles.decorator";
 import { PrismaService } from "../../prisma/prisma.service";
 import { OrderService } from "./order.service";
 import { UpdateOrderStatusDto } from "./dto/update-order-status.dto";
+import { DriverService } from "../driver/driver.service.minimal";
 
 @ApiTags("Driver")
 @Controller("drivers")
@@ -28,7 +31,41 @@ export class DriverEndpointsController {
   constructor(
     private readonly prisma: PrismaService,
     private readonly orderService: OrderService,
+    @Optional() private readonly driverService?: DriverService,
   ) {}
+
+  @Get(":driverId/earnings")
+  @ApiOperation({ summary: "Get earnings summary for the authenticated driver" })
+  @ApiResponse({ status: 200, description: "Driver earnings retrieved" })
+  async getEarnings(
+    @GetUser("id") authenticatedDriverId: string,
+    @Param("driverId") pathDriverId: string,
+  ): Promise<unknown> {
+    this.assertDriverIdentity(authenticatedDriverId, pathDriverId);
+    if (!this.driverService) {
+      throw new Error("Driver earnings service is unavailable");
+    }
+    return this.driverService.getEarningsSummary(authenticatedDriverId);
+  }
+
+  @Get(":driverId/earnings/history")
+  @ApiOperation({ summary: "Get earnings history for the authenticated driver" })
+  @ApiResponse({ status: 200, description: "Driver earnings history retrieved" })
+  async getEarningsHistory(
+    @GetUser("id") authenticatedDriverId: string,
+    @Param("driverId") pathDriverId: string,
+    @Query("limit") limit?: string,
+  ): Promise<unknown> {
+    this.assertDriverIdentity(authenticatedDriverId, pathDriverId);
+    const parsedLimit = limit ? Number.parseInt(limit, 10) : 20;
+    if (!this.driverService) {
+      throw new Error("Driver earnings service is unavailable");
+    }
+    return this.driverService.getEarningsHistory(
+      authenticatedDriverId,
+      Number.isFinite(parsedLimit) && parsedLimit > 0 ? Math.min(parsedLimit, 100) : 20,
+    );
+  }
 
   @Get("orders/available")
   @ApiOperation({ summary: "Get available orders for driver" })

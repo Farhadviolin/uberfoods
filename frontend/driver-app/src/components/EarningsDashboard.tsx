@@ -55,7 +55,13 @@ export function EarningsDashboard() {
     try {
       setLoading(true);
       const response = await api.get(`/drivers/${driver.id}/earnings?period=${period}`);
-      setEarnings(response.data);
+      const payload = response.data?.data ?? response.data;
+      setEarnings({
+        today: Number(payload?.today ?? 0),
+        week: Number(payload?.week ?? 0),
+        month: Number(payload?.month ?? 0),
+        total: Number(payload?.total ?? 0),
+      });
     } catch (error: any) {
       console.error('Fehler beim Laden der Verdienste:', error);
     } finally {
@@ -67,7 +73,8 @@ export function EarningsDashboard() {
     if (!driver) return;
     try {
       const response = await api.get(`/drivers/${driver.id}/earnings/history?limit=20`);
-      setHistory(response.data);
+      const payload = response.data?.data ?? response.data;
+      setHistory(Array.isArray(payload) ? payload : []);
     } catch (error: any) {
       console.error('Fehler beim Laden der Historie:', error);
     }

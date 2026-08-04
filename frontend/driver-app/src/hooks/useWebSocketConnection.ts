@@ -7,7 +7,6 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { config } from '../config';
 import { logger } from '../utils/logger';
-import { resetDriverAuthSession } from '../utils/authSession';
 
 const getWebSocketUrl = (url: string, isDevelopment: boolean): string => {
   if (url.startsWith('ws://')) {
@@ -195,8 +194,9 @@ export function useWebSocketConnection({
       if (errorMessage.includes('authentication') || 
           errorMessage.includes('Unauthorized') || 
           errorMessage.includes('token')) {
-        setConnectionError('Authentifizierung fehlgeschlagen. Bitte melden Sie sich erneut an.');
-        resetDriverAuthSession();
+        // WebSocket ist optional; ein fehlgeschlagener Handshake darf keine
+        // gültige REST-Session löschen oder die geschützte Route verlassen.
+        setConnectionError('WebSocket-Authentifizierung fehlgeschlagen. Echtzeit-Updates sind derzeit nicht verfügbar.');
       } else {
         setConnectionError('WebSocket-Verbindung fehlgeschlagen. App funktioniert im Offline-Modus.');
       }
