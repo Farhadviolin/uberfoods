@@ -29,6 +29,17 @@ const FEATURE_ANALYTICS = getEnvVar('VITE_ENABLE_ANALYTICS') === 'true';
 const FEATURE_GEOCODING = getEnvVar('VITE_ENABLE_GEOCODING') === 'true';
 const FEATURE_NOTIFICATIONS = getEnvVar('VITE_ENABLE_NOTIFICATIONS') === 'true';
 
+export function resolveApiBaseUrl({
+  isProduction,
+  configuredApiBaseUrl,
+}: {
+  isProduction: boolean;
+  configuredApiBaseUrl?: string;
+}): string {
+  const normalizedApiBaseUrl = configuredApiBaseUrl?.trim().replace(/\/+$/, '');
+  return isProduction && normalizedApiBaseUrl ? normalizedApiBaseUrl : '/api';
+}
+
 const normalizeUrlForMatching = (url?: string) => {
   if (!url || typeof url !== 'string') return '';
   const trimmed = url.trim();
@@ -71,10 +82,12 @@ if (typeof window !== 'undefined') {
   };
 }
 
-// Verwende relativen Pfad für Vite-Proxy (keine CORS-Probleme)
-// Vite-Proxy leitet /api Requests an http://localhost:3000 weiter
+// Dev nutzt den Vite-Proxy; Preview/Production benötigt das konfigurierte Backend direkt.
 const api = axios.create({
-  baseURL: '/api',  // Vite-Proxy konfiguriert in vite.config.ts
+  baseURL: resolveApiBaseUrl({
+    isProduction: Boolean((globalThis as { __UBERFOODS_BUILD_IS_PRODUCTION__?: boolean }).__UBERFOODS_BUILD_IS_PRODUCTION__),
+    configuredApiBaseUrl: (globalThis as { __UBERFOODS_BUILD_API_BASE_URL__?: string }).__UBERFOODS_BUILD_API_BASE_URL__,
+  }),
   timeout: 30000, // 30 Sekunden Timeout
 });
 

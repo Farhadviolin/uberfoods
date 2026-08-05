@@ -3,7 +3,7 @@ import axios, {
   type AxiosResponse,
   type InternalAxiosRequestConfig,
 } from 'axios';
-import { api } from '../api';
+import { api, resolveApiBaseUrl } from '../api';
 
 jest.mock('axios', () => {
   const instance = Object.assign(jest.fn(), {
@@ -99,6 +99,23 @@ describe('API Utils', () => {
     it('should expose the configured base URL and timeout', () => {
       expect(api.defaults.baseURL).toBe('/api');
       expect(api.defaults.timeout).toBe(30000);
+    });
+  });
+
+  describe('API base URL resolution', () => {
+    it('uses the configured absolute backend URL for production previews', () => {
+      expect(resolveApiBaseUrl({
+        isProduction: true,
+        configuredApiBaseUrl: 'http://127.0.0.1:60748/api/',
+      })).toBe('http://127.0.0.1:60748/api');
+    });
+
+    it('keeps the relative proxy URL outside production', () => {
+      expect(resolveApiBaseUrl({
+        isProduction: false,
+        configuredApiBaseUrl: 'http://127.0.0.1:60748/api',
+      })).toBe('/api');
+      expect(resolveApiBaseUrl({ isProduction: true })).toBe('/api');
     });
   });
 

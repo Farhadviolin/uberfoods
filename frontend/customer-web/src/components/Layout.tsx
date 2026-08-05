@@ -20,9 +20,10 @@ interface LayoutProps {
 
 export function Layout({ children }: LayoutProps) {
   const { t } = useTranslation();
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const navigate = useNavigate();
   const { toggleTheme } = useTheme();
+  const enableNotifications = import.meta.env.VITE_ENABLE_NOTIFICATIONS === 'true';
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
@@ -210,12 +211,22 @@ export function Layout({ children }: LayoutProps) {
           </div>
           
           <nav className="header-nav">
-            {user && <NotificationCenter />}
+            {user && enableNotifications && <NotificationCenter />}
             <LanguageSwitcher />
             <ThemeToggle />
             {user && (
               <div className="user-menu">
                 <span className="user-name">{user.name}</span>
+                <button
+                  type="button"
+                  className="logout-btn"
+                  onClick={() => {
+                    logout();
+                    navigate('/login');
+                  }}
+                >
+                  {t('auth.logout')}
+                </button>
               </div>
             )}
           </nav>

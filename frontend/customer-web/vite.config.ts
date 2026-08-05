@@ -4,8 +4,13 @@ import react from '@vitejs/plugin-react';
 export default defineConfig(({ mode }) => ({
   // Ensure SPA semantics (history fallback behavior expected)
   appType: 'spa',
+  define: {
+    'globalThis.__UBERFOODS_BUILD_IS_PRODUCTION__': JSON.stringify(mode === 'production'),
+    'globalThis.__UBERFOODS_BUILD_API_BASE_URL__': JSON.stringify(process.env.VITE_API_BASE_URL || ''),
+  },
   plugins: [
     react(),
+    customerApiCsp(process.env.VITE_API_BASE_URL),
     ...(mode === 'e2e' ? [spaFallbackE2E()] : []),
   ],
   server: {
@@ -46,6 +51,24 @@ export default defineConfig(({ mode }) => ({
     ],
   },
 }));
+
+function customerApiCsp(apiBaseUrl?: string): Plugin {
+  return {
+    name: 'customer-api-csp',
+    transformIndexHtml(html) {
+      let apiOrigin = '';
+      if (apiBaseUrl?.trim()) {
+        try {
+          apiOrigin = new URL(apiBaseUrl.trim()).origin;
+        } catch {
+          apiOrigin = '';
+        }
+      }
+
+      return html.replace('__UBERFOODS_API_CSP_ORIGIN__', apiOrigin);
+    },
+  };
+}
 
 function spaFallbackE2E(): Plugin {
   return {
