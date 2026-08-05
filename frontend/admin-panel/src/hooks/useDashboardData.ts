@@ -41,8 +41,6 @@ const OPTIONAL_ENDPOINTS_ALLOWLIST = [
   '/admin/statistics/driver-performance',
   '/admin/statistics/top-promotions',
   '/admin/statistics/promotion-performance',
-  '/admin/statistics/customer-growth',
-  '/admin/statistics/order-status-distribution',
 ];
 
 // Default Stats für den Fall, dass API fehlschlägt
@@ -263,14 +261,14 @@ export function useDashboardData(period: string = '7d') {
       return [];
       })
       .catch((error) => handleApiError(error, {
-        allowlist: OPTIONAL_ENDPOINTS_ALLOWLIST.includes('/admin/statistics/customer-growth') ? [404] : [],
+        allowlist: [],
         fallbackValue: [],
-        logLevel: OPTIONAL_ENDPOINTS_ALLOWLIST.includes('/admin/statistics/customer-growth') ? 'warn' : 'error',
+        logLevel: 'error',
         context: 'Dashboard Customer Growth',
         endpoint: `/admin/statistics/customer-growth?period=${period}`
       })),
     staleTime: 2 * 60 * 1000,
-    retry: false, // Don't retry if this endpoint doesn't exist
+    retry: false,
   });
 
   interface OrderStatusDistribution {
@@ -287,9 +285,9 @@ export function useDashboardData(period: string = '7d') {
       return null;
       })
       .catch((error) => handleApiError(error, {
-        allowlist: OPTIONAL_ENDPOINTS_ALLOWLIST.includes('/admin/statistics/order-status-distribution') ? [404] : [],
+        allowlist: [],
         fallbackValue: null,
-        logLevel: OPTIONAL_ENDPOINTS_ALLOWLIST.includes('/admin/statistics/order-status-distribution') ? 'warn' : 'error',
+        logLevel: 'error',
         context: 'Dashboard Order Status Distribution',
         endpoint: `/admin/statistics/order-status-distribution?period=${period}`
       })),
@@ -331,7 +329,9 @@ export function useDashboardData(period: string = '7d') {
       topRestaurantsQuery.isLoading ||
       driverPerformanceQuery.isLoading ||
       topPromotionsQuery.isLoading ||
-      promotionPerformanceQuery.isLoading,
+      promotionPerformanceQuery.isLoading ||
+      customerGrowthQuery.isLoading ||
+      orderStatusQuery.isLoading,
     [
       statsQuery.isLoading,
       revenueQuery.isLoading,
@@ -339,6 +339,8 @@ export function useDashboardData(period: string = '7d') {
       driverPerformanceQuery.isLoading,
       topPromotionsQuery.isLoading,
       promotionPerformanceQuery.isLoading,
+      customerGrowthQuery.isLoading,
+      orderStatusQuery.isLoading,
     ]
   );
 
@@ -350,7 +352,9 @@ export function useDashboardData(period: string = '7d') {
       topRestaurantsQuery.error ||
       driverPerformanceQuery.error ||
       topPromotionsQuery.error ||
-      promotionPerformanceQuery.error,
+      promotionPerformanceQuery.error ||
+      customerGrowthQuery.error ||
+      orderStatusQuery.error,
     [
       softError,
       statsQuery.error,
@@ -359,6 +363,8 @@ export function useDashboardData(period: string = '7d') {
       driverPerformanceQuery.error,
       topPromotionsQuery.error,
       promotionPerformanceQuery.error,
+      customerGrowthQuery.error,
+      orderStatusQuery.error,
     ]
   );
 

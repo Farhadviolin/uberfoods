@@ -40,6 +40,10 @@ describe("AdminService", () => {
     order: {
       count: jest.fn(),
       aggregate: jest.fn(),
+      groupBy: jest.fn(),
+    },
+    customer: {
+      findMany: jest.fn(),
     },
     driver: {
       count: jest.fn(),
@@ -178,6 +182,55 @@ describe("AdminService", () => {
         onlineCustomers: 0,
       }),
     );
+  });
+
+  it("returns real customer growth points for the requested period", async () => {
+    const today = new Date();
+    const twoDaysAgo = new Date(today);
+    twoDaysAgo.setUTCDate(twoDaysAgo.getUTCDate() - 2);
+    mockPrismaService.customer.findMany.mockResolvedValue([
+      { createdAt: today },
+      { createdAt: today },
+      { createdAt: twoDaysAgo },
+    ]);
+
+    const result = await service.getCustomerGrowth("7d");
+
+    expect(result).toHaveLength(7);
+    expect(result.every((point) =>
+      typeof point.date === "string" && typeof point.count === "number",
+    )).toBe(true);
+    expect(result.at(-1)?.count).toBe(2);
+    expect(result.at(-3)?.count).toBe(1);
+    expect(mockPrismaService.customer.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { createdAt: { gte: expect.any(Date) } },
+        select: { createdAt: true },
+      }),
+    );
+  });
+
+  it("returns real order status counts and a valid empty shape", async () => {
+    mockPrismaService.order.groupBy.mockResolvedValue([
+      { status: "PENDING", _count: { _all: 2 } },
+      { status: "DELIVERED", _count: { _all: 5 } },
+    ]);
+
+    await expect(service.getOrderStatusDistribution("7d")).resolves.toEqual({
+      distribution: { pending: 2, delivered: 5 },
+    });
+
+    mockPrismaService.order.groupBy.mockResolvedValue([]);
+    await expect(service.getOrderStatusDistribution("7d")).resolves.toEqual({
+      distribution: {},
+    });
+  });
+
+  it("rejects unsupported statistics periods", async () => {
+    await expect(service.getCustomerGrowth("week")).rejects.toThrow(
+      BadRequestException,
+    );
+    expect(mockPrismaService.customer.findMany).not.toHaveBeenCalled();
   });
 
   it("maps active emergency severity to dashboard priority", async () => {

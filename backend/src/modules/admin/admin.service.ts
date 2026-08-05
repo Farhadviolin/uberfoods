@@ -21,6 +21,27 @@ const safeNumber = (value: any): number => {
   const num = Number(value);
   return isNaN(num) ? 0 : num;
 };
+
+const ADMIN_STATISTICS_PERIOD_DAYS = {
+  "7d": 7,
+  "30d": 30,
+  "90d": 90,
+} as const;
+
+function statisticsWindow(period: string) {
+  const days = ADMIN_STATISTICS_PERIOD_DAYS[period as keyof typeof ADMIN_STATISTICS_PERIOD_DAYS];
+  if (!days) {
+    throw new BadRequestException(
+      "period must be one of: 7d, 30d, 90d",
+    );
+  }
+
+  const startDate = new Date();
+  startDate.setUTCHours(0, 0, 0, 0);
+  startDate.setUTCDate(startDate.getUTCDate() - (days - 1));
+
+  return { days, startDate };
+}
 import { SubscriptionService } from "../driver/subscription.service";
 import { SubscriptionAnalyticsService } from "../driver/subscription-analytics.service";
 import { SubscriptionAdvancedAnalyticsService } from "../driver/subscription-advanced-analytics.service";
@@ -8826,6 +8847,46 @@ export class AdminService {
       totalCustomers: 0,
       systemHealth: "operational",
     };
+  }
+
+  async getCustomerGrowth(period = "7d") {
+    const { days, startDate } = statisticsWindow(period);
+    const customers = await this.prisma.customer.findMany({
+      where: { createdAt: { gte: startDate } },
+      select: { createdAt: true },
+    });
+
+    const counts = new Map<string, number>();
+    for (const customer of customers) {
+      const date = customer.createdAt.toISOString().slice(0, 10);
+      counts.set(date, (counts.get(date) ?? 0) + 1);
+    }
+
+    return Array.from({ length: days }, (_, index) => {
+      const date = new Date(startDate);
+      date.setUTCDate(date.getUTCDate() + index);
+      const key = date.toISOString().slice(0, 10);
+      return { date: key, count: counts.get(key) ?? 0 };
+    });
+  }
+
+  async getOrderStatusDistribution(period = "7d") {
+    const { startDate } = statisticsWindow(period);
+    const groupedOrders = await this.prisma.order.groupBy({
+      by: ["status"],
+      where: { createdAt: { gte: startDate } },
+      _count: { _all: true },
+    });
+
+    const distribution = groupedOrders.reduce<Record<string, number>>(
+      (result, group) => {
+        result[group.status.toLowerCase()] = group._count._all;
+        return result;
+      },
+      {},
+    );
+
+    return { distribution };
   }
 
   /**

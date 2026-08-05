@@ -2404,6 +2404,18 @@ export class AdminController {
     }
   }
 
+  @Get("statistics/customer-growth")
+  @Roles(AdminRole.SUPER_ADMIN, AdminRole.ADMIN, AdminRole.MODERATOR)
+  async getCustomerGrowth(@Query("period") period = "7d") {
+    return this.adminService.getCustomerGrowth(period);
+  }
+
+  @Get("statistics/order-status-distribution")
+  @Roles(AdminRole.SUPER_ADMIN, AdminRole.ADMIN, AdminRole.MODERATOR)
+  async getOrderStatusDistribution(@Query("period") period = "7d") {
+    return this.adminService.getOrderStatusDistribution(period);
+  }
+
   // ============================================
   // ANALYTICS & REPORTING
   // ============================================

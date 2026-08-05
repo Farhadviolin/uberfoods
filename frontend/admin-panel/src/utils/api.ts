@@ -130,16 +130,15 @@ api.interceptors.response.use(
       url.includes('/top-restaurants') ||
       url.includes('/driver-performance') ||
       url.includes('/top-promotions') ||
-      url.includes('/promotion-performance') ||
-      url.includes('/customer-growth') ||
-      url.includes('/order-status-distribution')
+      url.includes('/promotion-performance')
     );
+    const suppressOptionalNotFound = isOptionalEndpoint && status === 404;
 
     // Log Error - aber weniger störend für optionale Endpoints
-    if (isOptionalEndpoint && status === 500) {
+    if (isOptionalEndpoint && (status === 500 || suppressOptionalNotFound)) {
       // Nur in Development warnen, nicht als Error
       if (isDevMode()) {
-        logger.warn(`Optional endpoint failed (500): ${url}`);
+        logger.warn(`Optional endpoint failed (${status}): ${url}`);
       }
     } else {
       logError(error);
@@ -228,7 +227,7 @@ api.interceptors.response.use(
     }
 
     // Automatische Toast-Anzeige für bestimmte Fehler (außer Auth-Fehler)
-    if (globalToastFunction && status && status >= 400 && !isAuthError(error)) {
+    if (globalToastFunction && status && status >= 400 && !isAuthError(error) && !suppressOptionalNotFound) {
       const toastType = status >= 500 ? 'error' : 'warning';
       const toastMessage = status >= 500
         ? 'Serverfehler aufgetreten. Bitte versuchen Sie es später erneut.'

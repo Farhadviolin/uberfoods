@@ -5,6 +5,7 @@ jest.unmock('@tanstack/react-query');
 // Use the global custom render that includes providers
 const render = (global as any).customRender;
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { renderHook, waitFor, act } from '@testing-library/react';
 import { useDashboardData } from '../useDashboardData';
 import api from '../../utils/api';
 
@@ -64,15 +65,19 @@ describe('useDashboardData Hook', () => {
 
   beforeEach(() => {
     mockApi.get = jest.fn();
-    (mockApi.get as jest.Mock)
-      .mockResolvedValueOnce(mockStatsResponse) // /statistics/dashboard
-      .mockResolvedValueOnce(mockRevenueResponse) // /statistics/revenue
-      .mockResolvedValueOnce(mockTopRestaurantsResponse) // /statistics/top-restaurants
-      .mockResolvedValueOnce(mockDriverPerformanceResponse) // /statistics/driver-performance
-      .mockResolvedValueOnce({ data: [] }) // /statistics/top-promotions
-      .mockResolvedValueOnce({ data: [] }) // /statistics/promotion-performance
-      .mockResolvedValueOnce({ data: [] }) // /statistics/customer-growth
-      .mockResolvedValueOnce({ data: null }); // /statistics/order-status-distribution
+    (mockApi.get as jest.Mock).mockImplementation((endpoint: string) => {
+      if (endpoint.includes('/statistics/dashboard')) return Promise.resolve(mockStatsResponse);
+      if (endpoint.includes('/statistics/revenue')) return Promise.resolve(mockRevenueResponse);
+      if (endpoint.includes('/statistics/top-restaurants')) return Promise.resolve(mockTopRestaurantsResponse);
+      if (endpoint.includes('/statistics/driver-performance')) return Promise.resolve(mockDriverPerformanceResponse);
+      if (endpoint.includes('/statistics/customer-growth')) {
+        return Promise.resolve({ data: [{ date: '2024-01-01', count: 4 }] });
+      }
+      if (endpoint.includes('/statistics/order-status-distribution')) {
+        return Promise.resolve({ data: { distribution: { pending: 2, delivered: 4 } } });
+      }
+      return Promise.resolve({ data: [] });
+    });
   });
 
   afterEach(() => {
@@ -110,12 +115,20 @@ describe('useDashboardData Hook', () => {
   });
 
   it('calls the correct API endpoints', async () => {
-    renderHook(() => useDashboardData(), { wrapper });
+    const { result } = renderHook(() => useDashboardData(), { wrapper });
 
     await waitFor(() => {
       expect(mockApi.get).toHaveBeenCalledWith('/admin/statistics/dashboard?period=7d');
       expect(mockApi.get).toHaveBeenCalledWith('/admin/statistics/revenue?period=7d');
       expect(mockApi.get).toHaveBeenCalledWith('/admin/statistics/top-restaurants?limit=5');
+      expect(mockApi.get).toHaveBeenCalledWith('/admin/statistics/customer-growth?period=7d');
+      expect(mockApi.get).toHaveBeenCalledWith('/admin/statistics/order-status-distribution?period=7d');
+    });
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+    expect(result.current.customerGrowth).toEqual([{ date: '2024-01-01', count: 4 }]);
+    expect(result.current.orderStatusDistribution).toEqual({
+      distribution: { pending: 2, delivered: 4 },
     });
   });
 
@@ -129,6 +142,20 @@ describe('useDashboardData Hook', () => {
 
     expect(result.current.error?.message).toBe('API Error');
     expect(result.current.stats.orders.total).toBe(0);
+  });
+
+  it('surfaces a real statistics 404 instead of treating it as optional', async () => {
+    mockApi.get.mockReset();
+    const notFound = Object.assign(new Error('Request failed with status code 404'), {
+      response: { status: 404 },
+    });
+    (mockApi.get as jest.Mock).mockRejectedValue(notFound);
+
+    const { result } = renderHook(() => useDashboardData(), { wrapper });
+
+    await waitFor(() => expect(result.current.error).toMatchObject({ status: 404 }), { timeout: 5000 });
+    expect(result.current.customerGrowth).toEqual([]);
+    expect(result.current.orderStatusDistribution).toBeNull();
   });
 
   it('provides statistics data', async () => {
@@ -271,11 +298,17 @@ describe('useDashboardData Hook', () => {
     });
 
     // Simulate error on refetch
-    (mockApi.get as jest.Mock).mockRejectedValueOnce(new Error('Refetch Error'));
-    result.current.refetch();
+    (mockApi.get as jest.Mock).mockImplementation((endpoint: string) => {
+      if (endpoint.includes('/statistics/dashboard')) return Promise.reject(new Error('Refetch Error'));
+      return Promise.resolve({ data: [] });
+    });
+    await act(async () => {
+      result.current.refetch();
+    });
 
     await waitFor(() => {
-      expect(result.current.error).toBeInstanceOf(Error);
+      expect(mockApi.get).toHaveBeenCalledWith('/admin/statistics/dashboard?period=7d');
+      expect(result.current.stats?.orders.total).toBe(1250);
     });
 
     // Data should still be available from previous successful load
