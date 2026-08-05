@@ -606,6 +606,18 @@ export function useWebSocket(
       options.onOrderUpdate?.(data);
     });
 
+    socketRef.current.on('order-assigned', (data: any) => {
+      logger.info('Order assignment received:', data);
+      actions.updateOrder(data.orderId ?? data.id, data);
+      options.onOrderUpdate?.(data);
+    });
+
+    socketRef.current.on('order-update', (data: any) => {
+      logger.info('Order status update received:', data);
+      actions.updateOrder(data.orderId ?? data.id, data);
+      options.onOrderUpdate?.(data);
+    });
+
     socketRef.current.on('new_order', (order: Order) => {
       logger.info('New order received:', order);
       actions.addOrder(order);

@@ -171,4 +171,48 @@ describe('useWebSocket authentication lifecycle', () => {
     expect(localStorage.getItem('driver_token')).toBe('rest-token');
     unmount();
   });
+
+  it('applies owner-specific order assignments from the backend event contract', () => {
+    const socket = createSocket();
+    const updateOrder = jest.fn();
+    const onOrderUpdate = jest.fn();
+    mockedIo.mockReturnValue(socket);
+    mockedUseAppState.mockReturnValue({
+      state: {
+        driver: null,
+        orders: { pending: [], active: [], completed: [], loading: false, error: null },
+        location: { current: null, lastUpdate: null },
+      },
+      actions: {
+        updateLocation: jest.fn(),
+        updateOrder,
+        addOrder: jest.fn(),
+        updateDriver: jest.fn(),
+        setEmergencyAlert: jest.fn(),
+        setEmergencyActive: jest.fn(),
+        setPerformanceMetrics: jest.fn(),
+        setGamificationStats: jest.fn(),
+        addNotification: jest.fn(),
+      },
+    } as unknown as ReturnType<typeof useAppState>);
+
+    const { unmount } = renderHook(() => useWebSocket('driver-1', { onOrderUpdate }));
+    const assignedOrder = { id: 'order-1', orderId: 'order-1', driverId: 'driver-1', status: 'CONFIRMED' };
+
+    act(() => {
+      socket.handlers.get('order-assigned')?.(assignedOrder);
+    });
+
+    expect(updateOrder).toHaveBeenCalledWith('order-1', assignedOrder);
+    expect(onOrderUpdate).toHaveBeenCalledWith(assignedOrder);
+
+    const statusUpdate = { id: 'order-1', orderId: 'order-1', driverId: 'driver-1', status: 'PICKED_UP' };
+    act(() => {
+      socket.handlers.get('order-update')?.(statusUpdate);
+    });
+
+    expect(updateOrder).toHaveBeenCalledWith('order-1', statusUpdate);
+    expect(onOrderUpdate).toHaveBeenCalledWith(statusUpdate);
+    unmount();
+  });
 });
