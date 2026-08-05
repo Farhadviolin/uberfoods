@@ -35,7 +35,9 @@ export class DriverEndpointsController {
   ) {}
 
   @Get(":driverId/earnings")
-  @ApiOperation({ summary: "Get earnings summary for the authenticated driver" })
+  @ApiOperation({
+    summary: "Get earnings summary for the authenticated driver",
+  })
   @ApiResponse({ status: 200, description: "Driver earnings retrieved" })
   async getEarnings(
     @GetUser("id") authenticatedDriverId: string,
@@ -49,8 +51,13 @@ export class DriverEndpointsController {
   }
 
   @Get(":driverId/earnings/history")
-  @ApiOperation({ summary: "Get earnings history for the authenticated driver" })
-  @ApiResponse({ status: 200, description: "Driver earnings history retrieved" })
+  @ApiOperation({
+    summary: "Get earnings history for the authenticated driver",
+  })
+  @ApiResponse({
+    status: 200,
+    description: "Driver earnings history retrieved",
+  })
   async getEarningsHistory(
     @GetUser("id") authenticatedDriverId: string,
     @Param("driverId") pathDriverId: string,
@@ -63,7 +70,9 @@ export class DriverEndpointsController {
     }
     return this.driverService.getEarningsHistory(
       authenticatedDriverId,
-      Number.isFinite(parsedLimit) && parsedLimit > 0 ? Math.min(parsedLimit, 100) : 20,
+      Number.isFinite(parsedLimit) && parsedLimit > 0
+        ? Math.min(parsedLimit, 100)
+        : 20,
     );
   }
 

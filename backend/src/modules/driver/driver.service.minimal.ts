@@ -11,7 +11,11 @@ export class DriverService {
     startOfDay.setHours(0, 0, 0, 0);
     const startOfWeek = new Date(startOfDay);
     startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay());
-    const startOfMonth = new Date(startOfDay.getFullYear(), startOfDay.getMonth(), 1);
+    const startOfMonth = new Date(
+      startOfDay.getFullYear(),
+      startOfDay.getMonth(),
+      1,
+    );
 
     const deliveredOrders = await this.prisma.order.findMany({
       where: {
@@ -24,14 +28,25 @@ export class DriverService {
 
     const driverEarnings = (from: Date) =>
       deliveredOrders
-        .filter((order) => order.deliveredAt && order.deliveredAt >= from && order.deliveredAt <= now)
+        .filter(
+          (order) =>
+            order.deliveredAt &&
+            order.deliveredAt >= from &&
+            order.deliveredAt <= now,
+        )
         .reduce((sum, order) => sum + order.totalAmount * 0.8, 0);
 
     return {
       today: Math.round(driverEarnings(startOfDay) * 100) / 100,
       week: Math.round(driverEarnings(startOfWeek) * 100) / 100,
       month: Math.round(driverEarnings(startOfMonth) * 100) / 100,
-      total: Math.round(deliveredOrders.reduce((sum, order) => sum + order.totalAmount * 0.8, 0) * 100) / 100,
+      total:
+        Math.round(
+          deliveredOrders.reduce(
+            (sum, order) => sum + order.totalAmount * 0.8,
+            0,
+          ) * 100,
+        ) / 100,
     };
   }
 
@@ -49,7 +64,10 @@ export class DriverService {
       id: transaction.id,
       orderId: transaction.orderId,
       amount: transaction.orderAmount,
-      commission: Math.max(0, transaction.orderAmount - transaction.driverCommission),
+      commission: Math.max(
+        0,
+        transaction.orderAmount - transaction.driverCommission,
+      ),
       netEarnings: transaction.driverCommission,
       status: transaction.status,
       createdAt: transaction.createdAt,
