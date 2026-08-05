@@ -2,6 +2,7 @@ import * as dotenv from "dotenv";
 import { resolve } from "path";
 import { execSync } from "child_process";
 import { PrismaClient } from "@prisma/client";
+import { resolveExplicitE2EDatabaseUrl } from "../../src/common/config/e2e-database-url";
 
 // Load E2E env
 const candidates = [
@@ -26,13 +27,18 @@ if (!loaded) {
   );
 }
 
-if (!process.env.DATABASE_URL) {
-  throw new Error("DATABASE_URL is required for E2E. Set it in .env.e2e");
-}
+const explicitDatabaseUrl = resolveExplicitE2EDatabaseUrl(process.env);
+process.env.DATABASE_URL = explicitDatabaseUrl;
 
 process.env.NODE_ENV = "e2e";
 
 export default async function globalSetup(): Promise<void> {
+  const e2eEnv = {
+    ...process.env,
+    DATABASE_URL: explicitDatabaseUrl,
+    E2E_DATABASE_URL: explicitDatabaseUrl,
+  };
+
   // Deploy migrations and seed (run from backend dir)
   const backendDir = process.cwd().includes("backend")
     ? process.cwd()
@@ -40,13 +46,14 @@ export default async function globalSetup(): Promise<void> {
   execSync("npx prisma migrate deploy --schema=./prisma/schema.prisma", {
     cwd: backendDir,
     stdio: "inherit",
+    env: e2eEnv,
   });
 
   execSync("npx prisma db seed --schema=./prisma/schema.prisma", {
     cwd: backendDir,
     stdio: "inherit",
     env: {
-      ...process.env,
+      ...e2eEnv,
       SEED_CUSTOMER_PASSWORD:
         process.env.SEED_CUSTOMER_PASSWORD || "customer123",
       SEED_RESTAURANT_PASSWORD:

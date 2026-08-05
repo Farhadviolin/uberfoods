@@ -2,6 +2,15 @@ import { useQuery } from '@tanstack/react-query';
 import { useCallback, useState } from 'react';
 import api from '../utils/api';
 
+function extractList<T>(value: unknown): T[] {
+  if (Array.isArray(value)) return value as T[];
+  if (value && typeof value === 'object' && 'data' in value) {
+    const data = (value as { data?: unknown }).data;
+    return Array.isArray(data) ? (data as T[]) : [];
+  }
+  return [];
+}
+
 export interface Report {
   id: string;
   name: string;
@@ -45,7 +54,7 @@ export function useReportingData() {
     queryFn: () =>
       api
         .get<Report[]>('/reporting/reports')
-        .then((res) => res.data || [])
+        .then((res) => extractList<Report>(res.data))
         .catch((error) => {
           recordError(error);
           return [];
@@ -60,7 +69,7 @@ export function useReportingData() {
     queryFn: () =>
       api
         .get<Dashboard[]>('/reporting/dashboards')
-        .then((res) => res.data || [])
+        .then((res) => extractList<Dashboard>(res.data))
         .catch((error) => {
           recordError(error);
           return [];
@@ -75,7 +84,7 @@ export function useReportingData() {
     queryFn: () =>
       api
         .get<ScheduledReport[]>('/reporting/scheduled')
-        .then((res) => res.data || [])
+        .then((res) => extractList<ScheduledReport>(res.data))
         .catch((error) => {
           recordError(error);
           return [];

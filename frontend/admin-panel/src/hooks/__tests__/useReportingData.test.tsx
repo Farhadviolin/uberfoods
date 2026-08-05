@@ -1,10 +1,14 @@
 import { renderHook } from '@testing-library/react';
 import { useQuery } from '@tanstack/react-query';
 import { useReportingData } from '../useReportingData';
+import api from '../../utils/api';
 
 jest.mock('@tanstack/react-query', () => ({
   useQuery: jest.fn(),
 }));
+jest.mock('../../utils/api');
+
+const mockApi = api as jest.Mocked<typeof api>;
 
 describe('useReportingData Hook', () => {
   beforeEach(() => {
@@ -46,5 +50,22 @@ describe('useReportingData Hook', () => {
     expect(useQuery).toHaveBeenCalledWith(
       expect.objectContaining({ queryKey: ['reporting', 'scheduled'] })
     );
+  });
+
+  it('unwraps the full-app response envelope', async () => {
+    mockApi.get = jest.fn().mockResolvedValue({
+      data: { success: true, data: [{ id: 'r1' }] },
+    });
+    (useQuery as jest.Mock).mockReturnValue({
+      data: [],
+      isLoading: false,
+      error: null,
+      refetch: jest.fn(),
+    });
+
+    renderHook(() => useReportingData());
+    const firstQuery = (useQuery as jest.Mock).mock.calls[0][0];
+
+    await expect(firstQuery.queryFn()).resolves.toEqual([{ id: 'r1' }]);
   });
 });

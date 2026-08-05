@@ -2,6 +2,15 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useState } from 'react';
 import api from '../utils/api';
 
+function extractList<T>(value: unknown): T[] {
+  if (Array.isArray(value)) return value as T[];
+  if (value && typeof value === 'object' && 'data' in value) {
+    const data = (value as { data?: unknown }).data;
+    return Array.isArray(data) ? (data as T[]) : [];
+  }
+  return [];
+}
+
 export interface Integration {
   id: string;
   name: string;
@@ -52,7 +61,7 @@ export function useIntegrationsData() {
     queryFn: () =>
       api
         .get<Integration[]>('/integrations/available')
-        .then((res) => res.data || [])
+        .then((res) => extractList<Integration>(res.data))
         .catch((error) => {
           recordError(error);
           return [];
@@ -67,7 +76,7 @@ export function useIntegrationsData() {
     queryFn: () =>
       api
         .get<Integration[]>('/integrations/connected')
-        .then((res) => res.data || [])
+        .then((res) => extractList<Integration>(res.data))
         .catch((error) => {
           recordError(error);
           return [];
@@ -82,7 +91,7 @@ export function useIntegrationsData() {
     queryFn: () =>
       api
         .get<APIKey[]>('/integrations/api-keys')
-        .then((res) => res.data || [])
+        .then((res) => extractList<APIKey>(res.data))
         .catch((error) => {
           recordError(error);
           return [];
@@ -97,7 +106,7 @@ export function useIntegrationsData() {
     queryFn: () =>
       api
         .get<Webhook[]>('/integrations/webhooks')
-        .then((res) => res.data || [])
+        .then((res) => extractList<Webhook>(res.data))
         .catch((error) => {
           recordError(error);
           return [];
