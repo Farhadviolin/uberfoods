@@ -388,7 +388,10 @@ export class AuthService {
 
     // Generate refresh token if requested
     if (includeRefreshToken) {
-      result.refresh_token = await this.generateRefreshToken(user.id, role);
+      result.refresh_token = await this.generateRefreshToken(
+        user.id,
+        userType || String(role).toLowerCase(),
+      );
     }
 
     return result;

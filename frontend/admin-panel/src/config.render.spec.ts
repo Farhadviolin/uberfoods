@@ -72,6 +72,6 @@ describe("Render staging Admin configuration", () => {
     const { config } = require("./config");
 
     expect(config.apiUrl).toBe("");
-    expect(config.wsUrl).toBe("/socket.io");
+    expect(config.wsUrl).toBe(window.location.origin);
   });
 });

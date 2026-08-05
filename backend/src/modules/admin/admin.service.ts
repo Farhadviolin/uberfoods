@@ -29,11 +29,12 @@ const ADMIN_STATISTICS_PERIOD_DAYS = {
 } as const;
 
 function statisticsWindow(period: string) {
-  const days = ADMIN_STATISTICS_PERIOD_DAYS[period as keyof typeof ADMIN_STATISTICS_PERIOD_DAYS];
+  const days =
+    ADMIN_STATISTICS_PERIOD_DAYS[
+      period as keyof typeof ADMIN_STATISTICS_PERIOD_DAYS
+    ];
   if (!days) {
-    throw new BadRequestException(
-      "period must be one of: 7d, 30d, 90d",
-    );
+    throw new BadRequestException("period must be one of: 7d, 30d, 90d");
   }
 
   const startDate = new Date();

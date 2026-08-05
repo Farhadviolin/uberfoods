@@ -422,5 +422,26 @@ describe('AuthService', () => {
         expect.objectContaining({ secret: 'test-refresh-secret' }),
       );
     });
+
+    it('should normalize role names in refresh token payloads', async () => {
+      mockJwtService.sign
+        .mockReturnValueOnce('access-token')
+        .mockReturnValueOnce('refresh-token');
+
+      await service.login(
+        { id: 'admin_1', email: 'admin@example.com', role: 'ADMIN' },
+        true,
+      );
+
+      expect(mockJwtService.sign).toHaveBeenNthCalledWith(
+        2,
+        expect.objectContaining({
+          sub: 'admin_1',
+          userType: 'admin',
+          type: 'refresh',
+        }),
+        expect.objectContaining({ secret: 'test-refresh-secret' }),
+      );
+    });
   });
 });

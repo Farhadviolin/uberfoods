@@ -115,9 +115,13 @@ const getWsUrl = (): string => {
 
   // ✅ Production: explizite WS-URL aus ENV, mit Validierung
   const wsUrl = getEnvVar('VITE_WS_URL', developmentOrigin(3000), isProduction);
-  return isSameOriginPath(wsUrl)
-    ? wsUrl
-    : validateProductionUrl(wsUrl, 'VITE_WS_URL', ['wss:']);
+  if (isSameOriginPath(wsUrl)) {
+    // Socket.IO expects the origin as its first argument and uses /socket.io
+    // as the transport path. Passing /socket.io here would select that path as
+    // a namespace and leaves the production simulation disconnected.
+    return typeof window !== 'undefined' ? window.location.origin : wsUrl;
+  }
+  return validateProductionUrl(wsUrl, 'VITE_WS_URL', ['wss:']);
 };
 
 const envConfig = getImportMetaEnv();
