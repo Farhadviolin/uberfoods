@@ -359,7 +359,8 @@ export function Cart({ cart, restaurant, updateQuantity, onClearCart }: CartProp
 
       const response = await api.post('/orders/customer', order);
       markCheckoutProbe({ apiPostCalled: true });
-      setOrderId(response.data.id);
+      const responseData = response.data?.data ?? response.data;
+      setOrderId(responseData.id);
       setShowPayment(true);
     } catch (err: unknown) {
       const axiosError = err as {

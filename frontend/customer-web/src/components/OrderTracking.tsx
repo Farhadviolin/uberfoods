@@ -84,7 +84,7 @@ export function OrderTracking() {
       setLoading(true);
       setError(null);
       const response = await api.get(`/orders/${orderId}`);
-      setOrder(response.data);
+      setOrder(response.data?.data ?? response.data);
     } catch (err: unknown) {
       const axiosError = err as AxiosErrorWithResponse;
       if (axiosError.response?.status === 404) {
@@ -135,14 +135,14 @@ export function OrderTracking() {
       // Wenn eingeloggt, normale Anfrage
       if (user) {
         const response = await api.get(`/orders/${orderId}`);
-        setOrder(response.data);
+        setOrder(response.data?.data ?? response.data);
         setError(null);
       } else {
         // Wenn nicht eingeloggt, prüfe ob E-Mail in LocalStorage gespeichert ist
         const savedGuestEmail = localStorage.getItem(`guest_order_${orderId}`);
         if (savedGuestEmail) {
           const response = await api.get(`/orders/${orderId}?email=${encodeURIComponent(savedGuestEmail)}`);
-          setOrder(response.data);
+          setOrder(response.data?.data ?? response.data);
           setError(null);
           setGuestEmail(savedGuestEmail);
         } else {
@@ -177,7 +177,7 @@ export function OrderTracking() {
     try {
       setLoading(true);
       const response = await api.get(`/orders/${id}?email=${encodeURIComponent(guestEmail)}`);
-      setOrder(response.data);
+      setOrder(response.data?.data ?? response.data);
       setError(null);
       setShowGuestEmailInput(false);
       // Speichere E-Mail für zukünftige Besuche

@@ -97,7 +97,12 @@ const viteEnv =
   (typeof globalThis !== 'undefined' &&
     (globalThis as { import?: { meta?: { env?: ImportMetaEnv } } }).import?.meta?.env) ||
   { VITE_WS_URL: 'http://localhost:3000' };
-const WS_URL = viteEnv.VITE_WS_URL || 'http://localhost:3000';
+const configuredWsUrl = viteEnv.VITE_WS_URL || 'http://localhost:3000';
+const useSameOriginSocket = typeof window !== 'undefined' && (
+  configuredWsUrl === '/socket.io' || configuredWsUrl === 'http://localhost:3000'
+);
+const WS_URL = useSameOriginSocket ? window.location.origin : configuredWsUrl;
+const WS_PATH = configuredWsUrl.startsWith('/') ? `${configuredWsUrl.replace(/\/$/, '')}/` : '/socket.io/';
 
 export function useWebSocket(
   customerId: string | null,
@@ -162,6 +167,7 @@ export function useWebSocket(
 
     // Erstelle Socket-Verbindung mit Token-Authentifizierung
     socketRef.current = io(WS_URL, {
+      path: WS_PATH,
       transports: ['websocket', 'polling'], // Fallback zu polling
       reconnection: true,
       reconnectionDelay: 1000,

@@ -102,9 +102,13 @@ export function Menu() {
       setError(null);
       console.log('Fetching restaurant data for:', restaurantId);
 
-      const response = await api.get<Restaurant>(`/restaurants/public/${restaurantId}`);
-      restaurantRef.current = response.data;
-      setRestaurant(response.data);
+      const response = await api.get<Restaurant | { data?: Restaurant }>(`/restaurants/public/${restaurantId}`);
+      const payload = response.data;
+      const restaurantData = payload && typeof payload === 'object' && 'data' in payload && payload.data
+        ? payload.data
+        : payload as Restaurant;
+      restaurantRef.current = restaurantData;
+      setRestaurant(restaurantData);
     } catch (err: unknown) {
       restaurantRef.current = null;
       setError(extractErrorMessage(err));

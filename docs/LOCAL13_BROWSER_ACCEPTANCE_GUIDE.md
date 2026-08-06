@@ -1,117 +1,108 @@
 # LOCAL-13 Browser-Abnahme
 
-Diese Anleitung beschreibt die isolierte lokale Abnahme der vier Web-Apps mit
-einem gemeinsamen Backend, PostgreSQL und Redis. Sie verwendet ausschließlich
-lokale Seed-Daten und erzeugt dynamische Host-Ports.
+Diese Anleitung beschreibt den authentifizierten lokalen UI-Gate für Customer-Web,
+Admin-Panel, Restaurant-Web und `frontend/driver-app`. Jeder Lauf verwendet ein
+eigenes Docker-Compose-Projekt, eine eigene PostgreSQL-/Redis-Instanz, dynamische
+Host-Ports, frische Testidentitäten und getrennte Playwright-Browserkontexte.
 
 ## Voraussetzungen
 
 - Docker Desktop läuft.
-- Node.js/npm sind aus dem Repository-Vertrag verfügbar.
-- Das Arbeitsverzeichnis ist der Repository-Root.
-- Die Browser-Abnahme erfolgt in getrennten Browser-Tabs bzw. Kontexten pro
-  Rolle: Customer, Admin, Restaurant Owner, Driver A und optional Driver B.
+- Node.js/npm sind verfügbar.
+- Das Arbeitsverzeichnis ist der Repository-Root des isolierten Worktrees.
+- Die vier mobilen/Frontend-Oberflächen werden nur über ihre Web-UIs geprüft;
+  `mobile/customer-app/` und `mobile/driver-app/` bleiben außerhalb des Scopes.
 
-## Start und URL-Ermittlung
-
-PowerShell:
+Vor dem ersten Browserlauf einmalig die Runner-Abhängigkeit installieren:
 
 ```powershell
-$runDir = Join-Path $env:TEMP 'uberfoods-local13-browser'
-New-Item -ItemType Directory -Path $runDir -Force | Out-Null
-npm run verify:production-simulation -- `
-  --browser-session-file (Join-Path $runDir 'session.json') `
-  --browser-control-dir (Join-Path $runDir 'control')
+Push-Location frontend/customer-web
+npm ci
+Pop-Location
 ```
 
-Der Verifier baut und startet PostgreSQL, Redis, Migration/Seed, Backend,
-Customer-Web, Admin-Panel, Restaurant-Web und `frontend/driver-app` in einem
-eigenen Compose-Projekt. Er reserviert freie Ports und gibt sie in der
-Startausgabe aus. Die vollständigen URLs stehen zusätzlich in der temporären
-`session.json` unter `urls.backend`, `urls.customer`, `urls.admin`,
-`urls.restaurant` und `urls.driver`; die Datei bleibt außerhalb des
-Repositories und darf nicht veröffentlicht werden.
-
-Backend-Prüfungen:
-
-```text
-<backend-url>/api/health       -> 200
-<backend-url>/api/health/ready -> 200
-<backend-url>/api/restaurants/public -> 200
-```
-
-Die Frontends verwenden im Produktions-Simulationsbuild `/api` und den
-proxied Socket.IO-Pfad `/socket.io`; dadurch zeigen alle vier Apps auf dasselbe
-aktuelle Backend, ohne historische Ports festzulegen.
-
-## Seed-Rollen und Reihenfolge
-
-Der Seed stellt diese Rollen bereit: Customer, Admin, Restaurant Owner,
-Driver A und Driver B. Die Zugangsdaten werden nur vom Verifier in der
-temporären Session-Datei bereitgestellt. Werte niemals in Reports,
-Screenshots, Logs oder das Repository kopieren.
-
-Empfohlene Reihenfolge:
-
-1. Backend-Health und alle vier Root-Dokumente öffnen.
-2. Customer-Web: Login, Session-Restore nach Reload, öffentliche Restaurants,
-   Profil, Restaurant/Menü, Warenkorb befüllen und wieder leeren, Logout und
-   geschützte Route nach Logout.
-3. Admin-Panel: Login, Dashboard, Restaurants, Bestellungen oder Kunden,
-   Reporting, Integrationen, Supplier Management, Einstellungen und Logout.
-4. Restaurant-Web: Login, Onboarding nur mit lokaler Seed-Lieferzone
-   abschließen, Reload/Session-Restore, Restaurant-Profil, Dashboard, Menü,
-   Bestellungen, KDS, Standorte, Meal Planner, Analytics, Reporting,
-   WebSocket-Status, Logout und erneuten Login.
-5. Driver-App: Login, Dashboard/Driver-Me, verfügbare und aktive
-   Bestellungen, authentifizierten WebSocket-Status, Logout und erneuten
-   Login. Driver B darf keine Bestellung von Driver A als eigene aktive
-   Bestellung sehen oder übernehmen.
-
-Keine Zahlung, Mail, Push-Nachricht oder produktive Integration auslösen.
-
-## Negative Auth-, RBAC- und Ownership-Prüfungen
-
-Mit den bereits angemeldeten Tabs prüfen und das erwartete Ergebnis als PASS
-markieren:
-
-- Customer erhält keine Admin- oder Restaurant-Owner-Seite.
-- Restaurant Owner erhält keine Admin-Seite und keinen Zugriff auf eine
-  fremde Restaurant-Ressource.
-- Driver erhält keine Admin- oder Restaurant-Owner-Seite.
-- Driver B erhält keinen Zugriff auf Driver-A-Bestellungen.
-- Ungültige/abgelaufene Sessions werden entfernt.
-- Nach Logout führt jede geschützte Route zum jeweiligen Login.
-
-Erwartete `401`/`403` sind bei diesen Negativtests kein Fehler. Unerwartete
-`401`/`403`, `404`, `500`, `requestfailed`, `pageerror`, nicht erklärbare
-`console.error`/`console.warn`, Unhandled Rejections oder WebSocket-Fehler
-sind als Findings zu erfassen.
-
-## Kontrollierte Checkpoints, Stop und Cleanup
-
-Der Verifier wartet für `initial`, `after-controlled-restart`,
-`after-application-recreate` und `after-postgres-recreate` auf die jeweilige
-Datei `continue-<stage>` im Control-Verzeichnis. Nach dem Browser-Smoke kann
-der nächste Checkpoint kontrolliert freigegeben werden:
+## Session starten
 
 ```powershell
-New-Item -ItemType File -Path (Join-Path $runDir 'control\continue-initial')
+$startOutput = node scripts/local13-session.mjs start
+$startOutput
 ```
 
-Für die weiteren Stufen entsprechend `continue-after-controlled-restart`,
-`continue-after-application-recreate` und
-`continue-after-postgres-recreate` verwenden. Erst nach dem letzten
-Checkpoint beendet sich der Verifier erfolgreich und entfernt ausschließlich
-seine eigenen Container, sein Netzwerk und temporäre Laufzeit-Artefakte.
+Die Ausgabe enthält `LOCAL13_SESSION_FILE`, die fünf lokalen URLs und den
+Compose-Namespace. Die Credential-Datei liegt ausschließlich unter `%TEMP%`.
+Ihr Inhalt darf nicht geöffnet, kopiert, geloggt oder in Evidence übernommen
+werden.
 
-Bei einem kontrollierten Abbruch `Ctrl+C` verwenden und anschließend prüfen,
-dass das vom Verifier ausgegebene Compose-Projekt, seine Listener und
-Container verschwunden sind. Fremde Container, Volumes, Prozesse und
-untracked Repository-Dateien nicht verändern.
+Optionaler Statuscheck:
 
-## Optionale Integrationen
+```powershell
+$sessionFile = ($startOutput | Select-String '^LOCAL13_SESSION_FILE=').ToString().Split('=', 2)[1]
+node scripts/local13-session.mjs status --session-file $sessionFile
+```
 
-Zahlungsanbieter, Mail, Push, Google/Facebook/Apple-Login und externe Karten-
-oder Geocoding-Dienste sind in dieser lokalen Abnahme NOT-TESTED, sofern kein
-lokaler Sandbox-/Mock-Vertrag ausdrücklich vorhanden ist.
+## Browser-Abnahme ausführen
+
+Der Runner verwendet ausschließlich sichtbare UI-Aktionen: Login-Formulare,
+Profil-/Checkout-/Zahlungsdialog, Restaurant-Statusbuttons, Driver-Statusbuttons,
+Admin-Navigation, Reload und Logout. Er injiziert keine Tokens, setzt kein
+`localStorage` und führt den Bestell-Lifecycle nicht per direkter API aus.
+
+```powershell
+node scripts/local13-browser-acceptance.mjs --session-file $sessionFile
+```
+
+Die UI-Reihenfolge ist:
+
+1. Guest-Checks gegen geschützte Routen aller vier Apps.
+2. Customer-Login, Profiladresse, Restaurant/Menü, Warenkorb, Checkout und
+   lokale Überweisung; Bestell-ID wird aus der sichtbaren UI-Route gelesen.
+3. Restaurant-Login/Onboarding und `PENDING -> CONFIRMED -> PREPARING -> READY_FOR_PICKUP`.
+4. Driver A: Online, Übernahme, `PICKED_UP -> IN_TRANSIT -> DELIVERED`.
+5. Driver B: kein sichtbarer Zugriff auf die Bestellung von Driver A, einschließlich
+   sicherem Deep-Link-Check.
+6. Customer: Live-/Polling-Update, Reload, finaler Status und Bestellhistorie.
+7. Admin: Suche nach vollständiger Bestell-ID, `DELIVERED`, Dashboard/Reporting/
+   Integrations-/Orders-Navigation ohne 404.
+8. Inkompatible Rollen-Logins auf dem Admin-Panel, danach UI-Logout und geschützte
+   Route nach Logout.
+
+Erwartete `401`/`403` bei den negativen UI-Checks werden als erwartete Fälle
+klassifiziert. Unerwartete `4xx`/`5xx`, `requestfailed`, `pageerror`, nicht
+erklärbare Console-Fehler oder WebSocket-Fehler führen zum Fail.
+
+## Evidence und Cleanup
+
+Sanitisierte Evidence wird unter
+`%TEMP%\UberFoods-local13-080-artifacts\<Run-ID>\browser` geschrieben:
+
+- `summary.json`, `order-lifecycle.json`, `security-negative-cases.json`
+- `sanitized-network.json`, `sanitized-console.json`, `events.jsonl`
+- `browser-contexts.json`, `applications.json`, Screenshots und
+  `manual-checklist-result.md`
+
+Die Evidence enthält keine Request-Bodies, Header, Tokens oder Passwörter. Der
+Runner scannt die Textdateien zusätzlich gegen alle Laufzeit-Geheimnisse.
+
+Nach jedem Lauf, auch nach einem fehlgeschlagenen Lauf, nur die eigene Session
+bereinigen:
+
+```powershell
+node scripts/local13-session.mjs cleanup --session-file $sessionFile
+```
+
+Der Cleanup prüft den `uberfoods_local13_`-Namespace, entfernt nur dessen
+Container/Netzwerk/Volumes und löscht das Credential-Bundle. Danach muss
+`cleanup.json` `PASS` sowie null eigene Ressourcen ausweisen.
+
+## Verifikation
+
+```powershell
+node --check scripts/local13-session.mjs
+node --check scripts/local13-browser-acceptance.mjs
+node --test scripts/__tests__/local13-browser-acceptance.test.mjs
+```
+
+Nur nach zwei unabhängigen `PASS`-Läufen und erfolgreichem Cleanup darf der
+isolierte Finding-Branch committed und gepusht werden. Externe Zahlungsanbieter,
+Mail, Push, Karten/Geocoding und Cloud-/Render-/Production-Ziele sind nicht Teil
+dieses lokalen Gates.

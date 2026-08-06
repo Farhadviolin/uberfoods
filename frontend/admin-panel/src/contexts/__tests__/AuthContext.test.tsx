@@ -100,6 +100,7 @@ describe('AuthContext', () => {
     expect(mockApi.post).toHaveBeenCalledWith('/auth/login', {
       email: 'test@example.com',
       password: 'password',
+      userType: 'admin',
     });
   });
 

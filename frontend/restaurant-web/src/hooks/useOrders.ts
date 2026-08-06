@@ -53,7 +53,8 @@ export function useRestaurantOrders(restaurantId: string | null) {
       if (!rid) return [];
       try {
         const response = await api.get<Order[]>(`/restaurants/${rid}/orders`);
-        return response.data || [];
+        const responseData = response.data as unknown as { data?: Order[] } | Order[] | null | undefined;
+        return (responseData && !Array.isArray(responseData) ? responseData.data : responseData) || [];
       } catch (error) {
         const appError = handleApiError(error);
         logError(appError, "useRestaurantOrders");
@@ -196,7 +197,10 @@ export function useOrder(id: string | null) {
     queryFn: async () => {
       if (!id || !rid) return null;
       const response = await api.get<Order>(`/restaurants/${rid}/orders/${id}`);
-      return response.data;
+      const responseData = response.data as unknown as { data?: Order } | Order | null | undefined;
+      return responseData && !Array.isArray(responseData) && "data" in responseData
+        ? responseData.data ?? null
+        : responseData;
     },
     enabled: !!id && !!rid,
   });
@@ -211,7 +215,10 @@ export function useOrderDetails(id: string | null) {
     queryFn: async () => {
       if (!id || !rid) return null;
       const response = await api.get(`/restaurants/${rid}/orders/${id}`);
-      return response.data;
+      const responseData = response.data as { data?: Order } | Order | null | undefined;
+      return responseData && !Array.isArray(responseData) && "data" in responseData
+        ? responseData.data ?? null
+        : responseData;
     },
     enabled: !!id && !!rid,
   });

@@ -6,6 +6,7 @@ import {
   unregisterGlobalToastFunction,
 } from "./utils/api";
 import { Header } from "./components/Header";
+import { Login } from "./components/Login/Login";
 import { Sidebar } from "./components/Sidebar";
 import { MainContent } from "./components/MainContent/MainContent";
 import { ChangePassword } from "./components/ChangePassword/ChangePassword";
@@ -35,7 +36,7 @@ function GlobalToastRegistrar({ children }: { children: React.ReactNode }) {
 }
 
 function AppContent() {
-  const { restaurantId, mustChangePassword } = useAuth();
+  const { restaurantId, mustChangePassword, isAuthenticated, loading } = useAuth();
   const [activeTab, setActiveTab] = useState("dashboard");
   const [onboardingDone, setOnboardingDone] = useState(false);
 
@@ -64,6 +65,14 @@ function AppContent() {
     onNewOrder: handleNewOrder,
     onOrderUpdate: handleOrderUpdate,
   });
+
+  if (loading) {
+    return <div role="status">Authentifizierung wird geprüft...</div>;
+  }
+
+  if (!isAuthenticated) {
+    return <Login />;
+  }
 
   // Zeige Passwort-Änderung, wenn erforderlich
   if (mustChangePassword) {

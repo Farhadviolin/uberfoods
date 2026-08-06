@@ -797,7 +797,7 @@ export class OrderService {
     });
 
     // Invalidate order-related caches when an order is created
-    this.cacheService.deletePattern("order_findAll.*");
+    this.cacheService.deletePattern("orders_findAll_.*");
     this.cacheService.deletePattern("order_findOne.*");
 
     const duration = Date.now() - startTime;
@@ -853,7 +853,7 @@ export class OrderService {
 
     // Invalidate order-related caches
     this.cacheService.delete(`order_findOne_${id}`);
-    this.cacheService.deletePattern("order_findAll.*");
+    this.cacheService.deletePattern("orders_findAll_.*");
 
     const duration = Date.now() - startTime;
     this.metricsService.incrementCounter("order.updateStatus.success", {
@@ -953,7 +953,7 @@ export class OrderService {
 
     // Invalidate order-related caches
     this.cacheService.delete(`order_findOne_${id}`);
-    this.cacheService.deletePattern("order_findAll.*");
+    this.cacheService.deletePattern("orders_findAll_.*");
 
     // Trigger webhook for driver assignment
     await this.triggerOrderWebhooks("driver.assigned", updatedOrder);
@@ -1027,7 +1027,7 @@ export class OrderService {
 
   private invalidateOrderCaches(id: string): void {
     this.cacheService.delete(`order_findOne_${id}`);
-    this.cacheService.deletePattern("order_findAll.*");
+    this.cacheService.deletePattern("orders_findAll_.*");
   }
 
   private async appendOrderAuditEntry(
@@ -1099,7 +1099,7 @@ export class OrderService {
 
     // Invalidate order-related caches
     this.cacheService.delete(`order_findOne_${id}`);
-    this.cacheService.deletePattern("order_findAll.*");
+    this.cacheService.deletePattern("orders_findAll_.*");
 
     return updatedOrder;
   }
@@ -1126,7 +1126,7 @@ export class OrderService {
 
     // Invalidate order-related caches
     this.cacheService.delete(`order_findOne_${id}`);
-    this.cacheService.deletePattern("order_findAll.*");
+    this.cacheService.deletePattern("orders_findAll_.*");
 
     return updatedOrder;
   }
@@ -1264,7 +1264,7 @@ export class OrderService {
 
     // Invalidate order-related caches
     this.cacheService.delete(`order_findOne_${id}`);
-    this.cacheService.deletePattern("order_findAll.*");
+    this.cacheService.deletePattern("orders_findAll_.*");
 
     return updatedOrder;
   }

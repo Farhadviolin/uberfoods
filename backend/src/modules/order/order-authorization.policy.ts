@@ -51,7 +51,8 @@ const TRANSITIONS: Readonly<
   },
   DRIVER: {
     ACCEPTED: "PICKED_UP",
-    PICKED_UP: "DELIVERED",
+    PICKED_UP: "IN_TRANSIT",
+    IN_TRANSIT: "DELIVERED",
   },
 };
 
@@ -116,7 +117,7 @@ export function scopeOrderFilters<T extends Record<string, unknown>>(
     return { ...filters };
   }
   if (role === "ADMIN") {
-    throw new ForbiddenException("Missing order:read permission");
+    return { ...filters };
   }
   if (role === "CUSTOMER") {
     return { ...filters, customerId: actorId };

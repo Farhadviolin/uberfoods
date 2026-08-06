@@ -3107,7 +3107,7 @@ export class AdminController {
   @Get("restaurants")
   @UseGuards(JwtAuthGuard, RolesGuard, PermissionGuard)
   @Roles(AdminRole.ADMIN, AdminRole.MODERATOR)
-  @RequirePermission("restaurants:read")
+  @RequirePermission("restaurant:read")
   async getRestaurants(
     @Query("page") page?: string,
     @Query("limit") limit?: string,
@@ -3135,7 +3135,7 @@ export class AdminController {
   @Get("restaurants/:id")
   @UseGuards(JwtAuthGuard, RolesGuard, PermissionGuard)
   @Roles(AdminRole.ADMIN, AdminRole.MODERATOR)
-  @RequirePermission("restaurants:read")
+  @RequirePermission("restaurant:read")
   async getRestaurant(@Param("id") id: string) {
     try {
       return await this.adminService.getRestaurantById(id);

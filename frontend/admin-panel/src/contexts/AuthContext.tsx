@@ -181,6 +181,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const response = await api.post('/auth/login', {
         email,
         password,
+        userType: 'admin',
       });
 
       const session = parseAdminAuthEnvelope(response.data);
