@@ -79,6 +79,36 @@ describe("useAuth", () => {
       expect(result.current.token).toBeNull();
       expect(result.current.isAuthenticated).toBe(false);
     });
+
+    it("clears an invalid stored session and stays logged out", async () => {
+      localStorage.setItem("restaurant_token", "expired-token");
+      localStorage.setItem(
+        "restaurant_user",
+        JSON.stringify({
+          id: "restaurant-1",
+          email: "owner@pizza-palace.com",
+          role: "restaurant",
+        }),
+      );
+      localStorage.setItem("restaurant_id", "restaurant-1");
+      mockApi.get.mockRejectedValueOnce({ response: { status: 401 } });
+
+      const { result } = renderHook(() => useAuth(), {
+        wrapper: createWrapper(null),
+      });
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      expect(result.current.isAuthenticated).toBe(false);
+      expect(result.current.user).toBeNull();
+      expect(result.current.token).toBeNull();
+      expect(mockApi.get).toHaveBeenCalledWith("/auth/me");
+      expect(localStorage.getItem("restaurant_token")).toBeNull();
+      expect(localStorage.getItem("restaurant_user")).toBeNull();
+      expect(localStorage.getItem("restaurant_id")).toBeNull();
+    });
   });
 
   describe("useLogin", () => {
