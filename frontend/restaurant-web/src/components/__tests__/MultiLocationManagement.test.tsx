@@ -28,7 +28,7 @@ describe("MultiLocationManagement", () => {
   });
 
   it("unwraps the standard API envelope before rendering locations", async () => {
-    (api.get as jest.Mock).mockResolvedValueOnce({
+    (api.get as jest.Mock).mockResolvedValue({
       data: {
         success: true,
         data: [
@@ -52,8 +52,25 @@ describe("MultiLocationManagement", () => {
     );
   });
 
+  it("renders locations returned as a raw array by the E2E API", async () => {
+    (api.get as jest.Mock).mockResolvedValue({
+      data: [
+        {
+          id: "location-1",
+          name: "Hauptstandort",
+          isActive: true,
+        },
+      ],
+    });
+
+    render(<MultiLocationManagement />);
+
+    expect(await screen.findByText("Hauptstandort")).toBeInTheDocument();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
   it("renders a controlled error for a malformed response", async () => {
-    (api.get as jest.Mock).mockResolvedValueOnce({
+    (api.get as jest.Mock).mockResolvedValue({
       data: { success: true, data: { locations: [] } },
     });
 

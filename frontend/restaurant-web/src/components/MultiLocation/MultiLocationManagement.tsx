@@ -31,7 +31,11 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function normalizeLocations(payload: unknown): Location[] {
-  const candidate = isRecord(payload) ? payload.data : payload;
+  const candidate = Array.isArray(payload)
+    ? payload
+    : isRecord(payload)
+      ? payload.data
+      : payload;
   if (!Array.isArray(candidate)) {
     throw new Error("Ungültiges Standortdatenformat.");
   }

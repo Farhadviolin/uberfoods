@@ -15,6 +15,8 @@
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
     "test:e2e": "playwright test",
+    "test:e2e:local07": "playwright test e2e/local07-restaurant.spec.ts --project=chromium",
+    "test:e2e:lifecycle": "playwright test e2e/order-management.spec.ts --project=chromium",
     "e2e:gate:a": "playwright test --project=chromium --project=firefox e2e/order-management.spec.ts",
     "e2e:gate:b": "playwright test --project=\"Mobile Chrome\" e2e/order-management.spec.ts",
     "lighthouse": "lighthouse http://localhost:3003 --output html --output-path ./lighthouse-report.html",

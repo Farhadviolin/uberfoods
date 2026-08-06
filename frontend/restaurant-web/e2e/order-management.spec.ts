@@ -1,6 +1,8 @@
 import { test, expect } from '@playwright/test';
 
-test.describe('Restaurant - Order Management (E2E)', () => {
+// LOCAL-10 contract: full customer -> restaurant -> driver order lifecycle.
+// LOCAL-07 deliberately uses e2e/local07-restaurant.spec.ts instead.
+test.describe('LOCAL-10 Order Lifecycle - Restaurant (E2E)', () => {
   test.beforeEach(async ({ page }) => {
     // Login as restaurant
     await page.goto('http://localhost:3003');
@@ -89,12 +91,7 @@ test.describe('Restaurant - Order Management (E2E)', () => {
 
     // Toggle and wait for text to change (more deterministic than timeout)
     await toggleButton.click();
-    await page.waitForFunction(
-      (button, initial) => button.textContent !== initial,
-      toggleButton.elementHandle(),
-      initialStatus,
-      { timeout: 5000 }
-    );
+    await expect(toggleButton).not.toHaveText(initialStatus ?? "");
 
     // Verify changed
     const newStatus = await toggleButton.textContent();

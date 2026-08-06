@@ -1,5 +1,19 @@
 import { defineConfig, devices } from '@playwright/test';
 
+const restaurantWebBaseUrl = process.env.RESTAURANT_WEB_BASE_URL || process.env.BASE_URL;
+
+if (!restaurantWebBaseUrl) {
+  throw new Error(
+    'RESTAURANT_WEB_BASE_URL is required for restaurant-web E2E; refusing a historical or guessed URL.',
+  );
+}
+
+try {
+  new URL(restaurantWebBaseUrl);
+} catch {
+  throw new Error(`RESTAURANT_WEB_BASE_URL must be an absolute URL: ${restaurantWebBaseUrl}`);
+}
+
 /**
  * @see https://playwright.dev/docs/test-configuration
  */
@@ -21,7 +35,7 @@ export default defineConfig({
   /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
   use: {
     /* Base URL to use in actions like `await page.goto('/')`. */
-    baseURL: process.env.BASE_URL || 'http://localhost:3003',
+    baseURL: restaurantWebBaseUrl.replace(/\/$/, ''),
 
     /* Collect trace when retrying the failed test. See https://playwright.dev/docs/trace-viewer */
     trace: 'on-first-retry',
@@ -57,11 +71,4 @@ export default defineConfig({
     },
   ],
 
-  /* Run your local dev server before starting the tests */
-  webServer: process.env.E2E_ORCHESTRATED ? undefined : {
-    command: 'npm run dev',
-    port: 3003,
-    reuseExistingServer: !process.env.CI,
-    timeout: 120 * 1000,
-  },
 });
