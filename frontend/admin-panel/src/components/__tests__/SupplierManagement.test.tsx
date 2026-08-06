@@ -104,12 +104,13 @@ describe('SupplierManagement', () => {
   });
 
   it('should create a new supplier', async () => {
+    mockedApi.get.mockResolvedValue({ data: [] });
     mockedApi.post.mockResolvedValue({ data: { id: 'supplier-2', name: 'Supplier 2' } });
 
     renderWithProviders(<SupplierManagement />);
 
     await waitFor(() => {
-      expect(screen.getByText('Supplier Management')).toBeInTheDocument();
+      expect(screen.getByText('Keine Lieferanten vorhanden. Erstellen Sie einen neuen Lieferanten.')).toBeInTheDocument();
     });
 
     const user = userEvent.setup();
@@ -124,6 +125,7 @@ describe('SupplierManagement', () => {
     await user.click(saveButton);
 
     await waitFor(() => {
+      expect(mockedApi.post).toHaveBeenCalledTimes(1);
       expect(mockedApi.post).toHaveBeenCalledWith(
         '/suppliers',
         expect.objectContaining({
@@ -132,6 +134,12 @@ describe('SupplierManagement', () => {
           restaurantId: 'rest-1',
         })
       );
+      expect(mockShowToast).toHaveBeenCalledWith('Lieferant angelegt', 'success');
+    });
+
+    await waitFor(() => {
+      expect(mockedApi.get).toHaveBeenCalledTimes(4);
+      expect(screen.getByLabelText('Lieferant Name')).toHaveValue('');
     });
   });
 
