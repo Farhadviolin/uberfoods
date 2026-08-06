@@ -1,11 +1,12 @@
 // Konfiguration für die Driver App
 import { getEnvBool, getEnvVar } from './utils/env';
 
-// Helper function to safely access import.meta.env
+// The browser entry initializes globalThis.importMetaEnv before this module
+// is evaluated; keeping this helper indirect also makes Jest/Node compatible.
 function getImportMetaEnv(): { DEV: boolean; PROD: boolean } {
-  const viteEnv = (import.meta as ImportMeta & {
-    env?: { DEV?: boolean; PROD?: boolean };
-  }).env;
+  const viteEnv = (globalThis as any).importMetaEnv as
+    | { DEV?: boolean; PROD?: boolean }
+    | undefined;
 
   return {
     DEV: viteEnv?.DEV ?? getEnvBool('DEV'),

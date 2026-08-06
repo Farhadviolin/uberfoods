@@ -1,3 +1,4 @@
+import './runtimeEnv';
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -5,11 +6,6 @@ import App from './App';
 import { ThemeProvider } from './contexts/ThemeContext';
 import './index.css';
 import './i18n';
-// Stelle Env auch außerhalb von import.meta bereit (für Tests/SSR)
-if (!(globalThis as any).importMetaEnv) {
-  (globalThis as any).importMetaEnv = import.meta.env;
-}
-
 // Console Error Filter - Filtert Safari WebSocket Suspension-Fehler, Network-Fehler und Safari Extension Fehler
 // Console error filtering removed - errors handled by error boundaries
 const originalConsoleError = console.error;

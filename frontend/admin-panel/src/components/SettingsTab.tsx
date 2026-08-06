@@ -25,30 +25,16 @@ function SettingsTabInner() {
   const fetchSettings = useCallback(async () => {
     try {
       setLoading(true);
-      const [platform, payment, email, features] = await Promise.all([
-        api.get('/settings/platform'),
-        api.get('/settings/payment'),
-        api.get('/settings/email'),
-        api.get('/settings/features').catch(() => ({ data: {} })), // Feature-Flags optional
-      ]);
+      const response = await api.get('/admin/settings');
+      const systemSettings = extractData(response.data) || response.data || {};
 
-      const platformData = extractData(platform.data) || platform.data || {};
-      const paymentData = extractData(payment.data) || payment.data || {};
-      const emailData = extractData(email.data) || email.data || {};
-      const featuresData = extractData(features.data) || features.data || {};
-
-      setPlatformSettings(platformData);
-      setPaymentSettings(paymentData);
-      setEmailSettings(emailData);
-      setFeatureSettings(featuresData);
+      setPlatformSettings(systemSettings);
+      setPaymentSettings(systemSettings);
+      setEmailSettings(systemSettings);
+      setFeatureSettings(systemSettings);
 
       // Merge für editedSettings
-      setEditedSettings({
-        ...platform.data,
-        ...payment.data,
-        ...email.data,
-        ...features.data,
-      });
+      setEditedSettings(systemSettings);
     } catch (err: any) {
       showToast(err.response?.data?.message || 'Fehler beim Laden der Einstellungen', 'error');
     } finally {
@@ -69,12 +55,7 @@ function SettingsTabInner() {
 
   const handleSaveSettings = useCallback(async () => {
     try {
-      const settingsArray = Object.entries(editedSettings).map(([key, value]) => ({
-        key,
-        value: typeof value === 'object' ? JSON.stringify(value) : String(value),
-      }));
-
-      await api.put('/settings/bulk/update', { settings: settingsArray });
+      await api.put('/admin/settings', editedSettings);
       showToast('Einstellungen erfolgreich gespeichert!', 'success');
       fetchSettings();
     } catch (err: any) {

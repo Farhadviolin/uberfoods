@@ -30,6 +30,12 @@ const resolveApiUrl = () => {
 const resolveWsUrl = () => {
   const url =
     viteEnv.VITE_WS_URL || viteEnv.VITE_API_URL || "http://localhost:3000";
+  // Socket.IO expects the origin as its first argument and uses
+  // `/socket.io` as the transport path. A relative production value is the
+  // reverse-proxy contract, not a namespace URL.
+  if (viteEnv.PROD && url.startsWith("/")) {
+    return typeof window !== "undefined" ? window.location.origin : url;
+  }
   return validateUrl(url, "WebSocket URL");
 };
 

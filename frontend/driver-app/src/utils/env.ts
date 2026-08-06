@@ -1,5 +1,5 @@
-// Zentrale Env-Helfer, vermeiden direkten Zugriff auf import.meta in Tests/Node.
-// Zur Laufzeit setzt main.tsx `globalThis.importMetaEnv = import.meta.env` (Vite).
+// Zentrale Env-Helfer, ohne direkten import.meta-Zugriff in Jest/Node.
+// Zur Laufzeit setzt runtimeEnv.ts `globalThis.importMetaEnv = import.meta.env`.
 
 type EnvRecord = Record<string, any> | undefined;
 
@@ -13,9 +13,8 @@ const resolveEnv = (): EnvRecord => {
   return undefined;
 };
 
-const env = resolveEnv() || {};
-
 export const getEnvVar = <T = string>(key: string, fallback?: T): T | undefined => {
+  const env = resolveEnv() || {};
   const value = (env as any)[key];
   if (value === undefined) return fallback;
   return value as T;
