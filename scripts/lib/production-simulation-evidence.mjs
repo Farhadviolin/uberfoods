@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import {
   closeSync,
   mkdirSync,
@@ -239,40 +239,110 @@ export function sha256(value) {
   return createHash("sha256").update(canonicalJson(value)).digest("hex");
 }
 
+let temporarySequence = 0;
+const lockWaitState = new Int32Array(new SharedArrayBuffer(4));
+const MAX_LOCK_ATTEMPTS = 200;
+const MAX_LOCK_WAIT_MS = 20;
+
+function waitForTargetLock(milliseconds) {
+  Atomics.wait(lockWaitState, 0, 0, milliseconds);
+}
+
+function uniqueTemporaryPath(target) {
+  temporarySequence += 1;
+  return `${target}.tmp-${process.pid}-${temporarySequence}-${randomBytes(8).toString("hex")}`;
+}
+
+function acquireTargetLock(target, api) {
+  const lockPath = `${target}.lock`;
+  for (let attempt = 0; attempt < MAX_LOCK_ATTEMPTS; attempt += 1) {
+    try {
+      api.mkdirSync(lockPath);
+      return { path: lockPath };
+    } catch (error) {
+      const lockIsContended =
+        error?.code === "EEXIST" ||
+        (error?.code === "EPERM" && error?.syscall === "mkdir");
+      if (!lockIsContended) throw error;
+      if (attempt === MAX_LOCK_ATTEMPTS - 1) {
+        throw Object.assign(
+          new Error(`timed out acquiring evidence write lock for ${target}`),
+          {
+            code: "ELOCKTIMEOUT",
+            operation: "atomic-evidence-write-lock",
+            path: target,
+            lockPath,
+            cause: error,
+          },
+        );
+      }
+      waitForTargetLock(Math.min(1 + attempt, MAX_LOCK_WAIT_MS));
+    }
+  }
+  throw new Error(`unreachable evidence write lock state for ${target}`);
+}
+
+function releaseTargetLock(lock, api) {
+  if (!lock) return;
+  let releaseError;
+  try {
+    api.rmSync(lock.path, { recursive: true, force: true });
+  } catch (error) {
+    releaseError = error;
+  }
+  if (releaseError) throw releaseError;
+}
+
 function atomicWrite(target, contents, fs = {}) {
+  target = path.resolve(target);
   const api = {
     mkdirSync,
     openSync,
+    readFileSync,
     writeSync,
     closeSync,
     renameSync,
     rmSync,
     ...fs,
   };
-  const temporary = `${target}.tmp`;
+  const temporary = uniqueTemporaryPath(target);
   let handle;
+  let lock;
+  let writeError;
   try {
     api.mkdirSync(path.dirname(target), { recursive: true });
-    api.rmSync(temporary, { force: true });
+    lock = acquireTargetLock(target, api);
+    const resolvedContents =
+      typeof contents === "function" ? contents(api, target) : contents;
     handle = api.openSync(temporary, "w");
-    api.writeSync(handle, contents, undefined, "utf8");
+    api.writeSync(handle, resolvedContents, undefined, "utf8");
     api.closeSync(handle);
     handle = undefined;
     api.renameSync(temporary, target);
   } catch (error) {
+    writeError = error instanceof Error ? error : new Error(String(error));
+  } finally {
     if (handle !== undefined) {
       try {
         api.closeSync(handle);
       } catch (closeError) {
-        void closeError;
+        writeError ??= closeError;
       }
     }
     try {
       api.rmSync(temporary, { force: true });
     } catch (cleanupError) {
-      void cleanupError;
+      writeError ??= cleanupError;
     }
-    const wrapped = error instanceof Error ? error : new Error(String(error));
+    try {
+      releaseTargetLock(lock, api);
+    } catch (releaseError) {
+      writeError ??= releaseError;
+    }
+  }
+  if (writeError) {
+    const wrapped =
+      writeError instanceof Error ? writeError : new Error(String(writeError));
     wrapped.operation ??= "atomic-summary-write";
     wrapped.path ??= target;
     throw wrapped;
@@ -308,11 +378,30 @@ export function createEvidenceRun({
   };
   const events = (event) => {
     const target = path.join(directory, "events.jsonl");
-    const prior = files.has("events.jsonl") ? readFileSync(target, "utf8") : "";
-    write(
-      "events.jsonl",
-      `${prior}${JSON.stringify(safeJsonValue({ schemaVersion: 1, runId, namespace, timestamp: new Date().toISOString(), ...event }))}\n`,
+    const serialized = `${JSON.stringify(
+      safeJsonValue({
+        schemaVersion: 1,
+        runId,
+        namespace,
+        timestamp: new Date().toISOString(),
+        ...event,
+      }),
+    )}\n`;
+    atomicWrite(
+      target,
+      (api, targetPath) => {
+        let prior = "";
+        try {
+          prior = api.readFileSync(targetPath, "utf8");
+        } catch (error) {
+          if (error?.code !== "ENOENT") throw error;
+        }
+        return `${prior}${serialized}`;
+      },
+      fs,
     );
+    files.add("events.jsonl");
+    return target;
   };
   const summary = {
     schemaVersion: 1,
