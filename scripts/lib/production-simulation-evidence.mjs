@@ -214,6 +214,7 @@ export function normalizeEvidenceError(
     syscall: candidate.syscall,
     operation: candidate.operation || operation,
     message: redact(candidate.message || String(error)),
+    httpDiagnostics: candidate.httpDiagnostics,
     relativePath: relative(
       candidate.relativePath || candidate.path || relativePath,
     ),

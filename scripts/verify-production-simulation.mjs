@@ -14,6 +14,11 @@ import {
   finalizeSimulationEvidence,
   sha256,
 } from "./lib/production-simulation-evidence.mjs";
+import {
+  probeWithBoundedRetries,
+  requestHttp,
+  sanitizeHttpUrl,
+} from "./lib/production-simulation-http.mjs";
 
 const repoRoot = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -26,6 +31,7 @@ let postgresVolumeName;
 let evidence;
 let evidencePhase = "startup";
 let evidenceStep = "initialization";
+let simulationServices = new Map();
 
 function setEvidencePhase(phase, step) {
   evidencePhase = phase;
@@ -367,6 +373,85 @@ function auditLogs(logs, context, label) {
   return result;
 }
 
+function captureFailureRuntimeEvidence(environment) {
+  if (!evidence) return;
+  const containerIds = run(
+    "docker",
+    [
+      "ps",
+      "-a",
+      "--quiet",
+      "--filter",
+      `label=com.docker.compose.project=${project}`,
+    ],
+    { env: environment, allowFailure: true, quiet: true },
+  )
+    .output.split(/\r?\n/)
+    .filter(Boolean);
+  const containers = containerIds.map((containerId) => {
+    let inspection;
+    try {
+      const value = inspectJson("container", containerId);
+      inspection = {
+        id: containerId,
+        name: String(value.Name || "").replace(/^\//, ""),
+        service: value.Config?.Labels?.["com.docker.compose.service"],
+        status: value.State?.Status,
+        health: value.State?.Health?.Status || null,
+        restartCount: value.RestartCount,
+        startedAt: value.State?.StartedAt,
+        finishedAt: value.State?.FinishedAt,
+        hostPorts: value.NetworkSettings?.Ports || {},
+        image: value.Config?.Image,
+      };
+    } catch (error) {
+      inspection = {
+        id: containerId,
+        inspectFailure: sanitize(error instanceof Error ? error.message : error),
+      };
+    }
+    const logs = run(
+      "docker",
+      ["logs", "--timestamps", "--tail", "300", containerId],
+      { env: environment, allowFailure: true, quiet: true },
+    ).output;
+    const ports = run("docker", ["port", containerId], {
+      env: environment,
+      allowFailure: true,
+      quiet: true,
+    }).output;
+    return {
+      ...inspection,
+      ports: sanitize(ports),
+      logs: sanitize(logs),
+    };
+  });
+  const listeners = run(
+    "powershell",
+    [
+      "-NoLogo",
+      "-NoProfile",
+      "-Command",
+      "Get-NetTCPConnection -State Listen | Sort-Object LocalPort | Select-Object LocalAddress,LocalPort,OwningProcess | ConvertTo-Json -Compress",
+    ],
+    { env: environment, allowFailure: true, quiet: true },
+  ).output;
+  evidence.write("failure-runtime-state.json", {
+    namespace: project,
+    capturedAt: new Date().toISOString(),
+    composePs: sanitize(
+      compose(["ps", "-a"], {
+        env: environment,
+        allowFailure: true,
+        quiet: true,
+      }).output,
+    ),
+    containerIds,
+    containers,
+    listeners: sanitize(listeners),
+  });
+}
+
 function safeFinalCleanup(environment) {
   assertProject();
   const down = compose(["down", "--remove-orphans"], {
@@ -478,18 +563,22 @@ function delay(ms) {
 
 async function waitFor(label, check, timeoutMs = 120_000) {
   const started = Date.now();
-  let lastError = "not ready";
+  let lastError = null;
   while (Date.now() - started < timeoutMs) {
     try {
       if (await check()) return;
     } catch (error) {
-      lastError = error instanceof Error ? error.message : String(error);
+      lastError = error instanceof Error ? error : new Error(String(error));
     }
     await delay(1_000);
   }
-  fail(
-    `${label} was not ready within ${Math.round(timeoutMs / 1000)} seconds: ${lastError}`,
+  const timeoutError = new Error(
+    `${label} was not ready within ${Math.round(timeoutMs / 1000)} seconds: ${lastError?.message || "not ready"}`,
+    { cause: lastError || undefined },
   );
+  timeoutError.name = "ProductionSimulationWaitTimeoutError";
+  timeoutError.httpDiagnostics = lastError?.httpDiagnostics;
+  throw timeoutError;
 }
 
 async function available(port) {
@@ -515,17 +604,57 @@ function unwrap(value) {
     : value;
 }
 
-async function request(url, options = {}) {
-  const response = await fetch(url, { redirect: "manual", ...options });
-  const text = await response.text();
-  let json;
-  let primaryFailure;
+function serviceForUrl(url) {
   try {
-    json = JSON.parse(text);
+    const port = Number(new URL(String(url)).port);
+    return simulationServices.get(port) || "unknown-service";
   } catch {
-    json = undefined;
+    return "unknown-service";
   }
-  return { response, text, json };
+}
+
+async function request(url, options = {}, context = {}) {
+  const method = String(context.method || options.method || "GET").toUpperCase();
+  const service = context.service || serviceForUrl(url);
+  const requestLabel =
+    context.label || `${service} ${method} ${sanitizeHttpUrl(url)}`;
+  return requestHttp({
+    url,
+    options,
+    method,
+    phase: context.phase || evidencePhase,
+    step: context.step || evidenceStep,
+    requestLabel,
+    service,
+    attempt: context.attempt || 1,
+    onEvent: (event) =>
+      evidence?.events({
+        ...event,
+        phase: event.phase || context.phase || evidencePhase,
+        step: event.step || context.step || evidenceStep,
+      }),
+  });
+}
+
+// Docker Desktop can close a host request while the restarted Node process is
+// still binding its internal listener. Keep this boundary
+// bounded and startup-only; functional requests remain single-attempt.
+const startupBackoffMs = [0, 250, 500, 750, 1_000, 1_500, 2_500, 4_000];
+
+async function waitForBackendReadiness(backendBase, label) {
+  return probeWithBoundedRetries({
+    label,
+    maxAttempts: startupBackoffMs.length,
+    backoffMs: startupBackoffMs,
+    probe: (attempt) =>
+      request(`${backendBase}/api/health/ready`, {}, {
+        label,
+        service: "backend",
+        attempt,
+      }),
+    isReady: (health) =>
+      health.response.status === 200 && unwrap(health.json)?.status === "ready",
+  });
 }
 
 function assertStatus(result, statuses, label) {
@@ -852,7 +981,19 @@ function driverRefreshAuditSnapshot(driverId, environment) {
 
 async function checkFrontend(name, port, route) {
   const base = `http://127.0.0.1:${port}`;
-  const root = await request(`${base}/`);
+  const service = name.split(" after ", 1)[0];
+  const root = await probeWithBoundedRetries({
+    label: `${name} listener startup`,
+    maxAttempts: startupBackoffMs.length,
+    backoffMs: startupBackoffMs,
+    probe: (attempt) =>
+      request(`${base}/`, {}, {
+        label: `${name} listener startup`,
+        service,
+        attempt,
+      }),
+    isReady: (result) => result.response.status === 200,
+  });
   assertStatus(root, [200], `${name} root`);
   if (!root.response.headers.get("content-type")?.includes("text/html"))
     fail(`${name} root did not return HTML`);
@@ -1180,6 +1321,13 @@ async function main() {
   const ports = await allocatePorts();
   const [backendPort, customerPort, adminPort, restaurantPort, driverPort] =
     ports;
+  simulationServices = new Map([
+    [backendPort, "backend"],
+    [customerPort, "customer-web"],
+    [adminPort, "admin-panel"],
+    [restaurantPort, "restaurant-web"],
+    [driverPort, "driver-web"],
+  ]);
   const postgresPassword = `sim_db_${randomBytes(12).toString("hex")}`;
   const jwtSecret = `sim_jwt_${randomBytes(32).toString("hex")}`;
   const jwtRefreshSecret = `sim_refresh_${randomBytes(32).toString("hex")}`;
@@ -1249,7 +1397,7 @@ async function main() {
     compose(["config", "--quiet"], { env: environment });
     setEvidencePhase("build", "no-cache-images");
     compose(["build", "--no-cache"], { env: environment });
-    setEvidencePhase("database", "fresh-database");
+    setEvidencePhase("database", "bootstrap");
     const expectedInitialVolumeName = `${project}_postgres-data`;
     const namespaceBeforeBootstrap = namespaceResourceSnapshot();
     if (
@@ -1279,6 +1427,7 @@ async function main() {
     let seedSucceeded = false;
     let seedIdempotent = false;
     let backendReady = false;
+    setEvidencePhase("database", "bootstrap-verification");
     const freshTables = compose(
       [
         "exec",
@@ -1300,7 +1449,9 @@ async function main() {
       fail(
         `fresh production database unexpectedly has ${freshTables} public tables`,
       );
+    setEvidencePhase("database", "migration");
     compose(["run", "--rm", "migration"], { env: environment });
+    setEvidencePhase("database", "migration-status");
     compose(
       [
         "run",
@@ -1316,10 +1467,13 @@ async function main() {
     );
     migrationsApplied = true;
     schemaReachable = true;
+    setEvidencePhase("database", "seed-first");
     compose(["run", "--rm", "seed"], { env: environment });
     seedSucceeded = true;
+    setEvidencePhase("database", "seed-second");
     compose(["run", "--rm", "seed"], { env: environment });
     seedIdempotent = true;
+    setEvidencePhase("runtime", "application-fixtures");
     compose(
       ["run", "--rm", "tooling", "node", "scripts/create-test-restaurant.js"],
       { env: environment },
@@ -1338,6 +1492,7 @@ async function main() {
       ],
       { env: environment },
     );
+    setEvidencePhase("runtime", "start");
     compose(
       [
         "up",
@@ -1395,14 +1550,10 @@ async function main() {
         `backend runtime audit failed: configured=${configuredProcess || "missing"}; running=${runningCommands.join(" | ") || "missing"}`,
       );
     const backendBase = `http://127.0.0.1:${backendPort}`;
-    await waitFor("backend readiness", async () => {
-      const health = await request(`${backendBase}/api/health/ready`);
-      return (
-        health.response.status === 200 &&
-        unwrap(health.json)?.status === "ready"
-      );
-    });
+    setEvidencePhase("runtime", "backend-readiness");
+    await waitForBackendReadiness(backendBase, "backend readiness");
     backendReady = true;
+    setEvidencePhase("runtime", "backend-contracts");
     for (const pathPart of [
       "/api/health/live",
       "/api/health/ready",
@@ -1443,12 +1594,17 @@ async function main() {
       if (!corsAllowed.response.headers.get(header))
         fail(`backend is missing ${header}`);
     }
+    setEvidencePhase("runtime", "customer-web");
     await checkFrontend("customer-web", customerPort, "/restaurants");
+    setEvidencePhase("runtime", "admin-panel");
     await checkFrontend("admin-panel", adminPort, "/login");
+    setEvidencePhase("runtime", "restaurant-web");
     await checkFrontend("restaurant-web", restaurantPort, "/login");
+    setEvidencePhase("runtime", "driver-web");
     await checkFrontend("driver-web", driverPort, "/login");
 
     assertBackendSecretEnvironment(environment);
+    setEvidencePhase("auth", "driver");
     const driverA = await verifyAuthSecretContract(
       backendBase,
       driverPassword,
@@ -1456,12 +1612,14 @@ async function main() {
       jwtRefreshSecret,
       environment,
     );
+    setEvidencePhase("auth", "driver-secondary");
     const driverB = await loginDriver(
       backendBase,
       "production-sim-driver-b@example.test",
       driverBPassword,
       "Driver B login",
     );
+    setEvidencePhase("lifecycle", "order");
     const finalVerification = run(
       "pwsh",
       [
@@ -1502,6 +1660,7 @@ async function main() {
       sha256: sha256({ orderId: lifecycleOrderId, snapshot: beforeRestart }),
     };
     evidence.write("persistence-before.json", persistenceBefore);
+    setEvidencePhase("runtime", "controlled-restart");
     compose(
       [
         "restart",
@@ -1513,13 +1672,13 @@ async function main() {
       ],
       { env: environment },
     );
-    await waitFor(
+    setEvidencePhase("runtime", "post-restart-readiness");
+    await waitForBackendReadiness(
+      backendBase,
       "backend after controlled restart",
-      async () =>
-        (await request(`${backendBase}/api/health/ready`)).response.status ===
-        200,
     );
     assertBackendSecretEnvironment(environment);
+    setEvidencePhase("auth", "refresh-after-restart");
     await verifyRefreshFlow(
       backendBase,
       driverA.refreshToken,
@@ -1528,7 +1687,9 @@ async function main() {
       driverA.driverId,
       environment,
     );
+    setEvidencePhase("auth", "restaurant-after-restart");
     await verifyRestaurantLogin(backendBase, restaurantPassword);
+    setEvidencePhase("runtime", "customer-web-after-restart");
     await checkFrontend(
       "customer-web after restart",
       customerPort,
@@ -1544,11 +1705,13 @@ async function main() {
         driverB,
         "controlled restart",
       );
+    setEvidencePhase("database", "migration-after-restart");
     compose(["run", "--rm", "migration"], { env: environment });
     const backendContainerBeforeRecreate = compose(["ps", "-q", "backend"], {
       env: environment,
       quiet: true,
     }).output.trim();
+    setEvidencePhase("runtime", "application-recreate");
     compose(
       [
         "up",
@@ -1563,13 +1726,10 @@ async function main() {
       ],
       { env: environment },
     );
-    await waitFor(
-      "backend after recreation",
-      async () =>
-        (await request(`${backendBase}/api/health/ready`)).response.status ===
-        200,
-    );
+    setEvidencePhase("runtime", "post-recreate-readiness");
+    await waitForBackendReadiness(backendBase, "backend after recreation");
     assertBackendSecretEnvironment(environment);
+    setEvidencePhase("auth", "refresh-after-recreate");
     await verifyRefreshFlow(
       backendBase,
       driverA.refreshToken,
@@ -1578,7 +1738,9 @@ async function main() {
       driverA.driverId,
       environment,
     );
+    setEvidencePhase("auth", "restaurant-after-recreate");
     await verifyRestaurantLogin(backendBase, restaurantPassword);
+    setEvidencePhase("runtime", "driver-web-after-recreate");
     await checkFrontend("driver-web after recreation", driverPort, "/login");
     if (databaseSnapshot(lifecycleOrderId) !== beforeRestart)
       fail("order state changed during application recreation");
@@ -1602,6 +1764,7 @@ async function main() {
       );
     evidence.summary.driverRuntimeLifecycle.backendContainerRecreated = true;
 
+    setEvidencePhase("logs", "audit-before-postgres-recreate");
     const bootstrapPostgresLogs = run(
       "docker",
       ["logs", "--timestamps", initialPostgres.containerId],
@@ -1708,7 +1871,7 @@ async function main() {
     if (!oldPostgres.healthy)
       fail("PostgreSQL was not healthy before controlled recreate");
     postgresVolumeName = oldPostgres.volumeName;
-    setEvidencePhase("postgres-recreate", "controlled-stop");
+    setEvidencePhase("database", "postgres-recreate-stop");
     const recreateRequestedAt = new Date();
     const controlledStopResult = compose(["stop", "postgres"], {
       env: environment,
@@ -1751,7 +1914,9 @@ async function main() {
     ) {
       fail("old PostgreSQL container still exists after controlled removal");
     }
+    setEvidencePhase("database", "postgres-recreate-start");
     compose(["up", "-d", "--wait", "postgres"], { env: environment });
+    setEvidencePhase("database", "postgres-recreate-readiness");
     await waitFor(
       "PostgreSQL after controlled recreate",
       () =>
@@ -1774,6 +1939,7 @@ async function main() {
     const newPostgresContainerStartedAt = new Date(newPostgres.startedAt);
     if (Number.isNaN(newPostgresContainerStartedAt.getTime()))
       fail("new PostgreSQL container start timestamp is missing");
+    setEvidencePhase("database", "migration-after-postgres-recreate");
     compose(
       [
         "run",
@@ -1788,14 +1954,14 @@ async function main() {
       { env: environment },
     );
 
+    setEvidencePhase("runtime", "post-postgres-recreate-readiness");
     compose(["restart", "backend"], { env: environment });
-    await waitFor(
+    await waitForBackendReadiness(
+      backendBase,
       "backend after PostgreSQL recreate",
-      async () =>
-        (await request(`${backendBase}/api/health/ready`)).response.status ===
-        200,
     );
     assertBackendSecretEnvironment(environment);
+    setEvidencePhase("auth", "refresh-after-postgres-recreate");
     await verifyRefreshFlow(
       backendBase,
       driverA.refreshToken,
@@ -1804,12 +1970,15 @@ async function main() {
       driverA.driverId,
       environment,
     );
+    setEvidencePhase("auth", "restaurant-after-postgres-recreate");
     await verifyRestaurantLogin(backendBase, restaurantPassword);
+    setEvidencePhase("runtime", "customer-web-after-postgres-recreate");
     await checkFrontend(
       "customer-web after PostgreSQL recreate",
       customerPort,
       "/restaurants",
     );
+    setEvidencePhase("persistence", "verification");
     const afterPostgresRecreate = databaseSnapshot(lifecycleOrderId);
     evidence.summary.driverRuntimeLifecycle.afterPostgresRecreate =
       await verifyDriverPersistenceHttp(
@@ -1863,6 +2032,7 @@ async function main() {
     if (!ownershipVerified)
       fail("order ownership changed during PostgreSQL container recreation");
 
+    setEvidencePhase("logs", "audit-after-postgres-recreate");
     assertPostgresRecreateEvidence({
       oldContainerId: oldPostgres.containerId,
       newContainerId: newPostgres.containerId,
@@ -2013,14 +2183,18 @@ async function main() {
     );
   } catch (error) {
     primaryFailure = error;
+    const failedPhase = evidencePhase;
+    const failedStep = evidenceStep;
     const primary = {
-      phase: evidencePhase,
-      step: evidenceStep,
+      phase: failedPhase,
+      step: failedStep,
       timestamp: new Date().toISOString(),
       exitCode: 1,
       sanitizedMessage: sanitize(
         error instanceof Error ? error.message : error,
       ),
+      httpDiagnostics:
+        error?.httpDiagnostics || error?.cause?.httpDiagnostics || null,
       sourceLogFile: "events.jsonl",
     };
     evidence.summary.primaryFailure = primary;
@@ -2028,6 +2202,13 @@ async function main() {
     console.error(
       `Primary failure: ${sanitize(error instanceof Error ? error.message : error)}`,
     );
+    try {
+      captureFailureRuntimeEvidence(environment);
+    } catch (captureError) {
+      console.error(
+        `Failure runtime evidence capture failed: ${sanitize(captureError instanceof Error ? captureError.message : captureError)}`,
+      );
+    }
     const logs = compose(["logs", "--no-color"], {
       env: environment,
       allowFailure: true,
@@ -2037,6 +2218,7 @@ async function main() {
       console.error(sanitize(logs).split(/\r?\n/).slice(-120).join("\n"));
   } finally {
     try {
+      setEvidencePhase("cleanup", "cleanup");
       safeFinalCleanup(environment);
       evidence.summary.cleanup = { result: "PASS" };
       evidence.write("cleanup-result.json", evidence.summary.cleanup);
@@ -2055,6 +2237,7 @@ async function main() {
         `Cleanup failure: ${sanitize(error instanceof Error ? error.message : error)}`,
       );
     }
+    setEvidencePhase("finalization", "summary");
     finalizationResult = finalizeSimulationEvidence({
       evidence,
       repoRoot,

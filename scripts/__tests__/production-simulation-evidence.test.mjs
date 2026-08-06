@@ -688,6 +688,60 @@ test("a realistic port primary failure survives cleanup and reaches the finalize
     assert.equal(summary.runtimeLogAudit.result, "NOT_PROVEN");
   }));
 
+test("structured HTTP primary diagnostics survive primary-failure and final summary", () =>
+  withEvidence((root, evidence) => {
+    const httpDiagnostics = {
+      phase: "runtime",
+      step: "backend-readiness",
+      requestLabel: "backend readiness",
+      method: "GET",
+      service: "backend",
+      url: "http://127.0.0.1:19306/api/health/ready",
+      attempt: 6,
+      durationMs: 12,
+      error: {
+        name: "TypeError",
+        message: "fetch failed",
+        cause: {
+          code: "ECONNREFUSED",
+          syscall: "connect",
+          address: "127.0.0.1",
+          port: 19306,
+        },
+      },
+    };
+    const primary = {
+      phase: "runtime",
+      step: "backend-readiness",
+      exitCode: 1,
+      sanitizedMessage: "backend readiness GET http://127.0.0.1:19306/api/health/ready: TypeError fetch failed cause.code=ECONNREFUSED",
+      httpDiagnostics,
+      sourceLogFile: "events.jsonl",
+    };
+    evidence.summary.primaryFailure = primary;
+    evidence.write("primary-failure.txt", JSON.stringify(primary, null, 2));
+    evidence.summary.cleanup = { result: "PASS" };
+    const failure = Object.assign(new Error(primary.sanitizedMessage), {
+      httpDiagnostics,
+    });
+    const result = finalizeSimulationEvidence({
+      evidence,
+      repoRoot: root,
+      phase: "finalization",
+      step: "summary",
+      primaryFailure: failure,
+    });
+    const summary = JSON.parse(readFileSync(result.result.summaryPath, "utf8"));
+    const primaryArtifact = JSON.parse(
+      readFileSync(path.join(evidence.directory, "primary-failure.txt"), "utf8"),
+    );
+    assert.deepEqual(summary.primaryFailure.httpDiagnostics, httpDiagnostics);
+    assert.deepEqual(primaryArtifact.httpDiagnostics, httpDiagnostics);
+    assert.equal(summary.primaryResult, "FAIL");
+    assert.equal(summary.cleanupResult, "PASS");
+    assert.equal(summary.result, "FAIL");
+  }));
+
 test("summary rename failure writes exactly one redacted fallback and stays nonzero", () =>
   withEvidence((root) => {
     let renameAttempts = 0;

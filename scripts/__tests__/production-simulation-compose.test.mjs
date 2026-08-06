@@ -47,6 +47,43 @@ test("the verifier still proves the application database and migration schema af
   );
 });
 
+test("the verifier exposes granular runtime evidence boundaries", () => {
+  for (const [phase, step] of [
+    ["database", "bootstrap"],
+    ["database", "migration"],
+    ["database", "seed-first"],
+    ["database", "seed-second"],
+    ["runtime", "backend-readiness"],
+    ["runtime", "customer-web"],
+    ["runtime", "admin-panel"],
+    ["runtime", "restaurant-web"],
+    ["runtime", "driver-web"],
+    ["auth", "driver"],
+    ["lifecycle", "order"],
+    ["runtime", "controlled-restart"],
+    ["runtime", "post-restart-readiness"],
+    ["runtime", "application-recreate"],
+    ["runtime", "post-recreate-readiness"],
+    ["database", "postgres-recreate-stop"],
+    ["database", "postgres-recreate-readiness"],
+    ["persistence", "verification"],
+    ["logs", "audit-after-postgres-recreate"],
+    ["cleanup", "cleanup"],
+    ["finalization", "summary"],
+  ]) {
+    assert.match(
+      verifier,
+      new RegExp(`setEvidencePhase\\(\\"${phase}\\", \\"${step}\\"\\)`),
+      `${phase}/${step} must be separately evidenced`,
+    );
+  }
+  assert.doesNotMatch(
+    verifier,
+    /setEvidencePhase\("database", "fresh-database"\)/,
+    "fresh-database must not remain a catch-all evidence step",
+  );
+});
+
 test("command evidence is non-empty and failed log audits preserve unexplained diagnostics", () => {
   assert.match(verifier, /\[command completed without output\]/);
   assert.match(
