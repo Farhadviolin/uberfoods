@@ -258,6 +258,9 @@ export function Cart({ cart, restaurant, updateQuantity, onClearCart }: CartProp
         setError(t('cart.guestFieldsError'));
         return;
       }
+      markCheckoutProbe({ guard: 'auth-required' });
+      setError(t('cart.loginRequired'));
+      return;
     } else {
       const resolvedEffectiveAddress = checkoutSubmitResolution.address;
       const checkoutSubmitDiagnostics = {
