@@ -58,7 +58,12 @@ export function Checkout() {
     const validateStoredCart = async () => {
       if (!storedCart) return;
       try {
-        const response = await api.get(`/restaurants/public/${storedCart.restaurantId}`);
+        const response = await api.get(`/restaurants/public/${storedCart.restaurantId}`, {
+          // Ein fehlendes Restaurant ist hier ein erwartbarer stale-Cart-Zustand;
+          // als erfolgreicher Response behandelt, damit der globale 404-Toast
+          // nicht zusätzlich zur Recovery-Meldung erscheint.
+          validateStatus: (status) => status >= 200 && status < 300 || status === 404,
+        });
         const restaurantPayload = response.data?.data ?? response.data;
         const restaurantDishes = Array.isArray(restaurantPayload?.dishes) ? restaurantPayload.dishes : [];
         const validDishIds = new Set(restaurantDishes
