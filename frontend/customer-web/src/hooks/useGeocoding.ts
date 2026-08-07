@@ -13,6 +13,35 @@ export interface GeocodeResult {
   placeId?: string;
 }
 
+function unwrapGeocodeResponse(payload: unknown): GeocodeResult | null {
+  if (!payload || typeof payload !== 'object') return null;
+
+  const candidate = payload as {
+    success?: unknown;
+    data?: unknown;
+    coordinates?: unknown;
+    formattedAddress?: unknown;
+  };
+  const value = candidate.success === true ? candidate.data : payload;
+  if (!value || typeof value !== 'object') return null;
+
+  const result = value as {
+    coordinates?: unknown;
+    formattedAddress?: unknown;
+  };
+  if (!result.coordinates || typeof result.coordinates !== 'object') return null;
+
+  const coordinates = result.coordinates as { lat?: unknown; lng?: unknown };
+  if (typeof coordinates.lat !== 'number' || typeof coordinates.lng !== 'number') {
+    return null;
+  }
+
+  return {
+    coordinates: { lat: coordinates.lat, lng: coordinates.lng },
+    formattedAddress: typeof result.formattedAddress === 'string' ? result.formattedAddress : '',
+  };
+}
+
 // Adresse zu Koordinaten geocoden
 export function useGeocodeAddress(address: string | null) {
   return useQuery({
@@ -23,7 +52,7 @@ export function useGeocodeAddress(address: string | null) {
       }
       try {
         const response = await api.post('/geocoding/geocode', { address });
-        return response.data as GeocodeResult;
+        return unwrapGeocodeResponse(response.data);
       } catch (error: unknown) {
         // Bei Fehlern (inkl. 404) null zurückgeben (stillschweigend)
         // Endpunkt existiert möglicherweise nicht im Backend
@@ -46,7 +75,7 @@ export function useReverseGeocode(coordinates: Coordinates | null) {
       }
       try {
         const response = await api.post('/geocoding/reverse-geocode', coordinates);
-        return response.data as GeocodeResult;
+        return unwrapGeocodeResponse(response.data);
       } catch (error: unknown) {
         // Bei Fehlern (inkl. 404) null zurückgeben (stillschweigend)
         // Endpunkt existiert möglicherweise nicht im Backend
@@ -58,4 +87,3 @@ export function useReverseGeocode(coordinates: Coordinates | null) {
     staleTime: Infinity,
   });
 }
-

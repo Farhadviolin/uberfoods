@@ -32,6 +32,7 @@ import { AdminModule } from "./modules/admin/admin.module";
 import { MealPlannerModule } from "./modules/meal-planner/meal-planner.module";
 import { ReportingModule } from "./modules/reporting/reporting.module";
 import { IntegrationsModule } from "./modules/integrations/integrations.module";
+import { GeocodingModule } from "./modules/geocoding/geocoding.module";
 
 // Guards, Filters, Interceptors
 import { HttpExceptionFilter } from "./common/filters/http-exception.filter";
@@ -88,6 +89,7 @@ import { RateLimitGuard } from "./common/guards/rate-limit.guard";
     MealPlannerModule,
     ReportingModule,
     IntegrationsModule,
+    GeocodingModule,
   ],
   providers: [
     // Core Services (MetricsService only via MetricsModule @Global())

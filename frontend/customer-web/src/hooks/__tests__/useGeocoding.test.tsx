@@ -49,6 +49,22 @@ describe('useGeocoding', () => {
       expect(result.current.data).toEqual(mockResponse.data);
     });
 
+    it('unwraps the backend API response envelope', async () => {
+      const geocodeResult = {
+        coordinates: { lat: 48.2082, lng: 16.3738 },
+        formattedAddress: 'Vienna, Austria',
+      };
+      mockedApi.post.mockResolvedValue({
+        data: { success: true, data: geocodeResult },
+      });
+
+      const { result } = renderHook(() => useGeocodeAddress('Vienna'), { wrapper });
+
+      await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+      expect(result.current.data).toEqual(geocodeResult);
+    });
+
     it('does not fetch for empty address', () => {
       const { result } = renderHook(() => useGeocodeAddress(''), { wrapper });
 
@@ -100,7 +116,6 @@ describe('useGeocoding', () => {
     });
   });
 });
-
 
 
 
