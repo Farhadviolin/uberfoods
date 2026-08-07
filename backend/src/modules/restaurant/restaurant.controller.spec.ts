@@ -11,6 +11,7 @@ describe("RestaurantController reports ownership", () => {
     createLocation: jest.fn(),
     toggleLocationStatus: jest.fn(),
     deleteLocation: jest.fn(),
+    getEstimatedDeliveryTime: jest.fn(),
   };
   const prisma = {
     dish: {
@@ -30,6 +31,23 @@ describe("RestaurantController reports ownership", () => {
       freeDeliveryThreshold: 30,
     });
     service.update.mockResolvedValue({ id: "restaurant-1" });
+    service.getEstimatedDeliveryTime.mockResolvedValue({
+      estimatedTime: 30,
+      unit: "minutes",
+    });
+  });
+
+  it("serves the customer POST estimated-delivery-time contract", async () => {
+    await expect(
+      controller.postEstimatedDeliveryTime("restaurant-1", {
+        customerLocation: { lat: 48.2082, lng: 16.3738 },
+      }),
+    ).resolves.toEqual({ estimatedDeliveryTime: 30, unit: "minutes" });
+
+    expect(service.getEstimatedDeliveryTime).toHaveBeenCalledWith(
+      "restaurant-1",
+      { lat: 48.2082, lng: 16.3738 },
+    );
   });
 
   it("serves reports for the authenticated restaurant", async () => {

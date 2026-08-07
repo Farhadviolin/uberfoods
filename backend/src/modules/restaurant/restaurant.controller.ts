@@ -631,6 +631,33 @@ export class RestaurantController {
     return this.restaurantService.getEstimatedDeliveryTime(id, location);
   }
 
+  @Post(":id/estimated-delivery-time")
+  async postEstimatedDeliveryTime(
+    @Param("id") id: string,
+    @Body()
+    body: {
+      customerLocation?: { lat?: number; lng?: number };
+    },
+  ) {
+    const customerLocation = body?.customerLocation;
+    const location =
+      typeof customerLocation?.lat === "number" &&
+      Number.isFinite(customerLocation.lat) &&
+      typeof customerLocation?.lng === "number" &&
+      Number.isFinite(customerLocation.lng)
+        ? { lat: customerLocation.lat, lng: customerLocation.lng }
+        : undefined;
+    const result = await this.restaurantService.getEstimatedDeliveryTime(
+      id,
+      location,
+    );
+
+    return {
+      estimatedDeliveryTime: result.estimatedTime,
+      unit: result.unit,
+    };
+  }
+
   @Get(":id/analytics")
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles("RESTAURANT")
