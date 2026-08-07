@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Cart } from './Cart';
+import api from '../utils/api';
 
 interface Dish {
   id: string;
@@ -29,7 +30,10 @@ function readCartFromStorage(): StoredCart | null {
   const keys = Object.keys(localStorage).filter((key) => key.startsWith('cart_'));
   if (keys.length === 0) return null;
 
-  const key = keys[keys.length - 1];
+  const activeRestaurantId = localStorage.getItem('active_cart_restaurant_id');
+  const key = activeRestaurantId && localStorage.getItem(`cart_${activeRestaurantId}`)
+    ? `cart_${activeRestaurantId}`
+    : keys[keys.length - 1];
   const restaurantId = key.replace('cart_', '');
   const raw = localStorage.getItem(key);
   if (!raw) return null;
@@ -47,6 +51,36 @@ export function Checkout() {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const [storedCart, setStoredCart] = useState<StoredCart | null>(() => readCartFromStorage());
+  const [recoveryMessage, setRecoveryMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    const validateStoredCart = async () => {
+      if (!storedCart) return;
+      try {
+        const response = await api.get(`/restaurants/public/${storedCart.restaurantId}`);
+        const restaurantPayload = response.data?.data ?? response.data;
+        const restaurantDishes = Array.isArray(restaurantPayload?.dishes) ? restaurantPayload.dishes : [];
+        const validDishIds = new Set(restaurantDishes
+          .filter((dish: { isActive?: boolean; isAvailable?: boolean }) => dish.isActive !== false && dish.isAvailable !== false)
+          .map((dish: { id: string }) => dish.id));
+        const valid = storedCart.items.every((item) => validDishIds.has(item.dish.id));
+        if (!valid) throw new Error('Cart dish is no longer available');
+      } catch {
+        if (cancelled) return;
+        localStorage.removeItem(`cart_${storedCart.restaurantId}`);
+        if (localStorage.getItem('active_cart_restaurant_id') === storedCart.restaurantId) {
+          localStorage.removeItem('active_cart_restaurant_id');
+        }
+        setStoredCart(null);
+        setRecoveryMessage(t('cart.staleRecovery', {
+          defaultValue: 'Ihr Warenkorb war nicht mehr gültig und wurde geleert.',
+        }));
+      }
+    };
+    void validateStoredCart();
+    return () => { cancelled = true; };
+  }, [storedCart?.restaurantId, t]);
 
   useEffect(() => {
     const sync = () => setStoredCart(readCartFromStorage());
@@ -92,6 +126,7 @@ export function Checkout() {
   if (!storedCart || !restaurant) {
     return (
       <div style={{ padding: '24px' }}>
+        {recoveryMessage && <p role="alert">{recoveryMessage}</p>}
         <h2>{t('cart.empty', { defaultValue: 'Your cart is empty' })}</h2>
         <button type="button" onClick={() => navigate('/')}>
           {t('menu.backToRestaurants', { defaultValue: 'Back to restaurants' })}
