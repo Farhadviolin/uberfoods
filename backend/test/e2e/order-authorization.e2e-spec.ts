@@ -309,12 +309,37 @@ describe("P0 order authorization and atomic driver claim over HTTP", () => {
     await request(app.getHttpServer())
       .patch(`/api/orders/${seed.driverFlow.id}/status`)
       .set("Authorization", bearer(driverAToken))
+      .send({ status: "IN_TRANSIT" })
+      .expect(200);
+    await request(app.getHttpServer())
+      .patch(`/api/orders/${seed.driverFlow.id}/status`)
+      .set("Authorization", bearer(driverAToken))
       .send({ status: "DELIVERED" })
       .expect(200);
     await expectOrder(seed.driverFlow.id, {
       status: "DELIVERED",
       driverId: seed.driverA.id,
     });
+  });
+
+  it("rejects a direct picked-up to delivered transition", async () => {
+    const order = await createRejectOrder("PICKED_UP", seed.driverA.id);
+    const before = await prisma.order.findUniqueOrThrow({
+      where: { id: order.id },
+      select: { status: true, driverId: true, version: true },
+    });
+
+    await request(app.getHttpServer())
+      .patch(`/api/orders/${order.id}/status`)
+      .set("Authorization", bearer(driverAToken))
+      .send({ status: "DELIVERED" })
+      .expect(409);
+
+    const after = await prisma.order.findUniqueOrThrow({
+      where: { id: order.id },
+      select: { status: true, driverId: true, version: true },
+    });
+    expect(after).toEqual(before);
   });
 
   it("returns conflict for skipped/backward transitions and 400 for unknown status", async () => {
