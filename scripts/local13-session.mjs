@@ -85,6 +85,23 @@ async function allocatePort() {
 }
 
 async function allocatePorts() {
+  if (process.env.LOCAL13_FIXED_PORTS === "true") {
+    const fixedPorts = [3000, 3102, 3002, 3003, 3004];
+    for (const port of fixedPorts) {
+      const server = createServer();
+      await new Promise((resolve, reject) => {
+        server.once("error", reject);
+        server.listen(port, "127.0.0.1", resolve);
+      }).catch((error) => {
+        if (error?.code === "EADDRINUSE") {
+          fail(`Fixed LOCALHOST-Port ${port} ist bereits belegt; fremder Prozess bleibt unangetastet`);
+        }
+        throw error;
+      });
+      await new Promise((resolve) => server.close(resolve));
+    }
+    return fixedPorts;
+  }
   const ports = [];
   while (ports.length < 5) {
     const port = await allocatePort();
