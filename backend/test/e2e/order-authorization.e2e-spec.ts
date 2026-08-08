@@ -157,7 +157,7 @@ describe("P0 order authorization and atomic driver claim over HTTP", () => {
       .expect(200);
   });
 
-  it("uses persisted RBAC permissions only on the administrative order route", async () => {
+  it("uses persisted RBAC permissions for administrative order lists", async () => {
     const adminOrders = await request(app.getHttpServer())
       .get("/api/admin/orders?limit=50")
       .set("Authorization", bearer(adminToken))
@@ -166,10 +166,13 @@ describe("P0 order authorization and atomic driver claim over HTTP", () => {
       seed.customerOwn.id,
     );
 
-    await request(app.getHttpServer())
+    const generalOrders = await request(app.getHttpServer())
       .get("/api/orders?limit=50")
       .set("Authorization", bearer(adminToken))
-      .expect(403);
+      .expect(200);
+    expect(extractActorOrderIds(generalOrders.body)).toContain(
+      seed.customerOwn.id,
+    );
 
     await request(app.getHttpServer())
       .get("/api/admin/orders?limit=50")

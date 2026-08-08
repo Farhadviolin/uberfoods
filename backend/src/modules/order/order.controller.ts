@@ -49,6 +49,7 @@ import {
   OrderActor,
   scopeOrderFilters,
 } from "./order-authorization.policy";
+import { RbacService } from "../rbac/rbac.service";
 
 interface AdvancedStatsQuery {
   startDate?: string;
@@ -142,6 +143,7 @@ export class OrderController {
     private readonly orderService: OrderService,
     private readonly paymentService: PaymentService,
     private readonly webhookService: WebhookService,
+    private readonly rbacService: RbacService,
   ) {}
 
   /**
@@ -287,6 +289,24 @@ export class OrderController {
     },
     @GetUser() actor: OrderActor,
   ) {
+    const actorRole = getOrderActorRole(actor);
+    if (actorRole === "ADMIN") {
+      const actorId = getOrderActorId(actor);
+      const permissions = await this.rbacService.getUserPermissions(
+        actorId,
+        actorRole,
+      );
+      const canReadOrders =
+        permissions.includes("order:read") || permissions.includes("order:*");
+
+      if (!canReadOrders) {
+        this.rbacService.incrementPermissionDenial(actorId, "order:read");
+        throw new ForbiddenException(
+          "Insufficient permissions. Required: order:read",
+        );
+      }
+    }
+
     const scopedQuery = scopeOrderFilters(actor, {
       ...query,
       status: normalizeStatusFilter(query.status ?? query["status[]"]),

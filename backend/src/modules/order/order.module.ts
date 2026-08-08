@@ -9,9 +9,16 @@ import { CacheModule } from "../../common/cache/cache.module";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { RolesGuard } from "../auth/guards/roles.guard";
 import { OrderOwnershipGuard } from "./order-ownership.guard";
+import { RbacModule } from "../rbac/rbac.module";
 
 @Module({
-  imports: [DatabaseModule, PaymentModule, CacheModule, MetricsModule],
+  imports: [
+    DatabaseModule,
+    PaymentModule,
+    CacheModule,
+    MetricsModule,
+    RbacModule,
+  ],
   controllers: [OrderController],
   providers: [
     OrderService,
