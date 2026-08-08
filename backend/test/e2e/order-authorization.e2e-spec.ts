@@ -236,6 +236,25 @@ describe("P0 order authorization and atomic driver claim over HTTP", () => {
       .expect(401);
   });
 
+  it("serves KDS orders through the owner-scoped restaurant endpoint", async () => {
+    const ownOrders = await request(app.getHttpServer())
+      .get(`/api/restaurants/${seed.restaurantA.id}/orders`)
+      .set("Authorization", bearer(restaurantAToken))
+      .expect(200);
+    expect(extractActorOrderIds(ownOrders.body)).toContain(
+      seed.restaurantFlow.id,
+    );
+
+    await request(app.getHttpServer())
+      .get(`/api/restaurants/${seed.restaurantB.id}/orders`)
+      .set("Authorization", bearer(restaurantAToken))
+      .expect(403);
+    await request(app.getHttpServer())
+      .get(`/api/restaurants/${seed.restaurantA.id}/orders`)
+      .set("Authorization", bearer(customerAToken))
+      .expect(403);
+  });
+
   it("rejects every customer attempt to use the general status route", async () => {
     for (const status of [
       "CONFIRMED",
@@ -353,6 +372,15 @@ describe("P0 order authorization and atomic driver claim over HTTP", () => {
       .set("Authorization", bearer(restaurantAToken))
       .send({ status: "CONFIRMED" })
       .expect(409);
+    await request(app.getHttpServer())
+      .patch(`/api/orders/${seed.backwardTransition.id}/status`)
+      .set("Authorization", bearer(restaurantAToken))
+      .send({ status: "READY" })
+      .expect(409);
+    await expectOrder(seed.backwardTransition.id, {
+      status: "PREPARING",
+      driverId: null,
+    });
     await request(app.getHttpServer())
       .patch(`/api/orders/${seed.skipTransition.id}/status`)
       .set("Authorization", bearer(restaurantAToken))

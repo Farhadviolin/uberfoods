@@ -5,9 +5,14 @@ import { KitchenDisplay } from "../Kitchen/KitchenDisplay";
 const mockMutateAsync = jest.fn();
 const mockShowToast = jest.fn();
 let mockOrders: Order[] = [];
+let mockOrdersError: Error | null = null;
 
 jest.mock("../../hooks/useOrders", () => ({
-  useRestaurantOrders: () => ({ data: mockOrders }),
+  useKitchenOrders: () => ({
+    data: mockOrders,
+    isError: Boolean(mockOrdersError),
+    error: mockOrdersError,
+  }),
   useUpdateOrderStatus: () => ({ mutateAsync: mockMutateAsync }),
 }));
 
@@ -17,13 +22,6 @@ jest.mock("../../contexts/AuthContext", () => ({
 
 jest.mock("../../contexts/ToastContext", () => ({
   useToast: () => ({ showToast: mockShowToast }),
-}));
-
-jest.mock("../../hooks/useKitchenDisplay", () => ({
-  useKitchenOrders: () => ({ data: [] }),
-  useKitchenStations: () => ({ data: [] }),
-  useOrderTimeline: () => ({ data: [] }),
-  useKitchenPerformance: () => ({ data: null }),
 }));
 
 const baseOrder: Order = {
@@ -69,6 +67,7 @@ describe("KitchenDisplay", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockOrders = [baseOrder];
+    mockOrdersError = null;
     mockMutateAsync.mockResolvedValue({
       ...baseOrder,
       status: "PREPARING",
@@ -89,6 +88,14 @@ describe("KitchenDisplay", () => {
     expect(screen.getByText("2x")).toBeInTheDocument();
     expect(screen.getByText("Test Pizza")).toBeInTheDocument();
     expect(screen.getByText("Ohne Zwiebeln")).toBeInTheDocument();
+  });
+
+  it("shows a normal empty state for an empty successful list", () => {
+    mockOrders = [];
+
+    render(<KitchenDisplay />);
+
+    expect(screen.getByText("Keine aktiven Bestellungen")).toBeInTheDocument();
   });
 
   it("uses the status DTO without the response-only order version", async () => {
@@ -122,9 +129,22 @@ describe("KitchenDisplay", () => {
     await waitFor(() =>
       expect(mockMutateAsync).toHaveBeenCalledWith({
         id: "order-kitchen-1",
-        status: "READY",
+        status: "READY_FOR_PICKUP",
       }),
     );
+  });
+
+  it("shows a KDS API error instead of an empty success state", () => {
+    mockOrdersError = new Error("KDS API unavailable");
+
+    render(<KitchenDisplay />);
+
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "Bestellungen konnten nicht geladen werden: KDS API unavailable",
+    );
+    expect(
+      screen.queryByText("Keine aktiven Bestellungen"),
+    ).not.toBeInTheDocument();
   });
 
   it("does not report a rejected update as successful", async () => {

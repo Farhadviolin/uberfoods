@@ -45,6 +45,24 @@ function resolveRestaurantId(contextRestaurantId?: string | null) {
   return contextRestaurantId || localStorage.getItem("restaurant_id");
 }
 
+function unwrapRestaurantOrders(payload: unknown): Order[] {
+  if (Array.isArray(payload)) return payload as Order[];
+  if (
+    payload &&
+    typeof payload === "object" &&
+    "data" in payload &&
+    Array.isArray((payload as { data?: unknown }).data)
+  ) {
+    return (payload as { data: Order[] }).data;
+  }
+  return [];
+}
+
+async function fetchRestaurantOrders(restaurantId: string): Promise<Order[]> {
+  const response = await api.get(`/restaurants/${restaurantId}/orders`);
+  return unwrapRestaurantOrders(response.data);
+}
+
 export function useRestaurantOrders(restaurantId: string | null) {
   const rid = resolveRestaurantId(restaurantId);
   return useQuery({
@@ -52,9 +70,7 @@ export function useRestaurantOrders(restaurantId: string | null) {
     queryFn: async () => {
       if (!rid) return [];
       try {
-        const response = await api.get<Order[]>(`/restaurants/${rid}/orders`);
-        const responseData = response.data as unknown as { data?: Order[] } | Order[] | null | undefined;
-        return (responseData && !Array.isArray(responseData) ? responseData.data : responseData) || [];
+        return await fetchRestaurantOrders(rid);
       } catch (error) {
         const appError = handleApiError(error);
         logError(appError, "useRestaurantOrders");
@@ -67,7 +83,26 @@ export function useRestaurantOrders(restaurantId: string | null) {
     refetchOnReconnect: "always",
     refetchOnWindowFocus: "always",
     refetchInterval: 30 * 1000,
-    placeholderData: [], 
+    placeholderData: [],
+    retry: false,
+  });
+}
+
+export function useKitchenOrders(restaurantId: string | null) {
+  const rid = resolveRestaurantId(restaurantId);
+
+  return useQuery({
+    queryKey: ["kitchen-orders", rid],
+    queryFn: async () => {
+      if (!rid) return [];
+      return fetchRestaurantOrders(rid);
+    },
+    enabled: !!rid,
+    staleTime: 5 * 1000,
+    refetchOnMount: "always",
+    refetchOnReconnect: "always",
+    refetchOnWindowFocus: "always",
+    refetchInterval: 10 * 1000,
     retry: false,
   });
 }
@@ -197,9 +232,12 @@ export function useOrder(id: string | null) {
     queryFn: async () => {
       if (!id || !rid) return null;
       const response = await api.get<Order>(`/restaurants/${rid}/orders/${id}`);
-      const responseData = response.data as unknown as { data?: Order } | Order | null | undefined;
-      return responseData && !Array.isArray(responseData) && "data" in responseData
-        ? responseData.data ?? null
+      const responseData = response.data as unknown as
+        { data?: Order } | Order | null | undefined;
+      return responseData &&
+        !Array.isArray(responseData) &&
+        "data" in responseData
+        ? (responseData.data ?? null)
         : responseData;
     },
     enabled: !!id && !!rid,
@@ -215,9 +253,12 @@ export function useOrderDetails(id: string | null) {
     queryFn: async () => {
       if (!id || !rid) return null;
       const response = await api.get(`/restaurants/${rid}/orders/${id}`);
-      const responseData = response.data as { data?: Order } | Order | null | undefined;
-      return responseData && !Array.isArray(responseData) && "data" in responseData
-        ? responseData.data ?? null
+      const responseData = response.data as
+        { data?: Order } | Order | null | undefined;
+      return responseData &&
+        !Array.isArray(responseData) &&
+        "data" in responseData
+        ? (responseData.data ?? null)
         : responseData;
     },
     enabled: !!id && !!rid,
@@ -280,6 +321,7 @@ export function useUpdateOrderStatus() {
         ),
       );
       queryClient.invalidateQueries({ queryKey: ["orders", rid] });
+      queryClient.invalidateQueries({ queryKey: ["kitchen-orders", rid] });
       if (targetId) {
         queryClient.invalidateQueries({ queryKey: ["order", targetId] });
         queryClient.invalidateQueries({

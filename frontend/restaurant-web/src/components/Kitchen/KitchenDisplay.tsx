@@ -1,14 +1,8 @@
 import { useState, useMemo, useEffect } from "react";
-import { useRestaurantOrders, Order } from "../../hooks/useOrders";
+import { useKitchenOrders, Order } from "../../hooks/useOrders";
 import { useAuth } from "../../contexts/AuthContext";
 import { useUpdateOrderStatus } from "../../hooks/useOrders";
 import { useRetry } from "../../hooks/useRetry";
-import {
-  useKitchenOrders,
-  useKitchenStations,
-  useOrderTimeline,
-  useKitchenPerformance,
-} from "../../hooks/useKitchenDisplay";
 import { formatCurrency, formatTime } from "../../utils/formatters";
 import { useToast } from "../../contexts/ToastContext";
 import { handleApiError } from "../../utils/errorUtils";
@@ -16,7 +10,11 @@ import "./KitchenDisplay.css";
 
 export function KitchenDisplay() {
   const { restaurantId } = useAuth();
-  const { data: ordersData = [] } = useRestaurantOrders(restaurantId);
+  const {
+    data: ordersData = [],
+    error: ordersError,
+    isError: ordersLoadFailed,
+  } = useKitchenOrders(restaurantId);
 
   // Sicherstellen, dass orders immer ein Array ist
   const orders = useMemo(
@@ -38,20 +36,17 @@ export function KitchenDisplay() {
   const [fullscreen, setFullscreen] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [alarmThreshold, setAlarmThreshold] = useState(900); // 15 Minuten in Sekunden
-  const [selectedOrderId, _setSelectedOrderId] = useState<string | null>(null);
 
-  // Kitchen Display Hooks
-  const { data: _kitchenOrders = [] } = useKitchenOrders(restaurantId, {
-    station: selectedStation !== "all" ? selectedStation : undefined,
-  });
-  const { data: _stations = [] } = useKitchenStations(restaurantId);
-  const { data: _timeline } = useOrderTimeline(restaurantId, selectedOrderId);
-  const { data: _performance } = useKitchenPerformance(restaurantId, "today");
-
-  // Filter active orders
+  // Only the restaurant-owned kitchen lifecycle belongs on the KDS.
   const activeOrders = useMemo(() => {
+    const kitchenStatuses = new Set([
+      "PENDING",
+      "CONFIRMED",
+      "PREPARING",
+      "READY_FOR_PICKUP",
+    ]);
     return Array.isArray(orders)
-      ? orders.filter((o) => !["DELIVERED", "CANCELLED"].includes(o.status))
+      ? orders.filter((order) => kitchenStatuses.has(order.status))
       : [];
   }, [orders]);
 
@@ -190,28 +185,37 @@ export function KitchenDisplay() {
         </div>
       </div>
 
-      <div className="kitchen-grid">
-        {displayOrders.map((order) => (
-          <KitchenOrderCard
-            key={order.id}
-            order={order}
-            onStatusChange={handleStatusChange}
-            soundEnabled={soundEnabled}
-            alarmThreshold={alarmThreshold}
-          />
-        ))}
-      </div>
-
-      {displayOrders.length === 0 && (
-        <div
-          style={{
-            textAlign: "center",
-            padding: "var(--fb-space-8)",
-            color: "var(--fb-text-secondary)",
-          }}
-        >
-          Keine aktiven Bestellungen
+      {ordersLoadFailed ? (
+        <div role="alert" className="kitchen-load-error">
+          Bestellungen konnten nicht geladen werden:{" "}
+          {handleApiError(ordersError).message}
         </div>
+      ) : (
+        <>
+          <div className="kitchen-grid">
+            {displayOrders.map((order) => (
+              <KitchenOrderCard
+                key={order.id}
+                order={order}
+                onStatusChange={handleStatusChange}
+                soundEnabled={soundEnabled}
+                alarmThreshold={alarmThreshold}
+              />
+            ))}
+          </div>
+
+          {displayOrders.length === 0 && (
+            <div
+              style={{
+                textAlign: "center",
+                padding: "var(--fb-space-8)",
+                color: "var(--fb-text-secondary)",
+              }}
+            >
+              Keine aktiven Bestellungen
+            </div>
+          )}
+        </>
       )}
     </div>
   );
@@ -419,14 +423,14 @@ function KitchenOrderCard({
         )}
         {order.status === "PREPARING" && (
           <button
-            onClick={() => onStatusChange(order.id, "READY")}
+            onClick={() => onStatusChange(order.id, "READY_FOR_PICKUP")}
             className="fb-button"
             style={{ flex: 1, backgroundColor: "var(--fb-success)" }}
           >
             Fertig ✓
           </button>
         )}
-        {order.status === "READY" && (
+        {order.status === "READY_FOR_PICKUP" && (
           <div
             style={{
               textAlign: "center",
