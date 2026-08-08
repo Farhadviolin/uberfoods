@@ -21,6 +21,7 @@ import { OrderService } from "../order/order.service";
 import { PaymentService } from "../payment/payment.service";
 import { RateLimitGuard } from "../../common/guards/rate-limit.guard";
 import { WebhookService } from "../order/webhook.service";
+import { RbacService } from "../rbac/rbac.service";
 
 interface TestOrder {
   id: string;
@@ -211,6 +212,13 @@ describe("Driver order runtime HTTP routes", () => {
         { provide: OrderService, useValue: state },
         { provide: PaymentService, useValue: {} },
         { provide: WebhookService, useValue: {} },
+        {
+          provide: RbacService,
+          useValue: {
+            getUserPermissions: jest.fn(),
+            incrementPermissionDenial: jest.fn(),
+          },
+        },
       ],
     }).compile();
     app = module.createNestApplication();

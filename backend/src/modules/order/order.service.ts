@@ -1091,16 +1091,70 @@ export class OrderService {
       }, {});
   }
 
-  async reject(id: string, reason: string) {
-    const updatedOrder = await this.prisma.order.update({
+  async reject(id: string, reason: string, actor: OrderActor) {
+    const role = getOrderActorRole(actor);
+    if (role !== "DRIVER") {
+      throw new ForbiddenException("Only drivers can reject orders");
+    }
+    const driverId = getOrderActorId(actor);
+    const order = await this.prisma.order.findUnique({
       where: { id },
-      data: { status: "CANCELLED", cancelReason: reason },
+      select: { id: true, status: true, driverId: true },
     });
+
+    if (!order) {
+      throw new NotFoundException(`Order with ID ${id} not found`);
+    }
+    if (order.driverId !== driverId) {
+      throw new ForbiddenException("Order is not assigned to driver");
+    }
+    if (order.status !== "ACCEPTED") {
+      throw new ConflictException(
+        "Driver can only reject an accepted order before pickup",
+      );
+    }
 
     // Invalidate order-related caches
     this.cacheService.delete(`order_findOne_${id}`);
     this.cacheService.deletePattern("orders_findAll_.*");
 
+    const updatedOrder = await this.prisma.$transaction(async (tx) => {
+      const result = await tx.order.updateMany({
+        where: {
+          id,
+          status: "ACCEPTED",
+          driverId,
+        },
+        data: {
+          status: "READY_FOR_PICKUP",
+          driverId: null,
+          version: { increment: 1 },
+        },
+      });
+
+      if (result.count !== 1) {
+        throw new ConflictException(
+          "Order changed before the driver rejection could be applied",
+        );
+      }
+
+      await this.appendOrderAuditEntry(tx, {
+        actorId: driverId,
+        action: "order.driver_rejected",
+        orderId: id,
+        payload: {
+          driverId,
+          reason,
+          previousStatus: "ACCEPTED",
+          status: "READY_FOR_PICKUP",
+        },
+      });
+
+      return tx.order.findUniqueOrThrow({ where: { id } });
+    });
+
+    this.invalidateOrderCaches(id);
+    await this.triggerOrderWebhooks("driver.rejected", updatedOrder);
     return updatedOrder;
   }
 

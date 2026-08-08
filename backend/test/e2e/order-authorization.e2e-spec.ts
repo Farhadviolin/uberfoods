@@ -442,6 +442,146 @@ describe("P0 order authorization and atomic driver claim over HTTP", () => {
       .expect(403);
   });
 
+  it("enforces reject ownership and role authorization without mutation", async () => {
+    const orderIds = [seed.customerAcceptExploit.id, seed.driverForeign.id];
+    const before = await prisma.order.findMany({
+      where: { id: { in: orderIds } },
+      select: { id: true, status: true, driverId: true },
+      orderBy: { id: "asc" },
+    });
+    const beforeAuditCount = await rejectionAuditCount(orderIds);
+
+    const attempts = [
+      request(app.getHttpServer())
+        .post(`/api/orders/${seed.customerAcceptExploit.id}/reject`)
+        .set("Authorization", bearer(driverAToken))
+        .send({ reason: "ORD-001 unassigned" }),
+      request(app.getHttpServer())
+        .post(`/api/orders/${seed.driverForeign.id}/reject`)
+        .set("Authorization", bearer(driverAToken))
+        .send({ reason: "ORD-001 foreign driver" }),
+      request(app.getHttpServer())
+        .post(`/api/orders/${seed.customerAcceptExploit.id}/reject`)
+        .set("Authorization", bearer(customerAToken))
+        .send({ reason: "ORD-001 customer" }),
+      request(app.getHttpServer())
+        .post(`/api/orders/${seed.customerAcceptExploit.id}/reject`)
+        .set("Authorization", bearer(restaurantAToken))
+        .send({ reason: "ORD-001 restaurant" }),
+      request(app.getHttpServer())
+        .post(`/api/orders/${seed.customerAcceptExploit.id}/reject`)
+        .set("Authorization", bearer(adminToken))
+        .send({ reason: "ORD-001 admin" }),
+      request(app.getHttpServer())
+        .post(`/api/orders/${seed.customerAcceptExploit.id}/reject`)
+        .set("Authorization", bearer(superAdminToken))
+        .send({ reason: "ORD-001 super admin" }),
+    ];
+    const responses = await Promise.all(attempts);
+
+    expect(responses.map((response) => response.status)).toEqual([
+      403, 403, 403, 403, 403, 403,
+    ]);
+
+    const after = await prisma.order.findMany({
+      where: { id: { in: orderIds } },
+      select: { id: true, status: true, driverId: true },
+      orderBy: { id: "asc" },
+    });
+    expect(after).toEqual(before);
+    expect(await rejectionAuditCount(orderIds)).toBe(beforeAuditCount);
+  });
+
+  it("requeues an accepted order only for its assigned driver", async () => {
+    const order = await createRejectOrder("ACCEPTED", seed.driverA.id);
+    const before = await prisma.order.findUniqueOrThrow({
+      where: { id: order.id },
+      select: {
+        status: true,
+        driverId: true,
+        cancelReason: true,
+        version: true,
+      },
+    });
+
+    const response = await request(app.getHttpServer())
+      .post(`/api/orders/${order.id}/reject`)
+      .set("Authorization", bearer(driverAToken))
+      .send({
+        driverId: seed.driverB.id,
+        reason: "Driver unavailable before pickup",
+      })
+      .expect(201);
+
+    expect(unwrap(response.body)).toMatchObject({
+      id: order.id,
+      status: "READY_FOR_PICKUP",
+      driverId: null,
+      cancelReason: null,
+    });
+
+    const after = await prisma.order.findUniqueOrThrow({
+      where: { id: order.id },
+      select: {
+        status: true,
+        driverId: true,
+        cancelReason: true,
+        version: true,
+      },
+    });
+    expect(after).toEqual({
+      status: "READY_FOR_PICKUP",
+      driverId: null,
+      cancelReason: before.cancelReason,
+      version: before.version + 1,
+    });
+
+    const audit = await prisma.auditLedger.findFirst({
+      where: {
+        action: "order.driver_rejected",
+        entityType: "order",
+        entityId: order.id,
+      },
+      orderBy: { createdAt: "desc" },
+    });
+    expect(audit).toEqual(
+      expect.objectContaining({ actorId: seed.driverA.id }),
+    );
+    expect(audit?.payload).toMatchObject({
+      driverId: seed.driverA.id,
+      reason: "Driver unavailable before pickup",
+      previousStatus: "ACCEPTED",
+      status: "READY_FOR_PICKUP",
+    });
+  });
+
+  it("rejects driver reject after pickup and terminal states without mutation", async () => {
+    const statuses = ["PICKED_UP", "IN_TRANSIT", "DELIVERED", "CANCELLED"];
+    const orders = await Promise.all(
+      statuses.map((status) => createRejectOrder(status, seed.driverA.id)),
+    );
+    const orderIds = orders.map(({ id }) => id);
+    const beforeAuditCount = await rejectionAuditCount(orderIds);
+
+    for (const order of orders) {
+      await request(app.getHttpServer())
+        .post(`/api/orders/${order.id}/reject`)
+        .set("Authorization", bearer(driverAToken))
+        .send({ reason: "ORD-001 invalid state" })
+        .expect(409);
+    }
+
+    await Promise.all(
+      orders.map((order) =>
+        expectOrder(order.id, {
+          status: order.status,
+          driverId: seed.driverA.id,
+        }),
+      ),
+    );
+    expect(await rejectionAuditCount(orderIds)).toBe(beforeAuditCount);
+  });
+
   async function login(
     path: string,
     email: string,
@@ -473,6 +613,40 @@ describe("P0 order authorization and atomic driver claim over HTTP", () => {
         action: "order.driver_claimed",
         entityType: "order",
         entityId: { in: orderIds },
+      },
+    });
+  }
+
+  async function rejectionAuditCount(orderIds: string[]): Promise<number> {
+    return prisma.auditLedger.count({
+      where: {
+        action: "order.driver_rejected",
+        entityType: "order",
+        entityId: { in: orderIds },
+      },
+    });
+  }
+
+  function createRejectOrder(status: string, driverId: string | null) {
+    return prisma.order.create({
+      data: {
+        customerId: seed.customerA.id,
+        restaurantId: seed.restaurantA.id,
+        driverId,
+        status,
+        totalAmount: 17.5,
+        subtotal: 15,
+        deliveryFee: 2.5,
+        taxAmount: 0,
+        deliveryAddress: "Synthetic Reject Delivery Address",
+        paymentMethod: "CASH",
+        items: {
+          create: {
+            dishId: seed.dish.id,
+            quantity: 1,
+            price: 15,
+          },
+        },
       },
     });
   }
@@ -658,6 +832,7 @@ describe("P0 order authorization and atomic driver claim over HTTP", () => {
       restaurantB,
       driverA,
       driverB,
+      dish,
       admin,
       moderator,
       support,

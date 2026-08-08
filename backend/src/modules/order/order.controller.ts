@@ -503,8 +503,13 @@ export class OrderController {
   async reject(
     @Param("id") id: string,
     @Body() body: { reason?: string; driverId?: string },
+    @GetUser() actor: OrderActor,
   ) {
-    return this.orderService.reject(id, body.reason || "Driver rejected");
+    return this.orderService.reject(
+      id,
+      body.reason || "Driver rejected",
+      actor,
+    );
   }
 
   @Post(":id/cancel")

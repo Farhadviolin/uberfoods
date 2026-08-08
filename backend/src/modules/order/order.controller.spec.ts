@@ -4,6 +4,7 @@ import { OrderService } from "./order.service";
 import { PaymentService } from "../payment/payment.service";
 import { WebhookService } from "./webhook.service";
 import { PrismaService } from "../../prisma/prisma.service";
+import { RbacService } from "../rbac/rbac.service";
 
 describe("OrderController", () => {
   let controller: OrderController;
@@ -53,6 +54,13 @@ describe("OrderController", () => {
         {
           provide: PrismaService,
           useValue: { order: { findUnique: jest.fn() } },
+        },
+        {
+          provide: RbacService,
+          useValue: {
+            getUserPermissions: jest.fn(),
+            incrementPermissionDenial: jest.fn(),
+          },
         },
       ],
     }).compile();
