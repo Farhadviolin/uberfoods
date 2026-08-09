@@ -582,7 +582,7 @@ export class DriverService {
 
   static async getOrderHistory(driverId: string, page: number = 1, limit: number = 20): Promise<DriverServiceResponse<any>> {
     try {
-      const response = await api.get(`/drivers/${driverId}/orders/history`, {
+      const response = await api.get(`/orders/driver/${driverId}`, {
         params: { page, limit }
       });
       return {

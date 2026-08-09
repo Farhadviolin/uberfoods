@@ -35,8 +35,12 @@ export function OrderHistory() {
       if (filters.minAmount) params.minAmount = filters.minAmount;
       if (filters.maxAmount) params.maxAmount = filters.maxAmount;
 
-      const response = await api.get(`/drivers/${driver.id}/orders/history`, { params });
-      setOrders(response.data.orders || response.data);
+      const response = await api.get(`/orders/driver/${driver.id}`, { params });
+      const payload = response.data;
+      const orderList = Array.isArray(payload)
+        ? payload
+        : payload?.data?.data || payload?.data?.orders || payload?.data || payload?.orders || [];
+      setOrders(Array.isArray(orderList) ? orderList : []);
     } catch (error: any) {
       console.error('Fehler beim Laden der Bestellhistorie:', error);
     } finally {
