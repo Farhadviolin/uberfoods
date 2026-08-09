@@ -1,7 +1,7 @@
 import { useQuery, useMutation } from '@tanstack/react-query';
 import api from '../utils/api';
 import { useAuth } from '../contexts/AuthContext';
-import { isAuthError, isAxiosErrorResponse } from '../utils/errorHandler';
+import { isAxiosErrorResponse } from '../utils/errorHandler';
 
 interface Geofence {
   id: string;
@@ -61,38 +61,12 @@ export function useGeofencing(orderId?: string) {
     },
   });
 
-  // Get geofence events
-  const eventsQuery = useQuery({
-    queryKey: ['geofence-events', driver?.id, orderId],
-    queryFn: async () => {
-      if (!driver?.id) return [];
-      try {
-        const params = new URLSearchParams();
-        params.append('driverId', driver.id);
-        if (orderId) params.append('orderId', orderId);
-        
-        const response = await api.get<GeofenceEvent[]>(`/geofencing/events?${params.toString()}`);
-        return response.data;
-      } catch (error: unknown) {
-        if (isAuthError(error)) {
-          return [];
-        }
-        throw error;
-      }
-    },
-    enabled: !!driver?.id,
-    staleTime: 1 * 60 * 1000, // 1 minute
-    retry: false,
-  });
-
   return {
     geofences: geofencesQuery.data || [],
-    events: eventsQuery.data || [],
-    isLoading: geofencesQuery.isLoading || eventsQuery.isLoading,
-    error: geofencesQuery.error || eventsQuery.error,
+    isLoading: geofencesQuery.isLoading,
+    error: geofencesQuery.error,
     refetch: () => {
       geofencesQuery.refetch();
-      eventsQuery.refetch();
     },
     checkLocation: checkLocationMutation.mutateAsync,
     isCheckingLocation: checkLocationMutation.isPending,
