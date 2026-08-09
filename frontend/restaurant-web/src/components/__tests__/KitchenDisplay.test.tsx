@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import type { Order } from "../../hooks/useOrders";
 import { KitchenDisplay } from "../Kitchen/KitchenDisplay";
 
@@ -66,6 +66,18 @@ const baseOrder: Order = {
 describe("KitchenDisplay", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    Object.defineProperty(document, "fullscreenElement", {
+      configurable: true,
+      get: () => null,
+    });
+    Object.defineProperty(document.documentElement, "requestFullscreen", {
+      configurable: true,
+      value: jest.fn().mockResolvedValue(undefined),
+    });
+    Object.defineProperty(document, "exitFullscreen", {
+      configurable: true,
+      value: jest.fn().mockResolvedValue(undefined),
+    });
     mockOrders = [baseOrder];
     mockOrdersError = null;
     mockMutateAsync.mockResolvedValue({
@@ -162,5 +174,125 @@ describe("KitchenDisplay", () => {
       expect.any(String),
       "success",
     );
+  });
+
+  it("does not exit fullscreen when no fullscreen element is active", () => {
+    render(<KitchenDisplay />);
+
+    expect(document.exitFullscreen).not.toHaveBeenCalled();
+  });
+
+  it("enters fullscreen only after explicit activation", async () => {
+    let activeFullscreen: Element | null = null;
+    const requestFullscreen = jest.fn().mockImplementation(async () => {
+      activeFullscreen = document.documentElement;
+      document.dispatchEvent(new Event("fullscreenchange"));
+    });
+    Object.defineProperty(document, "fullscreenElement", {
+      configurable: true,
+      get: () => activeFullscreen,
+    });
+    Object.defineProperty(document.documentElement, "requestFullscreen", {
+      configurable: true,
+      value: requestFullscreen,
+    });
+
+    render(<KitchenDisplay />);
+
+    expect(requestFullscreen).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "⛶ Vollbild" }));
+
+    await waitFor(() =>
+      expect(requestFullscreen).toHaveBeenCalledTimes(1),
+    );
+    expect(
+      screen.getByRole("button", { name: "✕ Vollbild beenden" }),
+    ).toBeInTheDocument();
+  });
+
+  it("exits fullscreen only after explicit deactivation", async () => {
+    let activeFullscreen: Element | null = document.documentElement;
+    const exitFullscreen = jest.fn().mockImplementation(async () => {
+      activeFullscreen = null;
+      document.dispatchEvent(new Event("fullscreenchange"));
+    });
+    Object.defineProperty(document, "fullscreenElement", {
+      configurable: true,
+      get: () => activeFullscreen,
+    });
+    Object.defineProperty(document, "exitFullscreen", {
+      configurable: true,
+      value: exitFullscreen,
+    });
+
+    render(<KitchenDisplay />);
+    act(() => {
+      document.dispatchEvent(new Event("fullscreenchange"));
+    });
+    await waitFor(() =>
+      expect(
+        screen.getByRole("button", { name: "✕ Vollbild beenden" }),
+      ).toBeInTheDocument(),
+    );
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "✕ Vollbild beenden" }),
+    );
+
+    await waitFor(() => expect(exitFullscreen).toHaveBeenCalledTimes(1));
+    expect(
+      screen.getByRole("button", { name: "⛶ Vollbild" }),
+    ).toBeInTheDocument();
+  });
+
+  it("handles a rejected fullscreen request without an uncaught rejection", async () => {
+    const requestFullscreen = jest
+      .fn()
+      .mockRejectedValue(new TypeError("Document not active"));
+    Object.defineProperty(document, "fullscreenElement", {
+      configurable: true,
+      get: () => null,
+    });
+    Object.defineProperty(document.documentElement, "requestFullscreen", {
+      configurable: true,
+      value: requestFullscreen,
+    });
+
+    render(<KitchenDisplay />);
+    fireEvent.click(screen.getByRole("button", { name: "⛶ Vollbild" }));
+
+    await waitFor(() => expect(requestFullscreen).toHaveBeenCalledTimes(1));
+    expect(
+      screen.getByRole("button", { name: "⛶ Vollbild" }),
+    ).toBeInTheDocument();
+  });
+
+  it("handles a rejected fullscreen exit without an uncaught rejection", async () => {
+    const exitFullscreen = jest
+      .fn()
+      .mockRejectedValue(new TypeError("Document not active"));
+    Object.defineProperty(document, "fullscreenElement", {
+      configurable: true,
+      get: () => document.documentElement,
+    });
+    Object.defineProperty(document, "exitFullscreen", {
+      configurable: true,
+      value: exitFullscreen,
+    });
+
+    render(<KitchenDisplay />);
+    act(() => {
+      document.dispatchEvent(new Event("fullscreenchange"));
+    });
+    await waitFor(() =>
+      expect(
+        screen.getByRole("button", { name: "✕ Vollbild beenden" }),
+      ).toBeInTheDocument(),
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: "✕ Vollbild beenden" }),
+    );
+
+    await waitFor(() => expect(exitFullscreen).toHaveBeenCalledTimes(1));
   });
 });

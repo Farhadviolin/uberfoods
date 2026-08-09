@@ -129,12 +129,39 @@ export function KitchenDisplay() {
   };
 
   useEffect(() => {
-    if (fullscreen) {
-      document.documentElement.requestFullscreen?.();
-    } else {
-      document.exitFullscreen?.();
+    const handleFullscreenChange = () => {
+      setFullscreen(Boolean(document.fullscreenElement));
+    };
+
+    document.addEventListener("fullscreenchange", handleFullscreenChange);
+    return () => {
+      document.removeEventListener("fullscreenchange", handleFullscreenChange);
+    };
+  }, []);
+
+  const handleFullscreenToggle = async () => {
+    if (fullscreen || document.fullscreenElement) {
+      if (!document.fullscreenElement || !document.exitFullscreen) {
+        setFullscreen(false);
+        return;
+      }
+
+      try {
+        await document.exitFullscreen();
+      } catch {
+        setFullscreen(Boolean(document.fullscreenElement));
+      }
+      return;
     }
-  }, [fullscreen]);
+
+    if (!document.documentElement.requestFullscreen) return;
+
+    try {
+      await document.documentElement.requestFullscreen();
+    } catch {
+      setFullscreen(Boolean(document.fullscreenElement));
+    }
+  };
 
   return (
     <div className={`kitchen-display ${fullscreen ? "fullscreen" : ""}`}>
@@ -155,7 +182,9 @@ export function KitchenDisplay() {
             <option value="other">Sonstige</option>
           </select>
           <button
-            onClick={() => setFullscreen(!fullscreen)}
+            onClick={() => {
+              void handleFullscreenToggle();
+            }}
             className="fb-button-secondary"
           >
             {fullscreen ? "✕ Vollbild beenden" : "⛶ Vollbild"}
