@@ -718,9 +718,9 @@ if ($unchangedActive.Status -ne 200 -or -not $unchangedOrder -or
     throw "Rejected cross-driver or illegal mutation changed order state or ownership"
 }
 
-# Step 4: Driver advances the order to DELIVERED (200)
-Write-Host "   Step 4: Driver advances to DELIVERED..." -ForegroundColor Cyan
-foreach ($driverStatus in @("PICKED_UP", "DELIVERED")) {
+# Step 4: Driver advances the order through IN_TRANSIT to DELIVERED (200)
+Write-Host "   Step 4: Driver advances through IN_TRANSIT to DELIVERED..." -ForegroundColor Cyan
+foreach ($driverStatus in @("PICKED_UP", "IN_TRANSIT", "DELIVERED")) {
     $deliver = Invoke-CurlJson -Method "PUT" -Url "$baseUrl/api/drivers/orders/$orderId/status" -Headers @{
         Authorization = "Bearer $accessToken"
     } -Body @{
@@ -786,7 +786,7 @@ $driverRuntimeEvidence = [ordered]@{
     crossAcceptStatus = $crossAccept.Status
     crossStatusUpdateStatus = $crossStatus.Status
     illegalTransitionStatus = $illegalTransition.Status
-    lifecycle = @("READY_FOR_PICKUP", "ACCEPTED", "PICKED_UP", "DELIVERED")
+    lifecycle = @("READY_FOR_PICKUP", "ACCEPTED", "PICKED_UP", "IN_TRANSIT", "DELIVERED")
     finalStatus = $verifiedStatus
     finalDriverId = [string]$verifiedDriverId
 }

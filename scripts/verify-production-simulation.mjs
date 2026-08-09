@@ -1166,7 +1166,13 @@ function parseDriverRuntimeEvidence(output, expectedOrderId) {
     value.driverAId === value.driverBId ||
     value.finalDriverId !== value.driverAId ||
     JSON.stringify(value.lifecycle) !==
-      JSON.stringify(["READY_FOR_PICKUP", "ACCEPTED", "PICKED_UP", "DELIVERED"])
+      JSON.stringify([
+        "READY_FOR_PICKUP",
+        "ACCEPTED",
+        "PICKED_UP",
+        "IN_TRANSIT",
+        "DELIVERED",
+      ])
   ) {
     fail("driver runtime evidence did not prove lifecycle ownership");
   }
