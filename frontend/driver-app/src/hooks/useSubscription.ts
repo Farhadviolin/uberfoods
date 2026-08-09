@@ -5,6 +5,7 @@ import { useWebSocket } from './useWebSocket';
 import { logger } from '../utils/logger';
 import {
   DriverSubscription,
+  DriverSubscriptionResponse,
   mapDriverSubscriptionResponse,
 } from '../types';
 
@@ -22,6 +23,57 @@ interface SubscriptionInsights {
     netBenefit: number;
     confidence: 'HIGH' | 'MEDIUM' | 'LOW';
   }>;
+}
+
+type ApiEnvelope<T> = {
+  success?: boolean;
+  data?: T;
+};
+
+function unwrapApiData<T>(response: T | ApiEnvelope<T>): T {
+  if (
+    response &&
+    typeof response === 'object' &&
+    'success' in response &&
+    response.success === true &&
+    'data' in response
+  ) {
+    return response.data as T;
+  }
+
+  return response as T;
+}
+
+function normalizeRecommendations(
+  recommendations: unknown[],
+): SubscriptionInsights['recommendations'] {
+  return recommendations.reduce<SubscriptionInsights['recommendations']>((result, value) => {
+    if (!value || typeof value !== 'object') return result;
+
+    const recommendation = value as Record<string, unknown>;
+    const confidence = String(recommendation.confidence || '').toUpperCase();
+    const potentialEarnings = Number(recommendation.potentialEarnings);
+    const netBenefit = Number(recommendation.netBenefit);
+
+    if (
+      typeof recommendation.tier !== 'string' ||
+      typeof recommendation.reason !== 'string' ||
+      !['HIGH', 'MEDIUM', 'LOW'].includes(confidence) ||
+      !Number.isFinite(potentialEarnings) ||
+      !Number.isFinite(netBenefit)
+    ) {
+      return result;
+    }
+
+    result.push({
+      tier: recommendation.tier,
+      reason: recommendation.reason,
+      potentialEarnings,
+      netBenefit,
+      confidence: confidence as 'HIGH' | 'MEDIUM' | 'LOW',
+    });
+    return result;
+  }, []);
 }
 
 export function useSubscription() {
@@ -46,7 +98,8 @@ export function useSubscription() {
       setLoading(true);
       setError(null);
       const response = await api.get('/drivers/subscription');
-      setSubscription(mapDriverSubscriptionResponse(response.data));
+      const subscriptionData = unwrapApiData<DriverSubscriptionResponse>(response.data);
+      setSubscription(mapDriverSubscriptionResponse(subscriptionData));
     } catch (err: any) {
       if (err.response?.status === 403 || err.response?.status === 401) {
         // Authentifizierungsfehler
@@ -67,17 +120,28 @@ export function useSubscription() {
     if (!driver?.id) return;
 
     try {
-      const response = await api.get(`/drivers/${driver.id}/insights/roi`);
-      const recommendationsResponse = await api.get(`/drivers/${driver.id}/insights/recommendations`);
+      const response = await api.get('/drivers/insights/roi');
+      const recommendationsResponse = await api.get('/drivers/insights/recommendations');
+      const roiData = unwrapApiData<{
+        roi?: number;
+        netProfit?: number;
+        totalSubscriptionCost?: number;
+        totalEarnings?: number;
+        monthsActive?: number;
+        earningsPerMonth?: number;
+      }>(response.data);
+      const recommendationData = unwrapApiData<{ recommendations?: unknown[] }>(
+        recommendationsResponse.data,
+      );
 
       setInsights({
-        roi: response.data.roi,
-        netProfit: response.data.netProfit,
-        totalSubscriptionCost: response.data.totalSubscriptionCost,
-        totalEarnings: response.data.totalEarnings,
-        monthsActive: response.data.monthsActive,
-        avgEarningsPerMonth: response.data.earningsPerMonth,
-        recommendations: recommendationsResponse.data.recommendations || [],
+        roi: roiData.roi ?? 0,
+        netProfit: roiData.netProfit ?? 0,
+        totalSubscriptionCost: roiData.totalSubscriptionCost ?? 0,
+        totalEarnings: roiData.totalEarnings ?? 0,
+        monthsActive: roiData.monthsActive ?? 0,
+        avgEarningsPerMonth: roiData.earningsPerMonth ?? 0,
+        recommendations: normalizeRecommendations(recommendationData.recommendations || []),
       });
     } catch (err: any) {
       if (err.response?.status === 404 || err.response?.status === 403) {

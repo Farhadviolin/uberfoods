@@ -13,6 +13,7 @@ import { SubscriptionDriverInsightsService } from "./subscription-driver-insight
 import { SubscriptionTierConfigService } from "./subscription-tier-config.service";
 import { DriverSubscriptionTiersController } from "./driver-subscription-tiers.controller";
 import { DriverSubscriptionController } from "./driver-subscription.controller";
+import { DriverInsightsController } from "./driver-insights.controller";
 import { OrderModule } from "../order/order.module";
 import { DriverEndpointsController } from "../order/driver-endpoints.controller";
 
@@ -21,6 +22,7 @@ import { DriverEndpointsController } from "../order/driver-endpoints.controller"
   controllers: [
     DriverSubscriptionTiersController,
     DriverSubscriptionController,
+    DriverInsightsController,
     DriverEndpointsController,
   ],
   providers: [

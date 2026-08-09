@@ -75,6 +75,80 @@ export class DriverService {
     }));
   }
 
+  async getROIInsights(driverId: string) {
+    const [subscription, earnings] = await Promise.all([
+      this.prisma.driverSubscription.findUnique({
+        where: { driverId },
+        select: { createdAt: true, tier: true },
+      }),
+      this.getEarningsSummary(driverId),
+    ]);
+
+    if (!subscription) {
+      return {
+        roi: 0,
+        netProfit: 0,
+        totalSubscriptionCost: 0,
+        totalEarnings: earnings.total,
+        monthsActive: 0,
+        earningsPerMonth: 0,
+      };
+    }
+
+    const tierConfig = await this.prisma.subscriptionTierConfig.findUnique({
+      where: { tier: subscription.tier },
+      select: { price: true },
+    });
+    const monthsActive = Math.max(
+      1,
+      Math.floor(
+        (Date.now() - subscription.createdAt.getTime()) /
+          (30 * 24 * 60 * 60 * 1000),
+      ),
+    );
+    const totalSubscriptionCost = Number(tierConfig?.price ?? 0) * monthsActive;
+    const totalEarnings = earnings.total;
+    const netProfit = totalEarnings - totalSubscriptionCost;
+    const roi =
+      totalSubscriptionCost > 0
+        ? (netProfit / totalSubscriptionCost) * 100
+        : 0;
+
+    return {
+      roi: Number(roi.toFixed(2)),
+      netProfit: Number(netProfit.toFixed(2)),
+      totalSubscriptionCost: Number(totalSubscriptionCost.toFixed(2)),
+      totalEarnings: Number(totalEarnings.toFixed(2)),
+      monthsActive,
+      earningsPerMonth: Number((totalEarnings / monthsActive).toFixed(2)),
+    };
+  }
+
+  async getRecommendations(driverId: string) {
+    const insights = await this.getROIInsights(driverId);
+    const recommendations = [];
+
+    if (insights.roi < 50) {
+      recommendations.push({
+        type: "UPGRADE",
+        title: "Consider upgrading subscription tier",
+        description: "Higher tier may provide better earning opportunities",
+        priority: "MEDIUM",
+      });
+    }
+
+    if (insights.earningsPerMonth < 1000) {
+      recommendations.push({
+        type: "PERFORMANCE",
+        title: "Focus on high-value orders",
+        description: "Target orders with higher delivery fees",
+        priority: "HIGH",
+      });
+    }
+
+    return { recommendations };
+  }
+
   async getAvailableOrders(driverId: string) {
     // Get orders that are ready for pickup and don't have a driver assigned
     const availableOrders = await this.prisma.order.findMany({
