@@ -3,6 +3,30 @@ const bcrypt = require("bcrypt");
 
 const prisma = new PrismaClient({ log: ["error", "warn"] });
 
+const acceptanceOperatingHours = {
+  monday: { open: "09:00", close: "22:00", isClosed: false },
+  tuesday: { open: "09:00", close: "22:00", isClosed: false },
+  wednesday: { open: "09:00", close: "22:00", isClosed: false },
+  thursday: { open: "09:00", close: "22:00", isClosed: false },
+  friday: { open: "09:00", close: "23:00", isClosed: false },
+  saturday: { open: "10:00", close: "23:00", isClosed: false },
+  sunday: { open: "10:00", close: "22:00", isClosed: false },
+};
+
+const acceptanceDeliveryZones = [
+  {
+    name: "Local Acceptance Zone",
+    coordinates: [
+      { lat: 48.2082, lng: 16.3738 },
+      { lat: 48.2182, lng: 16.3838 },
+      { lat: 48.2122, lng: 16.3988 },
+      { lat: 48.2022, lng: 16.3888 },
+    ],
+    deliveryFee: 0,
+    isActive: true,
+  },
+];
+
 function requireEnv(name, fallback) {
   const value = process.env[name] ?? fallback;
   if (typeof value !== "string" || value.trim().length === 0) {
@@ -84,6 +108,8 @@ async function main() {
       isActive: true,
       mustChangePassword: false,
       welcomeEmailSent: false,
+      operatingHours: acceptanceOperatingHours,
+      deliveryZones: acceptanceDeliveryZones,
     },
     create: {
       name: restaurantName,
@@ -100,6 +126,8 @@ async function main() {
       minOrderAmount: 0,
       cuisines: ["Test"],
       tags: ["ci", "test"],
+      operatingHours: acceptanceOperatingHours,
+      deliveryZones: acceptanceDeliveryZones,
     },
   });
 
