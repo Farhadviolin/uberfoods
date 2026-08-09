@@ -7,6 +7,73 @@ import {
   ValidateNested,
 } from "class-validator";
 import { Type } from "class-transformer";
+import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
+
+export type DriverSubscriptionTier =
+  | "BASIC"
+  | "PRO"
+  | "FULLTIME"
+  | "ENTERPRISE";
+
+export type DriverSubscriptionStatus =
+  | "ACTIVE"
+  | "TRIALING"
+  | "PAST_DUE"
+  | "CANCELED"
+  | "UNPAID"
+  | "INCOMPLETE";
+
+export class DriverSubscriptionDto {
+  @ApiProperty()
+  id: string;
+
+  @ApiProperty()
+  driverId: string;
+
+  @ApiProperty({ enum: ["BASIC", "PRO", "FULLTIME", "ENTERPRISE"] })
+  tier: DriverSubscriptionTier;
+
+  @ApiProperty({
+    enum: [
+      "ACTIVE",
+      "TRIALING",
+      "PAST_DUE",
+      "CANCELED",
+      "UNPAID",
+      "INCOMPLETE",
+    ],
+  })
+  status: DriverSubscriptionStatus;
+
+  @ApiProperty({ type: String, format: "date-time" })
+  currentPeriodStart: Date;
+
+  @ApiProperty({ type: String, format: "date-time" })
+  currentPeriodEnd: Date;
+
+  @ApiPropertyOptional({ type: String, format: "date-time", nullable: true })
+  trialEndsAt: Date | null;
+
+  @ApiProperty()
+  cancelAtPeriodEnd: boolean;
+
+  @ApiProperty()
+  price: number;
+
+  @ApiProperty()
+  monthlyDeliveries: number;
+
+  @ApiProperty()
+  monthlyEarnings: number;
+
+  @ApiProperty()
+  commissionRate: number;
+}
+
+export class DriverSubscriptionResponseDto {
+  @ApiProperty({ type: DriverSubscriptionDto, nullable: true })
+  subscription: DriverSubscriptionDto | null;
+}
 
 export class SubscriptionTierDto {
   @IsString()

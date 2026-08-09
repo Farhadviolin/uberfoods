@@ -12,12 +12,17 @@ import { SubscriptionAuditService } from "./subscription-audit.service";
 import { SubscriptionDriverInsightsService } from "./subscription-driver-insights.service";
 import { SubscriptionTierConfigService } from "./subscription-tier-config.service";
 import { DriverSubscriptionTiersController } from "./driver-subscription-tiers.controller";
+import { DriverSubscriptionController } from "./driver-subscription.controller";
 import { OrderModule } from "../order/order.module";
 import { DriverEndpointsController } from "../order/driver-endpoints.controller";
 
 @Module({
   imports: [DatabaseModule, OrderModule],
-  controllers: [DriverSubscriptionTiersController, DriverEndpointsController],
+  controllers: [
+    DriverSubscriptionTiersController,
+    DriverSubscriptionController,
+    DriverEndpointsController,
+  ],
   providers: [
     DriverService,
     SubscriptionService,

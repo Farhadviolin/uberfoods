@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import api from '../utils/api';
 import { SubscriptionTierSelector } from './SubscriptionTierSelector';
+import { DriverSubscription, mapDriverSubscriptionResponse } from '../types';
 import './Settings.css';
 
 interface DriverSettings {
@@ -34,7 +35,7 @@ export function Settings() {
   const [settings, setSettings] = useState<DriverSettings | null>(null);
   const [loading, setLoading] = useState(false);
   const [, setSaving] = useState(false);
-  const [subscription, setSubscription] = useState<any>(null);
+  const [subscription, setSubscription] = useState<DriverSubscription | null>(null);
   const [loadingSubscription, setLoadingSubscription] = useState(false);
 
   useEffect(() => {
@@ -86,13 +87,10 @@ export function Settings() {
     if (!driver) return;
     try {
       setLoadingSubscription(true);
-      const response = await api.get(`/drivers/${driver.id}/subscription`);
-      setSubscription(response.data);
+      const response = await api.get('/drivers/subscription');
+      setSubscription(mapDriverSubscriptionResponse(response.data));
     } catch (error: any) {
-      // Keine Subscription ist kein Fehler
-      if (error.response?.status !== 404) {
-        console.error('Fehler beim Laden der Subscription:', error);
-      }
+      console.error('Fehler beim Laden der Subscription:', error);
     } finally {
       setLoadingSubscription(false);
     }

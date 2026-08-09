@@ -1,9 +1,14 @@
-import { Injectable, Logger } from "@nestjs/common";
+import {
+  Injectable,
+  InternalServerErrorException,
+  Logger,
+} from "@nestjs/common";
 import { PrismaService } from "../../prisma/prisma.service";
 import {
   SubscriptionResponseDto,
   SubscriptionTierDto,
   SubscriptionUpgradeDto,
+  DriverSubscriptionResponseDto,
 } from "./dto/subscription.dto";
 
 @Injectable()
@@ -118,6 +123,74 @@ export class SubscriptionService {
       availableTiers,
       usage,
       benefits,
+    };
+  }
+
+  async getDriverSubscription(
+    driverId: string,
+  ): Promise<DriverSubscriptionResponseDto> {
+    const subscription = await this.prisma.driverSubscription.findUnique({
+      where: { driverId },
+      select: {
+        id: true,
+        driverId: true,
+        tier: true,
+        status: true,
+        currentPeriodStart: true,
+        currentPeriodEnd: true,
+        trialEndsAt: true,
+        cancelAtPeriodEnd: true,
+      },
+    });
+
+    if (!subscription) {
+      return { subscription: null };
+    }
+
+    const tierConfig = await this.prisma.subscriptionTierConfig.findUnique({
+      where: { tier: subscription.tier },
+      select: { price: true, commissionRate: true },
+    });
+
+    if (!tierConfig) {
+      throw new InternalServerErrorException(
+        `Subscription tier configuration missing for ${subscription.tier}`,
+      );
+    }
+
+    const monthStart = new Date();
+    monthStart.setDate(1);
+    monthStart.setHours(0, 0, 0, 0);
+
+    const [monthlyDeliveries, earningsResult] = await Promise.all([
+      this.prisma.order.count({
+        where: { driverId, createdAt: { gte: monthStart } },
+      }),
+      this.prisma.order.aggregate({
+        where: {
+          driverId,
+          createdAt: { gte: monthStart },
+          status: "DELIVERED",
+        },
+        _sum: { deliveryFee: true, tip: true },
+      }),
+    ]);
+
+    const monthlyEarnings =
+      Math.round(
+        ((earningsResult._sum.deliveryFee || 0) +
+          (earningsResult._sum.tip || 0)) *
+          100,
+      ) / 100;
+
+    return {
+      subscription: {
+        ...subscription,
+        price: tierConfig.price,
+        monthlyDeliveries,
+        monthlyEarnings,
+        commissionRate: tierConfig.commissionRate,
+      },
     };
   }
 

@@ -14,6 +14,12 @@ describe("SubscriptionService", () => {
       count: jest.fn(),
       aggregate: jest.fn(),
     },
+    driverSubscription: {
+      findUnique: jest.fn(),
+    },
+    subscriptionTierConfig: {
+      findUnique: jest.fn(),
+    },
   };
 
   beforeEach(async () => {
@@ -77,6 +83,61 @@ describe("SubscriptionService", () => {
     await expect(service.getSubscription("missing")).rejects.toThrow(
       "Driver not found",
     );
+  });
+
+  it("returns the canonical subscription response for the authenticated driver", async () => {
+    mockPrismaService.driverSubscription.findUnique.mockResolvedValue({
+      id: "subscription_1",
+      driverId: "driver_1",
+      tier: "PRO",
+      status: "ACTIVE",
+      currentPeriodStart: new Date("2026-01-01T00:00:00.000Z"),
+      currentPeriodEnd: new Date("2026-02-01T00:00:00.000Z"),
+      trialEndsAt: null,
+      cancelAtPeriodEnd: false,
+    });
+    mockPrismaService.subscriptionTierConfig.findUnique.mockResolvedValue({
+      price: 49,
+      commissionRate: 0.3,
+    });
+    mockPrismaService.order.count.mockResolvedValue(8);
+    mockPrismaService.order.aggregate.mockResolvedValue({
+      _sum: { deliveryFee: 100, tip: 25 },
+    });
+
+    await expect(service.getDriverSubscription("driver_1")).resolves.toEqual({
+      subscription: {
+        id: "subscription_1",
+        driverId: "driver_1",
+        tier: "PRO",
+        status: "ACTIVE",
+        currentPeriodStart: new Date("2026-01-01T00:00:00.000Z"),
+        currentPeriodEnd: new Date("2026-02-01T00:00:00.000Z"),
+        trialEndsAt: null,
+        cancelAtPeriodEnd: false,
+        price: 49,
+        monthlyDeliveries: 8,
+        monthlyEarnings: 125,
+        commissionRate: 0.3,
+      },
+    });
+    expect(
+      mockPrismaService.driverSubscription.findUnique,
+    ).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { driverId: "driver_1" } }),
+    );
+  });
+
+  it("returns the defined no-subscription response without tier lookups", async () => {
+    mockPrismaService.driverSubscription.findUnique.mockResolvedValue(null);
+
+    await expect(
+      service.getDriverSubscription("driver_without_subscription"),
+    ).resolves.toEqual({ subscription: null });
+    expect(
+      mockPrismaService.subscriptionTierConfig.findUnique,
+    ).not.toHaveBeenCalled();
+    expect(mockPrismaService.order.count).not.toHaveBeenCalled();
   });
 
   it("upgrades to a paid tier", async () => {

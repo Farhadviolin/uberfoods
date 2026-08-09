@@ -45,6 +45,31 @@ export interface Driver {
   vehicle?: VehicleInfo;
 }
 
+export interface DriverSubscription {
+  id: string;
+  driverId: string;
+  tier: 'BASIC' | 'PRO' | 'FULLTIME' | 'ENTERPRISE';
+  status: 'ACTIVE' | 'TRIALING' | 'PAST_DUE' | 'CANCELED' | 'UNPAID' | 'INCOMPLETE';
+  currentPeriodStart: string;
+  currentPeriodEnd: string;
+  trialEndsAt?: string | null;
+  cancelAtPeriodEnd: boolean;
+  price: number;
+  monthlyDeliveries: number;
+  monthlyEarnings: number;
+  commissionRate: number;
+}
+
+export interface DriverSubscriptionResponse {
+  subscription: DriverSubscription | null;
+}
+
+export function mapDriverSubscriptionResponse(
+  response: DriverSubscriptionResponse,
+): DriverSubscription | null {
+  return response.subscription;
+}
+
 export interface DriverPerformance {
   rating: number;
   totalDeliveries: number;

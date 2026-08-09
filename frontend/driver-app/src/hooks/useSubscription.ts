@@ -3,21 +3,10 @@ import api from '../utils/api';
 import { useAuth } from '../contexts/AuthContext';
 import { useWebSocket } from './useWebSocket';
 import { logger } from '../utils/logger';
-
-interface Subscription {
-  id: string;
-  driverId: string;
-  tier: 'BASIC' | 'PRO' | 'FULLTIME' | 'ENTERPRISE';
-  status: 'ACTIVE' | 'TRIALING' | 'PAST_DUE' | 'CANCELED' | 'UNPAID' | 'INCOMPLETE';
-  currentPeriodStart: string;
-  currentPeriodEnd: string;
-  trialEndsAt?: string;
-  cancelAtPeriodEnd: boolean;
-  price: number;
-  monthlyDeliveries: number;
-  monthlyEarnings: number;
-  commissionRate: number;
-}
+import {
+  DriverSubscription,
+  mapDriverSubscriptionResponse,
+} from '../types';
 
 interface SubscriptionInsights {
   roi: number;
@@ -39,7 +28,7 @@ export function useSubscription() {
   const { driver } = useAuth();
   // ✅ WICHTIG: Stabilisiere driverId mit useMemo - verhindert unnötige Re-Renders
   const driverId = useMemo(() => driver?.id || null, [driver?.id]);
-  const [subscription, setSubscription] = useState<Subscription | null>(null);
+  const [subscription, setSubscription] = useState<DriverSubscription | null>(null);
   const [insights, setInsights] = useState<SubscriptionInsights | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -56,13 +45,10 @@ export function useSubscription() {
     try {
       setLoading(true);
       setError(null);
-      const response = await api.get(`/drivers/${driver.id}/subscription`);
-      setSubscription(response.data);
+      const response = await api.get('/drivers/subscription');
+      setSubscription(mapDriverSubscriptionResponse(response.data));
     } catch (err: any) {
-      if (err.response?.status === 404) {
-        // Keine Subscription vorhanden - kein Fehler, setze null
-        setSubscription(null);
-      } else if (err.response?.status === 403 || err.response?.status === 401) {
+      if (err.response?.status === 403 || err.response?.status === 401) {
         // Authentifizierungsfehler
         setSubscription(null);
         setError('Authentifizierung fehlgeschlagen');

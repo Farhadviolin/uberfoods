@@ -373,9 +373,9 @@ export class DriverService {
   }
 
   // ===== SUBSCRIPTION =====
-  static async getSubscriptionStatus(driverId: string): Promise<DriverServiceResponse<any>> {
+  static async getSubscriptionStatus(): Promise<DriverServiceResponse<any>> {
     try {
-      const response = await api.get(`/drivers/${driverId}/subscription`);
+      const response = await api.get('/drivers/subscription');
       return {
         data: response.data,
         success: true
