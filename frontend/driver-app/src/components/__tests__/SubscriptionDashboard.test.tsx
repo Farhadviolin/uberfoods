@@ -1,8 +1,14 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import { SubscriptionDashboard } from '../SubscriptionDashboard';
+import api from '../../utils/api';
 
 jest.mock('../../contexts/AuthContext', () => ({
-  useAuth: () => ({ driver: null }),
+  useAuth: () => ({ driver: { id: 'driver-1' } }),
+}));
+
+jest.mock('../../utils/api', () => ({
+  __esModule: true,
+  default: { get: jest.fn() },
 }));
 
 jest.mock('../../hooks/useSubscription', () => ({
@@ -29,8 +35,15 @@ jest.mock('../../hooks/useSubscription', () => ({
   }),
 }));
 
+const mockedApi = jest.mocked(api);
+const stalePerformanceRequest = ['/drivers', 'driver-1', 'insights', 'performance'].join('/') + '?period=30d';
+
 describe('SubscriptionDashboard', () => {
-  it('renders the canonical subscription fields', () => {
+  beforeEach(() => {
+    mockedApi.get.mockReset().mockResolvedValue({ data: [] } as never);
+  });
+
+  it('renders the canonical subscription fields', async () => {
     render(<SubscriptionDashboard />);
 
     expect(screen.getByText('Aktuelle Subscription')).toBeInTheDocument();
@@ -38,5 +51,18 @@ describe('SubscriptionDashboard', () => {
     expect(screen.getByText('ACTIVE')).toBeInTheDocument();
     expect(screen.getByText('€49/Monat')).toBeInTheDocument();
     expect(screen.getByText('30.0%')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(mockedApi.get).toHaveBeenCalledWith('/drivers/driver-1/earnings/history?limit=20');
+    });
+  });
+
+  it('does not request the removed performance insights endpoint', async () => {
+    render(<SubscriptionDashboard />);
+
+    await waitFor(() => {
+      expect(mockedApi.get).toHaveBeenCalledWith('/drivers/driver-1/earnings/history?limit=20');
+    });
+
+    expect(mockedApi.get).not.toHaveBeenCalledWith(stalePerformanceRequest);
   });
 });

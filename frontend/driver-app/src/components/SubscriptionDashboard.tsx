@@ -17,13 +17,11 @@ export function SubscriptionDashboard() {
   } = useSubscription();
 
   const [paymentHistory, setPaymentHistory] = useState<any[]>([]);
-  const [performance, setPerformance] = useState<any>(null);
   const [activeTab, setActiveTab] = useState<'overview' | 'insights' | 'payment' | 'manage'>('overview');
 
   useEffect(() => {
     if (driver?.id && subscription) {
       fetchPaymentHistory();
-      fetchPerformance();
     }
   }, [driver?.id, subscription]);
 
@@ -42,21 +40,6 @@ export function SubscriptionDashboard() {
       })));
     } catch (error) {
       console.error('Payment History Error:', error);
-    }
-  };
-
-  const fetchPerformance = async () => {
-    if (!driver?.id) return;
-    try {
-      const res = await api.get(`/drivers/${driver.id}/insights/performance?period=30d`);
-      setPerformance(res.data);
-    } catch (error: any) {
-      // Fallback wenn Endpoint nicht existiert
-      if (error.response?.status === 404) {
-        setPerformance(null);
-      } else {
-        console.error('Performance Error:', error);
-      }
     }
   };
 
@@ -204,25 +187,6 @@ export function SubscriptionDashboard() {
                   </div>
                 )}
 
-                {performance && (
-                  <div className="performance-section">
-                    <h4>Performance (30 Tage)</h4>
-                    <div className="performance-metrics">
-                      <div className="perf-metric">
-                        <span>Lieferungen:</span>
-                        <strong>{performance.metrics.totalDeliveries}</strong>
-                      </div>
-                      <div className="perf-metric">
-                        <span>Earnings:</span>
-                        <strong>€{performance.metrics.totalEarnings.toFixed(2)}</strong>
-                      </div>
-                      <div className="perf-metric">
-                        <span>Performance Score:</span>
-                        <strong>{performance.metrics.performanceScore}/100</strong>
-                      </div>
-                    </div>
-                  </div>
-                )}
               </div>
             </>
           ) : (
