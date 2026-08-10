@@ -17,11 +17,10 @@ interface SubscriptionInsights {
   monthsActive: number;
   avgEarningsPerMonth: number;
   recommendations: Array<{
-    tier: string;
-    reason: string;
-    potentialEarnings: number;
-    netBenefit: number;
-    confidence: 'HIGH' | 'MEDIUM' | 'LOW';
+    type: string;
+    title: string;
+    description: string;
+    priority: string;
   }>;
 }
 
@@ -44,33 +43,29 @@ function unwrapApiData<T>(response: T | ApiEnvelope<T>): T {
   return response as T;
 }
 
-function normalizeRecommendations(
+export function normalizeRecommendations(
   recommendations: unknown[],
 ): SubscriptionInsights['recommendations'] {
   return recommendations.reduce<SubscriptionInsights['recommendations']>((result, value) => {
     if (!value || typeof value !== 'object') return result;
 
     const recommendation = value as Record<string, unknown>;
-    const confidence = String(recommendation.confidence || '').toUpperCase();
-    const potentialEarnings = Number(recommendation.potentialEarnings);
-    const netBenefit = Number(recommendation.netBenefit);
+    const priority = String(recommendation.priority || '').toUpperCase();
 
     if (
-      typeof recommendation.tier !== 'string' ||
-      typeof recommendation.reason !== 'string' ||
-      !['HIGH', 'MEDIUM', 'LOW'].includes(confidence) ||
-      !Number.isFinite(potentialEarnings) ||
-      !Number.isFinite(netBenefit)
+      typeof recommendation.type !== 'string' ||
+      typeof recommendation.title !== 'string' ||
+      typeof recommendation.description !== 'string' ||
+      !['HIGH', 'MEDIUM', 'LOW'].includes(priority)
     ) {
       return result;
     }
 
     result.push({
-      tier: recommendation.tier,
-      reason: recommendation.reason,
-      potentialEarnings,
-      netBenefit,
-      confidence: confidence as 'HIGH' | 'MEDIUM' | 'LOW',
+      type: recommendation.type,
+      title: recommendation.title,
+      description: recommendation.description,
+      priority,
     });
     return result;
   }, []);

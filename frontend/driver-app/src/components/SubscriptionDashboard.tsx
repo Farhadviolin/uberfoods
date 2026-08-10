@@ -13,7 +13,6 @@ export function SubscriptionDashboard() {
     loading,
     trialDaysRemaining,
     isTrialEndingSoon,
-    upgradeSubscription,
   } = useSubscription();
 
   const [paymentHistory, setPaymentHistory] = useState<any[]>([]);
@@ -210,32 +209,17 @@ export function SubscriptionDashboard() {
                     {insights.recommendations.map((rec: any, index: number) => (
                       <div key={index} className="recommendation-item">
                         <div className="rec-header">
-                          <span className="rec-tier" style={{ color: getTierColor(rec.tier) }}>
-                            {rec.tier}
+                          <span className="rec-tier" style={{ color: getTierColor(rec.type) }}>
+                            {rec.type}
                           </span>
-                          <span className={`rec-confidence ${rec.confidence.toLowerCase()}`}>
-                            {rec.confidence}
+                          <span className={`rec-confidence ${rec.priority.toLowerCase()}`}>
+                            {rec.priority}
                           </span>
                         </div>
-                        <p className="rec-reason">{rec.reason}</p>
-                        <div className="rec-benefits">
-                          <div className="benefit">
-                            <span>Potenzielle Earnings:</span>
-                            <strong>€{rec.potentialEarnings.toFixed(2)}</strong>
-                          </div>
-                          <div className="benefit">
-                            <span>Net Benefit:</span>
-                            <strong className={rec.netBenefit > 0 ? 'positive' : 'negative'}>
-                              €{rec.netBenefit.toFixed(2)}
-                            </strong>
-                          </div>
-                        </div>
-                        <button
-                          className="upgrade-button"
-                          onClick={() => upgradeSubscription(rec.tier)}
-                        >
-                          Zu {rec.tier} upgraden
-                        </button>
+                        <p className="rec-reason">
+                          <strong>{rec.title}</strong><br />
+                          {rec.description}
+                        </p>
                       </div>
                     ))}
                   </div>
