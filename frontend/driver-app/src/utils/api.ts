@@ -1,6 +1,7 @@
 import axios, { AxiosError } from 'axios';
 import { offlineService } from '../services/offline';
 import { parseDriverAuthEnvelope, resetDriverAuthSession } from './authSession';
+import { config } from '../config';
 
 // Global Toast Registry für automatische Error-Toasts
 let globalToastFunction: ((message: string, type: 'success' | 'error' | 'info' | 'warning') => void) | null = null;
@@ -13,12 +14,12 @@ export function unregisterGlobalToastFunction() {
   globalToastFunction = null;
 }
 
-// Verwende relativen Pfad für Vite-Proxy (keine CORS-Probleme)
-// Vite-Proxy leitet /api Requests an http://localhost:3000 weiter
-export const API_BASE_URL = '/api';
+// Use the shared runtime contract: Vite proxy in development, configured API
+// URL in deployed environments, and the local standalone Driver fallback.
+export const API_BASE_URL = config.apiUrl;
 
 const api = axios.create({
-  baseURL: API_BASE_URL,  // Vite-Proxy konfiguriert in vite.config.ts
+  baseURL: API_BASE_URL,
   timeout: 30000, // 30 Sekunden Timeout
 });
 

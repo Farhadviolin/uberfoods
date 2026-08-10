@@ -29,8 +29,28 @@ function validateProductionUrl(url: string, name: string): string {
 }
 
 // Get API URL with production validation and canonical resolution logic
+const isStandaloneLocalDriverRuntime = (): boolean => {
+  if (typeof window === 'undefined') {
+    return false;
+  }
+
+  const hostname = window.location.hostname;
+  return (
+    window.location.port === '3004' &&
+    (hostname === 'localhost' || hostname === '127.0.0.1')
+  );
+};
+
 const resolveApiBaseUrl = (): string => {
-  const apiUrl = getEnvVar<string>('VITE_API_URL', 'http://localhost:3000') ?? 'http://localhost:3000';
+  const configuredApiUrl = getEnvVar<string>('VITE_API_URL');
+
+  // The local production-style Driver container serves static files directly
+  // on :3004, so it has no Vite proxy or same-origin gateway available.
+  if (!configuredApiUrl && isStandaloneLocalDriverRuntime()) {
+    return 'http://localhost:3000/api';
+  }
+
+  const apiUrl = configuredApiUrl ?? 'http://localhost:3000';
 
   // Primary: VITE_API_URL if set
   if (apiUrl !== 'http://localhost:3000') {
